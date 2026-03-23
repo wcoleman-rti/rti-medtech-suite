@@ -35,3 +35,36 @@ after closure. They form the project's decision log.
   All application code and future tests use `import rti.connextdds as dds`
   per the RTI API convention documented in `vision/technology.md`.
 - **Date closed:** 2026-03-23
+
+---
+
+## INC-002: Python codegen sys.path.append breaks flat install layout
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-23
+- **Phase/Step:** Phase 1 / Step 1.2
+- **Documents involved:** `interfaces/CMakeLists.txt`,
+  `vision/technology.md`
+- **Description:** By default, `rtiddsgen -language Python` emits
+  `sys.path.append(os.path.join(os.path.dirname(__file__), '<dep>/')))`
+  and `from <dep> import *` at the top of each generated `.py` file.
+  These stanzas assume that dependent IDL modules are in subdirectories
+  relative to the importing file (e.g., `surgery/common/common.py`).
+  When all generated files are installed flat into
+  `lib/python/site-packages/` (as required by the install tree spec),
+  the relative path does not resolve and imports fail with
+  `NameError: name 'Common' is not defined`.
+- **Possible resolutions:**
+  1. Use the `-noSysPathGeneration` rtiddsgen flag to suppress the
+     `sys.path.append` stanzas. Imports then resolve via `PYTHONPATH`
+     which already includes the install `site-packages` directory.
+  2. Restructure the install tree to mirror rtiddsgen's expected
+     subdirectory layout (rejected — violates the flat
+     `site-packages` convention in `vision/technology.md`).
+- **Resolution:** Resolution 1 adopted. Added
+  `EXTRA_ARGS -noSysPathGeneration` to the Python
+  `connextdds_rtiddsgen_run()` calls in `interfaces/CMakeLists.txt`.
+  See RTI documentation:
+  <https://community.rti.com/static/documentation/connext-dds/current/doc/manuals/connext_dds_professional/code_generator/users_manual/code_generator/users_manual/GeneratingCode.htm#4.1.4.2_Python_Import_Path>
+- **Date closed:** 2026-03-23

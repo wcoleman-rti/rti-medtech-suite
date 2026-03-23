@@ -726,7 +726,7 @@ correspond to nested key resolution through the types below.
 
 | Constant | Type | Value | Purpose |
 |----------|------|-------|---------|
-| `MAX_ID_LENGTH` | `long` | 64 | Bound for all entity identifier strings |
+| `MAX_ID_LENGTH` | `long` | 16 | Bound for all entity identifier strings |
 | `MAX_NAME_LENGTH` | `long` | 128 | Bound for human-readable names |
 | `MAX_DESCRIPTION_LENGTH` | `long` | 512 | Bound for free-text description and rationale fields |
 | `MAX_WAVEFORM_SAMPLES` | `long` | 64 | Maximum samples per waveform block |
@@ -745,7 +745,7 @@ Standard timestamp for all sample time-stamping. `@appendable`.
 
 | Member | Type | Key | Notes |
 |--------|------|-----|-------|
-| `seconds` | `int32` | — | Seconds since epoch |
+| `seconds` | `int64` | — | Seconds since epoch |
 | `nanoseconds` | `uint32` | — | Sub-second nanoseconds |
 
 #### `Common::EntityIdentity`

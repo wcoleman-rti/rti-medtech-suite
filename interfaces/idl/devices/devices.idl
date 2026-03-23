@@ -1,0 +1,102 @@
+/*
+ * Devices module types — device telemetry for clinical equipment.
+ *
+ * Module: Devices
+ * Domain: Procedure (clinical tag)
+ * All types are @appendable.
+ *
+ * Note: PumpStatus and VentilatorCommands are V2 types defined here
+ * to stabilize the type contract. They are not registered as V1 topics.
+ */
+
+#include "common/common.idl"
+
+module Devices {
+
+    // --- Enums ---
+
+    @appendable
+    enum DeviceKind {
+        UNKNOWN,
+        INFUSION_PUMP,
+        ANESTHESIA_MACHINE,
+        VENTILATOR,
+        PATIENT_MONITOR
+    };
+
+    @appendable
+    enum DeviceOperatingState {
+        UNKNOWN,
+        RUNNING,
+        STANDBY,
+        ALARM,
+        OFF
+    };
+
+    @appendable
+    enum PumpMode {
+        UNKNOWN,
+        CONTINUOUS,
+        INTERMITTENT,
+        LOADING_DOSE,
+        PCA,
+        KVO
+    };
+
+    @appendable
+    enum VentilationMode {
+        UNKNOWN,
+        CMV,
+        SIMV,
+        CPAP,
+        PCV,
+        PSV
+    };
+
+    // --- V1 Topic Types ---
+
+    // Topic: DeviceTelemetry | Domain Tag: clinical | Pattern: State
+    @appendable
+    struct DeviceTelemetry {
+        @key Common::EntityId device_id;
+        DeviceKind device_kind;
+        DeviceOperatingState operating_state;
+        double battery_percent;
+        int32 error_code;
+        string<Common::MAX_DESCRIPTION_LENGTH> status_message;
+        Common::Time_t timestamp;
+    };
+
+    // --- V2 Types (type contract stabilization — not registered as V1 topics) ---
+
+    // PumpStatus — V2 Device Integration Gateway
+    @appendable
+    struct PumpStatus {
+        @key Common::EntityId device_id;
+        string<Common::MAX_DESCRIPTION_LENGTH> drug_label;
+        PumpMode pump_mode;
+        double infusion_rate_ml_hr;
+        double volume_infused_ml;
+        double volume_remaining_ml;
+        boolean occlusion_detected;
+        boolean air_in_line_detected;
+        DeviceOperatingState operating_state;
+        Common::Time_t timestamp;
+    };
+
+    // VentilatorCommands — V2 Device Integration Gateway
+    @appendable
+    struct VentilatorCommands {
+        @key Common::EntityId device_id;
+        @key int32 command_id;
+        VentilationMode ventilation_mode;
+        double tidal_volume_ml;
+        double respiratory_rate_target;
+        double peep_cmh2o;
+        double fio2_percent;
+        double inspiratory_pressure_cmh2o;
+        double inspiratory_time_s;
+        Common::Time_t timestamp;
+    };
+
+};

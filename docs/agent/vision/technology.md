@@ -204,6 +204,9 @@ find_package(RTIConnextDDS "${CONNEXT_VERSION}" REQUIRED)
 This provides:
 - `find_package(RTIConnextDDS ...)` — locates Connext installation; version comes from the `CONNEXT_VERSION` cache variable
 - `connextdds_rtiddsgen_run(...)` — code generation from IDL files
+  (requires `include(ConnextDdsCodegen)` before first use — the module
+  is on `CMAKE_MODULE_PATH` after the `FetchContent` above but is not
+  auto-included by `find_package`)
 - Standard CMake targets for linking Connext libraries
 
 ### Default Build Configuration

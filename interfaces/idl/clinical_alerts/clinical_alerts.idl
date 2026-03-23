@@ -1,0 +1,59 @@
+/*
+ * ClinicalAlerts module types — risk scoring and clinical alerts.
+ *
+ * Module: ClinicalAlerts
+ * Domain: Hospital
+ * All types are @appendable.
+ */
+
+#include "common/common.idl"
+
+module ClinicalAlerts {
+
+    // --- Enums ---
+
+    @appendable
+    enum AlertSeverity {
+        UNKNOWN,
+        INFO,
+        WARNING,
+        CRITICAL
+    };
+
+    @appendable
+    enum AlertCategory {
+        UNKNOWN,
+        CLINICAL,
+        DEVICE,
+        SYSTEM
+    };
+
+    // --- Topic Types ---
+
+    // Topic: RiskScore | Domain: Hospital | Pattern: State
+    @appendable
+    struct RiskScore {
+        @key Common::EntityIdentity patient;
+        @key string<64> score_kind;
+        double score_value;
+        double confidence;
+        string<Common::MAX_DESCRIPTION_LENGTH> rationale;
+        Common::Time_t timestamp;
+    };
+
+    // Topic: ClinicalAlert | Domain: Hospital | Pattern: State
+    @appendable
+    struct ClinicalAlert {
+        @key Common::EntityId alert_id;
+        Common::EntityIdentity patient;
+        AlertSeverity severity;
+        AlertCategory category;
+        string<Common::MAX_DESCRIPTION_LENGTH> message;
+        string<Common::MAX_DESCRIPTION_LENGTH> rationale;
+        string<64> source_topic;
+        string<Common::MAX_NAME_LENGTH> room;
+        boolean is_resolved;
+        Common::Time_t timestamp;
+    };
+
+};

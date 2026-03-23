@@ -1,0 +1,36 @@
+/*
+ * Common types shared across all medtech suite modules.
+ *
+ * Module: Common
+ * All types are @appendable unless otherwise noted.
+ */
+
+module Common {
+
+    // --- Constants ---
+    const long MAX_ID_LENGTH = 16;
+    const long MAX_NAME_LENGTH = 128;
+    const long MAX_DESCRIPTION_LENGTH = 512;
+    const long MAX_WAVEFORM_SAMPLES = 64;
+    const long MAX_ALARM_COUNT = 16;
+    const long MAX_JOINT_COUNT = 7;
+
+    // --- Aliases ---
+    typedef string<MAX_ID_LENGTH> EntityId;
+
+    // --- Timestamp ---
+    @final
+    struct Time_t {
+        int64 seconds;
+        uint32 nanoseconds;
+    };
+
+    // --- Nested identity struct for key resolution ---
+    @appendable
+    @nested
+    struct EntityIdentity {
+        @key EntityId id;
+        string<MAX_NAME_LENGTH> name;
+    };
+
+};

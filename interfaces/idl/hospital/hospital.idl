@@ -1,0 +1,25 @@
+/*
+ * Hospital module types — resource availability and facility data.
+ *
+ * Module: Hospital
+ * Domain: Hospital
+ * All types are @appendable.
+ */
+
+#include "common/common.idl"
+
+module Hospital {
+
+    // Topic: ResourceAvailability | Domain: Hospital | Pattern: State
+    @appendable
+    struct ResourceAvailability {
+        @key Common::EntityId resource_id;
+        string<64> resource_kind;
+        string<Common::MAX_NAME_LENGTH> name;
+        boolean is_available;
+        string<Common::MAX_NAME_LENGTH> location;
+        string<Common::MAX_DESCRIPTION_LENGTH> notes;
+        Common::Time_t timestamp;
+    };
+
+};

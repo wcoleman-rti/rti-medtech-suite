@@ -1,0 +1,114 @@
+/*
+ * Surgery module types — robot control, safety, procedure context.
+ *
+ * Module: Surgery
+ * Domain: Procedure (control + operational tags)
+ * All types are @appendable.
+ */
+
+#include "common/common.idl"
+
+module Surgery {
+
+    // --- Enums ---
+
+    @appendable
+    enum RobotMode {
+        UNKNOWN,
+        IDLE,
+        OPERATIONAL,
+        PAUSED,
+        EMERGENCY_STOP
+    };
+
+    @appendable
+    enum ProcedurePhase {
+        UNKNOWN,
+        PRE_OP,
+        IN_PROGRESS,
+        COMPLETING,
+        COMPLETED,
+        ALERT
+    };
+
+    // --- Helper Structs ---
+
+    @appendable
+    @nested
+    struct CartesianPosition {
+        double x;
+        double y;
+        double z;
+    };
+
+    // --- Topic Types ---
+
+    // Topic: RobotCommand | Domain Tag: control | Pattern: Command
+    @appendable
+    struct RobotCommand {
+        @key Common::EntityId robot_id;
+        @key int32 command_id;
+        CartesianPosition target_position;
+        Common::Time_t timestamp;
+    };
+
+    // Topic: RobotState | Domain Tag: control | Pattern: State
+    @appendable
+    struct RobotState {
+        @key Common::EntityId robot_id;
+        sequence<double, Common::MAX_JOINT_COUNT> joint_positions;
+        CartesianPosition tool_tip_position;
+        RobotMode operational_mode;
+        int32 error_state;
+        Common::Time_t timestamp;
+    };
+
+    // Topic: SafetyInterlock | Domain Tag: control | Pattern: State
+    @appendable
+    struct SafetyInterlock {
+        @key Common::EntityId robot_id;
+        boolean interlock_active;
+        string<Common::MAX_DESCRIPTION_LENGTH> reason;
+        Common::Time_t timestamp;
+    };
+
+    // Topic: OperatorInput | Domain Tag: control | Pattern: Stream
+    @appendable
+    struct OperatorInput {
+        @key Common::EntityId operator_id;
+        @key Common::EntityId robot_id;
+        double x_axis;
+        double y_axis;
+        double z_axis;
+        double roll;
+        double pitch;
+        double yaw;
+        boolean primary_button;
+        boolean secondary_button;
+        Common::Time_t timestamp;
+    };
+
+    // Topic: ProcedureContext | Domain Tag: operational | Pattern: State
+    @appendable
+    struct ProcedureContext {
+        @key Common::EntityId procedure_id;
+        string<Common::MAX_NAME_LENGTH> hospital;
+        string<Common::MAX_NAME_LENGTH> room;
+        string<Common::MAX_NAME_LENGTH> bed;
+        Common::EntityIdentity patient;
+        string<Common::MAX_NAME_LENGTH> procedure_type;
+        string<Common::MAX_NAME_LENGTH> surgeon;
+        string<Common::MAX_NAME_LENGTH> anesthesiologist;
+        Common::Time_t start_time;
+    };
+
+    // Topic: ProcedureStatus | Domain Tag: operational | Pattern: State
+    @appendable
+    struct ProcedureStatus {
+        @key Common::EntityId procedure_id;
+        ProcedurePhase phase;
+        string<Common::MAX_DESCRIPTION_LENGTH> status_message;
+        Common::Time_t timestamp;
+    };
+
+};

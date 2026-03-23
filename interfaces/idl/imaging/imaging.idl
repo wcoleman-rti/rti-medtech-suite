@@ -1,0 +1,36 @@
+/*
+ * Imaging module types — camera frames and image metadata.
+ *
+ * Module: Imaging
+ * Domain: Procedure (operational tag)
+ * All types are @appendable.
+ */
+
+#include "common/common.idl"
+
+module Imaging {
+
+    // --- Helper Structs ---
+
+    @appendable
+    @nested
+    struct ImageMetadata {
+        uint32 width;
+        uint32 height;
+        string<32> encoding;
+        uint32 frame_size_bytes;
+    };
+
+    // --- Topic Types ---
+
+    // Topic: CameraFrame | Domain Tag: operational | Pattern: Stream
+    @appendable
+    struct CameraFrame {
+        @key Common::EntityId camera_id;
+        uint32 frame_sequence_number;
+        ImageMetadata metadata;
+        string<Common::MAX_DESCRIPTION_LENGTH> image_reference;
+        Common::Time_t timestamp;
+    };
+
+};

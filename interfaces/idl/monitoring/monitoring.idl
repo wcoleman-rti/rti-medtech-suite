@@ -1,0 +1,90 @@
+/*
+ * Monitoring module types — patient vitals, waveforms, alarms.
+ *
+ * Module: Monitoring
+ * Domain: Procedure (clinical tag)
+ * All types are @appendable.
+ */
+
+#include "common/common.idl"
+
+module Monitoring {
+
+    // --- Enums ---
+
+    @appendable
+    enum AlarmSeverity {
+        UNKNOWN,
+        INFO,
+        LOW,
+        MEDIUM,
+        HIGH,
+        CRITICAL
+    };
+
+    @appendable
+    enum AlarmState {
+        UNKNOWN,
+        ACTIVE,
+        CLEARED,
+        ACKNOWLEDGED
+    };
+
+    @appendable
+    enum WaveformKind {
+        UNKNOWN,
+        ECG,
+        PLETH,
+        CAPNOGRAPHY,
+        ABP
+    };
+
+    // --- Helper Structs ---
+
+    @appendable
+    @nested
+    struct AlarmEntry {
+        Common::EntityId alarm_id;
+        AlarmSeverity severity;
+        AlarmState state;
+        string<64> alarm_code;
+        string<Common::MAX_DESCRIPTION_LENGTH> message;
+        Common::Time_t onset_time;
+    };
+
+    // --- Topic Types ---
+
+    // Topic: PatientVitals | Domain Tag: clinical | Pattern: State
+    @appendable
+    struct PatientVitals {
+        @key Common::EntityIdentity patient;
+        double heart_rate;
+        double spo2;
+        double systolic_bp;
+        double diastolic_bp;
+        double temperature;
+        double respiratory_rate;
+        Common::Time_t timestamp;
+    };
+
+    // Topic: WaveformData | Domain Tag: clinical | Pattern: Stream
+    @appendable
+    struct WaveformData {
+        @key Common::EntityIdentity patient;
+        @key Common::EntityId source_device_id;
+        @key WaveformKind waveform_kind;
+        sequence<double, Common::MAX_WAVEFORM_SAMPLES> samples;
+        double sample_rate_hz;
+        Common::Time_t timestamp;
+    };
+
+    // Topic: AlarmMessages | Domain Tag: clinical | Pattern: State
+    @appendable
+    struct AlarmMessages {
+        @key Common::EntityIdentity patient;
+        @key Common::EntityId source_device_id;
+        sequence<AlarmEntry, Common::MAX_ALARM_COUNT> alarms;
+        Common::Time_t timestamp;
+    };
+
+};
