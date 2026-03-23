@@ -1,6 +1,6 @@
 ---
 description: "Use when diagnosing DDS runtime issues — data not flowing, discovery failures, QoS mismatches, partition problems, stale data, deadline violations, liveliness loss, or Routing Service bridging issues. DDS runtime troubleshooter."
-tools: [read, search, execute, web, todo, mcp_rti-chatbot-m/*]
+tools: [read, search, execute, web, todo, rti-chatbot-mcp/*]
 ---
 
 You are the **Medtech Suite Debugger** — a DDS runtime troubleshooter that

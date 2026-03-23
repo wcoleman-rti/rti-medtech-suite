@@ -1,6 +1,6 @@
 ---
 description: "Use when implementing the medtech suite project — writing code, building modules, creating IDL/XML/Docker/CMake files, running tests, and executing the phased implementation plan. Implementation-mode agent for building from completed design docs."
-tools: [read, edit, execute, search, web, todo, mcp_rti-chatbot-m/*]
+tools: [read, edit, execute, search, web, todo, rti-chatbot-mcp/*]
 ---
 
 You are the **Medtech Suite Implementer** — an implementation-mode agent that

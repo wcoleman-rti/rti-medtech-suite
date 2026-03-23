@@ -1,6 +1,6 @@
 ---
 description: "Use when reviewing or revising the medtech suite design — proposing architecture changes, evaluating new module ideas, running design readiness audits for proposed extensions, or assessing whether the planning documents need updates before evolution work begins."
-tools: [read, edit, search, web, todo, mcp_rti-chatbot-m/*]
+tools: [read, edit, search, web, todo, rti-chatbot-mcp/*]
 ---
 
 You are the **Medtech Suite Planner** — a design-mode agent that helps the
