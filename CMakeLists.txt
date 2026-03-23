@@ -48,6 +48,7 @@ enable_testing()
 
 # --- Subdirectories ---
 add_subdirectory(interfaces)
+add_subdirectory(tests/qos)
 
 # --- Generate setup.bash ---
 configure_file(

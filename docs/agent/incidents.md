@@ -68,3 +68,38 @@ after closure. They form the project's decision log.
   See RTI documentation:
   <https://community.rti.com/static/documentation/connext-dds/current/doc/manuals/connext_dds_professional/code_generator/users_manual/code_generator/users_manual/GeneratingCode.htm#4.1.4.2_Python_Import_Path>
 - **Date closed:** 2026-03-23
+
+---
+
+## INC-003: QosProvider topic-aware QoS resolution — correct API names
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-23
+- **Phase/Step:** Phase 1 / Step 1.3
+- **Documents involved:** `vision/data-model.md`
+- **Description:** The data model document (QoS Assigned to Topics via
+  Topic Filters section) references "topic-aware QoS APIs" using the
+  generic names `create_datawriter_with_profile` /
+  `create_datareader_with_profile` and "QosProvider with topic name"
+  without specifying the concrete method signatures. During Step 1.3
+  testing, the implementing agent attempted non-existent methods like
+  `datawriter_qos_from_profile()`. The correct Python API methods for
+  topic-filter QoS resolution via the QosProvider are:
+  - Named profile: `provider.datawriter_qos_from_profile(profile)`
+  - Named profile + topic filter: `provider.set_topic_datawriter_qos(profile, topic_name)`
+  - Default profile + topic filter: `provider.get_topic_datawriter_qos(topic_name)`
+  - Participant: `provider.participant_qos_from_profile(profile)`
+  - (Reader equivalents: `datareader_qos_from_profile`, `set_topic_datareader_qos`, `get_topic_datareader_qos`)
+  The C++ equivalents (RTI extension) are:
+  - `provider->datawriter_qos_w_topic_name(profile, topic_name)`
+  - `provider->datareader_qos_w_topic_name(profile, topic_name)`
+  Source: rti-chatbot-mcp (RTI Connext Python API 7.6.0 documentation).
+- **Possible resolutions:**
+  1. Update `vision/data-model.md` to include the concrete method names
+     alongside the generic description.
+  2. Leave the doc as-is and rely on incident documentation.
+- **Resolution:** Resolution 1 adopted. Updated
+  `vision/data-model.md` QoS Assigned to Topics via Topic Filters
+  section with the concrete Python and C++ method names.
+- **Date closed:** 2026-03-23

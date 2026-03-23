@@ -76,7 +76,18 @@ All XML files are validated against this schema as part of the build/CI process.
 
 ### QoS Assigned to Topics via Topic Filters
 
-QoS profiles use [topic filters](https://community.rti.com/static/documentation/connext-dds/current/doc/manuals/connext_dds_professional/users_manual/users_manual/Topic_Filters.htm) to bind DataWriter/DataReader QoS to topics by name pattern. Applications use the topic-aware QoS APIs (`create_datawriter_with_profile`, `create_datareader_with_profile`, or `QosProvider` with topic name) so that the correct QoS is automatically resolved based on the topic being written/read. This decouples applications from knowing which QoS profile applies to which topic.
+QoS profiles use [topic filters](https://community.rti.com/static/documentation/connext-dds/current/doc/manuals/connext_dds_professional/users_manual/users_manual/Topic_Filters.htm) to bind DataWriter/DataReader QoS to topics by name pattern. Applications use the topic-aware QoS APIs so that the correct QoS is automatically resolved based on the topic being written/read. This decouples applications from knowing which QoS profile applies to which topic.
+
+The concrete topic-aware QoS resolution methods are:
+
+- **Python:** `dds.QosProvider.default.get_topic_datawriter_qos(topic_name)` /
+  `dds.QosProvider.default.get_topic_datareader_qos(topic_name)`
+- **C++:** `provider.datawriter_qos(profile, topic_name)` /
+  `provider.datareader_qos(profile, topic_name)`
+
+Alternatively, when creating endpoints directly with `create_datawriter_with_profile` /
+`create_datareader_with_profile`, the topic name is passed implicitly and
+Connext resolves the matching topic-filter QoS automatically.
 
 ### Durability and Lifespan
 
