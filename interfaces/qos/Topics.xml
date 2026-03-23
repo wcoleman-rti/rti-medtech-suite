@@ -6,156 +6,209 @@
 
         <!--
             ProcedureTopics: topic-filter-bound QoS for Procedure domain (Domain 10).
-            Base pattern is State; streaming/command topics override via topic_filter.
+            Every topic-filtered entry explicitly declares its base pattern via
+            the base_name attribute — no implicit inheritance from the profile.
         -->
-        <qos_profile name="ProcedureTopics" base_name="Patterns::State">
+        <qos_profile name="ProcedureTopics">
 
-            <!-- OperatorInput: Stream pattern + Deadline4ms + Lifespan20ms (500 Hz control) -->
-            <datawriter_qos topic_filter="OperatorInput">
+            <!-- OperatorInput: Stream + Deadline4ms + Lifespan20ms (500 Hz control) -->
+            <datawriter_qos topic_filter="OperatorInput" base_name="Patterns::Stream">
                 <base_name>
-                    <element>Snippets::BestEffort</element>
-                    <element>Snippets::KeepLast4</element>
                     <element>Snippets::Deadline4ms</element>
                     <element>Snippets::Lifespan20ms</element>
                 </base_name>
             </datawriter_qos>
-            <datareader_qos topic_filter="OperatorInput">
+            <datareader_qos topic_filter="OperatorInput" base_name="Patterns::Stream">
                 <base_name>
-                    <element>Snippets::BestEffort</element>
-                    <element>Snippets::KeepLast4</element>
                     <element>Snippets::Deadline4ms</element>
                     <element>Snippets::Lifespan20ms</element>
                 </base_name>
             </datareader_qos>
 
-            <!-- RobotCommand: Command pattern (Reliable + Volatile) -->
-            <datawriter_qos topic_filter="RobotCommand">
-                <base_name>
-                    <element>Snippets::Volatile</element>
-                </base_name>
+            <!-- RobotCommand: Command (Reliable + Volatile + KeepLast1) -->
+            <datawriter_qos topic_filter="RobotCommand" base_name="Patterns::Command">
             </datawriter_qos>
-            <datareader_qos topic_filter="RobotCommand">
-                <base_name>
-                    <element>Snippets::Volatile</element>
-                </base_name>
+            <datareader_qos topic_filter="RobotCommand" base_name="Patterns::Command">
             </datareader_qos>
 
-            <!-- RobotState: State pattern + Deadline20ms (100 Hz continuous stream) -->
-            <datawriter_qos topic_filter="RobotState">
+            <!-- RobotState: State + Deadline20ms (100 Hz continuous stream) -->
+            <datawriter_qos topic_filter="RobotState" base_name="Patterns::State">
                 <base_name>
                     <element>Snippets::Deadline20ms</element>
                 </base_name>
             </datawriter_qos>
-            <datareader_qos topic_filter="RobotState">
+            <datareader_qos topic_filter="RobotState" base_name="Patterns::State">
                 <base_name>
                     <element>Snippets::Deadline20ms</element>
                 </base_name>
             </datareader_qos>
 
-            <!-- SafetyInterlock: State pattern + Liveliness500ms (write-on-change, tight lease) -->
-            <datawriter_qos topic_filter="SafetyInterlock">
+            <!-- SafetyInterlock: State + Liveliness500ms (write-on-change, tight lease) -->
+            <datawriter_qos topic_filter="SafetyInterlock" base_name="Patterns::State">
                 <base_name>
                     <element>Snippets::Liveliness500ms</element>
                 </base_name>
             </datawriter_qos>
-            <datareader_qos topic_filter="SafetyInterlock">
+            <datareader_qos topic_filter="SafetyInterlock" base_name="Patterns::State">
                 <base_name>
                     <element>Snippets::Liveliness500ms</element>
                 </base_name>
             </datareader_qos>
 
-            <!-- PatientVitals: State pattern + Deadline2s (1 Hz periodic snapshot) -->
-            <datawriter_qos topic_filter="PatientVitals">
+            <!-- PatientVitals: State + Deadline2s (1 Hz periodic snapshot) -->
+            <datawriter_qos topic_filter="PatientVitals" base_name="Patterns::State">
                 <base_name>
                     <element>Snippets::Deadline2s</element>
                 </base_name>
             </datawriter_qos>
-            <datareader_qos topic_filter="PatientVitals">
+            <datareader_qos topic_filter="PatientVitals" base_name="Patterns::State">
                 <base_name>
                     <element>Snippets::Deadline2s</element>
                 </base_name>
             </datareader_qos>
 
-            <!-- WaveformData: Stream pattern + Deadline40ms (50 Hz streaming) -->
-            <datawriter_qos topic_filter="WaveformData">
+            <!-- WaveformData: Stream + Deadline40ms (50 Hz streaming) -->
+            <datawriter_qos topic_filter="WaveformData" base_name="Patterns::Stream">
                 <base_name>
-                    <element>Snippets::BestEffort</element>
-                    <element>Snippets::KeepLast4</element>
                     <element>Snippets::Deadline40ms</element>
                 </base_name>
             </datawriter_qos>
-            <datareader_qos topic_filter="WaveformData">
+            <datareader_qos topic_filter="WaveformData" base_name="Patterns::Stream">
                 <base_name>
-                    <element>Snippets::BestEffort</element>
-                    <element>Snippets::KeepLast4</element>
                     <element>Snippets::Deadline40ms</element>
                 </base_name>
             </datareader_qos>
 
-            <!-- CameraFrame: Stream pattern + Deadline66ms (30 Hz streaming) -->
-            <datawriter_qos topic_filter="CameraFrame">
+            <!-- CameraFrame: Stream + Deadline66ms (30 Hz streaming) -->
+            <datawriter_qos topic_filter="CameraFrame" base_name="Patterns::Stream">
                 <base_name>
-                    <element>Snippets::BestEffort</element>
-                    <element>Snippets::KeepLast4</element>
                     <element>Snippets::Deadline66ms</element>
                 </base_name>
             </datawriter_qos>
-            <datareader_qos topic_filter="CameraFrame">
+            <datareader_qos topic_filter="CameraFrame" base_name="Patterns::Stream">
                 <base_name>
-                    <element>Snippets::BestEffort</element>
-                    <element>Snippets::KeepLast4</element>
                     <element>Snippets::Deadline66ms</element>
                 </base_name>
+            </datareader_qos>
+
+            <!-- AlarmMessages: State (write-on-change, per-alarm keying) -->
+            <datawriter_qos topic_filter="AlarmMessages" base_name="Patterns::State">
+            </datawriter_qos>
+            <datareader_qos topic_filter="AlarmMessages" base_name="Patterns::State">
+            </datareader_qos>
+
+            <!-- DeviceTelemetry: State (write-on-change) -->
+            <datawriter_qos topic_filter="DeviceTelemetry" base_name="Patterns::State">
+            </datawriter_qos>
+            <datareader_qos topic_filter="DeviceTelemetry" base_name="Patterns::State">
+            </datareader_qos>
+
+            <!-- ProcedureContext: State (write-on-change, TRANSIENT_LOCAL) -->
+            <datawriter_qos topic_filter="ProcedureContext" base_name="Patterns::State">
+            </datawriter_qos>
+            <datareader_qos topic_filter="ProcedureContext" base_name="Patterns::State">
+            </datareader_qos>
+
+            <!-- ProcedureStatus: State (write-on-change, TRANSIENT_LOCAL) -->
+            <datawriter_qos topic_filter="ProcedureStatus" base_name="Patterns::State">
+            </datawriter_qos>
+            <datareader_qos topic_filter="ProcedureStatus" base_name="Patterns::State">
             </datareader_qos>
 
         </qos_profile>
 
         <!--
             HospitalTopics: topic-filter-bound QoS for Hospital domain (Domain 11).
-            Base pattern is State; all Hospital topics are state-based (bridged or native).
+            Every topic explicitly declares its base pattern.
         -->
-        <qos_profile name="HospitalTopics" base_name="Patterns::State">
+        <qos_profile name="HospitalTopics">
 
-            <!-- ClinicalAlert: State pattern (write-on-change, reliable, TRANSIENT_LOCAL) -->
-            <!-- Inherits base State — no overrides needed -->
+            <!-- ClinicalAlert: State (write-on-change, reliable, TRANSIENT_LOCAL) -->
+            <datawriter_qos topic_filter="ClinicalAlert" base_name="Patterns::State">
+            </datawriter_qos>
+            <datareader_qos topic_filter="ClinicalAlert" base_name="Patterns::State">
+            </datareader_qos>
 
-            <!-- RiskScore: State pattern (write-on-change, reliable, TRANSIENT_LOCAL) -->
-            <!-- Inherits base State — no overrides needed -->
+            <!-- RiskScore: State (write-on-change, reliable, TRANSIENT_LOCAL) -->
+            <datawriter_qos topic_filter="RiskScore" base_name="Patterns::State">
+            </datawriter_qos>
+            <datareader_qos topic_filter="RiskScore" base_name="Patterns::State">
+            </datareader_qos>
+
+            <!-- ResourceAvailability: State (write-on-change, V1.1) -->
+            <datawriter_qos topic_filter="ResourceAvailability" base_name="Patterns::State">
+            </datawriter_qos>
+            <datareader_qos topic_filter="ResourceAvailability" base_name="Patterns::State">
+            </datareader_qos>
+
+            <!-- Bridged topics from Procedure domain — same pattern as source -->
+            <datareader_qos topic_filter="ProcedureStatus" base_name="Patterns::State">
+            </datareader_qos>
+            <datareader_qos topic_filter="ProcedureContext" base_name="Patterns::State">
+            </datareader_qos>
+            <datareader_qos topic_filter="PatientVitals" base_name="Patterns::State">
+                <base_name>
+                    <element>Snippets::Deadline2s</element>
+                </base_name>
+            </datareader_qos>
+            <datareader_qos topic_filter="AlarmMessages" base_name="Patterns::State">
+            </datareader_qos>
+            <datareader_qos topic_filter="DeviceTelemetry" base_name="Patterns::State">
+            </datareader_qos>
+            <datareader_qos topic_filter="RobotState" base_name="Patterns::State">
+                <base_name>
+                    <element>Snippets::Deadline20ms</element>
+                </base_name>
+            </datareader_qos>
 
         </qos_profile>
 
         <!--
             GuiProcedureTopics: downsampled QoS for GUI readers on Procedure domain.
-            Base is GuiState; streaming topics override with GuiStream + deadline.
+            Every topic explicitly declares its base pattern (GuiState or GuiStream).
         -->
-        <qos_profile name="GuiProcedureTopics" base_name="Patterns::GuiState">
+        <qos_profile name="GuiProcedureTopics">
 
-            <!-- Streaming topics: GuiStream-equivalent + deadline -->
-            <datareader_qos topic_filter="WaveformData">
+            <!-- State topics: GuiState (downsampled state) -->
+            <datareader_qos topic_filter="RobotState" base_name="Patterns::GuiState">
                 <base_name>
-                    <element>Snippets::BestEffort</element>
-                    <element>Snippets::KeepLast4</element>
+                    <element>Snippets::Deadline20ms</element>
+                </base_name>
+            </datareader_qos>
+            <datareader_qos topic_filter="SafetyInterlock" base_name="Patterns::GuiState">
+                <base_name>
+                    <element>Snippets::Liveliness500ms</element>
+                </base_name>
+            </datareader_qos>
+            <datareader_qos topic_filter="PatientVitals" base_name="Patterns::GuiState">
+                <base_name>
+                    <element>Snippets::Deadline2s</element>
+                </base_name>
+            </datareader_qos>
+            <datareader_qos topic_filter="AlarmMessages" base_name="Patterns::GuiState">
+            </datareader_qos>
+            <datareader_qos topic_filter="DeviceTelemetry" base_name="Patterns::GuiState">
+            </datareader_qos>
+            <datareader_qos topic_filter="ProcedureContext" base_name="Patterns::GuiState">
+            </datareader_qos>
+            <datareader_qos topic_filter="ProcedureStatus" base_name="Patterns::GuiState">
+            </datareader_qos>
+
+            <!-- Stream topics: GuiStream (downsampled streaming) -->
+            <datareader_qos topic_filter="WaveformData" base_name="Patterns::GuiStream">
+                <base_name>
                     <element>Snippets::Deadline40ms</element>
-                    <element>Snippets::GuiSubsample</element>
                 </base_name>
             </datareader_qos>
-
-            <datareader_qos topic_filter="CameraFrame">
+            <datareader_qos topic_filter="CameraFrame" base_name="Patterns::GuiStream">
                 <base_name>
-                    <element>Snippets::BestEffort</element>
-                    <element>Snippets::KeepLast4</element>
                     <element>Snippets::Deadline66ms</element>
-                    <element>Snippets::GuiSubsample</element>
                 </base_name>
             </datareader_qos>
-
-            <datareader_qos topic_filter="OperatorInput">
+            <datareader_qos topic_filter="OperatorInput" base_name="Patterns::GuiStream">
                 <base_name>
-                    <element>Snippets::BestEffort</element>
-                    <element>Snippets::KeepLast4</element>
                     <element>Snippets::Deadline4ms</element>
                     <element>Snippets::Lifespan20ms</element>
-                    <element>Snippets::GuiSubsample</element>
                 </base_name>
             </datareader_qos>
 
@@ -163,10 +216,35 @@
 
         <!--
             GuiHospitalTopics: downsampled QoS for GUI readers on Hospital domain.
-            Base is GuiState; all Hospital topics are state-based.
+            Every topic explicitly declares its base pattern.
         -->
-        <qos_profile name="GuiHospitalTopics" base_name="Patterns::GuiState">
-            <!-- All Hospital topics inherit GuiState — no overrides needed -->
+        <qos_profile name="GuiHospitalTopics">
+
+            <datareader_qos topic_filter="ClinicalAlert" base_name="Patterns::GuiState">
+            </datareader_qos>
+            <datareader_qos topic_filter="RiskScore" base_name="Patterns::GuiState">
+            </datareader_qos>
+            <datareader_qos topic_filter="ResourceAvailability" base_name="Patterns::GuiState">
+            </datareader_qos>
+            <datareader_qos topic_filter="ProcedureStatus" base_name="Patterns::GuiState">
+            </datareader_qos>
+            <datareader_qos topic_filter="ProcedureContext" base_name="Patterns::GuiState">
+            </datareader_qos>
+            <datareader_qos topic_filter="PatientVitals" base_name="Patterns::GuiState">
+                <base_name>
+                    <element>Snippets::Deadline2s</element>
+                </base_name>
+            </datareader_qos>
+            <datareader_qos topic_filter="AlarmMessages" base_name="Patterns::GuiState">
+            </datareader_qos>
+            <datareader_qos topic_filter="DeviceTelemetry" base_name="Patterns::GuiState">
+            </datareader_qos>
+            <datareader_qos topic_filter="RobotState" base_name="Patterns::GuiState">
+                <base_name>
+                    <element>Snippets::Deadline20ms</element>
+                </base_name>
+            </datareader_qos>
+
         </qos_profile>
 
     </qos_library>

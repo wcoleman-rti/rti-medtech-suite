@@ -33,7 +33,7 @@ module Surgery {
 
     // --- Helper Structs ---
 
-    @appendable
+    @final
     @nested
     struct CartesianPosition {
         double x;

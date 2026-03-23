@@ -26,12 +26,12 @@
         <domain name="Procedure_clinical" domain_id="10">
             <register_type name="Monitoring::PatientVitals"   type_ref="Monitoring::PatientVitals"/>
             <register_type name="Monitoring::WaveformData"    type_ref="Monitoring::WaveformData"/>
-            <register_type name="Monitoring::AlarmMessages"   type_ref="Monitoring::AlarmMessages"/>
+            <register_type name="Monitoring::AlarmMessage"   type_ref="Monitoring::AlarmMessage"/>
             <register_type name="Devices::DeviceTelemetry"    type_ref="Devices::DeviceTelemetry"/>
 
             <topic name="PatientVitals"   register_type_ref="Monitoring::PatientVitals"/>
             <topic name="WaveformData"    register_type_ref="Monitoring::WaveformData"/>
-            <topic name="AlarmMessages"   register_type_ref="Monitoring::AlarmMessages"/>
+            <topic name="AlarmMessages"   register_type_ref="Monitoring::AlarmMessage"/>
             <topic name="DeviceTelemetry" register_type_ref="Devices::DeviceTelemetry"/>
         </domain>
 
@@ -55,7 +55,7 @@
             <register_type name="Surgery::ProcedureStatus"     type_ref="Surgery::ProcedureStatus"/>
             <register_type name="Surgery::ProcedureContext"    type_ref="Surgery::ProcedureContext"/>
             <register_type name="Monitoring::PatientVitals"   type_ref="Monitoring::PatientVitals"/>
-            <register_type name="Monitoring::AlarmMessages"   type_ref="Monitoring::AlarmMessages"/>
+            <register_type name="Monitoring::AlarmMessage"    type_ref="Monitoring::AlarmMessage"/>
             <register_type name="Devices::DeviceTelemetry"    type_ref="Devices::DeviceTelemetry"/>
             <register_type name="Surgery::RobotState"         type_ref="Surgery::RobotState"/>
             <!-- Native Hospital types -->
@@ -67,7 +67,7 @@
             <topic name="ProcedureStatus"  register_type_ref="Surgery::ProcedureStatus"/>
             <topic name="ProcedureContext" register_type_ref="Surgery::ProcedureContext"/>
             <topic name="PatientVitals"    register_type_ref="Monitoring::PatientVitals"/>
-            <topic name="AlarmMessages"    register_type_ref="Monitoring::AlarmMessages"/>
+            <topic name="AlarmMessages"    register_type_ref="Monitoring::AlarmMessage"/>
             <topic name="DeviceTelemetry"  register_type_ref="Devices::DeviceTelemetry"/>
             <topic name="RobotState"       register_type_ref="Surgery::RobotState"/>
             <!-- Native topics -->

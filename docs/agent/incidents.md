@@ -103,3 +103,46 @@ after closure. They form the project's decision log.
   `vision/data-model.md` QoS Assigned to Topics via Topic Filters
   section with the concrete Python and C++ method names.
 - **Date closed:** 2026-03-23
+
+---
+
+## INC-004: DDS Design Review findings (Step 1.3b via rti-chatbot-mcp)
+
+- **Status:** Closed
+- **Category:** Design Review
+- **Date opened:** 2026-03-23
+- **Phase/Step:** Phase 1 / Step 1.3b
+- **Documents involved:** IDL files, `Topics.xml`, `Participants.xml`,
+  `domains.xml`, `vision/data-model.md`
+- **Description:** Submitted all IDL, QoS XML, and domain XML artifacts
+  to `rti-chatbot-mcp` for design review. Six findings identified:
+  - **F1 (Fixed):** `@key EntityIdentity patient` includes mutable `name`
+    field in the DDS key. Changed to `@key EntityId patient_id` with
+    non-key `EntityIdentity patient` where needed. Affected types:
+    `PatientVitals`, `WaveformData`, `AlarmMessage`, `RiskScore`.
+  - **F2 (Declined):** Chatbot recommended removing `@appendable` from
+    enums. Per RTI XTypes spec Section 2.2, enums *can* be appendable.
+    Kept `@appendable` on enums to allow adding constants in future
+    versions.
+  - **F3 (Fixed):** Stream/command topics inherited from State base
+    profile, leaving unwanted TransientLocal/Liveliness. Added explicit
+    `base_name` attribute on every `<datawriter_qos>`/`<datareader_qos>`
+    tag to declare the correct pattern per topic. Removed profile-level
+    `base_name` to eliminate implicit inheritance. Confirmed approach
+    with `rti-chatbot-mcp`.
+  - **F4 (Fixed):** Removed explicit `initial_peers` from
+    `Participants.xml`. UDPv4 mask already nullifies SHMEM default peer.
+    Default discovery peers are sufficient.
+  - **F5 (Confirmed):** Monitoring Library 2.0 configuration on domain 20
+    is correct.
+  - **Additional (Fixed):** `CartesianPosition` changed to `@final`
+    (stable 3-field struct). `AlarmMessages` refactored to per-alarm
+    keying as `AlarmMessage` (singular type, `@key alarm_id`). Topic
+    name kept as `AlarmMessages` for spec compatibility. All topics
+    in Procedure and Hospital domains now have explicit topic-filter
+    entries in Topics.xml (including previously implicit state topics:
+    AlarmMessages, DeviceTelemetry, ProcedureContext, ProcedureStatus).
+    GuiProcedureTopics and GuiHospitalTopics also made fully explicit.
+- **Resolution:** All actionable findings addressed. Tests pass
+  (C++ 15/15, Python 19/19). IDL codegen and type imports verified.
+- **Date closed:** 2026-03-23

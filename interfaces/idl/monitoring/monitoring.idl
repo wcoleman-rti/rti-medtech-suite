@@ -57,7 +57,8 @@ module Monitoring {
     // Topic: PatientVitals | Domain Tag: clinical | Pattern: State
     @appendable
     struct PatientVitals {
-        @key Common::EntityIdentity patient;
+        @key Common::EntityId patient_id;
+        Common::EntityIdentity patient;
         double heart_rate;
         double spo2;
         double systolic_bp;
@@ -70,7 +71,7 @@ module Monitoring {
     // Topic: WaveformData | Domain Tag: clinical | Pattern: Stream
     @appendable
     struct WaveformData {
-        @key Common::EntityIdentity patient;
+        @key Common::EntityId patient_id;
         @key Common::EntityId source_device_id;
         @key WaveformKind waveform_kind;
         sequence<double, Common::MAX_WAVEFORM_SAMPLES> samples;
@@ -78,12 +79,21 @@ module Monitoring {
         Common::Time_t timestamp;
     };
 
-    // Topic: AlarmMessages | Domain Tag: clinical | Pattern: State
+    // Topic: AlarmMessage | Domain Tag: clinical | Pattern: State
+    // Per-alarm keying: each alarm is its own DDS instance (Step 1.3b review).
+    // Writers may enable DDS batching for efficient transport.
+    // Note: spec references "AlarmMessages" — topic name kept as AlarmMessages
+    // for backward compatibility; type renamed to AlarmMessage (singular).
     @appendable
-    struct AlarmMessages {
-        @key Common::EntityIdentity patient;
-        @key Common::EntityId source_device_id;
-        sequence<AlarmEntry, Common::MAX_ALARM_COUNT> alarms;
+    struct AlarmMessage {
+        @key Common::EntityId alarm_id;
+        Common::EntityId patient_id;
+        Common::EntityId source_device_id;
+        AlarmSeverity severity;
+        AlarmState state;
+        string<64> alarm_code;
+        string<Common::MAX_DESCRIPTION_LENGTH> message;
+        Common::Time_t onset_time;
         Common::Time_t timestamp;
     };
 

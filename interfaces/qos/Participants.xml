@@ -36,7 +36,8 @@
 
         <!--
             SimulationTransport: participant QoS for local simulation.
-            Disables shared memory, enables UDPv4 only, no multicast, explicit peers.
+            Disables shared memory (UDPv4 only), disables multicast.
+            Initial peers left as default (SHMEM peer nullified by UDPv4 mask).
         -->
         <qos_profile name="SimulationTransport"
                      is_default_qos="true">
@@ -46,9 +47,6 @@
                 </transport_builtin>
                 <discovery>
                     <multicast_receive_addresses/>
-                    <initial_peers>
-                        <element>127.0.0.1</element>
-                    </initial_peers>
                 </discovery>
             </domain_participant_qos>
         </qos_profile>

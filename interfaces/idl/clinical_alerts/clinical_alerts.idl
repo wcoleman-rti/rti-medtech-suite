@@ -33,7 +33,7 @@ module ClinicalAlerts {
     // Topic: RiskScore | Domain: Hospital | Pattern: State
     @appendable
     struct RiskScore {
-        @key Common::EntityIdentity patient;
+        @key Common::EntityId patient_id;
         @key string<64> score_kind;
         double score_value;
         double confidence;
