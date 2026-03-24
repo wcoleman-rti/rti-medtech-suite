@@ -3,7 +3,10 @@ project(medtech-suite LANGUAGES CXX)
 
 # --- Connext version and architecture (single source of truth) ---
 set(CONNEXT_VERSION "7.6.0" CACHE STRING "RTI Connext DDS version")
-set(CONNEXT_ARCH "x64Linux4gcc8.5.0" CACHE STRING "RTI Connext target architecture")
+set(CONNEXTDDS_ARCH "$ENV{CONNEXTDDS_ARCH}" CACHE STRING "RTI Connext target architecture")
+if(NOT CONNEXTDDS_ARCH)
+    set(CONNEXTDDS_ARCH "x64Linux4gcc8.5.0" CACHE STRING "" FORCE)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

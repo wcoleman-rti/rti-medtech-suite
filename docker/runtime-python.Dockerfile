@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 ARG CONNEXT_VERSION=7.6.0
-ARG CONNEXT_ARCH=x64Linux4gcc8.5.0
+ARG CONNEXTDDS_ARCH=x64Linux4gcc8.5.0
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Python runtime + Qt dependencies for PySide6
@@ -19,11 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Connext shared libraries from additional build context "connext"
-COPY --from=connext lib/${CONNEXT_ARCH}/ /opt/rti.com/rti_connext_dds-${CONNEXT_VERSION}/lib/${CONNEXT_ARCH}/
+COPY --from=connext lib/${CONNEXTDDS_ARCH}/ /opt/rti.com/rti_connext_dds-${CONNEXT_VERSION}/lib/${CONNEXTDDS_ARCH}/
 
 ENV NDDSHOME=/opt/rti.com/rti_connext_dds-${CONNEXT_VERSION}
 ENV CONNEXTDDS_DIR=${NDDSHOME}
-ENV LD_LIBRARY_PATH="${NDDSHOME}/lib/${CONNEXT_ARCH}"
+ENV LD_LIBRARY_PATH="${NDDSHOME}/lib/${CONNEXTDDS_ARCH}"
 ENV QT_QPA_PLATFORM=offscreen
 
 # Create venv and install Python dependencies

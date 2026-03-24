@@ -3,6 +3,18 @@
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _ROOT="$(dirname "$_DIR")"
 
+# RTI Connext DDS environment (library paths, NDDSHOME, CONNEXTDDS_DIR)
+# Priority: runtime NDDSHOME/CONNEXTDDS_DIR > build-time baked path
+_CONNEXT_HOME="${NDDSHOME:-${CONNEXTDDS_DIR:-@CONNEXTDDS_DIR@}}"
+_CONNEXT_ARCH="${CONNEXTDDS_ARCH:-@CONNEXTDDS_ARCH@}"
+
+if [[ ":${LD_LIBRARY_PATH:-}:" == *":${_CONNEXT_HOME}/lib/${_CONNEXT_ARCH}:"* ]]; then
+    # Connext libs already on LD_LIBRARY_PATH — skip
+    :
+elif [[ -f "${_CONNEXT_HOME}/resource/scripts/rtisetenv_${_CONNEXT_ARCH}.bash" ]]; then
+    source "${_CONNEXT_HOME}/resource/scripts/rtisetenv_${_CONNEXT_ARCH}.bash"
+fi
+
 # Activate Python venv (pip-installed: rti.connext, PySide6, pytest)
 if [[ -f "$_ROOT/.venv/bin/activate" ]]; then
     source "$_ROOT/.venv/bin/activate"

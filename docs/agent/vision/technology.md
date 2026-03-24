@@ -27,7 +27,7 @@ When upgrading Connext (e.g., 7.6.0 → 7.7.0) with no breaking API changes:
 2. **requirements.txt** — update `rti.connext==7.7.0` (one line)
 3. **Dockerfiles** — update `ARG CONNEXT_VERSION=7.7.0` in each base image (three files, one line each)
 4. **QoS/domain XML** — update the XSD URL version in `xsi:noNamespaceSchemaLocation` (one `sed` across all XML files)
-5. **Connext architecture string** — if the target architecture name changes (e.g., `x64Linux4gcc8.5.0` → `x64Linux4gcc12.3.0`), update it in `CONNEXT_ARCH` in CMakeLists.txt and in the Dockerfile `rtisetenv` invocation
+5. **Connext architecture string** — if the target architecture name changes (e.g., `x64Linux4gcc8.5.0` → `x64Linux4gcc12.3.0`), update it in `CONNEXTDDS_ARCH` in CMakeLists.txt and in the Dockerfile `ARG` declarations
 6. **Validate** — run the full test suite, QoS XML XSD validation, and Docker build
 7. **Review RTI migration guide** — check the [RTI Connext Migration Guide](https://community.rti.com/static/documentation/connext-dds/current/doc/manuals/migration_guide/index.html) for any behavioral changes, deprecated APIs, or QoS default changes
 
@@ -38,7 +38,7 @@ When upgrading Connext (e.g., 7.6.0 → 7.7.0) with no breaking API changes:
 - **Python pin uses `==`, not `>=`.** Exact pinning prevents silent upgrades and makes the bump explicit.
 - **Docker images use `ARG` for the version.** All `COPY` paths and `ENV` values that reference the Connext install path derive from the `ARG`, not hardcoded paths.
 - **QoS XML schema URL is the only version reference in XML.** No other element in QoS or domain XML is version-specific.
-- **The architecture string is parameterized in CMake.** A `CONNEXT_ARCH` cache variable (defaulting to `x64Linux4gcc8.5.0`) is used wherever the architecture name appears in build logic, so a toolchain change is a single variable update.
+- **The architecture string is parameterized in CMake.** A `CONNEXTDDS_ARCH` cache variable (defaulting from the `$CONNEXTDDS_ARCH` environment variable set by `rtisetenv`, falling back to `x64Linux4gcc8.5.0`) is used wherever the architecture name appears in build logic, so a toolchain change is a single variable update.
 
 This design ensures that a non-breaking Connext version bump touches at most **5 files** and **~6 lines of configuration** — no application code, no QoS tuning, no IDL changes.
 
@@ -216,7 +216,10 @@ The top-level `CMakeLists.txt` must set these defaults:
 ```cmake
 # --- Connext version and architecture (single source of truth) ---
 set(CONNEXT_VERSION "7.6.0" CACHE STRING "RTI Connext DDS version")
-set(CONNEXT_ARCH "x64Linux4gcc8.5.0" CACHE STRING "RTI Connext target architecture")
+set(CONNEXTDDS_ARCH "$ENV{CONNEXTDDS_ARCH}" CACHE STRING "RTI Connext target architecture")
+if(NOT CONNEXTDDS_ARCH)
+    set(CONNEXTDDS_ARCH "x64Linux4gcc8.5.0" CACHE STRING "" FORCE)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -241,7 +244,7 @@ find_package(RTIConnextDDS "${CONNEXT_VERSION}" REQUIRED)
 ```
 
 - **`CONNEXT_VERSION`** — single CMake variable controlling the required Connext version. All `find_package` calls and version-dependent logic reference this variable, never a literal.
-- **`CONNEXT_ARCH`** — single CMake variable for the Connext target architecture. Used in `rtisetenv` script paths, Docker build args, and any architecture-dependent logic. Defaults to `x64Linux4gcc8.5.0` for the current Linux target.
+- **`CONNEXTDDS_ARCH`** — single CMake variable for the Connext target architecture, named to match RTI's `FindRTIConnextDDS` convention. Defaults from the `$CONNEXTDDS_ARCH` environment variable (set by `rtisetenv`), falling back to `x64Linux4gcc8.5.0`. Used in Docker build args and any architecture-dependent logic.
 - **C++17** — required minimum. Do not use C++20 features.
 - **Release** — default build type. Debug builds are used only for targeted troubleshooting.
 - **Shared libraries** — default linkage. Connext ships shared libraries for the target architecture; static linking is not used unless explicitly required by a deployment constraint.
@@ -459,17 +462,18 @@ export MEDTECH_CONFIG_DIR="$_DIR/etc"
 ### Local Development Workflow
 
 ```bash
-# One-time: Connext environment + venv
-source $NDDSHOME/resource/scripts/rtisetenv_x64Linux4gcc8.5.0.bash
+# One-time: venv setup
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 # Build + install (install prefix defaults to <source>/install/)
+# Source rtisetenv first so CMake can find Connext and read CONNEXTDDS_ARCH
+source $NDDSHOME/resource/scripts/rtisetenv_x64Linux4gcc8.5.0.bash
 cmake -B build -S .
 cmake --build build
 cmake --install build
 
-# Activate runtime environment
+# Activate runtime environment (sources rtisetenv + venv + sets all paths)
 source install/setup.bash
 
 # Run tests, modules, or services

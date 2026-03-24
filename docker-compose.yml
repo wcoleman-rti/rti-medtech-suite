@@ -19,7 +19,7 @@ x-qos-volumes: &qos-volumes
 
 x-build-args: &build-args
   CONNEXT_VERSION: "7.6.0"
-  CONNEXT_ARCH: "x64Linux4gcc8.5.0"
+  CONNEXTDDS_ARCH: "x64Linux4gcc8.5.0"
 
 networks:
   surgical-net:

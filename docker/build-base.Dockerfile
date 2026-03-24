@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 ARG CONNEXT_VERSION=7.6.0
-ARG CONNEXT_ARCH=x64Linux4gcc8.5.0
+ARG CONNEXTDDS_ARCH=x64Linux4gcc8.5.0
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -19,8 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=connext . /opt/rti.com/rti_connext_dds-${CONNEXT_VERSION}/
 
 ENV NDDSHOME=/opt/rti.com/rti_connext_dds-${CONNEXT_VERSION}
-ENV CONNEXT_ARCH=${CONNEXT_ARCH}
+ENV CONNEXTDDS_ARCH=${CONNEXTDDS_ARCH}
 ENV PATH="${NDDSHOME}/bin:${PATH}"
-ENV LD_LIBRARY_PATH="${NDDSHOME}/lib/${CONNEXT_ARCH}"
+ENV LD_LIBRARY_PATH="${NDDSHOME}/lib/${CONNEXTDDS_ARCH}"
 
 WORKDIR /workspace

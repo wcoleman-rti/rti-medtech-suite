@@ -566,7 +566,7 @@ per [vision/data-model.md](data-model.md) System Contract #7.
 
 | Element | Style | Example |
 |---------|-------|---------|
-| Variable (project) | `ALL_CAPS` | `CONNEXT_VERSION`, `BUILD_SHARED_LIBS` |
+| Variable (project) | `ALL_CAPS` | `CONNEXT_VERSION`, `CONNEXTDDS_ARCH`, `BUILD_SHARED_LIBS` |
 | Function / macro (project) | `snake_case` | `add_medtech_executable()` |
 | Target name | `snake_case` with module prefix | `surgical_procedure`, `hospital_dashboard` |
 | Option | `ALL_CAPS` with project prefix | `MEDTECH_BUILD_TESTS` |

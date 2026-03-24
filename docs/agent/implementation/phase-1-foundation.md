@@ -11,8 +11,8 @@
 
 ### Work
 
-- Create top-level `CMakeLists.txt` with `CONNEXT_VERSION` and `CONNEXT_ARCH` cache variables (see `vision/technology.md` Connext Version Management), C++17 standard, Release build type, shared libraries, and install prefix defaulting to `<source>/install/` via `CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT` (see `vision/technology.md` Default Build Configuration)
-- Source Connext environment: `source $NDDSHOME/resource/scripts/rtisetenv_${CONNEXT_ARCH}.bash`
+- Create top-level `CMakeLists.txt` with `CONNEXT_VERSION` and `CONNEXTDDS_ARCH` cache variables (see `vision/technology.md` Connext Version Management), C++17 standard, Release build type, shared libraries, and install prefix defaulting to `<source>/install/` via `CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT` (see `vision/technology.md` Default Build Configuration)
+- Source Connext environment: `source $NDDSHOME/resource/scripts/rtisetenv_${CONNEXTDDS_ARCH}.bash`
 - Integrate `rticonnextdds-cmake-utils` via `FetchContent` (main branch)
 - Call `find_package(RTIConnextDDS "${CONNEXT_VERSION}" REQUIRED)` — version must reference the CMake variable, never a literal
 - C++ targets must link against the `RTIConnextDDS::cpp2_api` imported target (Modern C++ API)
@@ -90,10 +90,10 @@
 ### Work
 
 - Author the four QoS XML files under `interfaces/qos/` per the structure in [vision/data-model.md](../vision/data-model.md):
-  - `Snippets.xml` — isolated, composable QoS policy chunks (Reliable, BestEffort, TransientLocal, Volatile, KeepLast1, KeepLast4, KeepAll, ExclusiveOwnership, Liveliness2s, GuiSubsample)
-  - `Patterns.xml` — data-pattern base profiles (State, Command, Stream, GuiState, GuiStream) rooted on `BuiltinQosLib::Generic.Common`
-  - `Topics.xml` — topic-filter-bound profiles that assign QoS by topic name pattern
-  - `Participants.xml` — discovery, transport, and resource configuration (simulation profile: SHMEM disabled, UDPv4 only, explicit peers, no multicast)
+  - `Snippets.xml` — custom QoS policy snippets for policies with no builtin equivalent (Volatile, KeepLast4, ExclusiveOwnership, Liveliness2s, Liveliness500ms, Deadline*, Lifespan20ms, GuiSubsample). Policies with builtin equivalents (Reliable, BestEffort, TransientLocal, KeepLast1, KeepAll) use `BuiltinQosSnippetLib::` directly.
+  - `Patterns.xml` — data-pattern base profiles (State, Command, Stream, GuiState, GuiStream) inheriting from semantically appropriate `BuiltinQosLib` profiles (`Generic.KeepLastReliable.TransientLocal`, `Generic.KeepLastReliable`, `Generic.BestEffort`)
+  - `Topics.xml` — two libraries: `TopicProfiles` (per-topic profiles as single source of truth for topic-specific tuning) and `Topics` (domain-scoped topic-filter bindings referencing `TopicProfiles::` profiles with no nested content)
+  - `Participants.xml` — two libraries: `Factory` (process-level `participant_factory_qos`) and `Participants` (participant-level discovery/transport/resource config). Simulation profile: SHMEM disabled, UDPv4 only, multicast fully disabled (three-step per RTI howto), `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation`, discovery peers via `NDDS_DISCOVERY_PEERS` env var
 - Each XML file must declare the RTI schema in its root element for validation:
   ```xml
   <dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
