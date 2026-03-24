@@ -12,6 +12,7 @@ Python API methods (confirmed via rti-chatbot-mcp, INC-003):
 """
 
 import os
+
 import pytest
 import rti.connextdds as dds
 
@@ -19,9 +20,9 @@ import rti.connextdds as dds
 @pytest.fixture(autouse=True)
 def _check_env():
     """Ensure NDDS_QOS_PROFILES is set before any test runs."""
-    assert os.environ.get("NDDS_QOS_PROFILES"), (
-        "NDDS_QOS_PROFILES not set — source install/setup.bash first"
-    )
+    assert os.environ.get(
+        "NDDS_QOS_PROFILES"
+    ), "NDDS_QOS_PROFILES not set — source install/setup.bash first"
 
 
 @pytest.fixture
@@ -31,6 +32,7 @@ def provider():
 
 
 # --- Snippets ---
+
 
 class TestSnippets:
     def test_reliable(self, provider):
@@ -65,6 +67,7 @@ class TestSnippets:
 
 # --- Patterns ---
 
+
 class TestPatterns:
     def test_state_writer(self, provider):
         qos = provider.datawriter_qos_from_profile("Patterns::State")
@@ -84,6 +87,7 @@ class TestPatterns:
 
 
 # --- Topic-filter QoS resolution (named profile) ---
+
 
 class TestTopicFilters:
     def test_patient_vitals_writer(self, provider):
@@ -120,9 +124,7 @@ class TestTopicFilters:
 
     def test_robot_state_writer(self, provider):
         """RobotState: State base + Deadline20ms."""
-        qos = provider.set_topic_datawriter_qos(
-            "Topics::ProcedureTopics", "RobotState"
-        )
+        qos = provider.set_topic_datawriter_qos("Topics::ProcedureTopics", "RobotState")
         assert qos.reliability.kind == dds.ReliabilityKind.RELIABLE
         assert qos.deadline.period.nanosec == 20000000
 
@@ -145,16 +147,13 @@ class TestTopicFilters:
 
 # --- Participant profiles ---
 
+
 class TestParticipants:
     def test_simulation_transport_loads(self, provider):
-        qos = provider.participant_qos_from_profile(
-            "Participants::SimulationTransport"
-        )
+        qos = provider.participant_qos_from_profile("Participants::SimulationTransport")
         assert qos is not None
 
     def test_factory_defaults_loads(self, provider):
-        qos = provider.participant_qos_from_profile(
-            "Participants::FactoryDefaults"
-        )
+        qos = provider.participant_qos_from_profile("Participants::FactoryDefaults")
         assert qos is not None
         assert qos is not None

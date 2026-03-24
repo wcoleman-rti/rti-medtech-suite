@@ -454,3 +454,90 @@ after closure. They form the project's decision log.
   `job="connext_logger"` (not `collector-service`). Use
   `category="N/A"` to filter to user-category logs.
 - **Date closed:** 2026-03-24
+
+---
+
+## INC-015: markdownlint-cli Node 18 compatibility
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.8
+- **Documents involved:** `scripts/ci.sh`
+- **Description:** The latest `markdownlint-cli` (0.42+) requires
+  Node.js 20+. The development environment runs Node.js 18.19.1.
+  Pinned to `markdownlint-cli@0.39.0` which is the last version
+  compatible with Node 18.
+- **Resolution:** CI script checks PATH first, then falls back to
+  `/tmp/mdlint/node_modules/.bin/markdownlint`. Install command:
+  `npm install --prefix /tmp/mdlint markdownlint-cli@0.39.0`.
+- **Guideline:** When adding Node-based CLI tools, verify the
+  minimum Node.js version. Pin to a compatible release rather than
+  using `@latest`.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-016: CTest quiet mode suppresses summary line
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.8
+- **Documents involved:** `scripts/ci.sh`
+- **Description:** `ctest -q` suppresses the "100% tests passed"
+  summary line, so `grep -q "100%"` used for the CI gate check
+  would always fail even when all tests passed. Gate 3 initially
+  ran CTest twice (once for output, once for the check) which also
+  doubled execution time.
+- **Resolution:** Capture CTest output once with `|| true`, display
+  the tail, and grep the captured output for "tests passed" to
+  determine pass/fail.
+- **Guideline:** For CI gate checks, capture command output into a
+  variable and parse it — avoid running the same command twice or
+  relying on quiet-mode output format.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-017: Integration test sleep durations dominated suite runtime
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.8
+- **Documents involved:** `tests/integration/test_domain_isolation.py`,
+  `tests/integration/test_partition_isolation.py`
+- **Description:** Non-discovery validation sleeps in integration
+  tests were set to 5s (domain isolation) and 3s (partition
+  isolation), making the full pytest suite take ~63s. On localhost,
+  DDS discovery completes in well under 1 second, so 2s is ample
+  to confirm that non-discovery holds.
+- **Resolution:** Reduced non-discovery sleeps from 5s→2s and
+  data-exchange waits from 2–3s→1–2s. Suite time reduced by ~15s.
+- **Guideline:** For non-discovery validation tests, 2s is
+  sufficient on localhost. Only increase if running across physical
+  network boundaries.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-018: Bash `set -euo pipefail` requires guards on grep absence checks
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.8
+- **Documents involved:** `scripts/ci.sh`
+- **Description:** Under `set -euo pipefail`, a `grep` that
+  legitimately matches zero lines returns exit code 1, which
+  triggers immediate script termination. This affects "absence
+  checks" (e.g., verifying no `print()` calls exist) where zero
+  matches is the success case.
+- **Resolution:** Use `if grep ... ; then VIOLATION` pattern
+  (grep inside an `if` does not trigger `set -e`) or append
+  `|| true` when the command's exit code is checked manually.
+- **Guideline:** In `set -e` bash scripts, always wrap grep-based
+  absence checks in `if` conditionals rather than relying on exit
+  code suppression.
+- **Date closed:** 2026-03-24

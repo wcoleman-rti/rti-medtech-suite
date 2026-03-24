@@ -3,13 +3,9 @@
 Tags: @gui @integration
 """
 
-import os
-
 import pytest
-from PySide6.QtGui import QFontDatabase
-from PySide6.QtWidgets import QApplication
-
 from medtech_gui import init_theme
+from PySide6.QtGui import QFontDatabase
 
 REQUIRED_FAMILIES = {"Roboto Condensed", "Montserrat", "Roboto Mono"}
 

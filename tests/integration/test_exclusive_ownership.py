@@ -9,18 +9,17 @@ primary failure, and primary reclaim on recovery using DeviceTelemetry.
 
 import time
 
-import pytest
-import rti.connextdds as dds
 import devices
-
-from conftest import wait_for_discovery, wait_for_data
+import rti.connextdds as dds
+from conftest import wait_for_data, wait_for_discovery
 
 TEST_DOMAIN = 0
 DeviceTelemetry = devices.Devices.DeviceTelemetry
 
 
 def _make_telemetry(
-    device_id: str, battery: float = 100.0,
+    device_id: str,
+    battery: float = 100.0,
 ) -> DeviceTelemetry:
     """Create a DeviceTelemetry sample with the given key."""
     sample = DeviceTelemetry()
@@ -54,7 +53,10 @@ class TestHigherStrengthPreferred:
     """Higher-strength writer is preferred when both are alive."""
 
     def test_subscriber_receives_from_stronger_writer(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         """Given writer A (strength 100) and writer B (strength 50),
         subscribers receive data only from writer A."""
@@ -67,10 +69,14 @@ class TestHigherStrengthPreferred:
         topic_r = dds.Topic(p_r, "OwnershipTest", DeviceTelemetry)
 
         w_a = writer_factory(
-            p_a, topic_a, qos=_make_exclusive_writer_qos(100),
+            p_a,
+            topic_a,
+            qos=_make_exclusive_writer_qos(100),
         )
         w_b = writer_factory(
-            p_b, topic_b, qos=_make_exclusive_writer_qos(50),
+            p_b,
+            topic_b,
+            qos=_make_exclusive_writer_qos(50),
         )
         r = reader_factory(p_r, topic_r, qos=_make_exclusive_reader_qos())
 
@@ -93,16 +99,19 @@ class TestHigherStrengthPreferred:
         assert len(valid) >= 1, "Should receive at least one sample"
         # Only writer A's data should be delivered (battery=90)
         batteries = [s.data.battery_percent for s in valid]
-        assert all(b == 90.0 for b in batteries), (
-            f"All samples should be from strong writer (90.0), got {batteries}"
-        )
+        assert all(
+            b == 90.0 for b in batteries
+        ), f"All samples should be from strong writer (90.0), got {batteries}"
 
 
 class TestFailoverToBackup:
     """Failover to backup writer when primary fails."""
 
     def test_backup_takes_over_on_primary_failure(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         """Given writer A (strength 100) fails, subscribers automatically
         begin receiving from writer B (strength 50)."""
@@ -115,10 +124,14 @@ class TestFailoverToBackup:
         topic_r = dds.Topic(p_r, "FailoverTest", DeviceTelemetry)
 
         w_a = writer_factory(
-            p_a, topic_a, qos=_make_exclusive_writer_qos(100),
+            p_a,
+            topic_a,
+            qos=_make_exclusive_writer_qos(100),
         )
         w_b = writer_factory(
-            p_b, topic_b, qos=_make_exclusive_writer_qos(50),
+            p_b,
+            topic_b,
+            qos=_make_exclusive_writer_qos(50),
         )
         r = reader_factory(p_r, topic_r, qos=_make_exclusive_reader_qos())
 
@@ -154,19 +167,20 @@ class TestFailoverToBackup:
 
         received = r.take()
         valid = [s for s in received if s.info.valid]
-        assert len(valid) >= 1, (
-            "Backup should deliver data after primary failure"
-        )
-        assert any(s.data.battery_percent == 55.0 for s in valid), (
-            "Should receive backup writer's data (battery=55)"
-        )
+        assert len(valid) >= 1, "Backup should deliver data after primary failure"
+        assert any(
+            s.data.battery_percent == 55.0 for s in valid
+        ), "Should receive backup writer's data (battery=55)"
 
 
 class TestPrimaryReclaim:
     """Primary reclaims ownership on recovery."""
 
     def test_primary_reclaims_after_recovery(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         """Given writer B has taken over, when writer A recovers,
         subscribers switch back to writer A."""
@@ -179,10 +193,14 @@ class TestPrimaryReclaim:
         topic_r = dds.Topic(p_r, "ReclaimTest", DeviceTelemetry)
 
         w_a = writer_factory(
-            p_a, topic_a, qos=_make_exclusive_writer_qos(100),
+            p_a,
+            topic_a,
+            qos=_make_exclusive_writer_qos(100),
         )
         w_b = writer_factory(
-            p_b, topic_b, qos=_make_exclusive_writer_qos(50),
+            p_b,
+            topic_b,
+            qos=_make_exclusive_writer_qos(50),
         )
         r = reader_factory(p_r, topic_r, qos=_make_exclusive_reader_qos())
 
@@ -210,7 +228,9 @@ class TestPrimaryReclaim:
         p_a2 = participant_factory(domain_id=TEST_DOMAIN)
         topic_a2 = dds.Topic(p_a2, "ReclaimTest", DeviceTelemetry)
         w_a2 = writer_factory(
-            p_a2, topic_a2, qos=_make_exclusive_writer_qos(100),
+            p_a2,
+            topic_a2,
+            qos=_make_exclusive_writer_qos(100),
         )
         p_a2.assert_liveliness()
         assert wait_for_discovery(w_a2, r, timeout_sec=10)

@@ -15,9 +15,9 @@ import rti.connextdds as dds
 @pytest.fixture(autouse=True, scope="session")
 def _check_qos_env():
     """Ensure NDDS_QOS_PROFILES is set before any test session."""
-    assert os.environ.get("NDDS_QOS_PROFILES"), (
-        "NDDS_QOS_PROFILES not set — source install/setup.bash first"
-    )
+    assert os.environ.get(
+        "NDDS_QOS_PROFILES"
+    ), "NDDS_QOS_PROFILES not set — source install/setup.bash first"
 
 
 @pytest.fixture
@@ -36,9 +36,7 @@ def _make_participant(domain_id, domain_tag=None, qos=None):
         qos = dds.DomainParticipant.default_participant_qos
 
     if domain_tag is not None:
-        qos.property[
-            "dds.domain_participant.domain_tag"
-        ] = domain_tag
+        qos.property["dds.domain_participant.domain_tag"] = domain_tag
 
     return dds.DomainParticipant(domain_id, qos)
 
@@ -135,10 +133,7 @@ def wait_for_discovery(writer, reader, timeout_sec=5.0):
     """Wait until a writer and reader have discovered each other."""
     deadline = time.time() + timeout_sec
     while time.time() < deadline:
-        if (
-            writer.matched_subscriptions
-            and reader.matched_publications
-        ):
+        if writer.matched_subscriptions and reader.matched_publications:
             return True
         time.sleep(0.05)
     return False

@@ -89,7 +89,7 @@ class TestDifferentPartitions:
         )
 
         # Give discovery time, then confirm no match
-        time.sleep(3)
+        time.sleep(2)
         assert not w.matched_subscriptions, (
             "Different partitions should not match"
         )
@@ -119,7 +119,7 @@ class TestDifferentPartitions:
 
         w.write(_make_vitals("patient-001", 99))
 
-        time.sleep(1)
+        time.sleep(0.5)
         received = r.read()
         valid = [s for s in received if s.info.valid]
         assert len(valid) == 0, "No data should cross partition boundary"

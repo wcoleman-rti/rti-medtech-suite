@@ -1,7 +1,6 @@
 """Tests for medtech_logging (Step 1.7 test gates)."""
 
 import pytest
-
 from medtech_logging import ModuleLogger, ModuleName, init_logging
 
 

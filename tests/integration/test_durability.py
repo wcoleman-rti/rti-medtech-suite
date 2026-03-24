@@ -9,11 +9,9 @@ using generated types (ProcedureContext, RobotCommand).
 
 import time
 
-import pytest
 import rti.connextdds as dds
 import surgery
-
-from conftest import wait_for_discovery, wait_for_data
+from conftest import wait_for_data, wait_for_discovery
 
 TEST_DOMAIN = 0
 ProcedureContext = surgery.Surgery.ProcedureContext
@@ -24,7 +22,10 @@ class TestTransientLocalLateJoiner:
     """TRANSIENT_LOCAL delivers historical data to late joiners."""
 
     def test_late_joiner_receives_most_recent(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         """Given 5 samples with TRANSIENT_LOCAL + KEEP_LAST 1,
         a late-joining subscriber receives exactly 1 (most recent)."""
@@ -66,20 +67,21 @@ class TestTransientLocalLateJoiner:
 
         received = r.take()
         valid = [s for s in received if s.info.valid]
-        assert len(valid) == 1, (
-            f"Late joiner should receive exactly 1 sample, got {len(valid)}"
-        )
+        assert (
+            len(valid) == 1
+        ), f"Late joiner should receive exactly 1 sample, got {len(valid)}"
         assert valid[0].data.procedure_id == "proc-001"
-        assert valid[0].data.room == "OR-5", (
-            "Should receive the most recent sample"
-        )
+        assert valid[0].data.room == "OR-5", "Should receive the most recent sample"
 
 
 class TestVolatileNoHistory:
     """VOLATILE does not deliver historical data."""
 
     def test_late_joiner_gets_no_history(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         """Given samples published with VOLATILE durability,
         a late-joining subscriber receives no historical samples."""
@@ -116,12 +118,15 @@ class TestVolatileNoHistory:
 
         received = r.read()
         valid = [s for s in received if s.info.valid]
-        assert len(valid) == 0, (
-            "VOLATILE late joiner should receive no historical samples"
-        )
+        assert (
+            len(valid) == 0
+        ), "VOLATILE late joiner should receive no historical samples"
 
     def test_receives_after_join(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         """After joining, subscriber receives newly published samples."""
         p1 = participant_factory(domain_id=TEST_DOMAIN)
@@ -148,7 +153,5 @@ class TestVolatileNoHistory:
         w.write(sample)
 
         received = wait_for_data(r, timeout_sec=5)
-        assert len(received) >= 1, (
-            "Should receive samples published after join"
-        )
+        assert len(received) >= 1, "Should receive samples published after join"
         assert received[0].data.command_id == 99

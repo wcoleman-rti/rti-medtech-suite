@@ -8,11 +8,9 @@ Tests for deadline missed, liveliness lost, lifespan expiry, and KEEP_LAST.
 
 import time
 
-import pytest
-import rti.connextdds as dds
 import monitoring
-
-from conftest import wait_for_discovery, wait_for_data
+import rti.connextdds as dds
+from conftest import wait_for_data, wait_for_discovery
 
 TEST_DOMAIN = 0
 PatientVitals = monitoring.Monitoring.PatientVitals
@@ -55,7 +53,10 @@ class TestDeadline:
     """Deadline violation detected when publisher stops."""
 
     def test_deadline_missed_on_timeout(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         """When publisher stops, subscriber's deadline-missed status triggers."""
         deadline_sec = 1.0
@@ -66,14 +67,10 @@ class TestDeadline:
         topic1 = dds.Topic(p1, "DeadlineTest", PatientVitals)
         topic2 = dds.Topic(p2, "DeadlineTest", PatientVitals)
 
-        wqos = _make_qos_with_deadline(
-            dds.DataWriterQos(), deadline_sec
-        )
+        wqos = _make_qos_with_deadline(dds.DataWriterQos(), deadline_sec)
         wqos = _make_qos_reliable_transient(wqos)
 
-        rqos = _make_qos_with_deadline(
-            dds.DataReaderQos(), deadline_sec
-        )
+        rqos = _make_qos_with_deadline(dds.DataReaderQos(), deadline_sec)
         rqos = _make_qos_reliable_transient(rqos)
 
         w = writer_factory(p1, topic1, qos=wqos)
@@ -88,16 +85,19 @@ class TestDeadline:
         time.sleep(deadline_sec * 2.5)
 
         status = r.requested_deadline_missed_status
-        assert status.total_count > 0, (
-            "Deadline missed should be detected when publisher stops"
-        )
+        assert (
+            status.total_count > 0
+        ), "Deadline missed should be detected when publisher stops"
 
 
 class TestLiveliness:
     """Liveliness lost detected when participant goes away."""
 
     def test_liveliness_lost_on_close(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         """When writer's participant closes, reader detects liveliness lost."""
         lease_sec = 1.0
@@ -157,7 +157,10 @@ class TestLifespan:
     """Lifespan prevents delivery of stale data."""
 
     def test_stale_sample_not_delivered(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         """A sample older than its lifespan is not delivered to the reader."""
         lifespan_sec = 0.2  # 200 ms
@@ -168,9 +171,7 @@ class TestLifespan:
         topic1 = dds.Topic(p1, "LifespanTest", PatientVitals)
         topic2 = dds.Topic(p2, "LifespanTest", PatientVitals)
 
-        wqos = _make_qos_with_lifespan(
-            dds.DataWriterQos(), lifespan_sec
-        )
+        wqos = _make_qos_with_lifespan(dds.DataWriterQos(), lifespan_sec)
         wqos = _make_qos_reliable_transient(wqos)
 
         rqos = _make_qos_reliable_transient(dds.DataReaderQos())
@@ -190,16 +191,17 @@ class TestLifespan:
 
         received = r.read()
         valid = [s for s in received if s.info.valid]
-        assert len(valid) == 0, (
-            "Stale sample (beyond lifespan) should not be delivered"
-        )
+        assert len(valid) == 0, "Stale sample (beyond lifespan) should not be delivered"
 
 
 class TestKeepLast:
     """KEEP_LAST 1 delivers only the most recent sample."""
 
     def test_keep_last_1_most_recent_only(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         p1 = participant_factory(domain_id=TEST_DOMAIN)
         p2 = participant_factory(domain_id=TEST_DOMAIN)
@@ -234,9 +236,9 @@ class TestKeepLast:
 
         received = r.take()
         valid = [s for s in received if s.info.valid]
-        assert len(valid) == 1, (
-            f"KEEP_LAST 1 should deliver exactly 1 sample, got {len(valid)}"
-        )
-        assert valid[0].data.heart_rate == 5, (
-            "Should receive the most recent sample (heart_rate=5)"
-        )
+        assert (
+            len(valid) == 1
+        ), f"KEEP_LAST 1 should deliver exactly 1 sample, got {len(valid)}"
+        assert (
+            valid[0].data.heart_rate == 5
+        ), "Should receive the most recent sample (heart_rate=5)"

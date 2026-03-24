@@ -278,23 +278,23 @@
 
 ### Work
 
-- Create a top-level `Makefile` (or `scripts/ci.sh`) that runs all quality gates from [workflow.md](../workflow.md) Section 7 in sequence:
+- Create `scripts/ci.sh` (bash — target environments are Linux-only: Docker containers and WSL dev machines) that runs all quality gates from [workflow.md](../workflow.md) Section 7 in sequence:
   1. `cmake -B build -S . && cmake --build build && cmake --install build` — clean build + install
   2. `pytest tests/` — full test suite (zero failures, zero skips)
   3. `markdownlint modules/*/README.md services/*/README.md` — README lint
   4. `python tests/lint/check_readme_sections.py` — section order lint
   5. `grep` checks for prohibited patterns: QoS setter API calls in application code, literal domain IDs (10, 11) in application code, `print()`/`printf`/`std::cout` in application code
   6. Verify no generated files in source tree
-  7. `black --check .` + `isort --check .` + `ruff check .` — Python code style per `vision/coding-standards.md`
+  7. `black --check modules/ tests/` + `isort --check modules/ tests/` + `ruff check modules/ tests/` — Python code style per `vision/coding-standards.md` (scoped to source dirs, excluding build artifacts and `.venv`)
   8. `python tests/performance/benchmark.py` — performance benchmark against latest baseline (from Phase 2 onward; Phase 1 produces the harness only)
 - The script must exit non-zero on the first gate failure
 - Document how to run the full gate check locally: `make ci` or `bash scripts/ci.sh`
 
 ### Test Gate
 
-- [ ] `make ci` (or equivalent) runs all quality gates end-to-end
-- [ ] A deliberately introduced violation (e.g., a `print()` call) causes the gate to fail
-- [ ] Gate passes on the clean foundation with no violations
+- [x] `make ci` (or equivalent) runs all quality gates end-to-end
+- [x] A deliberately introduced violation (e.g., a `print()` call) causes the gate to fail
+- [x] Gate passes on the clean foundation with no violations
 
 ---
 

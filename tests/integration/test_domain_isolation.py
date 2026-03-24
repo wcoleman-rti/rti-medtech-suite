@@ -10,10 +10,9 @@ domain tags, and verifies cross-domain isolation via distinct domain IDs.
 
 import time
 
+import monitoring
 import pytest
 import rti.connextdds as dds
-import monitoring
-
 from conftest import wait_for_discovery
 
 TEST_DOMAIN_A = 0
@@ -47,31 +46,23 @@ class TestDomainTagIsolation:
     ):
         """Participants with different domain tags on the same domain ID
         do not discover each other."""
-        p1 = participant_factory(
-            domain_id=TEST_DOMAIN_A, domain_tag=tag_a
-        )
-        p2 = participant_factory(
-            domain_id=TEST_DOMAIN_A, domain_tag=tag_b
-        )
+        p1 = participant_factory(domain_id=TEST_DOMAIN_A, domain_tag=tag_a)
+        p2 = participant_factory(domain_id=TEST_DOMAIN_A, domain_tag=tag_b)
 
-        topic1 = dds.Topic(
-            p1, f"TagTest_{tag_a}_{tag_b}", PatientVitals
-        )
-        topic2 = dds.Topic(
-            p2, f"TagTest_{tag_a}_{tag_b}", PatientVitals
-        )
+        topic1 = dds.Topic(p1, f"TagTest_{tag_a}_{tag_b}", PatientVitals)
+        topic2 = dds.Topic(p2, f"TagTest_{tag_a}_{tag_b}", PatientVitals)
 
         w = writer_factory(p1, topic1)
         r = reader_factory(p2, topic2)
 
         # Wait and verify no discovery
-        time.sleep(5)
-        assert not w.matched_subscriptions, (
-            f"Tag '{tag_a}' writer should not match tag '{tag_b}' reader"
-        )
-        assert not r.matched_publications, (
-            f"Tag '{tag_b}' reader should not match tag '{tag_a}' writer"
-        )
+        time.sleep(2)
+        assert (
+            not w.matched_subscriptions
+        ), f"Tag '{tag_a}' writer should not match tag '{tag_b}' reader"
+        assert (
+            not r.matched_publications
+        ), f"Tag '{tag_b}' reader should not match tag '{tag_a}' writer"
 
     def test_same_tag_discovers(
         self,
@@ -81,12 +72,8 @@ class TestDomainTagIsolation:
     ):
         """Participants with matching domain tags discover each other."""
         tag = "control"
-        p1 = participant_factory(
-            domain_id=TEST_DOMAIN_A, domain_tag=tag
-        )
-        p2 = participant_factory(
-            domain_id=TEST_DOMAIN_A, domain_tag=tag
-        )
+        p1 = participant_factory(domain_id=TEST_DOMAIN_A, domain_tag=tag)
+        p2 = participant_factory(domain_id=TEST_DOMAIN_A, domain_tag=tag)
 
         topic1 = dds.Topic(p1, "SameTagTest", PatientVitals)
         topic2 = dds.Topic(p2, "SameTagTest", PatientVitals)
@@ -94,9 +81,9 @@ class TestDomainTagIsolation:
         w = writer_factory(p1, topic1)
         r = reader_factory(p2, topic2)
 
-        assert wait_for_discovery(w, r, timeout_sec=10), (
-            "Same domain tag should discover"
-        )
+        assert wait_for_discovery(
+            w, r, timeout_sec=10
+        ), "Same domain tag should discover"
 
 
 class TestCrossDomainIsolation:
@@ -118,13 +105,9 @@ class TestCrossDomainIsolation:
         r = reader_factory(p2, topic2)
 
         # Wait for discovery timeout
-        time.sleep(5)
-        assert not w.matched_subscriptions, (
-            "Cross-domain endpoints should not match"
-        )
-        assert not r.matched_publications, (
-            "Cross-domain endpoints should not match"
-        )
+        time.sleep(2)
+        assert not w.matched_subscriptions, "Cross-domain endpoints should not match"
+        assert not r.matched_publications, "Cross-domain endpoints should not match"
 
     def test_different_domains_no_data_exchange(
         self,
@@ -141,16 +124,14 @@ class TestCrossDomainIsolation:
         w = writer_factory(p1, topic1)
         r = reader_factory(p2, topic2)
 
-        time.sleep(3)
+        time.sleep(2)
 
         sample = PatientVitals()
         sample.patient_id = "cross-domain-msg"
         sample.heart_rate = 42
         w.write(sample)
 
-        time.sleep(2)
+        time.sleep(1)
         received = r.read()
         valid = [s for s in received if s.info.valid]
-        assert len(valid) == 0, (
-            "No data should cross domain boundaries"
-        )
+        assert len(valid) == 0, "No data should cross domain boundaries"

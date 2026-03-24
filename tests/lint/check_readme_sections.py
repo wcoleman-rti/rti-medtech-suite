@@ -57,9 +57,7 @@ def check_readme(path: pathlib.Path) -> list[str]:
             errors.append(f"{path}: missing required section '## {required}'")
             continue
         if idx <= last_idx:
-            errors.append(
-                f"{path}: section '## {required}' is out of order"
-            )
+            errors.append(f"{path}: section '## {required}' is out of order")
         last_idx = idx
 
     return errors
@@ -68,8 +66,7 @@ def check_readme(path: pathlib.Path) -> list[str]:
 def main() -> int:
     root = pathlib.Path(__file__).resolve().parents[2]
     readme_paths = sorted(
-        list(root.glob("modules/*/README.md"))
-        + list(root.glob("services/*/README.md"))
+        list(root.glob("modules/*/README.md")) + list(root.glob("services/*/README.md"))
     )
 
     if not readme_paths:
