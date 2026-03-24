@@ -720,3 +720,61 @@ after closure. They form the project's decision log.
   launcher script. The value must match the module directory name
   per `vision/technology.md` naming convention.
 - **Date closed:** 2026-03-24
+
+---
+
+## INC-025: rtisetenv prerequisite for Monitoring Library 2.0 at runtime
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 Review
+- **Documents involved:** `setup.bash.in`, `vision/technology.md`
+- **Description:** The project's `setup.bash` adds
+  `install/lib` to `LD_LIBRARY_PATH`, but `librtimonitoring2.so`
+  resides under the Connext installation tree
+  (`$NDDSHOME/lib/<arch>/` and `$NDDSHOME/resource/app/lib/<arch>/`).
+  Without sourcing `rtisetenv` (or otherwise adding the Connext
+  library directories to `LD_LIBRARY_PATH`) before running tests or
+  applications, every DDS participant that enables the Monitoring
+  Library fails to load the shared library. During the Phase 1
+  compliance audit this manifested as 35 import errors and 3 test
+  failures — all resolved by sourcing `rtisetenv` first.
+- **Guideline:** For local development, always source `rtisetenv`
+  before `setup.bash`. The Docker runtime images already have
+  Connext libraries on the default library path, so containers are
+  not affected. Future sessions must not diagnose monitoring-related
+  `ImportError` or `OSError` without first confirming `rtisetenv`
+  has been sourced.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-026: Vision doc propagation gap after incident-driven design changes
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 Review
+- **Documents involved:** `vision/data-model.md`, `vision/technology.md`
+- **Description:** INC-004 refactored the `AlarmMessages` aggregate
+  type to a per-alarm keyed `AlarmMessage` struct, and INC-002
+  adopted the `-noSysPathGeneration` flat Python layout. Both
+  incidents changed the implementation and updated the directly
+  affected files (IDL, CMakeLists.txt, domains.xml), but neither
+  propagated the changes to all referencing vision documents. The
+  Phase 1 compliance audit found 8 stale `Monitoring::AlarmMessages`
+  type references in `data-model.md` and an entire obsolete
+  subdirectory-based Python packaging subsection in `technology.md`.
+  These were corrected in commit `54de015`.
+- **Root cause:** The incident closure process did not include a
+  cross-reference audit of all vision/spec documents that mention
+  the changed entity. When an incident changes a type name, install
+  layout, or other structural element, every vision and spec
+  document that references that element must be checked and updated.
+- **Guideline:** When closing any incident that changes a type name,
+  topic name, install path, QoS profile name, or other structural
+  identifier, grep the full `docs/agent/` tree for all references
+  and update them before marking the incident closed. A convenient
+  check: `grep -r "<old_name>" docs/agent/`.
+- **Date closed:** 2026-03-24
