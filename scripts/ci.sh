@@ -189,6 +189,16 @@ else
 fi
 pass
 
+# ─── Gate 10: QoS compatibility check ─────────────────────────────
+gate "QoS compatibility pre-flight check"
+if [ -f tools/qos-checker.py ]; then
+    python tools/qos-checker.py || fail "QoS incompatibilities detected"
+    pass
+else
+    echo "  QoS checker not yet implemented."
+    pass
+fi
+
 # ─── Summary ──────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
