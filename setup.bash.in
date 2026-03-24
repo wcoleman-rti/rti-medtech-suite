@@ -30,7 +30,7 @@ export NDDS_QOS_PROFILES="$_DIR/share/qos/Snippets.xml;\
 $_DIR/share/qos/Patterns.xml;\
 $_DIR/share/qos/Topics.xml;\
 $_DIR/share/qos/Participants.xml;\
-$_DIR/share/domains/domains.xml"
+$_DIR/share/domains/Domains.xml"
 
 # Runtime configuration root
 export MEDTECH_CONFIG_DIR="$_DIR/etc"

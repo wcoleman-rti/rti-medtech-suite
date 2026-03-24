@@ -58,7 +58,7 @@ This ensures:
 QoS and domain library XML files are loaded at runtime via the `NDDS_QOS_PROFILES` environment variable. This variable lists all XML files in dependency order (Snippets before Patterns, Patterns before Topics, etc.). Applications do not hardcode XML file paths.
 
 ```bash
-export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/domains.xml"
+export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/Domains.xml"
 ```
 
 Docker Compose sets this variable for all service containers. Local development sets it in the shell or via a wrapper script.
@@ -202,10 +202,10 @@ Domain IDs start at 10 (domain 0 is reserved for prototyping/testing).
 
 **Domain Naming Rule:** Numeric domain IDs are defined **exactly once** — in the
 headings below (e.g., "Domain 10 — Procedure") and in the corresponding
-`<domain>` element in `domains.xml`. Every other document, code comment,
+`<domain>` element in `Domains.xml`. Every other document, code comment,
 spec scenario, implementation step, and log message must reference a domain
 by **name only** (e.g., "Procedure domain", "Hospital domain", "Observability domain").
-If a domain ID changes, only this section and `domains.xml` require an update.
+If a domain ID changes, only this section and `Domains.xml` require an update.
 
 ### Domain 10 — Procedure
 
@@ -293,7 +293,7 @@ Dedicated domain for **RTI Observability Framework** telemetry. Monitoring Libra
 - **Safety** — temporarily increasing telemetry verbosity for debugging must not affect discovery, deadline enforcement, or sample delivery on Domains 10 or 11.
 - **Isolation** — Collector Service only needs to join the Observability domain. It does not participate in application domains, reducing its attack surface and resource footprint.
 
-The Observability domain has **no domain tags** and **no application-defined topics**. Monitoring Library 2.0 creates its internal telemetry topics, publishers, and subscribers automatically — no XML topic or endpoint definitions are needed in `domains.xml`.
+The Observability domain has **no domain tags** and **no application-defined topics**. Monitoring Library 2.0 creates its internal telemetry topics, publishers, and subscribers automatically — no XML topic or endpoint definitions are needed in `Domains.xml`.
 
 #### Configuration
 

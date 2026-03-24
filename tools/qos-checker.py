@@ -210,7 +210,7 @@ def format_qos_summary(qos, kind="writer"):
 
 
 def parse_domain_topics(domains_xml_path):
-    """Parse domains.xml and return {domain_name: [topic_names]}.
+    """Parse Domains.xml and return {domain_name: [topic_names]}.
 
     Skips domains with no topics (e.g. Observability).
     """
@@ -227,11 +227,11 @@ def parse_domain_topics(domains_xml_path):
 
 
 def find_domains_xml():
-    """Locate domains.xml from the NDDS_QOS_PROFILES environment variable."""
+    """Locate Domains.xml from the NDDS_QOS_PROFILES environment variable."""
     profiles = os.environ.get("NDDS_QOS_PROFILES", "")
     for path in profiles.split(";"):
         path = path.strip()
-        if path.endswith("domains.xml") and os.path.isfile(path):
+        if path.endswith("Domains.xml") and os.path.isfile(path):
             return path
     return None
 
@@ -313,7 +313,7 @@ def main():
     domains_xml = find_domains_xml()
     if not domains_xml:
         print(
-            "ERROR: Cannot find domains.xml in NDDS_QOS_PROFILES",
+            "ERROR: Cannot find Domains.xml in NDDS_QOS_PROFILES",
             file=sys.stderr,
         )
         sys.exit(2)

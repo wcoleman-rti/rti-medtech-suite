@@ -103,7 +103,7 @@
 - Author the domain library XML under `interfaces/domains/` with the same schema declaration
 - Configure `NDDS_QOS_PROFILES` environment variable to load all XML files in dependency order at runtime. This is the mechanism by which applications discover QoS profiles — no application code hardcodes XML file paths:
   ```bash
-  export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/domains.xml"
+  export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/Domains.xml"
   ```
 - All applications must use the default QosProvider:
   - C++: `dds::core::QosProvider::Default()`
@@ -128,7 +128,7 @@
 - Submit the following artifacts to `rti-chatbot-mcp` for design review per [workflow.md](../workflow.md) Section 8:
   - All IDL type definitions under `interfaces/idl/`
   - QoS XML hierarchy (`Snippets.xml`, `Patterns.xml`, `Topics.xml`, `Participants.xml`)
-  - Domain library XML (`interfaces/domains/domains.xml`)
+  - Domain library XML (`interfaces/domains/Domains.xml`)
   - Publication model assignments from `vision/data-model.md`
 - Review focus areas:
   - QoS compatibility across all writer/reader profile pairs (RxO policy matching)

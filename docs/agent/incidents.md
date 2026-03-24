@@ -113,7 +113,7 @@ after closure. They form the project's decision log.
 - **Date opened:** 2026-03-23
 - **Phase/Step:** Phase 1 / Step 1.3b
 - **Documents involved:** IDL files, `Topics.xml`, `Participants.xml`,
-  `domains.xml`, `vision/data-model.md`
+  `Domains.xml`, `vision/data-model.md`
 - **Description:** Submitted all IDL, QoS XML, and domain XML artifacts
   to `rti-chatbot-mcp` for design review. Six findings identified:
   - **F1 (Fixed):** `@key EntityIdentity patient` includes mutable `name`
@@ -761,7 +761,7 @@ after closure. They form the project's decision log.
   type to a per-alarm keyed `AlarmMessage` struct, and INC-002
   adopted the `-noSysPathGeneration` flat Python layout. Both
   incidents changed the implementation and updated the directly
-  affected files (IDL, CMakeLists.txt, domains.xml), but neither
+  affected files (IDL, CMakeLists.txt, Domains.xml), but neither
   propagated the changes to all referencing vision documents. The
   Phase 1 compliance audit found 8 stale `Monitoring::AlarmMessages`
   type references in `data-model.md` and an entire obsolete

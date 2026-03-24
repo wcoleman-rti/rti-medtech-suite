@@ -75,7 +75,7 @@ install(FILES
     DESTINATION share/qos
 )
 install(FILES
-    interfaces/domains/domains.xml
+    interfaces/domains/Domains.xml
     DESTINATION share/domains
 )
 

@@ -149,7 +149,7 @@ class TestDomainParsing:
     def test_find_domains_xml(self):
         xml = find_domains_xml()
         assert xml is not None
-        assert xml.endswith("domains.xml")
+        assert xml.endswith("Domains.xml")
         assert os.path.isfile(xml)
 
     def test_parse_domain_topics(self):

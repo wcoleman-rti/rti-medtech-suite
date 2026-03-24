@@ -15,5 +15,5 @@ set(_QOS_DIR "${CMAKE_SOURCE_DIR}/interfaces/qos")
 set(_DOM_DIR "${CMAKE_SOURCE_DIR}/interfaces/domains")
 set_tests_properties(qos_loading PROPERTIES
     ENVIRONMENT_MODIFICATION
-        "NDDS_QOS_PROFILES=set:${_QOS_DIR}/Snippets.xml\;${_QOS_DIR}/Patterns.xml\;${_QOS_DIR}/Topics.xml\;${_QOS_DIR}/Participants.xml\;${_DOM_DIR}/domains.xml;MEDTECH_APP_NAME=set:test_qos_loading"
+        "NDDS_QOS_PROFILES=set:${_QOS_DIR}/Snippets.xml\;${_QOS_DIR}/Patterns.xml\;${_QOS_DIR}/Topics.xml\;${_QOS_DIR}/Participants.xml\;${_DOM_DIR}/Domains.xml;MEDTECH_APP_NAME=set:test_qos_loading"
 )
