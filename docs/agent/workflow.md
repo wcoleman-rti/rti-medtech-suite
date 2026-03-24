@@ -127,6 +127,26 @@ code patterns, consult these additional resources (in priority order):
 - **No cleanup detours.** Do not refactor surrounding code, add
   comments to code you did not write, or "improve" file organization
   unless the phase file explicitly calls for it.
+- **Record discoveries after each step.** Before committing a
+  completed step, review the work for discoveries worth preserving:
+  API quirks, workarounds, design decisions that deviated from the
+  literal planning-doc text, patterns that future steps should follow,
+  or environmental findings. Record each as a closed "Discovery"
+  incident in `docs/agent/incidents.md` (see Section 5). Include a
+  **Guideline** field summarising the reusable lesson. This is not
+  optional — the incident log is the project's institutional memory
+  and the primary mechanism for cross-session knowledge transfer.
+- **Suggest doc clarifications.** If a step's implementation revealed
+  that a planning document (vision, spec, or phase file) was ambiguous,
+  incomplete, or could mislead a future agent, note the specific
+  document and section in the commit message or in an incident, and
+  propose a concrete edit to the operator. Do not modify planning docs
+  without approval (Section 1), but do surface improvements proactively.
+  Common triggers:
+  - A vision example that uses a deprecated API or incomplete pattern
+  - A spec scenario whose Given/When/Then is ambiguous about edge cases
+  - A phase step whose test gate wording doesn't match the actual API
+  - A naming convention that was unclear until implementation exposed it
 
 ### Ending a Session
 

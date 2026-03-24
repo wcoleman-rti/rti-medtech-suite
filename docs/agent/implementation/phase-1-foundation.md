@@ -266,11 +266,11 @@
 
 ### Test Gate
 
-- [ ] Python: `init_logging("surgical-procedure")` returns the Logger singleton without errors
-- [ ] C++: `medtech::init_logging("surgical-procedure")` returns the Logger reference without errors
-- [ ] Logger verbosity is controlled by QoS XML — no programmatic `verbosity()` or `verbosity_by_category()` calls exist in module code
-- [ ] A user-category log message written via the Connext Logging API is forwarded by Monitoring Library 2.0 and received by Collector Service
-- [ ] Module name prefix appears correctly in the forwarded log message
+- [x] Python: `init_logging("surgical-procedure")` returns the Logger singleton without errors
+- [x] C++: `medtech::init_logging("surgical-procedure")` returns the Logger reference without errors
+- [x] Logger verbosity is controlled by QoS XML — no programmatic `verbosity()` or `verbosity_by_category()` calls exist in module code
+- [x] A user-category log message written via the Connext Logging API is forwarded by Monitoring Library 2.0 and received by Collector Service
+- [x] Module name prefix appears correctly in the forwarded log message
 
 ---
 

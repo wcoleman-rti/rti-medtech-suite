@@ -52,6 +52,7 @@ endif()
 add_subdirectory(interfaces)
 if(BUILD_TESTING)
     add_subdirectory(tests/qos)
+    add_subdirectory(tests/logging)
 endif()
 
 # --- Generate setup.bash ---
@@ -82,3 +83,11 @@ add_subdirectory(resources)
 install(DIRECTORY modules/shared/medtech_gui/
     DESTINATION lib/python/site-packages/medtech_gui
     FILES_MATCHING PATTERN "*.py")
+install(DIRECTORY modules/shared/medtech_logging/
+    DESTINATION lib/python/site-packages/medtech_logging
+    FILES_MATCHING PATTERN "*.py")
+
+# --- Install shared C++ headers ---
+install(DIRECTORY modules/shared/medtech_logging/include/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.hpp")

@@ -318,3 +318,139 @@ after closure. They form the project's decision log.
   - `THIRD_PARTY_NOTICES.md` owns license attribution.
   - Both must be updated in the same commit when adding a dependency.
 - **Date closed:** 2026-03-24
+
+---
+
+## INC-011: Logging wrapper pattern over direct dds.Logger usage
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.7
+- **Documents involved:** `modules/shared/medtech_logging/_logging.py`,
+  `modules/shared/medtech_logging/include/medtech/logging.hpp`,
+  `vision/technology.md` (Logging Standard)
+- **Description:** The vision document's Logging Standard shows
+  application code calling `dds.Logger.instance` directly with manual
+  `[module-name]` prefixes in every message. This works but has two
+  shortcomings: (a) every call site must remember to include the prefix
+  (a common source of log hygiene failures), and (b) every call site is
+  tightly coupled to `dds.Logger` — swapping the backend later requires
+  touching every file. The `workflow.md` Section 4 prohibition on
+  "custom logging frameworks" targets replacements like `print()`,
+  `spdlog`, or Python `logging` that bypass Connext. A thin delegation
+  wrapper that routes all output through `dds.Logger` enforces the
+  standard rather than bypassing it.
+- **Resolution:** Implemented `ModuleLogger` — a thin composition
+  wrapper around `dds.Logger.instance` (Python) / `rti::config::Logger`
+  (C++) that auto-prefixes every message with `[module-name]`. Call
+  sites use `log.notice("msg")` with no manual prefix. The backend
+  can be swapped by changing only `_logging.py` / `logging.hpp`
+  internals. This is categorised as a convenience adapter, not a
+  custom logging framework, and remains compliant with the
+  vision/technology.md Logging Standard.
+- **Guideline:** Shared utilities that wrap RTI APIs are acceptable
+  when they (a) delegate all I/O to the underlying RTI API, (b) do
+  not suppress or alter severity/routing behavior, and (c) create a
+  single substitution point for future backend changes. The wrapper
+  pattern should be used for any shared infrastructure that may need
+  to be swapped.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-012: Type-safe module name enum over raw strings
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.7
+- **Documents involved:** `modules/shared/medtech_logging/_logging.py`,
+  `modules/shared/medtech_logging/include/medtech/logging.hpp`
+- **Description:** The initial `init_logging()` API accepted a raw
+  `str` (Python) / `std::string` (C++) for the module name, validated
+  at runtime against a `frozenset` / `std::array`. This allows typos
+  to compile and only fail at runtime. Since module names are a closed
+  set matching directory names, an enumeration provides compile-time
+  (C++) / IDE-autocomplete (Python) safety.
+- **Resolution:** Replaced raw strings with:
+  - Python: `ModuleName(str, Enum)` — compatible with Python 3.10+
+    (uses `str, Enum` base instead of `StrEnum` which requires 3.11).
+    Members are strings, usable directly in f-strings and comparisons.
+  - C++: `enum class ModuleName` with `constexpr to_string()` returning
+    `std::string_view`.
+  `init_logging()` now takes the enum type, making invalid module names
+  a static error (C++) or IDE-flagged mistake (Python).
+- **Guideline:** Prefer enumerations over raw strings for closed sets
+  of identifiers (module names, domain names, partition templates).
+  Use `str, Enum` in Python 3.10+ for string-compatible enums.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-013: rti::config::Logger string\_view overloads not in linked libraries
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.7
+- **Documents involved:**
+  `modules/shared/medtech_logging/include/medtech/logging.hpp`
+- **Description:** The RTI Connext 7.6.0 Modern C++ API documents two
+  overloads for each `rti::config::Logger` user-category method:
+  `const char*` and `std::string_view`. In practice, passing a
+  `std::string` (which implicitly converts to `std::string_view`)
+  results in an undefined-reference linker error — the
+  `std::string_view` overloads are declared in the header but not
+  present in the shipped shared libraries for the
+  `x64Linux4gcc8.5.0` architecture.
+- **Resolution:** Call the `const char*` overloads explicitly via
+  `.c_str()` on the concatenated `std::string`. This avoids the
+  `string_view` codepath entirely. Example:
+  `logger_.notice((prefix_ + msg).c_str());`
+- **Guideline:** When using `rti::config::Logger` user-category
+  methods in C++, always pass `const char*` (via `.c_str()`) rather
+  than relying on implicit `std::string` → `std::string_view`
+  conversion, until RTI ships the `string_view` symbols.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-014: Monitoring Library 2.0 lifecycle and Loki label schema
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.7
+- **Documents involved:** `interfaces/qos/Participants.xml`,
+  `docker-compose.yml`
+- **Description:** Two findings during the Step 1.7 log-forwarding
+  verification:
+
+  **1. Monitoring Library 2.0 lifecycle:** The monitoring library is
+  *configured* at the `participant_factory_qos` level (process-global),
+  but deferring runtime activation — the dedicated monitoring
+  participant on the Observability domain (Domain 20) does not appear
+  to be created until the first application `DomainParticipant` is
+  created. This means user-category log messages written before any
+  application participant exists may not be forwarded. Once the first
+  participant is created, the monitoring participant is created and
+  log forwarding begins.
+
+  **2. Loki label schema:** Collector Service exports logs to Grafana
+  Loki with the job label `connext_logger` (not `collector-service`
+  as one might assume). User-category logs have `category: "N/A"`,
+  while middleware logs have `category: "Discovery"`, `"Database"`,
+  etc. The `resource_guid` label identifies the source participant.
+  To query user logs in Loki/Grafana, use:
+  `{job="connext_logger", category="N/A"}`.
+- **Resolution:** Documented for future agent sessions. Forwarding
+  test verified: user log with `[surgical-procedure]` prefix
+  appeared in Loki within seconds of being written, confirming the
+  full pipeline (Logger → Monitoring Library 2.0 → Collector Service
+  → Loki) works correctly.
+- **Guideline:** When verifying log forwarding, always create at
+  least one application `DomainParticipant` first. Query Loki with
+  `job="connext_logger"` (not `collector-service`). Use
+  `category="N/A"` to filter to user-category logs.
+- **Date closed:** 2026-03-24
