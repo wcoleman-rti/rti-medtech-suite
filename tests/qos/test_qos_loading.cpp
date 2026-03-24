@@ -24,19 +24,19 @@ protected:
 // --- Snippets: isolated policy chunks ---
 
 TEST_F(QosLoadingTest, SnippetReliable) {
-    auto qos = provider_.datawriter_qos("Snippets::Reliable");
+    auto qos = provider_.datawriter_qos("BuiltinQosSnippetLib::QosPolicy.Reliability.Reliable");
     auto kind = qos.policy<dds::core::policy::Reliability>().kind();
     EXPECT_EQ(kind, dds::core::policy::ReliabilityKind::RELIABLE);
 }
 
 TEST_F(QosLoadingTest, SnippetBestEffort) {
-    auto qos = provider_.datawriter_qos("Snippets::BestEffort");
+    auto qos = provider_.datawriter_qos("BuiltinQosSnippetLib::QosPolicy.Reliability.BestEffort");
     auto kind = qos.policy<dds::core::policy::Reliability>().kind();
     EXPECT_EQ(kind, dds::core::policy::ReliabilityKind::BEST_EFFORT);
 }
 
 TEST_F(QosLoadingTest, SnippetTransientLocal) {
-    auto qos = provider_.datawriter_qos("Snippets::TransientLocal");
+    auto qos = provider_.datawriter_qos("BuiltinQosSnippetLib::QosPolicy.Durability.TransientLocal");
     auto kind = qos.policy<dds::core::policy::Durability>().kind();
     EXPECT_EQ(kind, dds::core::policy::DurabilityKind::TRANSIENT_LOCAL);
 }
@@ -48,20 +48,14 @@ TEST_F(QosLoadingTest, SnippetVolatile) {
 }
 
 TEST_F(QosLoadingTest, SnippetKeepLast1) {
-    auto qos = provider_.datawriter_qos("Snippets::KeepLast1");
+    auto qos = provider_.datawriter_qos("BuiltinQosSnippetLib::QosPolicy.History.KeepLast_1");
     auto hist = qos.policy<dds::core::policy::History>();
     EXPECT_EQ(hist.kind(), dds::core::policy::HistoryKind::KEEP_LAST);
     EXPECT_EQ(hist.depth(), 1);
 }
 
-TEST_F(QosLoadingTest, SnippetKeepLast4) {
-    auto qos = provider_.datawriter_qos("Snippets::KeepLast4");
-    auto depth = qos.policy<dds::core::policy::History>().depth();
-    EXPECT_EQ(depth, 4);
-}
-
 TEST_F(QosLoadingTest, SnippetKeepAll) {
-    auto qos = provider_.datawriter_qos("Snippets::KeepAll");
+    auto qos = provider_.datawriter_qos("BuiltinQosSnippetLib::QosPolicy.History.KeepAll");
     auto kind = qos.policy<dds::core::policy::History>().kind();
     EXPECT_EQ(kind, dds::core::policy::HistoryKind::KEEP_ALL);
 }
@@ -91,7 +85,7 @@ TEST_F(QosLoadingTest, PatternStreamWriter) {
     auto rel = qos.policy<dds::core::policy::Reliability>().kind();
     auto depth = qos.policy<dds::core::policy::History>().depth();
     EXPECT_EQ(rel, dds::core::policy::ReliabilityKind::BEST_EFFORT);
-    EXPECT_EQ(depth, 4);
+    EXPECT_EQ(depth, 1);
 }
 
 // --- Topics: topic-filter-bound QoS resolution (RTI extension API) ---
@@ -114,7 +108,7 @@ TEST_F(QosLoadingTest, TopicFilterOperatorInput) {
     auto depth = qos.policy<dds::core::policy::History>().depth();
     auto deadline_ns = qos.policy<dds::core::policy::Deadline>().period().nanosec();
     EXPECT_EQ(rel, dds::core::policy::ReliabilityKind::BEST_EFFORT);
-    EXPECT_EQ(depth, 4);
+    EXPECT_EQ(depth, 1);
     EXPECT_EQ(deadline_ns, 4000000u);
 }
 
@@ -133,6 +127,6 @@ TEST_F(QosLoadingTest, ParticipantSimulationTransport) {
 }
 
 TEST_F(QosLoadingTest, ParticipantFactoryDefaults) {
-    auto qos = provider_.participant_qos("Participants::FactoryDefaults");
+    auto qos = provider_.participant_qos("Factory::FactoryDefaults");
     (void)qos;
 }

@@ -36,15 +36,21 @@ def provider():
 
 class TestSnippets:
     def test_reliable(self, provider):
-        qos = provider.datawriter_qos_from_profile("Snippets::Reliable")
+        qos = provider.datawriter_qos_from_profile(
+            "BuiltinQosSnippetLib::QosPolicy.Reliability.Reliable"
+        )
         assert qos.reliability.kind == dds.ReliabilityKind.RELIABLE
 
     def test_best_effort(self, provider):
-        qos = provider.datawriter_qos_from_profile("Snippets::BestEffort")
+        qos = provider.datawriter_qos_from_profile(
+            "BuiltinQosSnippetLib::QosPolicy.Reliability.BestEffort"
+        )
         assert qos.reliability.kind == dds.ReliabilityKind.BEST_EFFORT
 
     def test_transient_local(self, provider):
-        qos = provider.datawriter_qos_from_profile("Snippets::TransientLocal")
+        qos = provider.datawriter_qos_from_profile(
+            "BuiltinQosSnippetLib::QosPolicy.Durability.TransientLocal"
+        )
         assert qos.durability.kind == dds.DurabilityKind.TRANSIENT_LOCAL
 
     def test_volatile(self, provider):
@@ -52,16 +58,16 @@ class TestSnippets:
         assert qos.durability.kind == dds.DurabilityKind.VOLATILE
 
     def test_keep_last_1(self, provider):
-        qos = provider.datawriter_qos_from_profile("Snippets::KeepLast1")
+        qos = provider.datawriter_qos_from_profile(
+            "BuiltinQosSnippetLib::QosPolicy.History.KeepLast_1"
+        )
         assert qos.history.kind == dds.HistoryKind.KEEP_LAST
         assert qos.history.depth == 1
 
-    def test_keep_last_4(self, provider):
-        qos = provider.datawriter_qos_from_profile("Snippets::KeepLast4")
-        assert qos.history.depth == 4
-
     def test_keep_all(self, provider):
-        qos = provider.datawriter_qos_from_profile("Snippets::KeepAll")
+        qos = provider.datawriter_qos_from_profile(
+            "BuiltinQosSnippetLib::QosPolicy.History.KeepAll"
+        )
         assert qos.history.kind == dds.HistoryKind.KEEP_ALL
 
 
@@ -82,6 +88,11 @@ class TestPatterns:
 
     def test_stream_writer(self, provider):
         qos = provider.datawriter_qos_from_profile("Patterns::Stream")
+        assert qos.reliability.kind == dds.ReliabilityKind.BEST_EFFORT
+        assert qos.history.depth == 1
+
+    def test_stream_reader(self, provider):
+        qos = provider.datareader_qos_from_profile("Patterns::Stream")
         assert qos.reliability.kind == dds.ReliabilityKind.BEST_EFFORT
         assert qos.history.depth == 4
 
@@ -107,12 +118,12 @@ class TestTopicFilters:
         assert qos.deadline.period.sec == 2
 
     def test_operator_input_writer(self, provider):
-        """OperatorInput: BestEffort + KeepLast4 + Deadline4ms + Lifespan20ms."""
+        """OperatorInput: BestEffort + KeepLast1 (writer) + Deadline4ms + Lifespan20ms."""
         qos = provider.set_topic_datawriter_qos(
             "Topics::ProcedureTopics", "OperatorInput"
         )
         assert qos.reliability.kind == dds.ReliabilityKind.BEST_EFFORT
-        assert qos.history.depth == 4
+        assert qos.history.depth == 1
         assert qos.deadline.period.nanosec == 4000000
 
     def test_robot_command_writer(self, provider):
@@ -154,6 +165,5 @@ class TestParticipants:
         assert qos is not None
 
     def test_factory_defaults_loads(self, provider):
-        qos = provider.participant_qos_from_profile("Participants::FactoryDefaults")
-        assert qos is not None
+        qos = provider.participant_qos_from_profile("Factory::FactoryDefaults")
         assert qos is not None

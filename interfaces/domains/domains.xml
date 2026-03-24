@@ -38,10 +38,12 @@
         <!-- operational tag: Class A / Class I (non-critical) -->
         <domain name="Procedure_operational" domain_id="10">
             <register_type name="Imaging::CameraFrame"         type_ref="Imaging::CameraFrame"/>
+            <register_type name="Imaging::CameraConfig"         type_ref="Imaging::CameraConfig"/>
             <register_type name="Surgery::ProcedureContext"    type_ref="Surgery::ProcedureContext"/>
             <register_type name="Surgery::ProcedureStatus"     type_ref="Surgery::ProcedureStatus"/>
 
             <topic name="CameraFrame"      register_type_ref="Imaging::CameraFrame"/>
+            <topic name="CameraConfig"     register_type_ref="Imaging::CameraConfig"/>
             <topic name="ProcedureContext" register_type_ref="Surgery::ProcedureContext"/>
             <topic name="ProcedureStatus"  register_type_ref="Surgery::ProcedureStatus"/>
         </domain>

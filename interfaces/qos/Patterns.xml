@@ -4,81 +4,63 @@
 
     <qos_library name="Patterns">
 
-        <!-- State: latest-state data (vitals, device status, robot state, alarms) -->
-        <qos_profile name="State"
-                     base_name="BuiltinQosLib::Generic.Common">
-            <datawriter_qos>
-                <base_name>
-                    <element>Snippets::Reliable</element>
-                    <element>Snippets::TransientLocal</element>
-                    <element>Snippets::KeepLast1</element>
-                    <element>Snippets::Liveliness2s</element>
-                </base_name>
-            </datawriter_qos>
-            <datareader_qos>
-                <base_name>
-                    <element>Snippets::Reliable</element>
-                    <element>Snippets::TransientLocal</element>
-                    <element>Snippets::KeepLast1</element>
-                    <element>Snippets::Liveliness2s</element>
-                </base_name>
-            </datareader_qos>
+        <!--
+            State: latest-state data (vitals, device status, robot state, alarms).
+            Base provides Reliable + KeepLast1 + TransientLocal + ReliabilityProtocol.KeepLast.
+            Liveliness2s composed for writer-health detection on write-on-change topics.
+        -->
+        <qos_profile name="State">
+            <base_name>
+                <element>BuiltinQosLib::Generic.KeepLastReliable.TransientLocal</element>
+                <element>Snippets::Liveliness2s</element>
+            </base_name>
         </qos_profile>
 
-        <!-- Command: volatile reliable commands (no stale delivery to late joiners) -->
+        <!--
+            Command: volatile reliable commands (no stale delivery to late joiners).
+            Base provides Reliable + KeepLast1 + ReliabilityProtocol.KeepLast.
+            Volatile durability is the Connext default — no explicit override needed.
+        -->
         <qos_profile name="Command"
-                     base_name="BuiltinQosLib::Generic.Common">
-            <datawriter_qos>
-                <base_name>
-                    <element>Snippets::Reliable</element>
-                    <element>Snippets::Volatile</element>
-                    <element>Snippets::KeepLast1</element>
-                </base_name>
-            </datawriter_qos>
-            <datareader_qos>
-                <base_name>
-                    <element>Snippets::Reliable</element>
-                    <element>Snippets::Volatile</element>
-                    <element>Snippets::KeepLast1</element>
-                </base_name>
-            </datareader_qos>
+                     base_name="BuiltinQosLib::Generic.KeepLastReliable">
         </qos_profile>
 
-        <!-- Stream: high-rate best-effort streaming (waveforms, camera, operator input) -->
+        <!--
+            Stream: high-rate best-effort streaming (waveforms, camera, operator input).
+            Base provides BestEffort + KeepLast (depth 100 by default).
+            Writer depth overridden to 1 (no repair cache needed for best-effort).
+            Reader depth overridden to 4 (buffer for bursty arrival).
+        -->
         <qos_profile name="Stream"
-                     base_name="BuiltinQosLib::Generic.Common">
+                     base_name="BuiltinQosLib::Generic.BestEffort">
             <datawriter_qos>
-                <base_name>
-                    <element>Snippets::BestEffort</element>
-                    <element>Snippets::KeepLast4</element>
-                </base_name>
+                <history>
+                    <kind>KEEP_LAST_HISTORY_QOS</kind>
+                    <depth>1</depth>
+                </history>
             </datawriter_qos>
             <datareader_qos>
-                <base_name>
-                    <element>Snippets::BestEffort</element>
-                    <element>Snippets::KeepLast4</element>
-                </base_name>
+                <history>
+                    <kind>KEEP_LAST_HISTORY_QOS</kind>
+                    <depth>4</depth>
+                </history>
             </datareader_qos>
         </qos_profile>
 
         <!-- GuiState: downsampled state for GUI readers -->
         <qos_profile name="GuiState"
                      base_name="Patterns::State">
-            <datareader_qos>
-                <base_name>
-                    <element>Snippets::GuiSubsample</element>
-                </base_name>
-            </datareader_qos>
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
         </qos_profile>
 
         <!-- GuiStream: downsampled streaming for GUI readers -->
         <qos_profile name="GuiStream"
                      base_name="Patterns::Stream">
-            <datareader_qos>
-                <base_name>
-                    <element>Snippets::GuiSubsample</element>
-                </base_name>
-            </datareader_qos>
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
         </qos_profile>
 
     </qos_library>

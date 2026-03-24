@@ -2,249 +2,242 @@
 <dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
      xsi:noNamespaceSchemaLocation="https://community.rti.com/schema/7.6.0/rti_dds_profiles.xsd">
 
+    <!--
+        Library 1: TopicProfiles — single source of truth for each topic's QoS.
+        Each profile inherits from a pattern and adds topic-specific tuning.
+        Changing a topic's deadline, lifespan, or liveliness requires editing
+        only its profile here.
+    -->
+    <qos_library name="TopicProfiles">
+
+        <!-- Topics that just alias a pattern (no extra tuning) -->
+        <qos_profile name="RobotCommand" base_name="Patterns::Command"/>
+        <qos_profile name="AlarmMessages" base_name="Patterns::State"/>
+        <qos_profile name="DeviceTelemetry" base_name="Patterns::State"/>
+        <qos_profile name="ProcedureContext" base_name="Patterns::State"/>
+        <qos_profile name="ProcedureStatus" base_name="Patterns::State"/>
+        <qos_profile name="ClinicalAlert" base_name="Patterns::State"/>
+        <qos_profile name="RiskScore" base_name="Patterns::State"/>
+        <qos_profile name="ResourceAvailability" base_name="Patterns::State"/>
+        <qos_profile name="CameraConfig" base_name="Patterns::State"/>
+
+        <!-- Topics with additional tuning (deadline, lifespan, liveliness) -->
+        <qos_profile name="OperatorInput" base_name="Patterns::Stream">
+            <base_name>
+                <element>Snippets::Deadline4ms</element>
+                <element>Snippets::Lifespan20ms</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="RobotState" base_name="Patterns::State">
+            <base_name>
+                <element>Snippets::Deadline20ms</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="SafetyInterlock" base_name="Patterns::State">
+            <base_name>
+                <element>Snippets::Liveliness500ms</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="PatientVitals" base_name="Patterns::State">
+            <base_name>
+                <element>Snippets::Deadline2s</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="WaveformData" base_name="Patterns::Stream">
+            <base_name>
+                <element>Snippets::Deadline40ms</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="CameraFrame" base_name="Patterns::Stream">
+            <base_name>
+                <element>Snippets::Deadline66ms</element>
+            </base_name>
+        </qos_profile>
+
+        <!-- GUI variants: inherit from topic profile, add GuiSubsample -->
+        <qos_profile name="GuiRobotState" base_name="TopicProfiles::RobotState">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiSafetyInterlock" base_name="TopicProfiles::SafetyInterlock">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiPatientVitals" base_name="TopicProfiles::PatientVitals">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiAlarmMessages" base_name="TopicProfiles::AlarmMessages">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiDeviceTelemetry" base_name="TopicProfiles::DeviceTelemetry">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiProcedureContext" base_name="TopicProfiles::ProcedureContext">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiProcedureStatus" base_name="TopicProfiles::ProcedureStatus">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiWaveformData" base_name="TopicProfiles::WaveformData">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiCameraFrame" base_name="TopicProfiles::CameraFrame">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiOperatorInput" base_name="TopicProfiles::OperatorInput">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiClinicalAlert" base_name="TopicProfiles::ClinicalAlert">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiRiskScore" base_name="TopicProfiles::RiskScore">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiResourceAvailability" base_name="TopicProfiles::ResourceAvailability">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiCameraConfig" base_name="TopicProfiles::CameraConfig">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="GuiRobotCommand" base_name="TopicProfiles::RobotCommand">
+            <base_name>
+                <element>Snippets::GuiSubsample</element>
+            </base_name>
+        </qos_profile>
+
+    </qos_library>
+
+    <!--
+        Library 2: Topics — domain-scoped topic-filter bindings (pure references).
+        Topic-filter entries contain no nested <base_name> tags or explicit
+        policy configuration — they are pure references to TopicProfiles.
+    -->
     <qos_library name="Topics">
 
         <!--
             ProcedureTopics: topic-filter-bound QoS for Procedure domain (Domain 10).
-            Every topic-filtered entry explicitly declares its base pattern via
-            the base_name attribute — no implicit inheritance from the profile.
         -->
         <qos_profile name="ProcedureTopics">
-
-            <!-- OperatorInput: Stream + Deadline4ms + Lifespan20ms (500 Hz control) -->
-            <datawriter_qos topic_filter="OperatorInput" base_name="Patterns::Stream">
-                <base_name>
-                    <element>Snippets::Deadline4ms</element>
-                    <element>Snippets::Lifespan20ms</element>
-                </base_name>
-            </datawriter_qos>
-            <datareader_qos topic_filter="OperatorInput" base_name="Patterns::Stream">
-                <base_name>
-                    <element>Snippets::Deadline4ms</element>
-                    <element>Snippets::Lifespan20ms</element>
-                </base_name>
-            </datareader_qos>
-
-            <!-- RobotCommand: Command (Reliable + Volatile + KeepLast1) -->
-            <datawriter_qos topic_filter="RobotCommand" base_name="Patterns::Command">
-            </datawriter_qos>
-            <datareader_qos topic_filter="RobotCommand" base_name="Patterns::Command">
-            </datareader_qos>
-
-            <!-- RobotState: State + Deadline20ms (100 Hz continuous stream) -->
-            <datawriter_qos topic_filter="RobotState" base_name="Patterns::State">
-                <base_name>
-                    <element>Snippets::Deadline20ms</element>
-                </base_name>
-            </datawriter_qos>
-            <datareader_qos topic_filter="RobotState" base_name="Patterns::State">
-                <base_name>
-                    <element>Snippets::Deadline20ms</element>
-                </base_name>
-            </datareader_qos>
-
-            <!-- SafetyInterlock: State + Liveliness500ms (write-on-change, tight lease) -->
-            <datawriter_qos topic_filter="SafetyInterlock" base_name="Patterns::State">
-                <base_name>
-                    <element>Snippets::Liveliness500ms</element>
-                </base_name>
-            </datawriter_qos>
-            <datareader_qos topic_filter="SafetyInterlock" base_name="Patterns::State">
-                <base_name>
-                    <element>Snippets::Liveliness500ms</element>
-                </base_name>
-            </datareader_qos>
-
-            <!-- PatientVitals: State + Deadline2s (1 Hz periodic snapshot) -->
-            <datawriter_qos topic_filter="PatientVitals" base_name="Patterns::State">
-                <base_name>
-                    <element>Snippets::Deadline2s</element>
-                </base_name>
-            </datawriter_qos>
-            <datareader_qos topic_filter="PatientVitals" base_name="Patterns::State">
-                <base_name>
-                    <element>Snippets::Deadline2s</element>
-                </base_name>
-            </datareader_qos>
-
-            <!-- WaveformData: Stream + Deadline40ms (50 Hz streaming) -->
-            <datawriter_qos topic_filter="WaveformData" base_name="Patterns::Stream">
-                <base_name>
-                    <element>Snippets::Deadline40ms</element>
-                </base_name>
-            </datawriter_qos>
-            <datareader_qos topic_filter="WaveformData" base_name="Patterns::Stream">
-                <base_name>
-                    <element>Snippets::Deadline40ms</element>
-                </base_name>
-            </datareader_qos>
-
-            <!-- CameraFrame: Stream + Deadline66ms (30 Hz streaming) -->
-            <datawriter_qos topic_filter="CameraFrame" base_name="Patterns::Stream">
-                <base_name>
-                    <element>Snippets::Deadline66ms</element>
-                </base_name>
-            </datawriter_qos>
-            <datareader_qos topic_filter="CameraFrame" base_name="Patterns::Stream">
-                <base_name>
-                    <element>Snippets::Deadline66ms</element>
-                </base_name>
-            </datareader_qos>
-
-            <!-- AlarmMessages: State (write-on-change, per-alarm keying) -->
-            <datawriter_qos topic_filter="AlarmMessages" base_name="Patterns::State">
-            </datawriter_qos>
-            <datareader_qos topic_filter="AlarmMessages" base_name="Patterns::State">
-            </datareader_qos>
-
-            <!-- DeviceTelemetry: State (write-on-change) -->
-            <datawriter_qos topic_filter="DeviceTelemetry" base_name="Patterns::State">
-            </datawriter_qos>
-            <datareader_qos topic_filter="DeviceTelemetry" base_name="Patterns::State">
-            </datareader_qos>
-
-            <!-- ProcedureContext: State (write-on-change, TRANSIENT_LOCAL) -->
-            <datawriter_qos topic_filter="ProcedureContext" base_name="Patterns::State">
-            </datawriter_qos>
-            <datareader_qos topic_filter="ProcedureContext" base_name="Patterns::State">
-            </datareader_qos>
-
-            <!-- ProcedureStatus: State (write-on-change, TRANSIENT_LOCAL) -->
-            <datawriter_qos topic_filter="ProcedureStatus" base_name="Patterns::State">
-            </datawriter_qos>
-            <datareader_qos topic_filter="ProcedureStatus" base_name="Patterns::State">
-            </datareader_qos>
-
+            <datawriter_qos topic_filter="OperatorInput" base_name="TopicProfiles::OperatorInput"/>
+            <datareader_qos topic_filter="OperatorInput" base_name="TopicProfiles::OperatorInput"/>
+            <datawriter_qos topic_filter="RobotCommand" base_name="TopicProfiles::RobotCommand"/>
+            <datareader_qos topic_filter="RobotCommand" base_name="TopicProfiles::RobotCommand"/>
+            <datawriter_qos topic_filter="RobotState" base_name="TopicProfiles::RobotState"/>
+            <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::RobotState"/>
+            <datawriter_qos topic_filter="SafetyInterlock" base_name="TopicProfiles::SafetyInterlock"/>
+            <datareader_qos topic_filter="SafetyInterlock" base_name="TopicProfiles::SafetyInterlock"/>
+            <datawriter_qos topic_filter="PatientVitals" base_name="TopicProfiles::PatientVitals"/>
+            <datareader_qos topic_filter="PatientVitals" base_name="TopicProfiles::PatientVitals"/>
+            <datawriter_qos topic_filter="WaveformData" base_name="TopicProfiles::WaveformData"/>
+            <datareader_qos topic_filter="WaveformData" base_name="TopicProfiles::WaveformData"/>
+            <datawriter_qos topic_filter="CameraFrame" base_name="TopicProfiles::CameraFrame"/>
+            <datareader_qos topic_filter="CameraFrame" base_name="TopicProfiles::CameraFrame"/>
+            <datawriter_qos topic_filter="CameraConfig" base_name="TopicProfiles::CameraConfig"/>
+            <datareader_qos topic_filter="CameraConfig" base_name="TopicProfiles::CameraConfig"/>
+            <datawriter_qos topic_filter="AlarmMessages" base_name="TopicProfiles::AlarmMessages"/>
+            <datareader_qos topic_filter="AlarmMessages" base_name="TopicProfiles::AlarmMessages"/>
+            <datawriter_qos topic_filter="DeviceTelemetry" base_name="TopicProfiles::DeviceTelemetry"/>
+            <datareader_qos topic_filter="DeviceTelemetry" base_name="TopicProfiles::DeviceTelemetry"/>
+            <datawriter_qos topic_filter="ProcedureContext" base_name="TopicProfiles::ProcedureContext"/>
+            <datareader_qos topic_filter="ProcedureContext" base_name="TopicProfiles::ProcedureContext"/>
+            <datawriter_qos topic_filter="ProcedureStatus" base_name="TopicProfiles::ProcedureStatus"/>
+            <datareader_qos topic_filter="ProcedureStatus" base_name="TopicProfiles::ProcedureStatus"/>
         </qos_profile>
 
         <!--
             HospitalTopics: topic-filter-bound QoS for Hospital domain (Domain 11).
-            Every topic explicitly declares its base pattern.
         -->
         <qos_profile name="HospitalTopics">
-
-            <!-- ClinicalAlert: State (write-on-change, reliable, TRANSIENT_LOCAL) -->
-            <datawriter_qos topic_filter="ClinicalAlert" base_name="Patterns::State">
-            </datawriter_qos>
-            <datareader_qos topic_filter="ClinicalAlert" base_name="Patterns::State">
-            </datareader_qos>
-
-            <!-- RiskScore: State (write-on-change, reliable, TRANSIENT_LOCAL) -->
-            <datawriter_qos topic_filter="RiskScore" base_name="Patterns::State">
-            </datawriter_qos>
-            <datareader_qos topic_filter="RiskScore" base_name="Patterns::State">
-            </datareader_qos>
-
-            <!-- ResourceAvailability: State (write-on-change, V1.1) -->
-            <datawriter_qos topic_filter="ResourceAvailability" base_name="Patterns::State">
-            </datawriter_qos>
-            <datareader_qos topic_filter="ResourceAvailability" base_name="Patterns::State">
-            </datareader_qos>
-
-            <!-- Bridged topics from Procedure domain — same pattern as source -->
-            <datareader_qos topic_filter="ProcedureStatus" base_name="Patterns::State">
-            </datareader_qos>
-            <datareader_qos topic_filter="ProcedureContext" base_name="Patterns::State">
-            </datareader_qos>
-            <datareader_qos topic_filter="PatientVitals" base_name="Patterns::State">
-                <base_name>
-                    <element>Snippets::Deadline2s</element>
-                </base_name>
-            </datareader_qos>
-            <datareader_qos topic_filter="AlarmMessages" base_name="Patterns::State">
-            </datareader_qos>
-            <datareader_qos topic_filter="DeviceTelemetry" base_name="Patterns::State">
-            </datareader_qos>
-            <datareader_qos topic_filter="RobotState" base_name="Patterns::State">
-                <base_name>
-                    <element>Snippets::Deadline20ms</element>
-                </base_name>
-            </datareader_qos>
-
+            <datawriter_qos topic_filter="ClinicalAlert" base_name="TopicProfiles::ClinicalAlert"/>
+            <datareader_qos topic_filter="ClinicalAlert" base_name="TopicProfiles::ClinicalAlert"/>
+            <datawriter_qos topic_filter="RiskScore" base_name="TopicProfiles::RiskScore"/>
+            <datareader_qos topic_filter="RiskScore" base_name="TopicProfiles::RiskScore"/>
+            <datawriter_qos topic_filter="ResourceAvailability" base_name="TopicProfiles::ResourceAvailability"/>
+            <datareader_qos topic_filter="ResourceAvailability" base_name="TopicProfiles::ResourceAvailability"/>
+            <!-- Bridged topics from Procedure domain — same profile as source -->
+            <datareader_qos topic_filter="ProcedureStatus" base_name="TopicProfiles::ProcedureStatus"/>
+            <datareader_qos topic_filter="ProcedureContext" base_name="TopicProfiles::ProcedureContext"/>
+            <datareader_qos topic_filter="PatientVitals" base_name="TopicProfiles::PatientVitals"/>
+            <datareader_qos topic_filter="AlarmMessages" base_name="TopicProfiles::AlarmMessages"/>
+            <datareader_qos topic_filter="DeviceTelemetry" base_name="TopicProfiles::DeviceTelemetry"/>
+            <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::RobotState"/>
         </qos_profile>
 
         <!--
             GuiProcedureTopics: downsampled QoS for GUI readers on Procedure domain.
-            Every topic explicitly declares its base pattern (GuiState or GuiStream).
         -->
         <qos_profile name="GuiProcedureTopics">
-
-            <!-- State topics: GuiState (downsampled state) -->
-            <datareader_qos topic_filter="RobotState" base_name="Patterns::GuiState">
-                <base_name>
-                    <element>Snippets::Deadline20ms</element>
-                </base_name>
-            </datareader_qos>
-            <datareader_qos topic_filter="SafetyInterlock" base_name="Patterns::GuiState">
-                <base_name>
-                    <element>Snippets::Liveliness500ms</element>
-                </base_name>
-            </datareader_qos>
-            <datareader_qos topic_filter="PatientVitals" base_name="Patterns::GuiState">
-                <base_name>
-                    <element>Snippets::Deadline2s</element>
-                </base_name>
-            </datareader_qos>
-            <datareader_qos topic_filter="AlarmMessages" base_name="Patterns::GuiState">
-            </datareader_qos>
-            <datareader_qos topic_filter="DeviceTelemetry" base_name="Patterns::GuiState">
-            </datareader_qos>
-            <datareader_qos topic_filter="ProcedureContext" base_name="Patterns::GuiState">
-            </datareader_qos>
-            <datareader_qos topic_filter="ProcedureStatus" base_name="Patterns::GuiState">
-            </datareader_qos>
-
-            <!-- Stream topics: GuiStream (downsampled streaming) -->
-            <datareader_qos topic_filter="WaveformData" base_name="Patterns::GuiStream">
-                <base_name>
-                    <element>Snippets::Deadline40ms</element>
-                </base_name>
-            </datareader_qos>
-            <datareader_qos topic_filter="CameraFrame" base_name="Patterns::GuiStream">
-                <base_name>
-                    <element>Snippets::Deadline66ms</element>
-                </base_name>
-            </datareader_qos>
-            <datareader_qos topic_filter="OperatorInput" base_name="Patterns::GuiStream">
-                <base_name>
-                    <element>Snippets::Deadline4ms</element>
-                    <element>Snippets::Lifespan20ms</element>
-                </base_name>
-            </datareader_qos>
-
+            <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::GuiRobotState"/>
+            <datareader_qos topic_filter="SafetyInterlock" base_name="TopicProfiles::GuiSafetyInterlock"/>
+            <datareader_qos topic_filter="PatientVitals" base_name="TopicProfiles::GuiPatientVitals"/>
+            <datareader_qos topic_filter="AlarmMessages" base_name="TopicProfiles::GuiAlarmMessages"/>
+            <datareader_qos topic_filter="DeviceTelemetry" base_name="TopicProfiles::GuiDeviceTelemetry"/>
+            <datareader_qos topic_filter="ProcedureContext" base_name="TopicProfiles::GuiProcedureContext"/>
+            <datareader_qos topic_filter="ProcedureStatus" base_name="TopicProfiles::GuiProcedureStatus"/>
+            <datareader_qos topic_filter="WaveformData" base_name="TopicProfiles::GuiWaveformData"/>
+            <datareader_qos topic_filter="CameraFrame" base_name="TopicProfiles::GuiCameraFrame"/>
+            <datareader_qos topic_filter="CameraConfig" base_name="TopicProfiles::GuiCameraConfig"/>
+            <datareader_qos topic_filter="OperatorInput" base_name="TopicProfiles::GuiOperatorInput"/>
         </qos_profile>
 
         <!--
             GuiHospitalTopics: downsampled QoS for GUI readers on Hospital domain.
-            Every topic explicitly declares its base pattern.
         -->
         <qos_profile name="GuiHospitalTopics">
-
-            <datareader_qos topic_filter="ClinicalAlert" base_name="Patterns::GuiState">
-            </datareader_qos>
-            <datareader_qos topic_filter="RiskScore" base_name="Patterns::GuiState">
-            </datareader_qos>
-            <datareader_qos topic_filter="ResourceAvailability" base_name="Patterns::GuiState">
-            </datareader_qos>
-            <datareader_qos topic_filter="ProcedureStatus" base_name="Patterns::GuiState">
-            </datareader_qos>
-            <datareader_qos topic_filter="ProcedureContext" base_name="Patterns::GuiState">
-            </datareader_qos>
-            <datareader_qos topic_filter="PatientVitals" base_name="Patterns::GuiState">
-                <base_name>
-                    <element>Snippets::Deadline2s</element>
-                </base_name>
-            </datareader_qos>
-            <datareader_qos topic_filter="AlarmMessages" base_name="Patterns::GuiState">
-            </datareader_qos>
-            <datareader_qos topic_filter="DeviceTelemetry" base_name="Patterns::GuiState">
-            </datareader_qos>
-            <datareader_qos topic_filter="RobotState" base_name="Patterns::GuiState">
-                <base_name>
-                    <element>Snippets::Deadline20ms</element>
-                </base_name>
-            </datareader_qos>
-
+            <datareader_qos topic_filter="ClinicalAlert" base_name="TopicProfiles::GuiClinicalAlert"/>
+            <datareader_qos topic_filter="RiskScore" base_name="TopicProfiles::GuiRiskScore"/>
+            <datareader_qos topic_filter="ResourceAvailability" base_name="TopicProfiles::GuiResourceAvailability"/>
+            <datareader_qos topic_filter="ProcedureStatus" base_name="TopicProfiles::GuiProcedureStatus"/>
+            <datareader_qos topic_filter="ProcedureContext" base_name="TopicProfiles::GuiProcedureContext"/>
+            <datareader_qos topic_filter="PatientVitals" base_name="TopicProfiles::GuiPatientVitals"/>
+            <datareader_qos topic_filter="AlarmMessages" base_name="TopicProfiles::GuiAlarmMessages"/>
+            <datareader_qos topic_filter="DeviceTelemetry" base_name="TopicProfiles::GuiDeviceTelemetry"/>
+            <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::GuiRobotState"/>
         </qos_profile>
 
     </qos_library>

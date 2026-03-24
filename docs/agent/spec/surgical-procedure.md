@@ -45,8 +45,8 @@ All scenarios assume the participant operates within a room partition (e.g., `ro
 
 ### Scenario: Operator input reaches robot controller within deadline `@integration` `@streaming`
 
-**Given** an operator console publishing `OperatorInput` on the Procedure domain (`control` tag) with `Stream` QoS + `Deadline4ms` + `Lifespan20ms` snippets
-**And** a robot controller subscribing to `OperatorInput` on the Procedure domain (`control` tag) in the same partition with the same `Deadline4ms` + `Lifespan20ms` snippets
+**Given** an operator console publishing `OperatorInput` on the Procedure domain (`control` tag) with the `TopicProfiles::OperatorInput` QoS profile (Stream pattern + Deadline4ms + Lifespan20ms)
+**And** a robot controller subscribing to `OperatorInput` on the Procedure domain (`control` tag) in the same partition with the same `TopicProfiles::OperatorInput` QoS profile
 **When** the operator publishes a control input sample
 **Then** the robot controller receives the sample within 4 ms of publication
 **And** the 4 ms threshold is enforced by DDS Deadline QoS (not only measured by the test harness) — a `REQUESTED_DEADLINE_MISSED` status on the reader indicates a stream interruption
