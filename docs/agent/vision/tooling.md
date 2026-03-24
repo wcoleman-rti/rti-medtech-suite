@@ -206,8 +206,8 @@ python tools/qos-checker.py
 python tools/qos-checker.py --verbose
 ```
 
-**Implementation phase:** Phase 1 (Step 1.5 or 1.8 — integrates with test
-harness and CI pipeline).
+**Implementation phase:** Phase 1 (Step 1.10 — QoS Compatibility Checker
+& Tool Scaffolding).
 
 ---
 

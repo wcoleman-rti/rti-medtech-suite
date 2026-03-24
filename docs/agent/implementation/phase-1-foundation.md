@@ -338,7 +338,7 @@
 
 ---
 
-## Step 1.10 — QoS Compatibility Checker & Tool Scaffolding
+## Step 1.10 — QoS Compatibility Checker & Tool Scaffolding ✅ `591652f`
 
 ### Work
 
@@ -358,7 +358,7 @@
 
 ### Test Gate
 
-- [ ] `python tools/qos-checker.py` runs against the Step 1.3 QoS XML and reports all topic pairs as compatible
-- [ ] A deliberately introduced QoS incompatibility (e.g., RELIABLE writer + BEST_EFFORT reader on a State pattern topic) causes the checker to report FAIL and exit 1
-- [ ] `tools/README.md` exists and indexes all tools
-- [ ] CI pipeline includes the QoS compatibility check
+- [x] `python tools/qos-checker.py` runs against the Step 1.3 QoS XML and reports all topic pairs as compatible
+- [x] A deliberately introduced QoS incompatibility (e.g., RELIABLE writer + BEST_EFFORT reader on a State pattern topic) causes the checker to report FAIL and exit 1
+- [x] `tools/README.md` exists and indexes all tools
+- [x] CI pipeline includes the QoS compatibility check

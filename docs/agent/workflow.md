@@ -354,6 +354,13 @@ or at any point to catch compliance drift.
 These gates are not aspirational. A phase step is not complete until
 every gate passes. If a gate cannot pass, escalate per Section 5.
 
+> **CI script authority:** The executable quality gate sequence lives in
+> `scripts/ci.sh`. The table above describes the conceptual gate
+> categories. As implementation progresses, `scripts/ci.sh` may include
+> additional automated gates (e.g., performance benchmark, QoS
+> compatibility check) that map to the categories above. When in doubt,
+> the CI script is the authoritative list of what must pass.
+
 ---
 
 ## 8. DDS Design Review Gate

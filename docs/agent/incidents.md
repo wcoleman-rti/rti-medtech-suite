@@ -592,3 +592,83 @@ after closure. They form the project's decision log.
   hook or running style fixes automatically as part of the commit
   workflow.
 - **Date closed:** 2026-03-24
+
+---
+
+## INC-021: Connext Python enum two-layer type model — `.underlying` pattern
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.10
+- **Documents involved:** `tools/qos-checker.py`
+- **Description:** Connext Python wraps pybind11 enums in two layers.
+  Class-level members (e.g., `dds.DurabilityKind.VOLATILE`) are the
+  *inner* type (`DurabilityKind.DurabilityKind`) — hashable, with
+  `.name` and `.value` attributes. QoS-returned values (e.g.,
+  `w_qos.durability.kind`) are the *outer* type (`DurabilityKind`) —
+  NOT hashable, no `.name`/`.value`, but expose `.underlying` to get
+  the inner type. Equality (`==`) works across both layers. Dict keys
+  and `hash()` require the inner type.
+- **Resolution:** Created a `_to_inner(val)` helper using
+  `getattr(val, "underlying", val)` that transparently handles both
+  layers. Dict keys use class-level members (already inner type);
+  QoS-returned values go through `_to_inner()` for lookups and
+  `.name` access.
+- **Guideline:** When using Connext Python enum values as dict keys,
+  in `hash()`, or accessing `.name`/`.value`, always call
+  `.underlying` on values obtained from QoS objects. Use a helper
+  like `_to_inner(val)` to handle both layers transparently.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-022: No built-in RxO compatibility checker in Connext Python API
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.10
+- **Documents involved:** `tools/qos-checker.py`,
+  `vision/tooling.md`
+- **Description:** The Connext Python API has no pre-flight function
+  to check DataWriterQos / DataReaderQos RxO compatibility. RxO
+  enforcement happens at entity matching time via
+  `OFFERED_INCOMPATIBLE_QOS_STATUS` /
+  `REQUESTED_INCOMPATIBLE_QOS_STATUS` listener callbacks.
+  For offline validation, manual comparison of the five DDS RxO
+  policies (reliability, durability, deadline, ownership, liveliness)
+  is required. Confirmed via `rti-chatbot-mcp`.
+- **Resolution:** Implemented manual RxO checks in
+  `tools/qos-checker.py`. The checker resolves writer and reader QoS
+  per topic via the default QosProvider's topic-filter API, then
+  compares each RxO policy.
+- **Guideline:** Use `tools/qos-checker.py` for pre-flight RxO
+  validation. Extend the checker if new RxO-relevant policies are
+  used in future phases.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-023: CI pipeline grew to 10 gates beyond original workflow.md list
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.10
+- **Documents involved:** `scripts/ci.sh`, `workflow.md` Section 7
+- **Description:** Step 1.8 added Gate 9 (performance benchmark) and
+  Step 1.10 added Gate 10 (QoS compatibility check) to
+  `scripts/ci.sh`. The original `workflow.md` Section 7 describes
+  quality gates as a conceptual checklist but does not enumerate the
+  CI script gates by number. As the implementation progresses, the
+  CI gate count grows beyond the original list.
+- **Resolution:** `scripts/ci.sh` is the authoritative runtime gate
+  set. A doc clarification was applied to `workflow.md` Section 7
+  noting that `scripts/ci.sh` may include additional automated gates
+  added during implementation.
+- **Guideline:** When adding a new CI gate, add it to
+  `scripts/ci.sh` and note the addition in the step's commit
+  message. The workflow.md quality gate table describes the
+  conceptual categories; the CI script is the executable authority.
+- **Date closed:** 2026-03-24
