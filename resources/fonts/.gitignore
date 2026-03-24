@@ -1,0 +1,2 @@
+# Font files are downloaded at CMake configure time (see cmake/DownloadFonts.cmake)
+*.ttf

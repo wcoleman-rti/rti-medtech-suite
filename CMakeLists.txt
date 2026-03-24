@@ -36,19 +36,23 @@ list(APPEND CMAKE_MODULE_PATH
 find_package(RTIConnextDDS "${CONNEXT_VERSION}" REQUIRED)
 
 # --- Google Test for C++ tests ---
-FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG        v1.14.0
-)
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
-enable_testing()
+include(CTest)
+if(BUILD_TESTING)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG        v1.14.0
+    )
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+endif()
 
 # --- Subdirectories ---
 add_subdirectory(interfaces)
-add_subdirectory(tests/qos)
+if(BUILD_TESTING)
+    add_subdirectory(tests/qos)
+endif()
 
 # --- Generate setup.bash ---
 configure_file(
@@ -71,9 +75,10 @@ install(FILES
     DESTINATION share/domains
 )
 
-# --- Install resources ---
-install(DIRECTORY resources/fonts/ DESTINATION share/resources/fonts
-    FILES_MATCHING PATTERN "*.ttf")
-install(DIRECTORY resources/images/ DESTINATION share/resources/images
-    FILES_MATCHING PATTERN "*.png" PATTERN "*.svg")
-install(FILES resources/styles/medtech.qss DESTINATION share/resources/styles)
+# --- Resources (fonts, images, stylesheets) ---
+add_subdirectory(resources)
+
+# --- Install shared Python packages ---
+install(DIRECTORY modules/shared/medtech_gui/
+    DESTINATION lib/python/site-packages/medtech_gui
+    FILES_MATCHING PATTERN "*.py")

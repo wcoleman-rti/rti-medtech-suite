@@ -239,10 +239,10 @@
 
 ### Test Gate
 
-- [ ] `python -c "from medtech_gui import init_theme"` succeeds after install
-- [ ] `init_theme(app)` loads the stylesheet without errors (pytest-qt test)
-- [ ] Fonts are registered and available after `init_theme()` call
-- [ ] Header widget renders with correct background color and logo
+- [x] `python -c "from medtech_gui import init_theme"` succeeds after install
+- [x] `init_theme(app)` loads the stylesheet without errors (pytest-qt test)
+- [x] Fonts are registered and available after `init_theme()` call
+- [x] Header widget renders with correct background color and logo
 
 ---
 

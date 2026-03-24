@@ -186,3 +186,135 @@ after closure. They form the project's decision log.
   (`docker compose --profile observability up`) starts all services
   successfully.
 - **Date closed:** 2026-03-24
+
+---
+
+## INC-006: Fetch resources at configure time — do not commit binaries
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.6
+- **Documents involved:** `resources/fonts/CMakeLists.txt`,
+  `CMakeLists.txt`
+- **Description:** Google Fonts TTF files (Roboto Condensed, Montserrat,
+  Roboto Mono) were initially committed directly to the source tree under
+  `resources/fonts/`. This inflated the repository with ~0.5 MB of binary
+  data and made provenance tracking harder. Since these fonts are freely
+  available from a stable upstream (GitHub `google/fonts`), they can be
+  fetched reproducibly at CMake configure time with SHA-256 verification.
+- **Resolution:** Moved font acquisition to `resources/fonts/CMakeLists.txt`
+  using `file(DOWNLOAD)` with pinned commit SHA and per-file SHA-256
+  hashes. TTF files download to `${CMAKE_CURRENT_BINARY_DIR}/downloaded/`
+  (not the source tree) and are installed from there. A `.gitignore` in
+  `resources/fonts/` prevents accidental re-commit. This pattern should
+  be used for any future fetchable binary assets.
+- **Guideline:** Prefer `file(DOWNLOAD)` with hash verification for
+  static assets and `FetchContent` for CMake/C++ dependencies. Always
+  pin to a specific commit or tag — never `main` or `latest` for
+  reproducibility-critical artifacts. Document every fetched component
+  in `THIRD_PARTY_NOTICES.md`.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-007: Guard test infrastructure behind BUILD\_TESTING
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.6
+- **Documents involved:** `CMakeLists.txt`
+- **Description:** GoogleTest was fetched unconditionally via
+  `FetchContent` and test subdirectories were always added, even when
+  the build was not intended to produce tests (e.g., a release or
+  install-only build). This wasted configure/build time and pulled in
+  unnecessary dependencies.
+- **Resolution:** Wrapped GoogleTest `FetchContent_Declare` /
+  `FetchContent_MakeAvailable` and all `add_subdirectory(tests/...)`
+  calls inside `if(BUILD_TESTING)` using the standard CMake
+  `include(CTest)` pattern. When configured with
+  `-DBUILD_TESTING=OFF`, no test framework is fetched and no test
+  targets are generated. Verified: `BUILD_TESTING=ON` builds and runs
+  all tests; `BUILD_TESTING=OFF` produces only `medtech_types` and
+  `medtech_types_python` targets.
+- **Guideline:** All future test-only dependencies (test frameworks,
+  mock libraries, test data generators) must be placed inside the
+  `if(BUILD_TESTING)` guard. Test subdirectories added in later phases
+  follow the same pattern.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-008: PySide6 variable font family names include foundry tags
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.6
+- **Documents involved:** `modules/shared/medtech_gui/_theme.py`,
+  `tests/gui/test_init_theme.py`
+- **Description:** When loading variable-weight TTF fonts via
+  `QFontDatabase.addApplicationFont()`, Qt/PySide6 reports the font
+  family name with a foundry tag suffix. For example, `RobotoMono.ttf`
+  (variable weight) registers as `"Roboto Mono [pyrs]"` or
+  `"Roboto Mono [GOOG]"` instead of the plain `"Roboto Mono"` that
+  non-variable (static) fonts would produce. This affects font lookup
+  and test assertions.
+- **Resolution:** Tests use `startswith("Roboto Mono")` matching
+  rather than exact string equality. Application code that sets font
+  families should use `QFont("Roboto Mono")` which Qt resolves
+  correctly regardless of the foundry tag. This quirk applies to all
+  variable-weight fonts — static-weight fonts are unaffected.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-009: CMake binary dir leak when installing downloaded resources
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.6
+- **Documents involved:** `resources/fonts/CMakeLists.txt`
+- **Description:** When using `CMAKE_CURRENT_BINARY_DIR` directly as
+  the download destination and then installing from that directory with
+  `install(DIRECTORY ...)`, CMake's own `CMakeFiles/` subdirectory was
+  included in the install tree. This leaked build system internals into
+  the install prefix.
+- **Resolution:** Download files to a dedicated subdirectory
+  (`${CMAKE_CURRENT_BINARY_DIR}/downloaded/`) and install from that
+  subdirectory instead of the binary dir root. This cleanly separates
+  downloaded artifacts from CMake's internal files. Apply this pattern
+  whenever using `file(DOWNLOAD)` with a subsequent `install(DIRECTORY)`.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-010: Python pip dependencies need license attribution alongside requirements.txt
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.6
+- **Documents involved:** `requirements.txt`, `THIRD_PARTY_NOTICES.md`,
+  `docs/agent/workflow.md`
+- **Description:** Python packages listed in `requirements.txt` (PySide6,
+  pytest, black, etc.) are third-party software with their own licenses,
+  but the project had no attribution record for them. `requirements.txt`
+  is the standard mechanism for declaring and pinning Python dependencies,
+  and the README already references it in the Quick Start section — so
+  version/install information is covered. However, license attribution
+  was missing. Unlike CMake `FetchContent` or `file(DOWNLOAD)` components
+  (which have no other manifest), pip packages have `requirements.txt` as
+  their version-pinning home, so `THIRD_PARTY_NOTICES.md` only needs to
+  record name, license, and usage (not version pins, to avoid duplication).
+- **Resolution:** Added a "Python Packages" section to
+  `THIRD_PARTY_NOTICES.md` with a row per package (name, SPDX license,
+  usage) and a checklist for adding future packages. Updated the
+  `Third-party notices` quality gate in `docs/agent/workflow.md` to
+  explicitly include pip dependencies. The convention is:
+  - `requirements.txt` owns version pins.
+  - `THIRD_PARTY_NOTICES.md` owns license attribution.
+  - Both must be updated in the same commit when adding a dependency.
+- **Date closed:** 2026-03-24

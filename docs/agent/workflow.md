@@ -150,6 +150,7 @@ code patterns, consult these additional resources (in priority order):
 | Modify a `vision/`, `spec/`, or `implementation/` doc without operator approval | These are contracts, not working notes (see [README.md — Approval Rule](README.md)) |
 | Delete or disable a test | Behavioral contracts are permanent (see [implementation/README.md — Test Policy](implementation/README.md)) |
 | Add a dependency not listed in `vision/technology.md` | Undeclared dependencies break reproducibility and may violate regulatory traceability |
+| Commit binary artifacts (fonts, test data, generated code) that can be fetched reproducibly at configure/build time | Binary blobs inflate the repository and complicate provenance tracking — use `file(DOWNLOAD)` with pinned hashes or `FetchContent` instead |
 | Change a domain ID, topic name, or QoS profile name | These are architectural constants defined in `vision/data-model.md` |
 | Use programmatic QoS (except XTypes compliance mask bit `0x00000020` and type registration — see `vision/data-model.md` Pre-Participant Initialization) | All QoS is XML-only per `vision/data-model.md` and `vision/technology.md`. The sole exception is the factory-level `accept_unknown_enum_value` XTypes compliance mask, which has no XML equivalent and must be set programmatically before any DomainParticipant is created. |
 | Write DDS I/O on the main/UI thread | Threading model is mandated by `vision/technology.md` |
@@ -320,6 +321,7 @@ or at any point to catch compliance drift.
 | **Thread safety** | No DDS read/write calls on the main/UI thread. Python uses `async`/`await` + QtAsyncio; C++ uses `AsyncWaitSet` or `SampleProcessor`. |
 | **Logging** | Every module configures the RTI Connext Logging API per `vision/technology.md`. No `print()`, `printf`, `std::cout`, or custom logging. Module name prefix matches module directory name. |
 | **Dependencies** | No new dependencies beyond those listed in `vision/technology.md` and `requirements.txt`. |
+| **Third-party notices** | Every third-party component — whether fetched during configure/build (FetchContent, `file(DOWNLOAD)`), installed via pip (`requirements.txt`), or pulled as a Docker image — is documented in `THIRD_PARTY_NOTICES.md` at the repository root. CMake/Docker components list: name, version/pin, SPDX license, source URL, fetching mechanism, and usage. Python pip packages list: name, SPDX license, and usage (version pins live in `requirements.txt`). When adding a new dependency of any kind, update `THIRD_PARTY_NOTICES.md` in the same commit. |
 | **Performance baseline** | Run `python tests/performance/benchmark.py` against the latest committed baseline. All metrics within regression thresholds per `vision/performance-baseline.md`. At phase completion, record a new baseline with `--record --phase <phase>`. |
 | **Publication model** | Every topic's publisher uses the correct publication model (continuous-stream, periodic-snapshot, or write-on-change) as defined in `vision/data-model.md` Publication Model section. Write-on-change topics must not publish on a fixed timer. |
 

@@ -22,3 +22,6 @@ $_DIR/share/domains/domains.xml"
 
 # Runtime configuration root
 export MEDTECH_CONFIG_DIR="$_DIR/etc"
+
+# Shared GUI resources (fonts, images, stylesheets)
+export MEDTECH_RESOURCE_DIR="$_DIR/share/resources"
