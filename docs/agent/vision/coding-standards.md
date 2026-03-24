@@ -200,6 +200,20 @@ auto p2 = p1;                // p2 references the SAME participant
 // When the last reference goes out of scope, the entity is destroyed
 ```
 
+#### No DynamicData in Applications
+
+**Never use `DynamicData` or `DynamicType` in application code.** All
+applications — publishers, subscribers, GUIs, services — must use the
+IDL-generated types produced by `rtiddsgen`. Generated types provide
+compile-time safety (C++) and IDE-discoverable field access (Python),
+and they match the type definitions under `interfaces/idl/` exactly.
+
+DynamicData is permitted **only** in developer tools (e.g.,
+`tools/qos-checker.py`) and standalone test utilities where
+type-agnostic introspection is the explicit goal. Integration tests
+that exercise DDS behaviors (partition isolation, QoS enforcement,
+etc.) must use the project's generated types.
+
 #### Entity Lifecycle
 
 Reference-type entities are destroyed when the last reference to them

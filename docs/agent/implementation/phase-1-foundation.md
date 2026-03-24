@@ -152,7 +152,7 @@
 
 ---
 
-## Step 1.4 — Docker Infrastructure
+## Step 1.4 — Docker Infrastructure ✅ `d73faff` (INC-005 partially resolved in Step 1.5)
 
 ### Work
 
@@ -183,14 +183,14 @@
 ### Test Gate
 
 - [x] `docker compose build` succeeds for all base images
-- [ ] `docker compose up` starts placeholder containers — **blocked by INC-005** (CDS license; placeholders depend on CDS healthy)
+- [x] `docker compose up` starts placeholder containers — CDS resolved via custom Dockerfile (INC-005)
 - [x] Container on `surgical-net` can reach other containers on `surgical-net`
 - [x] Container on `surgical-net` cannot reach containers on `hospital-net` (unless dual-homed)
 - [x] `NDDS_QOS_PROFILES` is set and QoS XML files are accessible inside each container
-- [ ] Cloud Discovery Service container starts and passes its TCP health check on port 7400 — **blocked by INC-005**
-- [ ] Cloud Discovery Service is reachable from both `surgical-net` and `hospital-net` containers — **blocked by INC-005**
-- [ ] Application placeholder containers do not start until Cloud Discovery Service is healthy (`depends_on` ordering verified) — **blocked by INC-005** (verified structurally: compose config validates, depends_on present)
-- [ ] `docker compose --profile observability up` starts Collector Service, Prometheus, Grafana Loki, and Grafana — **Collector Service blocked by INC-005**; Prometheus, Loki, Grafana verified healthy
+- [x] Cloud Discovery Service container starts and passes its UDP health check on port 7400 — resolved via custom Dockerfile wrapping local `$NDDSHOME` binary (INC-005)
+- [x] Cloud Discovery Service is reachable from both `surgical-net` and `hospital-net` containers
+- [x] Application placeholder containers do not start until Cloud Discovery Service is healthy (`depends_on` ordering verified)
+- [ ] `docker compose --profile observability up` starts Collector Service, Prometheus, Grafana Loki, and Grafana — **Collector Service blocked by INC-005** (no local binary; Docker Hub image requires feature license); Prometheus, Loki, Grafana verified healthy
 - [x] Grafana is accessible at its configured port and loads the RTI Observability Dashboards (38 dashboards loaded)
 - [x] Prometheus targets page shows Collector Service as a scrape target (target configured; status 'down' pending INC-005)
 
@@ -216,12 +216,12 @@
 
 ### Test Gate
 
-- [ ] `pytest tests/integration/test_partition_isolation.py` — all partition scenarios pass
-- [ ] `pytest tests/integration/test_domain_isolation.py` — domain isolation scenarios pass
-- [ ] `pytest tests/integration/test_qos_enforcement.py` — deadline, liveliness, lifespan, history scenarios pass
-- [ ] `pytest tests/integration/test_durability.py` — TRANSIENT_LOCAL and VOLATILE scenarios pass
-- [ ] `pytest tests/integration/test_exclusive_ownership.py` — ownership and failover scenarios pass
-- [ ] All tests run from project root with a single command: `pytest tests/`
+- [x] `pytest tests/integration/test_partition_isolation.py` — all partition scenarios pass
+- [x] `pytest tests/integration/test_domain_isolation.py` — domain isolation scenarios pass
+- [x] `pytest tests/integration/test_qos_enforcement.py` — deadline, liveliness, lifespan, history scenarios pass
+- [x] `pytest tests/integration/test_durability.py` — TRANSIENT_LOCAL and VOLATILE scenarios pass
+- [x] `pytest tests/integration/test_exclusive_ownership.py` — ownership and failover scenarios pass
+- [x] All tests run from project root with a single command: `pytest tests/`
 
 ---
 

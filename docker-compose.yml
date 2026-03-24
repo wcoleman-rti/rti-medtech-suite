@@ -32,17 +32,24 @@ services:
   # ─── Infrastructure ─────────────────────────────────────────────
 
   cloud-discovery-service:
-    image: rticom/cloud-discovery-service:latest
+    image: medtech/cloud-discovery-service
+    build:
+      context: .
+      dockerfile: docker/cloud-discovery-service.Dockerfile
+      additional_contexts:
+        connext: "${NDDSHOME:-/opt/rti.com/rti_connext_dds-7.6.0}"
+      args:
+        <<: *build-args
     container_name: cloud-discovery-service
-    command: ["-cfgName", "DockerCDS", "-verbosity", "WARN"]
+    command: ["-cfgFile", "/opt/medtech/config/CloudDiscoveryService.xml", "-cfgName", "DockerCDS", "-verbosity", "WARN"]
     volumes:
-      - ./services/cloud-discovery-service/CloudDiscoveryService.xml:/home/rtiuser/rti_workspace/7.6.0/user_config/cloud_discovery_service/USER_CLOUD_DISCOVERY_SERVICE.xml:ro
+      - ./services/cloud-discovery-service/CloudDiscoveryService.xml:/opt/medtech/config/CloudDiscoveryService.xml:ro
       - ${RTI_LICENSE_FILE:-./rti_license.dat}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro
     networks:
       surgical-net:
       hospital-net:
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "7400"]
+      test: ["CMD-SHELL", "nc -zu localhost 7400"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -86,7 +93,7 @@ services:
   # ─── Observability (--profile observability) ────────────────────
 
   collector-service:
-    image: rticom/collector-service:latest
+    image: rticom/collector-service:7.6.0
     container_name: collector-service
     profiles: ["observability"]
     environment:

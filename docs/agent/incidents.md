@@ -151,39 +151,39 @@ after closure. They form the project's decision log.
 
 ## INC-005: RTI license missing CDS and Collector Service features
 
-- **Status:** Open
+- **Status:** Partially resolved
 - **Category:** Environment / Licensing
 - **Date opened:** 2026-03-24
 - **Phase/Step:** Phase 1 / Step 1.4
 - **Documents involved:** `docker-compose.yml`,
-  `services/cloud-discovery-service/CloudDiscoveryService.xml`
+  `services/cloud-discovery-service/CloudDiscoveryService.xml`,
+  `docker/cloud-discovery-service.Dockerfile`
 - **Description:** The RTI license file at `/opt/rti.com/rti_license.dat`
   contains `RTIPRO` and `RTISECURITY` features but does not include the
-  Cloud Discovery Service or Collector Service feature licenses. Both
-  `rticom/cloud-discovery-service` and `rticom/collector-service` Docker
-  Hub images require feature-specific licenses and refuse to start:
-  ```
-  RTI Cloud Discovery Service feature license not found
-  ```
-  This blocks three Step 1.4 test gates:
-  - CDS container starts and passes TCP health check on port 7400
-  - CDS reachable from both `surgical-net` and `hospital-net`
-  - Application containers depend on CDS healthy
-  And two observability test gates:
-  - Collector Service starts
-  - Prometheus scrape target shows Collector Service as UP
+  Cloud Discovery Service or Collector Service feature licenses. The
+  Docker Hub images (`rticom/cloud-discovery-service`,
+  `rticom/collector-service`) require feature-specific licenses and
+  refuse to start.
 - **Impact:** Docker infrastructure is otherwise complete and verified:
   base images build successfully, Docker networks provide correct
   isolation, QoS XML files are mounted and accessible, Prometheus/
   Loki/Grafana start and are healthy, 38 RTI Observability Dashboards
   load in Grafana, data sources provisioned.
-- **Options:**
-  1. Obtain an updated license with CDS and Collector Service features
-     from the RTI Customer Portal or RTI Support.
-  2. Copy a valid license that includes these features to
-     `/opt/rti.com/rti_license.dat` or update `RTI_LICENSE_FILE` in
-     `.env` to point to one.
-  3. For local development without Docker, `NDDS_DISCOVERY_PEERS` can
-     substitute for CDS by listing explicit peer addresses.
-- **Resolution:** Pending operator action — license update required.
+- **CDS Resolution (Step 1.5):** Replaced the Docker Hub image
+  `rticom/cloud-discovery-service:latest` with a custom Dockerfile
+  (`docker/cloud-discovery-service.Dockerfile`) that wraps the local
+  CDS binary from `$NDDSHOME/resource/app/bin/<arch>/rticlouddiscoveryserviceapp`
+  and its 9 required shared libraries. The local binary ships with
+  RTI Connext Professional and works with the `RTIPRO` license — no
+  separate CDS feature license is needed. CDS container starts, passes
+  UDP health check on port 7400, is reachable from both `surgical-net`
+  and `hospital-net`, and placeholder containers successfully wait for
+  CDS health before starting.
+- **Collector Service (still blocked):** The Collector Service has no
+  local binary in `$NDDSHOME` — it is Docker-image-only
+  (`rticom/collector-service:7.6.0`). This image still requires a
+  Collector Service feature license. Options:
+  1. Obtain an updated license with Collector Service features.
+  2. Accept that observability is limited to Prometheus/Loki/Grafana
+     (which are healthy) without Collector Service forwarding.
 - **Date closed:** —

@@ -159,6 +159,7 @@ code patterns, consult these additional resources (in priority order):
 | Use `--force`, `--no-verify`, or equivalent safety bypasses | Reversibility and safety are non-negotiable |
 | Push code without running the full test suite | See Section 3 commit discipline |
 | Use `print()`, `printf`, `std::cout`, or a custom logging framework | All logging must use the RTI Connext Logging API per `vision/technology.md` |
+| Use DynamicData / DynamicType in application code | All applications must use IDL-generated types. DynamicData is permitted only in developer tools (e.g., `tools/qos-checker.py`) and test utilities. See `vision/coding-standards.md`. |
 
 ### What the Agent May Decide Autonomously
 
