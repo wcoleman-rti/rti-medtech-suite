@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Surgical Procedure Module — Participant Library
+
+    Defines named participant configurations for the surgical procedure
+    module. Each domain tag (control, clinical, operational) has its own
+    participant with all relevant publishers/writers and subscribers/readers.
+
+    Applications create participants with:
+      Python: provider.create_participant_from_config(
+                  "SurgicalParticipants::OperationalPub")
+      C++:    provider.extensions().create_participant_from_config(
+                  "SurgicalParticipants::ControlRobot")
+
+    Partition is injected at runtime via the PARTITION env variable.
+    Domain tag is set via property in each participant definition.
+
+    Entity naming convention for find_datawriter / find_datareader:
+      "PublisherName::WriterName"  or  "SubscriberName::ReaderName"
+-->
+<dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:noNamespaceSchemaLocation="https://community.rti.com/schema/7.6.0/rti_dds_profiles.xsd">
+
+    <domain_participant_library name="SurgicalParticipants">
+
+        <!--
+            OperationalPub — operational tag publisher
+            Publishes: ProcedureContext, ProcedureStatus, CameraFrame, CameraConfig
+            Used by: procedure context publisher, camera simulator
+        -->
+        <domain_participant name="OperationalPub"
+                            domain_ref="MedtechDomains::Procedure_operational">
+            <domain_participant_qos base_name="Participants::SimulationTransport">
+                <property>
+                    <value>
+                        <element>
+                            <name>dds.domain_participant.domain_tag</name>
+                            <value>operational</value>
+                        </element>
+                    </value>
+                </property>
+                <participant_name>
+                    <name>$(MEDTECH_APP_NAME)/operational-pub</name>
+                </participant_name>
+            </domain_participant_qos>
+
+            <publisher name="OperationalPublisher">
+                <publisher_qos>
+                    <partition>
+                        <name>
+                            <element>$(PARTITION)</element>
+                        </name>
+                    </partition>
+                </publisher_qos>
+
+                <data_writer name="ProcedureContextWriter"
+                             topic_ref="ProcedureContext">
+                    <datawriter_qos base_name="TopicProfiles::ProcedureContext"/>
+                </data_writer>
+
+                <data_writer name="ProcedureStatusWriter"
+                             topic_ref="ProcedureStatus">
+                    <datawriter_qos base_name="TopicProfiles::ProcedureStatus"/>
+                </data_writer>
+
+                <data_writer name="CameraFrameWriter"
+                             topic_ref="CameraFrame">
+                    <datawriter_qos base_name="TopicProfiles::CameraFrame"/>
+                </data_writer>
+
+                <data_writer name="CameraConfigWriter"
+                             topic_ref="CameraConfig">
+                    <datawriter_qos base_name="TopicProfiles::CameraConfig"/>
+                </data_writer>
+            </publisher>
+
+            <subscriber name="OperationalSubscriber">
+                <subscriber_qos>
+                    <partition>
+                        <name>
+                            <element>$(PARTITION)</element>
+                        </name>
+                    </partition>
+                </subscriber_qos>
+
+                <data_reader name="ProcedureContextReader"
+                             topic_ref="ProcedureContext">
+                    <datareader_qos base_name="TopicProfiles::ProcedureContext"/>
+                </data_reader>
+
+                <data_reader name="ProcedureStatusReader"
+                             topic_ref="ProcedureStatus">
+                    <datareader_qos base_name="TopicProfiles::ProcedureStatus"/>
+                </data_reader>
+            </subscriber>
+        </domain_participant>
+
+        <!--
+            ControlRobot — control tag (robot controller)
+            Publishes: RobotState
+            Subscribes: OperatorInput, RobotCommand, SafetyInterlock
+            Used by: robot controller (C++)
+        -->
+        <domain_participant name="ControlRobot"
+                            domain_ref="MedtechDomains::Procedure_control">
+            <domain_participant_qos base_name="Participants::SimulationTransport">
+                <property>
+                    <value>
+                        <element>
+                            <name>dds.domain_participant.domain_tag</name>
+                            <value>control</value>
+                        </element>
+                    </value>
+                </property>
+                <participant_name>
+                    <name>$(MEDTECH_APP_NAME)/control-robot</name>
+                </participant_name>
+            </domain_participant_qos>
+
+            <publisher name="RobotPublisher">
+                <publisher_qos>
+                    <partition>
+                        <name>
+                            <element>$(PARTITION)</element>
+                        </name>
+                    </partition>
+                </publisher_qos>
+
+                <data_writer name="RobotStateWriter"
+                             topic_ref="RobotState">
+                    <datawriter_qos base_name="TopicProfiles::RobotState"/>
+                </data_writer>
+            </publisher>
+
+            <subscriber name="RobotSubscriber">
+                <subscriber_qos>
+                    <partition>
+                        <name>
+                            <element>$(PARTITION)</element>
+                        </name>
+                    </partition>
+                </subscriber_qos>
+
+                <data_reader name="OperatorInputReader"
+                             topic_ref="OperatorInput">
+                    <datareader_qos base_name="TopicProfiles::OperatorInput"/>
+                </data_reader>
+
+                <data_reader name="RobotCommandReader"
+                             topic_ref="RobotCommand">
+                    <datareader_qos base_name="TopicProfiles::RobotCommand"/>
+                </data_reader>
+
+                <data_reader name="SafetyInterlockReader"
+                             topic_ref="SafetyInterlock">
+                    <datareader_qos base_name="TopicProfiles::SafetyInterlock"/>
+                </data_reader>
+            </subscriber>
+        </domain_participant>
+
+        <!--
+            ControlOperator — control tag (operator console)
+            Publishes: OperatorInput, RobotCommand, SafetyInterlock
+            Subscribes: RobotState
+            Used by: operator console simulator
+        -->
+        <domain_participant name="ControlOperator"
+                            domain_ref="MedtechDomains::Procedure_control">
+            <domain_participant_qos base_name="Participants::SimulationTransport">
+                <property>
+                    <value>
+                        <element>
+                            <name>dds.domain_participant.domain_tag</name>
+                            <value>control</value>
+                        </element>
+                    </value>
+                </property>
+                <participant_name>
+                    <name>$(MEDTECH_APP_NAME)/control-operator</name>
+                </participant_name>
+            </domain_participant_qos>
+
+            <publisher name="OperatorPublisher">
+                <publisher_qos>
+                    <partition>
+                        <name>
+                            <element>$(PARTITION)</element>
+                        </name>
+                    </partition>
+                </publisher_qos>
+
+                <data_writer name="OperatorInputWriter"
+                             topic_ref="OperatorInput">
+                    <datawriter_qos base_name="TopicProfiles::OperatorInput"/>
+                </data_writer>
+
+                <data_writer name="RobotCommandWriter"
+                             topic_ref="RobotCommand">
+                    <datawriter_qos base_name="TopicProfiles::RobotCommand"/>
+                </data_writer>
+
+                <data_writer name="SafetyInterlockWriter"
+                             topic_ref="SafetyInterlock">
+                    <datawriter_qos base_name="TopicProfiles::SafetyInterlock"/>
+                </data_writer>
+            </publisher>
+
+            <subscriber name="OperatorSubscriber">
+                <subscriber_qos>
+                    <partition>
+                        <name>
+                            <element>$(PARTITION)</element>
+                        </name>
+                    </partition>
+                </subscriber_qos>
+
+                <data_reader name="RobotStateReader"
+                             topic_ref="RobotState">
+                    <datareader_qos base_name="TopicProfiles::RobotState"/>
+                </data_reader>
+            </subscriber>
+        </domain_participant>
+
+        <!--
+            ClinicalMonitor — clinical tag (bedside monitor / vitals)
+            Publishes: PatientVitals, WaveformData, AlarmMessages
+            Used by: patient vitals simulator, alarm evaluator
+        -->
+        <domain_participant name="ClinicalMonitor"
+                            domain_ref="MedtechDomains::Procedure_clinical">
+            <domain_participant_qos base_name="Participants::SimulationTransport">
+                <property>
+                    <value>
+                        <element>
+                            <name>dds.domain_participant.domain_tag</name>
+                            <value>clinical</value>
+                        </element>
+                    </value>
+                </property>
+                <participant_name>
+                    <name>$(MEDTECH_APP_NAME)/clinical-monitor</name>
+                </participant_name>
+            </domain_participant_qos>
+
+            <publisher name="MonitorPublisher">
+                <publisher_qos>
+                    <partition>
+                        <name>
+                            <element>$(PARTITION)</element>
+                        </name>
+                    </partition>
+                </publisher_qos>
+
+                <data_writer name="PatientVitalsWriter"
+                             topic_ref="PatientVitals">
+                    <datawriter_qos base_name="TopicProfiles::PatientVitals"/>
+                </data_writer>
+
+                <data_writer name="WaveformDataWriter"
+                             topic_ref="WaveformData">
+                    <datawriter_qos base_name="TopicProfiles::WaveformData"/>
+                </data_writer>
+
+                <data_writer name="AlarmMessagesWriter"
+                             topic_ref="AlarmMessages">
+                    <datawriter_qos base_name="TopicProfiles::AlarmMessages"/>
+                </data_writer>
+            </publisher>
+
+            <subscriber name="MonitorSubscriber">
+                <subscriber_qos>
+                    <partition>
+                        <name>
+                            <element>$(PARTITION)</element>
+                        </name>
+                    </partition>
+                </subscriber_qos>
+
+                <data_reader name="PatientVitalsReader"
+                             topic_ref="PatientVitals">
+                    <datareader_qos base_name="TopicProfiles::PatientVitals"/>
+                </data_reader>
+            </subscriber>
+        </domain_participant>
+
+        <!--
+            ClinicalDeviceGateway — clinical tag (device telemetry)
+            Publishes: DeviceTelemetry
+            Used by: device telemetry simulators (pump, anesthesia machine)
+        -->
+        <domain_participant name="ClinicalDeviceGateway"
+                            domain_ref="MedtechDomains::Procedure_clinical">
+            <domain_participant_qos base_name="Participants::SimulationTransport">
+                <property>
+                    <value>
+                        <element>
+                            <name>dds.domain_participant.domain_tag</name>
+                            <value>clinical</value>
+                        </element>
+                    </value>
+                </property>
+                <participant_name>
+                    <name>$(MEDTECH_APP_NAME)/clinical-device-gateway</name>
+                </participant_name>
+            </domain_participant_qos>
+
+            <publisher name="DevicePublisher">
+                <publisher_qos>
+                    <partition>
+                        <name>
+                            <element>$(PARTITION)</element>
+                        </name>
+                    </partition>
+                </publisher_qos>
+
+                <data_writer name="DeviceTelemetryWriter"
+                             topic_ref="DeviceTelemetry">
+                    <datawriter_qos base_name="TopicProfiles::DeviceTelemetry"/>
+                </data_writer>
+            </publisher>
+        </domain_participant>
+
+        <!--
+            ControlDigitalTwin — control tag (digital twin display, read-only)
+            Subscribes: RobotState, RobotCommand, SafetyInterlock, OperatorInput
+            Used by: digital twin PySide6 GUI
+        -->
+        <domain_participant name="ControlDigitalTwin"
+                            domain_ref="MedtechDomains::Procedure_control">
+            <domain_participant_qos base_name="Participants::SimulationTransport">
+                <property>
+                    <value>
+                        <element>
+                            <name>dds.domain_participant.domain_tag</name>
+                            <value>control</value>
+                        </element>
+                    </value>
+                </property>
+                <participant_name>
+                    <name>$(MEDTECH_APP_NAME)/control-digital-twin</name>
+                </participant_name>
+            </domain_participant_qos>
+
+            <subscriber name="TwinSubscriber">
+                <subscriber_qos>
+                    <partition>
+                        <name>
+                            <element>$(PARTITION)</element>
+                        </name>
+                    </partition>
+                </subscriber_qos>
+
+                <!-- High-rate readers: apply time-based filter for 60 Hz rendering -->
+                <data_reader name="RobotStateReader"
+                             topic_ref="RobotState">
+                    <datareader_qos base_name="TopicProfiles::GuiRobotState"/>
+                </data_reader>
+
+                <data_reader name="OperatorInputReader"
+                             topic_ref="OperatorInput">
+                    <datareader_qos base_name="TopicProfiles::GuiOperatorInput"/>
+                </data_reader>
+
+                <!-- Safety-critical: NO time-based filter — every sample matters -->
+                <data_reader name="SafetyInterlockReader"
+                             topic_ref="SafetyInterlock">
+                    <datareader_qos base_name="TopicProfiles::SafetyInterlock"/>
+                </data_reader>
+
+                <!-- Command: NO time-based filter — each command must be processed -->
+                <data_reader name="RobotCommandReader"
+                             topic_ref="RobotCommand">
+                    <datareader_qos base_name="TopicProfiles::RobotCommand"/>
+                </data_reader>
+            </subscriber>
+        </domain_participant>
+
+    </domain_participant_library>
+
+</dds>

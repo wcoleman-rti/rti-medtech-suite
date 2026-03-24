@@ -25,12 +25,16 @@ export PATH="$_DIR/bin:$PATH"
 export LD_LIBRARY_PATH="$_DIR/lib:${LD_LIBRARY_PATH:-}"
 export PYTHONPATH="$_DIR/lib/python/site-packages:${PYTHONPATH:-}"
 
-# QoS + domain XML in dependency order
+# QoS + domain + participant XML in dependency order
 export NDDS_QOS_PROFILES="$_DIR/share/qos/Snippets.xml;\
 $_DIR/share/qos/Patterns.xml;\
 $_DIR/share/qos/Topics.xml;\
 $_DIR/share/qos/Participants.xml;\
-$_DIR/share/domains/Domains.xml"
+$_DIR/share/domains/Domains.xml;\
+$_DIR/share/participants/SurgicalParticipants.xml"
+
+# DDS partition (set by applications before launching; empty = default partition)
+export PARTITION="${PARTITION:-}"
 
 # Runtime configuration root
 export MEDTECH_CONFIG_DIR="$_DIR/etc"

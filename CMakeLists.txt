@@ -78,6 +78,10 @@ install(FILES
     interfaces/domains/Domains.xml
     DESTINATION share/domains
 )
+install(FILES
+    interfaces/participants/SurgicalParticipants.xml
+    DESTINATION share/participants
+)
 
 # --- Resources (fonts, images, stylesheets) ---
 add_subdirectory(resources)
@@ -94,3 +98,8 @@ install(DIRECTORY modules/shared/medtech_logging/
 install(DIRECTORY modules/shared/medtech_logging/include/
     DESTINATION include
     FILES_MATCHING PATTERN "*.hpp")
+
+# --- Install surgical-procedure Python module ---
+install(DIRECTORY modules/surgical-procedure/
+    DESTINATION lib/python/site-packages/surgical_procedure
+    FILES_MATCHING PATTERN "*.py")
