@@ -8,7 +8,7 @@
 
 ---
 
-## Step 2.1 — Procedure Context & Status Publisher
+## Step 2.1 — Procedure Context & Status Publisher ✅ `84c7b22`
 
 ### Work
 
@@ -22,10 +22,10 @@
 
 ### Test Gate (spec: surgical-procedure.md — Procedure Context)
 
-- [ ] Procedure context is published at startup with all required fields
-- [ ] Late-joining subscriber receives procedure context immediately
-- [ ] Procedure context update reflects changes
-- [ ] ProcedureStatus is published with running status and is durable for late joiners
+- [x] Procedure context is published at startup with all required fields
+- [x] Late-joining subscriber receives procedure context immediately
+- [x] Procedure context update reflects changes
+- [x] ProcedureStatus is published with running status and is durable for late joiners
 
 ---
 

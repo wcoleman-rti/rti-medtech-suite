@@ -920,3 +920,26 @@ after closure. They form the project's decision log.
   tables updated, `Common::Time_t` definition updated to Foxglove
   alignment (see INC-028). Build and tests pass.
 - **Date closed:** 2026-03-24
+
+---
+
+## INC-030: PARTITION env var must be defined for SurgicalParticipants.xml loading
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 2 / Step 2.1
+- **Documents involved:** `interfaces/participants/SurgicalParticipants.xml`, `setup.bash.in`
+- **Description:** SurgicalParticipants.xml uses `$(PARTITION)` in publisher/subscriber
+  QoS partition elements. When this XML is loaded via `NDDS_QOS_PROFILES`, the RTI XML
+  parser fails with `Undefined environment variable PARTITION` if PARTITION is not set in
+  the environment. This breaks all DDS operations, including existing Phase 1 tests that
+  don't use partitions. The fix is to ensure PARTITION is always defined (defaulting to
+  empty string for the default partition) in `setup.bash.in`.
+- **Resolution:** Added `export PARTITION="${PARTITION:-}"` to `setup.bash.in` before the
+  runtime configuration block. Applications set PARTITION to their specific value before
+  launching. All 126 tests pass.
+- **Guideline:** Any XML file loaded globally via NDDS_QOS_PROFILES that references
+  environment variables via `$(VAR)` must have a default defined in the setup script, or
+  the entire QoS provider will fail to load.
+- **Date closed:** 2026-03-24
