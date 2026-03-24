@@ -6,11 +6,9 @@ Tags: @integration @partition
 
 import time
 
-import pytest
-import rti.connextdds as dds
 import monitoring
-
-from conftest import wait_for_discovery, wait_for_data
+import rti.connextdds as dds
+from conftest import wait_for_data, wait_for_discovery
 
 TEST_DOMAIN = 0
 PatientVitals = monitoring.Monitoring.PatientVitals
@@ -28,7 +26,10 @@ class TestSamePartition:
     """Endpoints in the same partition discover each other."""
 
     def test_same_partition_discovers(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         partition = "room/OR-3/procedure/proc-001"
         p1 = participant_factory(domain_id=TEST_DOMAIN)
@@ -40,12 +41,15 @@ class TestSamePartition:
         w = writer_factory(p1, topic1, partition=partition)
         r = reader_factory(p2, topic2, partition=partition)
 
-        assert wait_for_discovery(w, r, timeout_sec=10), (
-            "Same-partition endpoints should discover each other"
-        )
+        assert wait_for_discovery(
+            w, r, timeout_sec=10
+        ), "Same-partition endpoints should discover each other"
 
     def test_same_partition_exchanges_data(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         partition = "room/OR-3/procedure/proc-001"
         p1 = participant_factory(domain_id=TEST_DOMAIN)
@@ -71,7 +75,10 @@ class TestDifferentPartitions:
     """Endpoints in different partitions do NOT match."""
 
     def test_different_partitions_no_match(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         p1 = participant_factory(domain_id=TEST_DOMAIN)
         p2 = participant_factory(domain_id=TEST_DOMAIN)
@@ -80,25 +87,26 @@ class TestDifferentPartitions:
         topic2 = dds.Topic(p2, "TestIsolated", PatientVitals)
 
         w = writer_factory(
-            p1, topic1,
+            p1,
+            topic1,
             partition="room/OR-3/procedure/proc-001",
         )
         r = reader_factory(
-            p2, topic2,
+            p2,
+            topic2,
             partition="room/OR-5/procedure/proc-002",
         )
 
         # Give discovery time, then confirm no match
         time.sleep(2)
-        assert not w.matched_subscriptions, (
-            "Different partitions should not match"
-        )
-        assert not r.matched_publications, (
-            "Different partitions should not match"
-        )
+        assert not w.matched_subscriptions, "Different partitions should not match"
+        assert not r.matched_publications, "Different partitions should not match"
 
     def test_different_partitions_no_data(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         p1 = participant_factory(domain_id=TEST_DOMAIN)
         p2 = participant_factory(domain_id=TEST_DOMAIN)
@@ -107,11 +115,13 @@ class TestDifferentPartitions:
         topic2 = dds.Topic(p2, "TestNoData", PatientVitals)
 
         w = writer_factory(
-            p1, topic1,
+            p1,
+            topic1,
             partition="room/OR-3/procedure/proc-001",
         )
         r = reader_factory(
-            p2, topic2,
+            p2,
+            topic2,
             partition="room/OR-5/procedure/proc-002",
         )
 
@@ -129,7 +139,10 @@ class TestWildcardPartition:
     """Wildcard partition receives from all matching partitions."""
 
     def test_wildcard_receives_from_multiple(
-        self, participant_factory, writer_factory, reader_factory,
+        self,
+        participant_factory,
+        writer_factory,
+        reader_factory,
     ):
         p1 = participant_factory(domain_id=TEST_DOMAIN)
         p2 = participant_factory(domain_id=TEST_DOMAIN)
@@ -140,21 +153,19 @@ class TestWildcardPartition:
         topic_agg = dds.Topic(p_agg, "TestWildcard", PatientVitals)
 
         w1 = writer_factory(
-            p1, topic1,
+            p1,
+            topic1,
             partition="room/OR-3/procedure/proc-001",
         )
         w2 = writer_factory(
-            p2, topic2,
+            p2,
+            topic2,
             partition="room/OR-5/procedure/proc-002",
         )
         r = reader_factory(p_agg, topic_agg, partition="room/*")
 
-        assert wait_for_discovery(w1, r, timeout_sec=10), (
-            "Wildcard should match OR-3"
-        )
-        assert wait_for_discovery(w2, r, timeout_sec=10), (
-            "Wildcard should match OR-5"
-        )
+        assert wait_for_discovery(w1, r, timeout_sec=10), "Wildcard should match OR-3"
+        assert wait_for_discovery(w2, r, timeout_sec=10), "Wildcard should match OR-5"
 
         w1.write(_make_vitals("from-OR-3", 1))
         w2.write(_make_vitals("from-OR-5", 2))

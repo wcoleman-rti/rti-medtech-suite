@@ -541,3 +541,54 @@ after closure. They form the project's decision log.
   absence checks in `if` conditionals rather than relying on exit
   code suppression.
 - **Date closed:** 2026-03-24
+
+---
+
+## INC-019: Throughput threshold direction requires inverted comparison
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.9
+- **Documents involved:** `tests/performance/metrics.py`,
+  `vision/performance-baseline.md`
+- **Description:** The PERCENTAGE threshold check (`current <=
+  baseline * (1 + max_ratio)`) works for latency and resource
+  metrics where higher-is-worse. For throughput metrics (T1–T4)
+  where `max_ratio` is negative (−0.10 = allowed 10% drop),
+  the formula produces a ceiling check (`current <= baseline * 0.90`)
+  that passes values *below* the floor instead of failing them.
+  Throughput regression means current is *lower* than acceptable,
+  so the comparison must be `current >= baseline * (1 + max_ratio)`.
+- **Resolution:** Added direction check in `Threshold.check()`:
+  when `max_ratio < 0`, use `>=` comparison (floor); when
+  `max_ratio >= 0`, use `<=` comparison (ceiling). Unit test
+  confirms 12% throughput drop correctly fails the 10% threshold.
+- **Guideline:** When implementing percentage-based thresholds,
+  always consider whether the regression direction is "higher is
+  worse" (latency) or "lower is worse" (throughput) and invert
+  the comparison accordingly.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-020: Code style must be applied before committing new files
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.9
+- **Documents involved:** `scripts/ci.sh`, `pyproject.toml`
+- **Description:** Newly created Python files (metrics.py,
+  benchmark.py, test_benchmark.py) and files edited during step
+  1.8 sleep reduction (test_partition_isolation.py) had black,
+  isort, and ruff violations that were not caught until the CI
+  pipeline ran. Each tool needed a separate pass to fix.
+- **Resolution:** Applied `black`, `isort --profile black`, and
+  `ruff check --fix` to all affected files before committing.
+- **Guideline:** Before committing any step, run
+  `black modules/ tests/ && isort --profile black modules/ tests/ && ruff check --fix modules/ tests/`
+  on all new or modified Python files. Consider adding a pre-commit
+  hook or running style fixes automatically as part of the commit
+  workflow.
+- **Date closed:** 2026-03-24

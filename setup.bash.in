@@ -25,3 +25,6 @@ export MEDTECH_CONFIG_DIR="$_DIR/etc"
 
 # Shared GUI resources (fonts, images, stylesheets)
 export MEDTECH_RESOURCE_DIR="$_DIR/share/resources"
+
+# Prometheus endpoint for performance benchmarks (observability stack)
+export PROMETHEUS_URL="${PROMETHEUS_URL:-http://localhost:9090}"

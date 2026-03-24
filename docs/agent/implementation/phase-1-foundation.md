@@ -196,7 +196,7 @@
 
 ---
 
-## Step 1.5 — Test Harness & Common Behaviors
+## Step 1.5 — Test Harness & Common Behaviors ✅ `9dd118a`
 
 ### Work
 
@@ -225,7 +225,7 @@
 
 ---
 
-## Step 1.6 — Shared GUI Bootstrap (`medtech_gui`)
+## Step 1.6 — Shared GUI Bootstrap (`medtech_gui`) ✅ `3908384`
 
 ### Work
 
@@ -246,7 +246,7 @@
 
 ---
 
-## Step 1.7 — Logging Initialization Utility
+## Step 1.7 — Logging Initialization Utility ✅ `6209736`
 
 ### Work
 
@@ -274,7 +274,7 @@
 
 ---
 
-## Step 1.8 — CI Pipeline & Quality Gate Automation
+## Step 1.8 — CI Pipeline & Quality Gate Automation ✅ `078ebbd`
 
 ### Work
 
@@ -298,7 +298,7 @@
 
 ---
 
-## Step 1.9 — Performance Benchmark Harness
+## Step 1.9 — Performance Benchmark Harness ✅ `f524eab`
 
 ### Work
 
@@ -318,23 +318,23 @@
   - Exit code 0 (all pass), 1 (regression), 2 (infrastructure error)
 - Implement `--record --phase <name>` mode for baseline recording
 - Implement `--baseline <path>` for explicit baseline comparison
-- Add `@benchmark` tag to `spec/README.md` tag table
-- Add `PROMETHEUS_URL` to Docker Compose environment and `setup.bash`
+- Add `@benchmark` tag to `spec/README.md` tag table (already present — no action needed)
+- Add `PROMETHEUS_URL` to `setup.bash` (Docker Compose addition deferred to the phase that creates the Compose file)
 - Note: the harness cannot run a meaningful benchmark at Phase 1 (no real publishers yet), but the harness itself must be testable with a mock Prometheus or unit tests of the comparison logic
 
 ### Test Gate (spec: performance-baseline.md — Benchmark Execution, Baseline Recording, Regression Detection)
 
-- [ ] `python tests/performance/benchmark.py --help` runs without errors
-- [ ] Comparison logic correctly reports PASS for a metric within threshold (unit test)
-- [ ] Comparison logic correctly reports FAIL for a metric exceeding threshold (unit test)
-- [ ] Comparison logic correctly reports NEW for a metric not in baseline (unit test)
-- [ ] Comparison logic correctly reports REMOVED for a baseline metric not in current run (unit test)
-- [ ] `T6` (deadline missed) comparison enforces absolute zero threshold (unit test)
-- [ ] `R1`/`R2` comparison enforces exact match (unit test)
-- [ ] `L6` (discovery time) comparison enforces both percentage and hard cap (unit test)
-- [ ] Harness exits with code 2 when Prometheus is unreachable
-- [ ] `--record --phase test` writes a valid JSON file to `tests/performance/baselines/test.json`
-- [ ] First run with no baseline reports all metrics as NEW and exits 0
+- [x] `python tests/performance/benchmark.py --help` runs without errors
+- [x] Comparison logic correctly reports PASS for a metric within threshold (unit test)
+- [x] Comparison logic correctly reports FAIL for a metric exceeding threshold (unit test)
+- [x] Comparison logic correctly reports NEW for a metric not in baseline (unit test)
+- [x] Comparison logic correctly reports REMOVED for a baseline metric not in current run (unit test)
+- [x] `T6` (deadline missed) comparison enforces absolute zero threshold (unit test)
+- [x] `R1`/`R2` comparison enforces exact match (unit test)
+- [x] `L6` (discovery time) comparison enforces both percentage and hard cap (unit test)
+- [x] Harness exits with code 2 when Prometheus is unreachable
+- [x] `--record --phase test` writes a valid JSON file to `tests/performance/baselines/test.json`
+- [x] First run with no baseline reports all metrics as NEW and exits 0
 
 ---
 

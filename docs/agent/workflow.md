@@ -121,6 +121,12 @@ code patterns, consult these additional resources (in priority order):
   commit the work with a message referencing the phase and step
   (e.g., `phase-1: step 1.3 — QoS profiles and topic bindings`).
   Do not accumulate uncommitted work across multiple steps.
+- **Mark completed steps in the phase file.** After committing a
+  step, annotate its `## Step` heading in the phase file with ✅
+  and the short commit hash (e.g.,
+  `## Step 1.3 — QoS Profile Library ✅ \`10f7c6b\``). Check all
+  test gate items as `[x]`. This gives resuming agents an
+  instant visual summary of progress without reading git log.
 - **No speculative work.** Do not begin the next step "while waiting"
   or pre-build infrastructure for future phases. The current step is
   the only scope.

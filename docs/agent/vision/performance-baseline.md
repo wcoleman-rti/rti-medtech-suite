@@ -199,7 +199,7 @@ for each metric tier. Deviations beyond these thresholds block the phase.
 
 | Metric | Allowed Regression | Rationale |
 |--------|--------------------|-----------|
-| `T1`–`T4` (sample rates) | ≤ **−10%** from baseline | Throughput drops beyond 10% indicate a real delivery problem, not variance. Reliability topics should lose zero. |
+| `T1`–`T4` (sample rates) | Must not decrease by more than **10%** from baseline (current ≥ 90% of baseline) | Throughput drops beyond 10% indicate a real delivery problem, not variance. Reliability topics should lose zero. |
 | `T5` (samples lost) | ≤ baseline **+ 0.1%** of total published samples | Best-effort topics may lose samples; 0.1% is the noise floor in Docker |
 | `T6` (deadline missed) | **= 0** (absolute, no deviation) | Deadline misses in steady state are never acceptable — they indicate a broken QoS contract |
 
