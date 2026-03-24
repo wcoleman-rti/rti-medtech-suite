@@ -672,3 +672,51 @@ after closure. They form the project's decision log.
   message. The workflow.md quality gate table describes the
   conceptual categories; the CI script is the executable authority.
 - **Date closed:** 2026-03-24
+
+---
+
+## INC-024: Monitoring Library 2.0 application name via XML env variable
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Post-Phase 1 (pre-Phase 2 preparation)
+- **Documents involved:** `interfaces/qos/Participants.xml`,
+  `setup.bash.in`, `vision/technology.md`
+- **Description:** Monitoring Library 2.0 exposes an
+  `application_name` field in the `<monitoring>` section of
+  `<participant_factory_qos>`. This name labels process-level
+  telemetry in Collector Service, Prometheus, and Grafana dashboards.
+  Without it, all applications appear as the same unnamed resource.
+  The field is distinct from `participant_name` in
+  `domain_participant_qos` (which labels individual participant
+  instances in Admin Console and discovery).
+  Because `participant_factory_qos` is process-global (not
+  per-participant), the application name cannot vary per participant
+  within a process. Each application process needs a unique name.
+- **Possible resolutions:**
+  1. XML environment variable substitution:
+     `<application_name>$(MEDTECH_APP_NAME)</application_name>` with
+     each process setting `MEDTECH_APP_NAME` before launch. Confirmed
+     supported by `rti-chatbot-mcp` and RTI User Manual (XML
+     Configuration Variables).
+  2. Programmatic: set `DomainParticipantFactoryQos.monitoring`
+     before creating any participant. Works but couples the name to
+     application code rather than deployment configuration.
+  3. Separate XML profiles per application — poor scaling when only
+     the name differs.
+- **Resolution:** Resolution 1 adopted. Added
+  `<application_name>$(MEDTECH_APP_NAME)</application_name>` to the
+  `FactoryDefaults` profile in `Participants.xml`. Added
+  `export MEDTECH_APP_NAME="${MEDTECH_APP_NAME:-unknown}"` to
+  `setup.bash.in` as a fallback default. Docker Compose will set the
+  variable per service container. Module launcher scripts set it
+  before sourcing `setup.bash`.
+- **Guideline:** Every application entry point must set
+  `MEDTECH_APP_NAME` to its module name (e.g.,
+  `surgical-procedure`, `hospital-dashboard`, `clinical-alerts`)
+  before any DDS entity is created. Docker Compose services set it
+  via `environment:`. Local development sets it in the shell or
+  launcher script. The value must match the module directory name
+  per `vision/technology.md` naming convention.
+- **Date closed:** 2026-03-24

@@ -28,3 +28,6 @@ export MEDTECH_RESOURCE_DIR="$_DIR/share/resources"
 
 # Prometheus endpoint for performance benchmarks (observability stack)
 export PROMETHEUS_URL="${PROMETHEUS_URL:-http://localhost:9090}"
+
+# Monitoring Library 2.0 application name (set per process before launch)
+export MEDTECH_APP_NAME="${MEDTECH_APP_NAME:-unknown}"
