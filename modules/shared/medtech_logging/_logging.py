@@ -9,6 +9,8 @@ name.  If the logging backend is swapped in the future, only this
 module needs to change — call sites remain untouched.
 """
 
+from __future__ import annotations
+
 from enum import Enum
 
 import rti.connextdds as dds

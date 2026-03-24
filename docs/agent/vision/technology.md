@@ -254,7 +254,7 @@ C++ targets must link against the `RTIConnextDDS::cpp2_api` imported target (the
 ```
 interfaces/idl/surgery/surgery.idl
   → <build>/generated/cpp/surgery/surgery.hpp     (C++11)
-  → <build>/generated/python/surgery/surgery.py   (Python)
+  → <build>/generated/python/surgery.py            (Python — flat)
 ```
 
 Generated output is written into the CMake build directory, not the source tree. The source tree is kept clean; `generated/` is never committed to version control.
@@ -263,48 +263,41 @@ Generated output is written into the CMake build directory, not the source tree.
 
 The CMake build generates Python type-support modules via `rtiddsgen -language Python`. These must be installed as importable Python packages without placing generated code in the source tree.
 
-**Build time:** `rtiddsgen` outputs one `.py` file per IDL file into `<build>/generated/python/<module>/`. CMake generates an `__init__.py` in each module directory to create valid Python packages:
+**Build time:** `rtiddsgen` outputs one `.py` file per IDL file into a **flat** directory `<build>/generated/python/`. The `-noSysPathGeneration` flag (see INC-002) suppresses the default `sys.path.append` stanzas, allowing clean imports via `PYTHONPATH`. No `__init__.py` markers or subdirectories are needed — each generated module is a standalone `.py` file importable directly.
 
 ```cmake
-# For each IDL module directory, generate an __init__.py alongside the rtiddsgen output
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated/python/surgery/__init__.py" "")
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated/python/monitoring/__init__.py" "")
-# ... etc. for each IDL module
+foreach(mod ${IDL_MODULES})
+    connextdds_rtiddsgen_run(
+        IDL_FILE "${IDL_DIR}/${mod}/${mod}.idl"
+        LANG "Python"
+        OUTPUT_DIRECTORY "${PY_GEN_DIR}"    # flat output
+        INCLUDE_DIRS "${IDL_DIR}"
+        VAR "${mod}_py"
+        EXTRA_ARGS -noSysPathGeneration
+    )
+endforeach()
 ```
 
-**Install time:** `cmake --install` copies the generated Python tree into `lib/python/site-packages/`, preserving the directory structure:
+**Install time:** `cmake --install` copies the flat generated `.py` files into `lib/python/site-packages/`:
 
 ```cmake
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/generated/python/
-        DESTINATION lib/python/site-packages
-        FILES_MATCHING PATTERN "*.py")
+install(DIRECTORY "${PY_GEN_DIR}/"
+    DESTINATION lib/python/site-packages
+    FILES_MATCHING PATTERN "*.py"
+    PATTERN "*_timestamp.cmake" EXCLUDE)
 ```
 
 The installed layout:
 
 ```
 install/lib/python/site-packages/
-├── common/
-│   ├── __init__.py
-│   └── common.py           # Common::Time_t, Common::EntityIdentity, etc.
-├── surgery/
-│   ├── __init__.py
-│   └── surgery.py          # Surgery::RobotCommand, Surgery::RobotState, etc.
-├── monitoring/
-│   ├── __init__.py
-│   └── monitoring.py       # Monitoring::PatientVitals, etc.
-├── imaging/
-│   ├── __init__.py
-│   └── imaging.py          # Imaging::CameraFrame
-├── devices/
-│   ├── __init__.py
-│   └── devices.py          # Devices::DeviceTelemetry
-├── clinical_alerts/
-│   ├── __init__.py
-│   └── clinical_alerts.py              # ClinicalAlerts::ClinicalAlert, ClinicalAlerts::RiskScore
-└── hospital/
-    ├── __init__.py
-    └── hospital.py         # Hospital::ResourceAvailability
+├── common.py               # Common::Time_t, Common::EntityIdentity, etc.
+├── surgery.py              # Surgery::RobotCommand, Surgery::RobotState, etc.
+├── monitoring.py           # Monitoring::PatientVitals, etc.
+├── imaging.py              # Imaging::CameraFrame
+├── devices.py              # Devices::DeviceTelemetry
+├── clinical_alerts.py      # ClinicalAlerts::ClinicalAlert, ClinicalAlerts::RiskScore
+└── hospital.py             # Hospital::ResourceAvailability
 ```
 
 **Runtime:** `setup.bash` sets `PYTHONPATH` to include `install/lib/python/site-packages/` (already configured). The canonical import pattern:
@@ -410,14 +403,14 @@ The project uses a CMake install step to produce a self-contained install tree. 
 install/
 ├── bin/                              # C++ executables
 ├── lib/                              # Project shared libraries (if any)
-├── lib/python/site-packages/         # rtiddsgen Python output (see Python Generated Type Packaging)
-│   ├── common/                       #   Common module types
-│   ├── surgery/                      #   Surgery module types
-│   ├── monitoring/                   #   Monitoring module types
-│   ├── imaging/                      #   Imaging module types
-│   ├── devices/                      #   Devices module types
-│   ├── clinical_alerts/                          #   ClinicalAlerts module types
-│   └── hospital/                     #   Hospital module types
+├── lib/python/site-packages/         # rtiddsgen Python output (flat layout — see §Python Generated Type Packaging)
+│   ├── common.py                     #   Common module types
+│   ├── surgery.py                    #   Surgery module types
+│   ├── monitoring.py                 #   Monitoring module types
+│   ├── imaging.py                    #   Imaging module types
+│   ├── devices.py                    #   Devices module types
+│   ├── clinical_alerts.py            #   ClinicalAlerts module types
+│   └── hospital.py                   #   Hospital module types
 ├── share/
 │   ├── qos/                          # Snippets.xml, Patterns.xml, Topics.xml, Participants.xml
 │   ├── domains/                      # domains.xml
