@@ -190,9 +190,9 @@
 - [x] Cloud Discovery Service container starts and passes its UDP health check on port 7400 — resolved via custom Dockerfile wrapping local `$NDDSHOME` binary (INC-005)
 - [x] Cloud Discovery Service is reachable from both `surgical-net` and `hospital-net` containers
 - [x] Application placeholder containers do not start until Cloud Discovery Service is healthy (`depends_on` ordering verified)
-- [ ] `docker compose --profile observability up` starts Collector Service, Prometheus, Grafana Loki, and Grafana — **Collector Service blocked by INC-005** (no local binary; Docker Hub image requires feature license); Prometheus, Loki, Grafana verified healthy
+- [x] `docker compose --profile observability up` starts Collector Service, Prometheus, Grafana Loki, and Grafana — all services start and run (INC-005 resolved)
 - [x] Grafana is accessible at its configured port and loads the RTI Observability Dashboards (38 dashboards loaded)
-- [x] Prometheus targets page shows Collector Service as a scrape target (target configured; status 'down' pending INC-005)
+- [x] Prometheus targets page shows Collector Service as a scrape target — status `up`
 
 ---
 

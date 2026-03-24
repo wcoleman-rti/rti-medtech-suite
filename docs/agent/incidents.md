@@ -151,7 +151,7 @@ after closure. They form the project's decision log.
 
 ## INC-005: RTI license missing CDS and Collector Service features
 
-- **Status:** Partially resolved
+- **Status:** Closed
 - **Category:** Environment / Licensing
 - **Date opened:** 2026-03-24
 - **Phase/Step:** Phase 1 / Step 1.4
@@ -161,14 +161,11 @@ after closure. They form the project's decision log.
 - **Description:** The RTI license file at `/opt/rti.com/rti_license.dat`
   contains `RTIPRO` and `RTISECURITY` features but does not include the
   Cloud Discovery Service or Collector Service feature licenses. The
-  Docker Hub images (`rticom/cloud-discovery-service`,
-  `rticom/collector-service`) require feature-specific licenses and
-  refuse to start.
-- **Impact:** Docker infrastructure is otherwise complete and verified:
+  Docker Hub image `rticom/cloud-discovery-service` required a
+  feature-specific license and refused to start.
+- **Impact:** Docker infrastructure was otherwise complete and verified:
   base images build successfully, Docker networks provide correct
-  isolation, QoS XML files are mounted and accessible, Prometheus/
-  Loki/Grafana start and are healthy, 38 RTI Observability Dashboards
-  load in Grafana, data sources provisioned.
+  isolation, QoS XML files are mounted and accessible.
 - **CDS Resolution (Step 1.5):** Replaced the Docker Hub image
   `rticom/cloud-discovery-service:latest` with a custom Dockerfile
   (`docker/cloud-discovery-service.Dockerfile`) that wraps the local
@@ -179,11 +176,13 @@ after closure. They form the project's decision log.
   UDP health check on port 7400, is reachable from both `surgical-net`
   and `hospital-net`, and placeholder containers successfully wait for
   CDS health before starting.
-- **Collector Service (still blocked):** The Collector Service has no
-  local binary in `$NDDSHOME` — it is Docker-image-only
-  (`rticom/collector-service:7.6.0`). This image still requires a
-  Collector Service feature license. Options:
-  1. Obtain an updated license with Collector Service features.
-  2. Accept that observability is limited to Prometheus/Loki/Grafana
-     (which are healthy) without Collector Service forwarding.
-- **Date closed:** —
+- **Collector Service Resolution:** The Docker Hub image
+  `rticom/collector-service:7.6.0` works with the `RTIPRO` license
+  ("Connext Professional" per the RTI container licensing table —
+  no additional feature license needed for non-secure, non-WAN usage).
+  Verified: container starts on Docker bridge network, Prometheus
+  exporter listens on TCP 19090, control server on TCP 19098,
+  Prometheus scrape target reports `up`. Full observability stack
+  (`docker compose --profile observability up`) starts all services
+  successfully.
+- **Date closed:** 2026-03-24
