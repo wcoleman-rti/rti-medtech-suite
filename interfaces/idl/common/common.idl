@@ -14,15 +14,18 @@ module Common {
     const long MAX_WAVEFORM_SAMPLES = 64;
     const long MAX_ALARM_COUNT = 16;
     const long MAX_JOINT_COUNT = 7;
+    const long MAX_FRAME_SIZE = 2097152;  // 2 MB — max compressed camera frame payload
 
     // --- Aliases ---
     typedef string<MAX_ID_LENGTH> EntityId;
 
     // --- Timestamp ---
+    // Aligned with foxglove::Time (uint32 sec + uint32 nsec).
+    // Accepts 2038 limitation for Foxglove CompressedImage compatibility (see INC-028).
     @final
     struct Time_t {
-        int64 seconds;
-        uint32 nanoseconds;
+        uint32 sec;
+        uint32 nsec;
     };
 
     // --- Nested identity struct for key resolution ---

@@ -173,6 +173,7 @@ difference from continuous-stream topics where sample absence indicates a fault.
 | `DeviceTelemetry` | Device parameter change, fault onset, or mode transition | A pump running at a steady rate of 100 mL/hr does not need a sample every 500 ms saying "still 100 mL/hr" |
 | `SafetyInterlock` | Interlock state change (activated/deactivated) | Safety events are discrete; redundant samples add no safety value |
 | `RobotCommand` | New command issued | Commands are inherently event-driven |
+| `CameraConfig` | Camera setting change (resolution, encoding, exposure) | Stream configuration is stable between adjustments |
 | `ClinicalAlert` | Risk threshold crossed or alert resolved | Alert events are discrete |
 | `RiskScore` | Score changes beyond a noise threshold (±0.05) | Avoids bus chatter from floating-point noise in repeated computations |
 | `ResourceAvailability` | Resource state change (bed freed, OR available) | Resource status is stable between transitions |
@@ -231,7 +232,8 @@ Data streams that cross a risk class boundary must not operate within the same d
 | `WaveformData` | `Monitoring::WaveformData` | `clinical` | `patient.id`, `source_device_id`, `waveform_kind` | High-rate physiological waveforms. Deadline-enforced (40 ms). |
 | `AlarmMessages` | `Monitoring::AlarmMessage` | `clinical` | `alarm_id` | Per-alarm instance (keyed by alarm ID). Write-on-change. |
 | `DeviceTelemetry` | `Devices::DeviceTelemetry` | `clinical` | `device_id` | Generic device status (pump, ventilator, anesthesia). |
-| `CameraFrame` | `Imaging::CameraFrame` | `operational` | `camera_id` | Endoscope/surgical camera feed (metadata + frame ref). Deadline-enforced (66 ms). |
+| `CameraFrame` | `Imaging::CameraFrame` | `operational` | `camera_id` | Endoscope/surgical camera compressed frame data (inline bytes). Deadline-enforced (66 ms). Foxglove `CompressedImage` field-semantically aligned (not wire-compatible due to `@key camera_id`). |
+| `CameraConfig` | `Imaging::CameraConfig` | `operational` | `camera_id` | Camera stream configuration state (resolution, encoding, exposure). Write-on-change, TRANSIENT_LOCAL. Late joiners correlate with `CameraFrame` via `camera_id`. |
 | `ProcedureContext` | `Surgery::ProcedureContext` | `operational` | `procedure_id` | Hospital, room, bed, patient, surgeon, procedure type. TRANSIENT_LOCAL. |
 | `ProcedureStatus` | `Surgery::ProcedureStatus` | `operational` | `procedure_id` | Running status (in-progress, completing, alert). Published by each instance. TRANSIENT_LOCAL. Bridged to Hospital domain. |
 
@@ -330,24 +332,32 @@ interfaces/qos/
 └── Participants.xml          # Discovery, transport, resource config for DomainParticipants
 ```
 
-- **Snippets** define isolated QoS policy chunks. They do not inherit from other snippets or profiles.
-- **Patterns** are generic base profiles that inherit from `BuiltinQosLib::Generic.Common` and compose snippets. They represent reusable data-flow archetypes. GUI downsampling variants (composing the `GuiSubsample` snippet) are defined here alongside their base patterns.
-- **Topics** profiles inherit from a pattern and use `topic_filter` to bind QoS to specific topic names. Applications use topic-aware QoS APIs so the correct QoS resolves automatically. GUI-specific topic bindings (e.g., dashboard readers using a downsampled pattern) are defined here via topic filter.
-- **Participants** profiles contain discovery, transport, and resource configuration. These are separate from data/topic profiles because they apply to DomainParticipants, not DataWriters/DataReaders.
+- **Snippets** define isolated QoS policy chunks. Where a builtin equivalent exists in `BuiltinQosSnippetLib` (e.g., `QosPolicy.Reliability.Reliable`, `QosPolicy.Durability.TransientLocal`, `QosPolicy.History.KeepLast_1`, `QosPolicy.History.KeepAll`, `QosPolicy.Reliability.BestEffort`), the builtin is used directly — custom snippets are only defined for policies that have no builtin equivalent. Snippets do not inherit from other snippets or profiles.
+- **Patterns** are generic base profiles that inherit from semantically appropriate `BuiltinQosLib` profiles (e.g., `Generic.KeepLastReliable.TransientLocal` for state data, `Generic.BestEffort` for streaming) and compose additional custom snippets as needed. They represent reusable data-flow archetypes. GUI downsampling variants (composing the `GuiSubsample` snippet) are defined here alongside their base patterns.
+- **TopicProfiles** (within `Topics.xml`) define per-topic profiles that inherit from a pattern and add topic-specific tuning (deadline, lifespan, liveliness) in exactly one place. Each topic that requires tuning beyond its base pattern has a single `TopicProfiles::` profile that is the **single source of truth** for that topic's QoS. GUI variants inherit from the standard topic profile and add `GuiSubsample`.
+- **Topics** profiles (within `Topics.xml`) use `topic_filter` to bind QoS to specific topic names by referencing `TopicProfiles::` profiles. Topic-filter entries contain no nested `<base_name>` tags or explicit policy configuration — they are pure references. Applications use topic-aware QoS APIs so the correct QoS resolves automatically.
+- **Participants** profiles contain discovery, transport, and resource configuration. These are separate from data/topic profiles because they apply to DomainParticipants, not DataWriters/DataReaders. A separate `Factory` QoS library (within the same file) contains the `participant_factory_qos` profile, which applies at the process level (above any individual participant).
 
 ### QoS Snippets (`Snippets.xml`)
 
-Isolated, composable, no inheritance. Each enables/disables a single concern:
+Isolated, composable, no inheritance. Each enables/disables a single concern.
+
+**Builtin snippets** (from `BuiltinQosSnippetLib`, not redefined in `Snippets.xml`):
+
+| Builtin Snippet | Applies To | What It Does |
+|-----------------|-----------|--------------|
+| `BuiltinQosSnippetLib::QosPolicy.Reliability.Reliable` | DW + DR | Sets RELIABLE reliability |
+| `BuiltinQosSnippetLib::QosPolicy.Reliability.BestEffort` | DW + DR | Sets BEST_EFFORT reliability |
+| `BuiltinQosSnippetLib::QosPolicy.Durability.TransientLocal` | DW + DR | Sets TRANSIENT_LOCAL durability |
+| `BuiltinQosSnippetLib::QosPolicy.History.KeepLast_1` | DW + DR | KEEP_LAST history, depth 1 |
+| `BuiltinQosSnippetLib::QosPolicy.History.KeepAll` | DW + DR | KEEP_ALL history |
+
+**Custom snippets** (defined in `Snippets.xml` — no builtin equivalent):
 
 | Snippet | Applies To | What It Does |
 |---------|-----------|--------------|
-| `Reliable` | DW + DR | Sets RELIABLE reliability |
-| `BestEffort` | DW + DR | Sets BEST_EFFORT reliability |
-| `TransientLocal` | DW + DR | Sets TRANSIENT_LOCAL durability |
 | `Volatile` | DW + DR | Sets VOLATILE durability |
-| `KeepLast1` | DW + DR | KEEP_LAST history, depth 1 |
 | `KeepLast4` | DW + DR | KEEP_LAST history, depth 4 |
-| `KeepAll` | DW + DR | KEEP_ALL history |
 | `ExclusiveOwnership` | DW + DR | Sets EXCLUSIVE_OWNERSHIP |
 | `Liveliness2s` | DW + DR | Automatic liveliness, 2-second lease |
 | `Deadline4ms` | DW + DR | Deadline period = 4 ms. Writer: detects publish stall. Reader: detects stream interruption. See *Deadline QoS* below. |
@@ -355,21 +365,21 @@ Isolated, composable, no inheritance. Each enables/disables a single concern:
 | `Deadline40ms` | DW + DR | Deadline period = 40 ms. Stream interruption detection for 50 Hz topics (2× nominal). |
 | `Deadline66ms` | DW + DR | Deadline period = 66 ms. Stream interruption detection for 30 Hz topics (2× nominal). |
 | `Deadline2s` | DW + DR | Deadline period = 2 s. Periodic-snapshot interruption detection for 1 Hz topics (2× nominal). |
-| `Lifespan20ms` | DW + DR | Lifespan duration = 20 ms. Samples older than 20 ms are discarded before delivery. |
+| `Lifespan20ms` | DW only | Lifespan duration = 20 ms. Samples older than 20 ms are discarded before delivery. |
 | `Liveliness500ms` | DW + DR | Automatic liveliness, 500 ms lease. Tight writer-health detection for safety-critical write-on-change topics. |
 | `GuiSubsample` | DR only | TIME_BASED_FILTER minimum_separation for GUI refresh rate |
 
 ### Data Pattern Base Profiles (`Patterns.xml`)
 
-Generic profiles rooted on `BuiltinQosLib::Generic.Common`, composed from snippets. These are not used directly — they are inherited by topic-specific profiles.
+Generic profiles that inherit from semantically appropriate `BuiltinQosLib` profiles. Each builtin base provides reliable/best-effort semantics, history, and reliability protocol optimization out of the box. Custom snippets are composed on top only where the builtin base does not cover a needed policy. These patterns are not used directly by applications — they are inherited by topic-specific profiles in `TopicProfiles`.
 
-| Pattern Profile | Base | Composed Snippets | Use Case |
-|----------------|------|-------------------|----------|
-| `State` | `BuiltinQosLib::Generic.Common` | `Reliable` + `TransientLocal` + `KeepLast1` + `Liveliness2s` | Latest-state data: vitals, device status, robot state, procedure context, alarms |
-| `Command` | `BuiltinQosLib::Generic.Common` | `Reliable` + `Volatile` + `KeepLast1` | Commands where only the most recent matters, stale commands must not reach late joiners |
-| `Stream` | `BuiltinQosLib::Generic.Common` | `BestEffort` + `KeepLast4` | High-rate streaming: waveforms, camera frames, operator input (operator input adds `Deadline4ms` + `Lifespan20ms` at the topic level) |
-| `GuiState` | `State` | `GuiSubsample` | Downsampled state for GUI readers (~100–200 ms minimum separation) |
-| `GuiStream` | `Stream` | `GuiSubsample` | Downsampled streaming for GUI readers (~33 ms / 30 Hz minimum separation) |
+| Pattern Profile | Base | Additional Composition | Use Case |
+|----------------|------|------------------------|----------|
+| `State` | `BuiltinQosLib::Generic.KeepLastReliable.TransientLocal` | `Snippets::Liveliness2s` | Latest-state data: vitals, device status, robot state, procedure context, alarms. Base provides Reliable + KeepLast1 + TransientLocal + ReliabilityProtocol.KeepLast optimization. |
+| `Command` | `BuiltinQosLib::Generic.KeepLastReliable` | *(none)* | Commands where only the most recent matters, stale commands must not reach late joiners. Base provides Reliable + KeepLast1 + ReliabilityProtocol.KeepLast optimization. Volatile durability is the Connext default — no explicit override needed. |
+| `Stream` | `BuiltinQosLib::Generic.BestEffort` | Override writer history depth to 1 (no repair cache needed for best-effort), reader history depth to 4. | High-rate streaming: waveforms, camera frames, operator input. Base provides BestEffort + KeepLast (depth 100 by default, overridden here). |
+| `GuiState` | `Patterns::State` | `Snippets::GuiSubsample` | Downsampled state for GUI readers (~100–200 ms minimum separation) |
+| `GuiStream` | `Patterns::Stream` | `Snippets::GuiSubsample` | Downsampled streaming for GUI readers (~33 ms / 30 Hz minimum separation) |
 
 ### Deadline QoS
 
@@ -400,121 +410,126 @@ Write-on-change topics rely on DDS liveliness QoS — not Deadline — to detect
 
 **`SafetyInterlock` exception:** The safety interlock is a write-on-change topic on the `control` tag (Class C / Class III). Although its data pattern is event-driven, the consequence of an undetected writer failure is a robot operating without safety oversight. A tighter liveliness lease (500 ms via `Liveliness500ms`) provides faster detection of safety-system failure than the general 2-second lease — the robot controller can transition to a safe-stopped state within 500 ms of losing the safety writer, rather than waiting 2 seconds.
 
-### Topic-Bound Profiles (`Topics.xml`)
+### Topic Profiles and Topic-Bound Profiles (`Topics.xml`)
 
-These profiles use `topic_filter` to assign QoS by topic name. Applications use `create_datawriter_with_profile` / `create_datareader_with_profile` with the topic name, and Connext resolves the matching QoS automatically.
+`Topics.xml` contains two QoS libraries:
+
+1. **`TopicProfiles`** — per-topic profiles that inherit from a pattern and add topic-specific tuning. Each topic that needs tuning beyond its base pattern has exactly one profile here. This is the **single source of truth** for that topic's QoS — changing a topic's deadline, lifespan, or liveliness requires editing only this one profile. Topic-specific snippets are composed at the profile level using `<base_name>` (which applies to both writer and reader QoS when the snippet defines both). GUI variants inherit from the standard topic profile and add `Snippets::GuiSubsample`.
+
+2. **`Topics`** — domain-scoped profiles that use `topic_filter` to bind QoS to specific topic names by referencing `TopicProfiles::` profiles. Topic-filter entries contain **no nested `<base_name>` tags or explicit policy configuration** — they are pure references to topic profiles.
+
+Applications use `create_datawriter_with_profile` / `create_datareader_with_profile` with the topic name, and Connext resolves the matching QoS automatically.
 
 Example structure:
 
 ```xml
-<qos_profile name="ProcedureTopics" base_name="Patterns::State">
-    <!-- Default: State pattern QoS for unmatched topics in this profile -->
+<!-- Library 1: Single source of truth for each topic's QoS -->
+<qos_library name="TopicProfiles">
 
-    <!-- Control topics (inherit State, but override for streaming where needed) -->
-    <datawriter_qos topic_filter="OperatorInput">
+    <!-- Topics that just alias a pattern (no extra tuning) -->
+    <qos_profile name="RobotCommand" base_name="Patterns::Command"/>
+    <qos_profile name="AlarmMessages" base_name="Patterns::State"/>
+    <qos_profile name="DeviceTelemetry" base_name="Patterns::State"/>
+    <qos_profile name="ProcedureContext" base_name="Patterns::State"/>
+    <qos_profile name="ProcedureStatus" base_name="Patterns::State"/>
+
+    <!-- Topics with additional tuning (deadline, lifespan, liveliness) -->
+    <qos_profile name="OperatorInput" base_name="Patterns::Stream">
         <base_name>
-            <element>Snippets::BestEffort</element>
-            <element>Snippets::KeepLast4</element>
             <element>Snippets::Deadline4ms</element>
             <element>Snippets::Lifespan20ms</element>
         </base_name>
-    </datawriter_qos>
-    <datareader_qos topic_filter="OperatorInput">
-        <base_name>
-            <element>Snippets::BestEffort</element>
-            <element>Snippets::KeepLast4</element>
-            <element>Snippets::Deadline4ms</element>
-            <element>Snippets::Lifespan20ms</element>
-        </base_name>
-    </datareader_qos>
+    </qos_profile>
 
-    <datawriter_qos topic_filter="RobotCommand">
-        <base_name>
-            <element>Snippets::Volatile</element>
-        </base_name>
-    </datawriter_qos>
-    <datareader_qos topic_filter="RobotCommand">
-        <base_name>
-            <element>Snippets::Volatile</element>
-        </base_name>
-    </datareader_qos>
-
-    <!-- RobotState: State pattern + Deadline20ms (100 Hz continuous stream) -->
-    <datawriter_qos topic_filter="RobotState">
+    <qos_profile name="RobotState" base_name="Patterns::State">
         <base_name>
             <element>Snippets::Deadline20ms</element>
         </base_name>
-    </datawriter_qos>
-    <datareader_qos topic_filter="RobotState">
-        <base_name>
-            <element>Snippets::Deadline20ms</element>
-        </base_name>
-    </datareader_qos>
+    </qos_profile>
 
-    <!-- SafetyInterlock: State pattern + Liveliness500ms (write-on-change, tighter lease) -->
-    <datawriter_qos topic_filter="SafetyInterlock">
+    <qos_profile name="SafetyInterlock" base_name="Patterns::State">
         <base_name>
             <element>Snippets::Liveliness500ms</element>
         </base_name>
-    </datawriter_qos>
-    <datareader_qos topic_filter="SafetyInterlock">
-        <base_name>
-            <element>Snippets::Liveliness500ms</element>
-        </base_name>
-    </datareader_qos>
+    </qos_profile>
 
-    <!-- PatientVitals: State pattern + Deadline2s (1 Hz periodic snapshot) -->
-    <datawriter_qos topic_filter="PatientVitals">
+    <qos_profile name="PatientVitals" base_name="Patterns::State">
         <base_name>
             <element>Snippets::Deadline2s</element>
         </base_name>
-    </datawriter_qos>
-    <datareader_qos topic_filter="PatientVitals">
-        <base_name>
-            <element>Snippets::Deadline2s</element>
-        </base_name>
-    </datareader_qos>
+    </qos_profile>
 
-    <!-- Streaming topics -->
-    <datawriter_qos topic_filter="WaveformData">
+    <qos_profile name="WaveformData" base_name="Patterns::Stream">
         <base_name>
-            <element>Snippets::BestEffort</element>
-            <element>Snippets::KeepLast4</element>
             <element>Snippets::Deadline40ms</element>
         </base_name>
-    </datawriter_qos>
-    <datareader_qos topic_filter="WaveformData">
-        <base_name>
-            <element>Snippets::BestEffort</element>
-            <element>Snippets::KeepLast4</element>
-            <element>Snippets::Deadline40ms</element>
-        </base_name>
-    </datareader_qos>
+    </qos_profile>
 
-    <datawriter_qos topic_filter="CameraFrame">
+    <qos_profile name="CameraFrame" base_name="Patterns::Stream">
         <base_name>
-            <element>Snippets::BestEffort</element>
-            <element>Snippets::KeepLast4</element>
             <element>Snippets::Deadline66ms</element>
         </base_name>
-    </datawriter_qos>
-    <datareader_qos topic_filter="CameraFrame">
+    </qos_profile>
+
+    <qos_profile name="ClinicalAlert" base_name="Patterns::State"/>
+    <qos_profile name="RiskScore" base_name="Patterns::State"/>
+    <qos_profile name="ResourceAvailability" base_name="Patterns::State"/>
+
+    <!-- GUI variants: inherit from topic profile, add GuiSubsample -->
+    <qos_profile name="GuiRobotState" base_name="TopicProfiles::RobotState">
         <base_name>
-            <element>Snippets::BestEffort</element>
-            <element>Snippets::KeepLast4</element>
-            <element>Snippets::Deadline66ms</element>
+            <element>Snippets::GuiSubsample</element>
         </base_name>
-    </datareader_qos>
-</qos_profile>
+    </qos_profile>
+    <!-- ... GuiSafetyInterlock, GuiPatientVitals, etc. follow same pattern ... -->
+
+</qos_library>
+
+<!-- Library 2: Domain-scoped topic-filter bindings (pure references) -->
+<qos_library name="Topics">
+
+    <qos_profile name="ProcedureTopics">
+        <datawriter_qos topic_filter="OperatorInput" base_name="TopicProfiles::OperatorInput"/>
+        <datareader_qos topic_filter="OperatorInput" base_name="TopicProfiles::OperatorInput"/>
+        <datawriter_qos topic_filter="RobotCommand" base_name="TopicProfiles::RobotCommand"/>
+        <datareader_qos topic_filter="RobotCommand" base_name="TopicProfiles::RobotCommand"/>
+        <datawriter_qos topic_filter="RobotState" base_name="TopicProfiles::RobotState"/>
+        <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::RobotState"/>
+        <!-- ...etc for all Procedure domain topics... -->
+    </qos_profile>
+
+    <qos_profile name="HospitalTopics">
+        <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::RobotState"/>
+        <datareader_qos topic_filter="PatientVitals" base_name="TopicProfiles::PatientVitals"/>
+        <!-- ...etc for all Hospital domain topics... -->
+    </qos_profile>
+
+    <qos_profile name="GuiProcedureTopics">
+        <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::GuiRobotState"/>
+        <!-- ...etc using Gui* topic profiles... -->
+    </qos_profile>
+
+    <qos_profile name="GuiHospitalTopics">
+        <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::GuiRobotState"/>
+        <!-- ...etc using Gui* topic profiles... -->
+    </qos_profile>
+
+</qos_library>
 ```
 
 ### Participant Configuration (`Participants.xml`)
 
 Discovery, transport, and resource settings for DomainParticipants. Separated from data/topic QoS because these apply to the participant entity, not to writers/readers.
 
+`Participants.xml` contains two QoS libraries:
+
+1. **`Factory`** — process-level `participant_factory_qos` profile for logging, Monitoring Library 2.0, and other factory-scoped settings. This profile has `is_default_participant_factory_profile="true"` and applies to the global `DomainParticipantFactory` — above any individual participant. Separated into its own library to make the scope boundary explicit.
+
+2. **`Participants`** — participant-level profiles for discovery, transport, and resource configuration.
+
 Defines profiles for:
-- **Simulation transport** — shared memory disabled, UDPv4 only, explicit peers, no multicast
-- **Discovery tuning** — peer lists per domain/network
+- **Simulation transport** — shared memory disabled, UDPv4 only, multicast fully disabled (three-step: `multicast_receive_addresses` cleared, `dds.transport.UDPv4.builtin.multicast_enabled=0`, unicast-only discovery peers via `NDDS_DISCOVERY_PEERS` environment variable). Composes `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation` to prevent IP fragmentation on Docker overlay networks.
+- **Discovery peers** — configured via the `NDDS_DISCOVERY_PEERS` environment variable (not in XML) to keep deployment topology out of the shared QoS configuration. Docker Compose sets this per-service; local development sets it in `setup.bash` or shell.
 - **Resource limits** — participant-level resource bounds
 
 ---
@@ -532,7 +547,7 @@ interfaces/idl/
 ├── monitoring/
 │   └── monitoring.idl      # module Monitoring { PatientVitals, WaveformData, AlarmMessage }
 ├── imaging/
-│   └── imaging.idl         # module Imaging { CameraFrame, ImageMetadata }
+│   └── imaging.idl         # module Imaging { CameraFrame, CameraConfig }
 ├── devices/
 │   └── devices.idl         # module Devices { DeviceTelemetry, PumpStatus, VentilatorCommands }
 ├── clinical_alerts/
@@ -623,7 +638,7 @@ void initialize_connext()
     // Step 2 — Register every compiled type referenced by XML <register_type name="..."/>.
     //           Name strings must match the <register_type name="..."/> in the domain XML.
     //           Only top-level topic types require registration — @nested types
-    //           (Time_t, EntityIdentity, CartesianPosition, AlarmEntry, ImageMetadata)
+    //           (Time_t, EntityIdentity, CartesianPosition)
     //           are embedded by the parent type and do not need separate registration.
     rti::domain::register_type<Surgery::RobotCommand>("Surgery::RobotCommand");
     rti::domain::register_type<Surgery::RobotState>("Surgery::RobotState");
@@ -635,6 +650,7 @@ void initialize_connext()
     rti::domain::register_type<Monitoring::WaveformData>("Monitoring::WaveformData");
     rti::domain::register_type<Monitoring::AlarmMessage>("Monitoring::AlarmMessage");
     rti::domain::register_type<Imaging::CameraFrame>("Imaging::CameraFrame");
+    rti::domain::register_type<Imaging::CameraConfig>("Imaging::CameraConfig");
     rti::domain::register_type<Devices::DeviceTelemetry>("Devices::DeviceTelemetry");
     rti::domain::register_type<ClinicalAlerts::ClinicalAlert>("ClinicalAlerts::ClinicalAlert");
     rti::domain::register_type<ClinicalAlerts::RiskScore>("ClinicalAlerts::RiskScore");
@@ -656,7 +672,7 @@ import rti.connextdds as dds
 from surgery.Surgery import (RobotCommand, RobotState, SafetyInterlock,
                               OperatorInput, ProcedureContext, ProcedureStatus)
 from monitoring.Monitoring import PatientVitals, WaveformData, AlarmMessage
-from imaging.Imaging import CameraFrame
+from imaging.Imaging import CameraFrame, CameraConfig
 from devices.Devices import DeviceTelemetry
 from clinical_alerts.ClinicalAlerts import ClinicalAlert, RiskScore
 from hospital.Hospital import ResourceAvailability
@@ -670,7 +686,7 @@ def initialize_connext():
 
     # Step 2 — Register every compiled type referenced by XML <register_type name="..."/>.
     #           Only top-level topic types require registration — @nested types
-    #           (Time_t, EntityIdentity, CartesianPosition, AlarmEntry, ImageMetadata)
+    #           (Time_t, EntityIdentity, CartesianPosition)
     #           are embedded by the parent type and do not need separate registration.
     dds.DomainParticipant.register_idl_type(RobotCommand,           "Surgery::RobotCommand")
     dds.DomainParticipant.register_idl_type(RobotState,             "Surgery::RobotState")
@@ -682,6 +698,7 @@ def initialize_connext():
     dds.DomainParticipant.register_idl_type(WaveformData,           "Monitoring::WaveformData")
     dds.DomainParticipant.register_idl_type(AlarmMessage,           "Monitoring::AlarmMessage")
     dds.DomainParticipant.register_idl_type(CameraFrame,            "Imaging::CameraFrame")
+    dds.DomainParticipant.register_idl_type(CameraConfig,           "Imaging::CameraConfig")
     dds.DomainParticipant.register_idl_type(DeviceTelemetry,        "Devices::DeviceTelemetry")
     dds.DomainParticipant.register_idl_type(ClinicalAlert,          "ClinicalAlerts::ClinicalAlert")
     dds.DomainParticipant.register_idl_type(RiskScore,              "ClinicalAlerts::RiskScore")
@@ -743,6 +760,7 @@ correspond to nested key resolution through the types below.
 | `MAX_WAVEFORM_SAMPLES` | `long` | 64 | Maximum samples per waveform block |
 | `MAX_ALARM_COUNT` | `long` | 16 | Maximum active alarms per alarm message |
 | `MAX_JOINT_COUNT` | `long` | 7 | Maximum robot arm joint count |
+| `MAX_FRAME_SIZE` | `long` | 2097152 | Maximum compressed camera frame payload (2 MB) |
 
 #### Aliases
 
@@ -752,12 +770,30 @@ correspond to nested key resolution through the types below.
 
 #### `Common::Time_t`
 
-Standard timestamp for all sample time-stamping. `@appendable`.
+Standard timestamp. `@final`. Aligned with
+[`foxglove::Time`](https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/Time.idl)
+(`uint32 sec` + `uint32 nsec`) for field-semantic compatibility with
+Foxglove's `CompressedImage` type (used by `Imaging::CameraFrame`).
+
+> **Y2038 limitation (INC-028):** `uint32 sec` overflows on
+> 2038-01-19 03:14:07 UTC. This trade-off is accepted for Foxglove
+> alignment. When Foxglove migrates to a wider seconds field, update
+> `Common::Time_t` to match. Because the struct is `@final`, any
+> field-type change is a breaking type evolution requiring coordinated
+> redeployment.
+
+> **`source_timestamp` convention:** Most top-level types no longer
+> carry an explicit `timestamp` member. Sample publication time is
+> conveyed via `SampleInfo.source_timestamp`, set automatically by
+> the DataWriter. `Common::Time_t` is retained only where a
+> domain-meaningful time distinct from write time is needed
+> (`CameraFrame.timestamp`, `ProcedureContext.start_time`,
+> `AlarmMessage.onset_time`).
 
 | Member | Type | Key | Notes |
 |--------|------|-----|-------|
-| `seconds` | `int64` | — | Seconds since epoch |
-| `nanoseconds` | `uint32` | — | Sub-second nanoseconds |
+| `sec` | `uint32` | — | Seconds since epoch (Y2038 — see INC-028) |
+| `nsec` | `uint32` | — | Sub-second nanoseconds |
 
 #### `Common::EntityIdentity`
 
@@ -820,7 +856,6 @@ Topic: `RobotCommand` | Domain Tag: `control` | Pattern: `Command`
 | `robot_id` | `Common::EntityId` | @key | Target robot |
 | `command_id` | `int32` | @key | Unique command sequence number |
 | `target_position` | `CartesianPosition` | — | Commanded tool-tip target |
-| `timestamp` | `Common::Time_t` | — | Command issue time |
 
 #### `Surgery::RobotState`
 
@@ -834,7 +869,6 @@ Topic: `RobotState` | Domain Tag: `control` | Pattern: `State`
 | `tool_tip_position` | `CartesianPosition` | — | Computed tool-tip position |
 | `operational_mode` | `RobotMode` | — | Current robot mode |
 | `error_state` | `int32` | — | Error code (0 = no error) |
-| `timestamp` | `Common::Time_t` | — | State sample time |
 
 #### `Surgery::SafetyInterlock`
 
@@ -846,7 +880,6 @@ Topic: `SafetyInterlock` | Domain Tag: `control` | Pattern: `State`
 | `robot_id` | `Common::EntityId` | @key | Robot being interlocked |
 | `interlock_active` | `boolean` | — | `true` = interlock engaged, robot must stop |
 | `reason` | `string<Common::MAX_DESCRIPTION_LENGTH>` | — | Human-readable interlock reason |
-| `timestamp` | `Common::Time_t` | — | Interlock event time |
 
 #### `Surgery::OperatorInput`
 
@@ -865,7 +898,6 @@ Topic: `OperatorInput` | Domain Tag: `control` | Pattern: `Stream`
 | `yaw` | `double` | — | Rotation about Z axis |
 | `primary_button` | `boolean` | — | Primary action button state |
 | `secondary_button` | `boolean` | — | Secondary action button state |
-| `timestamp` | `Common::Time_t` | — | Input sample time |
 
 #### `Surgery::ProcedureContext`
 
@@ -894,7 +926,6 @@ Topic: `ProcedureStatus` | Domain Tag: `operational` | Pattern:
 | `procedure_id` | `Common::EntityId` | @key | Procedure instance identifier |
 | `phase` | `ProcedurePhase` | — | Current procedure lifecycle phase |
 | `status_message` | `string<Common::MAX_DESCRIPTION_LENGTH>` | — | Optional human-readable status detail |
-| `timestamp` | `Common::Time_t` | — | Status update time |
 
 ---
 
@@ -934,20 +965,6 @@ Dependencies: `#include "common/common.idl"`
 | `CAPNOGRAPHY` | End-tidal CO₂ waveform |
 | `ABP` | Arterial blood pressure waveform |
 
-#### Helper Structs
-
-**`Monitoring::AlarmEntry`** — `@nested` `@appendable`. A single
-alarm within a Monitoring alarm context. Retained as a reusable nested type.
-
-| Member | Type | Key | Notes |
-|--------|------|-----|-------|
-| `alarm_id` | `Common::EntityId` | — | Unique alarm instance identifier |
-| `severity` | `AlarmSeverity` | — | Alarm severity level |
-| `state` | `AlarmState` | — | Current alarm state |
-| `alarm_code` | `string<64>` | — | Machine-readable alarm code |
-| `message` | `string<Common::MAX_DESCRIPTION_LENGTH>` | — | Human-readable alarm description |
-| `onset_time` | `Common::Time_t` | — | When the alarm condition first occurred |
-
 #### `Monitoring::PatientVitals`
 
 Topic: `PatientVitals` | Domain Tag: `clinical` | Pattern: `State`
@@ -962,7 +979,6 @@ Topic: `PatientVitals` | Domain Tag: `clinical` | Pattern: `State`
 | `diastolic_bp` | `double` | — | Diastolic blood pressure (mmHg) |
 | `temperature` | `double` | — | Body temperature (°C) |
 | `respiratory_rate` | `double` | — | Breaths per minute |
-| `timestamp` | `Common::Time_t` | — | Measurement time |
 
 #### `Monitoring::WaveformData`
 
@@ -976,7 +992,6 @@ Topic: `WaveformData` | Domain Tag: `clinical` | Pattern: `Stream`
 | `waveform_kind` | `WaveformKind` | @key | Type of waveform signal |
 | `samples` | `sequence<double, Common::MAX_WAVEFORM_SAMPLES>` | — | Waveform sample block (e.g., 10 samples per block for ECG at 500 Sa/s published at 50 Hz) |
 | `sample_rate_hz` | `double` | — | Nominal sample rate of the source signal |
-| `timestamp` | `Common::Time_t` | — | Timestamp of the first sample in this block |
 
 #### `Monitoring::AlarmMessage`
 
@@ -996,7 +1011,6 @@ Writers may enable DDS batching for efficient transport.
 | `alarm_code` | `string<64>` | — | Machine-readable alarm code |
 | `message` | `string<Common::MAX_DESCRIPTION_LENGTH>` | — | Human-readable alarm description |
 | `onset_time` | `Common::Time_t` | — | When the alarm condition first occurred |
-| `timestamp` | `Common::Time_t` | — | Alarm evaluation time |
 
 ---
 
@@ -1004,30 +1018,43 @@ Writers may enable DDS batching for efficient transport.
 
 Dependencies: `#include "common/common.idl"`
 
-#### Helper Structs
-
-**`Imaging::ImageMetadata`** — `@nested` `@appendable`. Describes
-properties of a captured frame.
-
-| Member | Type | Key | Notes |
-|--------|------|-----|-------|
-| `width` | `uint32` | — | Frame width (pixels) |
-| `height` | `uint32` | — | Frame height (pixels) |
-| `encoding` | `string<32>` | — | Pixel format (e.g., "RGB8", "YUV422") |
-| `frame_size_bytes` | `uint32` | — | Size of the raw image data |
-
 #### `Imaging::CameraFrame`
 
 Topic: `CameraFrame` | Domain Tag: `operational` | Pattern: `Stream`
 | `@appendable`
 
+Compressed image frame with inline data payload. Field-semantically aligned
+with Foxglove `CompressedImage` (`timestamp`, `frame_id`, `data`, `format`)
+but not wire-compatible due to `@key camera_id` (see XTypes analysis in
+INC-027). If Foxglove interop is needed, a Routing Service transformation
+would bridge between the two types.
+
 | Member | Type | Key | Notes |
 |--------|------|-----|-------|
 | `camera_id` | `Common::EntityId` | @key | Camera source identifier |
-| `frame_sequence_number` | `uint32` | — | Monotonically increasing frame counter |
-| `metadata` | `ImageMetadata` | — | Frame resolution and encoding |
-| `image_reference` | `string<Common::MAX_DESCRIPTION_LENGTH>` | — | URI or shared-memory handle to raw image data |
 | `timestamp` | `Common::Time_t` | — | Frame capture time |
+| `frame_id` | `string<Common::MAX_NAME_LENGTH>` | — | Coordinate frame reference (e.g., `"endoscope_left"`, `"overhead_rgb"`). Foxglove-compatible field. |
+| `data` | `sequence<uint8, Common::MAX_FRAME_SIZE>` | — | Inline compressed image bytes |
+| `format` | `string<16>` | — | Compression format: `"jpeg"`, `"png"`, `"h264"`, `"h265"` |
+
+#### `Imaging::CameraConfig`
+
+Topic: `CameraConfig` | Domain Tag: `operational` | Pattern: `State`
+| `@appendable`
+
+Camera stream configuration state — published once at startup, re-published
+only when camera settings change. Late joiners receive current config
+immediately via TRANSIENT_LOCAL durability. Subscribers correlate with
+`CameraFrame` samples via the shared `camera_id` key.
+
+| Member | Type | Key | Notes |
+|--------|------|-----|-------|
+| `camera_id` | `Common::EntityId` | @key | Camera source identifier (same key as `CameraFrame`) |
+| `width` | `uint32` | — | Frame width (pixels) |
+| `height` | `uint32` | — | Frame height (pixels) |
+| `encoding` | `string<32>` | — | Decoded pixel format (e.g., `"RGB8"`, `"YUV422"`, `"MONO8"`) |
+| `exposure_us` | `uint32` | — | Exposure time in microseconds — clinically relevant for motion blur detection |
+| `compression_ratio` | `float` | — | Typical compressed-size / raw-size ratio (0.0–1.0) for current settings |
 
 ---
 
@@ -1070,7 +1097,6 @@ Topic: `DeviceTelemetry` | Domain Tag: `clinical` | Pattern: `State`
 | `battery_percent` | `double` | — | Battery level (0–100; −1 if N/A) |
 | `error_code` | `int32` | — | Device error code (0 = no error) |
 | `status_message` | `string<Common::MAX_DESCRIPTION_LENGTH>` | — | Free-text device status |
-| `timestamp` | `Common::Time_t` | — | Telemetry sample time |
 
 **`Devices::PumpMode`** — `@appendable` *(V2)*
 
@@ -1117,7 +1143,6 @@ drug delivery context into clinical decision support.
 | `occlusion_detected` | `boolean` | — | True when the pump detects downstream line occlusion — safety alarm, triggers audible alert at bedside |
 | `air_in_line_detected` | `boolean` | — | True when the pump detects air bubbles in the infusion line — safety alarm, pump auto-pauses |
 | `operating_state` | `DeviceOperatingState` | — | General device state (RUNNING, STANDBY, ALARM, OFF) — distinct from `pump_mode` which describes the delivery pattern |
-| `timestamp` | `Common::Time_t` | — | Source timestamp from the device gateway — not DDS middleware time |
 
 #### `Devices::VentilatorCommands` *(V2 — Device Integration Gateway)*
 
@@ -1141,7 +1166,6 @@ unique sequence number for reliable tracking and audit.
 | `fio2_percent` | `double` | — | Fraction of inspired oxygen (21–100%); 21% = room air |
 | `inspiratory_pressure_cmh2o` | `double` | — | Target inspiratory pressure (cmH₂O); applicable in PCV and PSV modes; ignored in volume-controlled modes |
 | `inspiratory_time_s` | `double` | — | Inspiratory time (seconds); controls I:E ratio; 0.0 = use device default |
-| `timestamp` | `Common::Time_t` | — | Command issue time — used for command staleness detection at the gateway |
 
 ---
 
@@ -1181,7 +1205,6 @@ Topic: `RiskScore` | Domain: Hospital (11) | Pattern: `State`
 | `score_value` | `double` | — | Computed risk score (0.0–1.0) |
 | `confidence` | `double` | — | Model confidence (0.0–1.0) |
 | `rationale` | `string<Common::MAX_DESCRIPTION_LENGTH>` | — | Human-readable explanation of contributing factors |
-| `timestamp` | `Common::Time_t` | — | Computation time |
 
 #### `ClinicalAlerts::ClinicalAlert`
 
@@ -1199,7 +1222,6 @@ Topic: `ClinicalAlert` | Domain: Hospital (11) | Pattern: `State`
 | `source_topic` | `string<64>` | — | Originating topic (e.g., "PatientVitals") |
 | `room` | `string<Common::MAX_NAME_LENGTH>` | — | Operating room context |
 | `is_resolved` | `boolean` | — | `true` when the alert condition has cleared |
-| `timestamp` | `Common::Time_t` | — | Alert generation time |
 
 ---
 
@@ -1220,7 +1242,6 @@ Topic: `ResourceAvailability` | Domain: Hospital (11) | Pattern:
 | `is_available` | `boolean` | — | Current availability status |
 | `location` | `string<Common::MAX_NAME_LENGTH>` | — | Current location or assigned room |
 | `notes` | `string<Common::MAX_DESCRIPTION_LENGTH>` | — | Free-text notes (e.g., "in sterilization") |
-| `timestamp` | `Common::Time_t` | — | Last status update time |
 
 ---
 

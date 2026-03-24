@@ -778,3 +778,140 @@ after closure. They form the project's decision log.
   and update them before marking the incident closed. A convenient
   check: `grep -r "<old_name>" docs/agent/`.
 - **Date closed:** 2026-03-24
+
+---
+
+## INC-027: CameraFrame XTypes — @key field breaks Foxglove wire compatibility
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Extension — CameraFrame inline data redesign
+- **Documents involved:** `vision/data-model.md`, `interfaces/idl/imaging/imaging.idl`
+- **Description:** During the CameraFrame redesign to carry inline
+  compressed image data (Foxglove `CompressedImage`-aligned), the
+  question arose whether the medtech `CameraFrame` type could be
+  wire-compatible with Foxglove's type while also having `@key
+  camera_id` for per-camera DDS instance handling.
+  Consulted `rti-chatbot-mcp` for XTypes assignability rules.
+  Findings:
+  - **`@appendable`:** Adding a `@key` field at any position
+    (beginning or end) breaks assignability. Appendable only
+    allows non-key fields appended at the end.
+  - **`@mutable`:** Using member IDs solves position reordering,
+    but adding or removing key members still breaks assignability.
+  - **Conclusion:** A type with `@key camera_id` is fundamentally
+    a different DDS topic type, not a compatible evolution of
+    Foxglove's `CompressedImage`. Foxglove interop, if needed
+    (V3.0+ PACS gateway), requires a Routing Service
+    transformation bridge — not wire compatibility.
+- **Resolution:** Designed `CameraFrame` as a standalone medtech
+  type with `@key camera_id` first (project convention), kept
+  `@appendable`, and documented the non-wire-compatibility with
+  Foxglove. Field semantics are aligned (timestamp, frame_id,
+  data, format) for conceptual compatibility and future bridging.
+  Introduced separate `CameraConfig` state topic for stream
+  metadata (resolution, encoding, exposure) — write-on-change,
+  TRANSIENT_LOCAL, correlated via `camera_id`.
+- **Guideline:** When designing DDS types inspired by external
+  schemas (Foxglove, ROS 2, OMG), adding `@key` fields always
+  creates a distinct DDS type. Wire compatibility with the
+  external schema is only achievable if the key structure matches
+  exactly. Plan for Routing Service bridging when interop with
+  external types is needed.
+- **Date closed:** 2026-03-24
+
+---
+
+## INC-028: Common::Time_t uses uint32 sec — Y2038 limitation accepted for Foxglove alignment
+
+- **Status:** Open
+- **Category:** Design Decision
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Extension — timestamp field removal / Foxglove alignment
+- **Documents involved:** `interfaces/idl/common/common.idl`,
+  `interfaces/idl/imaging/imaging.idl`, `vision/data-model.md`
+- **Description:** `Common::Time_t` was changed from `{int64 seconds;
+  uint32 nanoseconds}` to `{uint32 sec; uint32 nsec}` to align with
+  Foxglove's `foxglove::Time` IDL definition
+  (https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/Time.idl).
+  This improves field-semantic compatibility between `Imaging::CameraFrame`
+  and Foxglove's `CompressedImage` type, which uses `foxglove::Time` for
+  its timestamp field.
+
+  **Trade-off:** `uint32` seconds overflows on 2038-01-19 03:14:07 UTC
+  (Unix epoch Y2038 problem). The previous `int64 seconds` representation
+  had no practical overflow horizon.
+
+  **Remaining consumers of `Common::Time_t`:**
+  - `Imaging::CameraFrame.timestamp` — Foxglove-aligned, primary
+    motivation for the change.
+  - `Surgery::ProcedureContext.start_time` — wall-clock procedure start;
+    affected by 2038 overflow.
+  - `Monitoring::AlarmMessage.onset_time` — wall-clock alarm onset;
+    affected by 2038 overflow.
+
+  **Context:** As part of this change, `Common::Time_t timestamp` was
+  also removed as the trailing member from all other top-level IDL
+  types. Those types now rely on DDS `SampleInfo.source_timestamp`
+  (set automatically by the DataWriter at `write()` time) to convey
+  sample publication time. Subscribers access it via
+  `SampleInfo.source_timestamp` (Python) /
+  `sample.info().source_timestamp()` (C++). This reduces wire payload
+  size by 12 bytes per sample and eliminates redundancy with DDS
+  infrastructure metadata.
+- **Migration plan:** When Foxglove updates `foxglove::Time` to use a
+  wider seconds field (e.g., `int64 sec`), update `Common::Time_t` to
+  match. Monitor the upstream schema at:
+  https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/Time.idl
+  Because `Common::Time_t` is `@final`, any field-type change is a
+  breaking type evolution — all publishers and subscribers must be
+  redeployed together. This is acceptable given the project's
+  containerized deployment model.
+- **Date closed:** —
+
+---
+
+## INC-029: source_timestamp convention — DDS metadata replaces IDL timestamp fields
+
+- **Status:** Closed
+- **Category:** Design Decision
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Extension — timestamp field removal / source_timestamp adoption
+- **Documents involved:** `vision/data-model.md`, all IDL files under
+  `interfaces/idl/`
+- **Description:** Removed `Common::Time_t timestamp` as the trailing
+  member from all top-level IDL types except `Imaging::CameraFrame`
+  (retained for Foxglove `CompressedImage` field-semantic alignment).
+  Sample publication time is now conveyed via DDS
+  `SampleInfo.source_timestamp`, which is automatically set by the
+  DataWriter at `write()` time and available to subscribers without
+  any payload overhead.
+
+  **Retained `Common::Time_t` fields** (domain-meaningful times distinct
+  from write time):
+  - `Imaging::CameraFrame.timestamp` — frame capture time (Foxglove compat)
+  - `Surgery::ProcedureContext.start_time` — wall-clock procedure start
+  - `Monitoring::AlarmMessage.onset_time` — wall-clock alarm onset
+
+  **Caveats confirmed via `rti-chatbot-mcp`:**
+  1. `source_timestamp` participates in `DESTINATION_ORDER
+     BY_SOURCE_TIMESTAMP` — if used, explicit timestamps must be
+     monotonically increasing or writes may fail.
+  2. Batching: `Batch::source_timestamp_resolution` controls whether
+     batched samples share a timestamp. High-rate topics
+     (`OperatorInput`, `WaveformData`) should verify per-sample
+     uniqueness if batching is enabled.
+  3. Routing Service: must preserve `source_timestamp` across bridges
+     (default behavior with `propagate_source_timestamp`). Verify for
+     Hospital domain bridged topics.
+  4. Subscribers must access `SampleInfo` alongside data — code paths
+     that pass only deserialized data objects will lose timestamp access.
+
+  **Wire savings:** 12 bytes per sample (8-byte `int64` + 4-byte
+  `uint32` under the old `Time_t`; 8 bytes under the new `uint32` +
+  `uint32` Foxglove-aligned `Time_t`).
+- **Resolution:** Applied. All IDL files updated, `data-model.md` type
+  tables updated, `Common::Time_t` definition updated to Foxglove
+  alignment (see INC-028). Build and tests pass.
+- **Date closed:** 2026-03-24

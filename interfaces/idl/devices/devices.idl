@@ -64,7 +64,6 @@ module Devices {
         double battery_percent;
         int32 error_code;
         string<Common::MAX_DESCRIPTION_LENGTH> status_message;
-        Common::Time_t timestamp;
     };
 
     // --- V2 Types (type contract stabilization — not registered as V1 topics) ---
@@ -81,7 +80,6 @@ module Devices {
         boolean occlusion_detected;
         boolean air_in_line_detected;
         DeviceOperatingState operating_state;
-        Common::Time_t timestamp;
     };
 
     // VentilatorCommands — V2 Device Integration Gateway
@@ -96,7 +94,6 @@ module Devices {
         double fio2_percent;
         double inspiratory_pressure_cmh2o;
         double inspiratory_time_s;
-        Common::Time_t timestamp;
     };
 
 };

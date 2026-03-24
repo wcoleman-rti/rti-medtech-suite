@@ -1,25 +1,22 @@
 /*
- * Imaging module types — camera frames and image metadata.
+ * Imaging module types — camera frames and stream configuration.
  *
  * Module: Imaging
  * Domain: Procedure (operational tag)
  * All types are @appendable.
+ *
+ * CameraFrame carries inline compressed image data. Field-semantically
+ * aligned with Foxglove CompressedImage (timestamp, frame_id, data, format)
+ * but not wire-compatible due to @key camera_id (see INC-027).
+ *
+ * CameraConfig is a separate state topic for stream configuration
+ * (resolution, encoding, exposure) — published write-on-change with
+ * TRANSIENT_LOCAL durability. Correlated with CameraFrame via camera_id.
  */
 
 #include "common/common.idl"
 
 module Imaging {
-
-    // --- Helper Structs ---
-
-    @appendable
-    @nested
-    struct ImageMetadata {
-        uint32 width;
-        uint32 height;
-        string<32> encoding;
-        uint32 frame_size_bytes;
-    };
 
     // --- Topic Types ---
 
@@ -27,10 +24,21 @@ module Imaging {
     @appendable
     struct CameraFrame {
         @key Common::EntityId camera_id;
-        uint32 frame_sequence_number;
-        ImageMetadata metadata;
-        string<Common::MAX_DESCRIPTION_LENGTH> image_reference;
         Common::Time_t timestamp;
+        string<Common::MAX_NAME_LENGTH> frame_id;
+        sequence<uint8, Common::MAX_FRAME_SIZE> data;
+        string<16> format;
+    };
+
+    // Topic: CameraConfig | Domain Tag: operational | Pattern: State
+    @appendable
+    struct CameraConfig {
+        @key Common::EntityId camera_id;
+        uint32 width;
+        uint32 height;
+        string<32> encoding;
+        uint32 exposure_us;
+        float compression_ratio;
     };
 
 };

@@ -38,7 +38,6 @@ module ClinicalAlerts {
         double score_value;
         double confidence;
         string<Common::MAX_DESCRIPTION_LENGTH> rationale;
-        Common::Time_t timestamp;
     };
 
     // Topic: ClinicalAlert | Domain: Hospital | Pattern: State
@@ -53,7 +52,6 @@ module ClinicalAlerts {
         string<64> source_topic;
         string<Common::MAX_NAME_LENGTH> room;
         boolean is_resolved;
-        Common::Time_t timestamp;
     };
 
 };

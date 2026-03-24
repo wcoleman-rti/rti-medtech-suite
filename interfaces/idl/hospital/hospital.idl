@@ -19,7 +19,6 @@ module Hospital {
         boolean is_available;
         string<Common::MAX_NAME_LENGTH> location;
         string<Common::MAX_DESCRIPTION_LENGTH> notes;
-        Common::Time_t timestamp;
     };
 
 };
