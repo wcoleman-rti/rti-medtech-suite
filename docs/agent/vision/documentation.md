@@ -161,7 +161,7 @@ but not required for ongoing work.
 | Cross-cutting system contracts (domain layout, partition strategy, alert pathways) | `docs/architecture/` — promoted from `docs/agent/vision/` | Post-V1.0.0 documentation audit |
 | Behavioral specifications (GWT scenarios) | `docs/architecture/specs/` or remain as `tests/` docstrings | Post-V1.0.0 documentation audit |
 | Simulation model and scenario profiles | Module `README.md` + `config/sim-profiles/README.md` | During Phase 2 implementation |
-| Security architecture and governance posture | `docs/architecture/security.md` + security module README | During Phase 5 implementation |
+| Security architecture and governance posture | `docs/architecture/security.md` + security module README | During Phase 6 implementation |
 | Performance baseline framework | `tests/performance/README.md` | During Phase 1 (benchmark harness step) |
 
 ### Phase-Level Handoff Step

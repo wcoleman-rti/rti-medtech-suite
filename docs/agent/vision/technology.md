@@ -46,8 +46,29 @@ This design ensures that a non-breaking Connext version bump touches at most **5
 
 | Language | Standard | Use |
 |----------|----------|-----|
-| C++ | C++17 | Terminal/background/service applications, Routing Service plugins, performance-critical data paths |
+| C++ | C++17 | Terminal/background/service applications, Routing Service plugins (including Foxglove Bridge — V2), performance-critical data paths |
 | Python | 3.10+ | GUI applications, simulators, test harnesses |
+
+## Foxglove IDL Schemas (V1.1)
+
+Selected [Foxglove OMG IDL schemas](https://github.com/foxglove/foxglove-sdk/tree/main/schemas/omgidl/foxglove) are compiled with `rtiddsgen` and linked into the Foxglove Transformation plugin. These schemas are **build-time dependencies of the plugin only** — they are not part of the medtech application data model and are not registered on application-domain participants.
+
+| Schema File | Foxglove Type | Used By |
+|-------------|---------------|--------|
+| `Time.idl` | `foxglove::Time` | All transformed types |
+| `Quaternion.idl` | `foxglove::Quaternion` | `FrameTransform`, `Pose` |
+| `Vector3.idl` | `foxglove::Vector3` | `FrameTransform`, `Pose` |
+| `Pose.idl` | `foxglove::Pose` | `PoseInFrame` |
+| `PoseInFrame.idl` | `foxglove::PoseInFrame` | Tool tip pose route |
+| `JointState.idl` | `foxglove::JointState` | `JointStates` |
+| `JointStates.idl` | `foxglove::JointStates` | Robot joint state route |
+| `FrameTransform.idl` | `foxglove::FrameTransform` | `FrameTransforms` |
+| `FrameTransforms.idl` | `foxglove::FrameTransforms` | Kinematic chain route |
+| `CompressedImage.idl` | `foxglove::CompressedImage` | Camera frame route |
+
+Foxglove IDL files are vendored into the project under `interfaces/idl/foxglove/` (copied from the foxglove-sdk repository at a pinned commit). They are compiled by `rtiddsgen` during the CMake build and generate C++ types linked into `libmedtech_foxglove_transf.so`. The vendored copy and pinned commit hash are tracked in `THIRD_PARTY_NOTICES.md`.
+
+Additional Foxglove schemas (`CameraCalibration`, `ImageAnnotations`, `CompressedVideo`, `SceneUpdate`, `SceneEntity`, `Log`, etc.) will be vendored when V2 and V3 scopes are implemented.
 
 ## GUI Framework
 
@@ -405,7 +426,10 @@ The project uses a CMake install step to produce a self-contained install tree. 
 ```
 install/
 ├── bin/                              # C++ executables
-├── lib/                              # Project shared libraries (if any)
+├── lib/                              # Project shared libraries
+│   ├── libmedtech_foxglove_transf.so  #   (V2) Foxglove Transformation plugin for Routing Service
+│   ├── libfoxglove_ws_adapter.so      #   (V2) Foxglove WebSocket Adapter plugin for Routing Service
+│   └── libmedtech_mcap_storage.so     #   (V2) MCAP Storage plugin for Recording Service
 ├── lib/python/site-packages/         # rtiddsgen Python output (flat layout — see §Python Generated Type Packaging)
 │   ├── common.py                     #   Common module types
 │   ├── surgery.py                    #   Surgery module types
@@ -786,7 +810,8 @@ medtech-suite/
 │   │   ├── imaging/
 │   │   ├── devices/
 │   │   ├── clinical_alerts/
-│   │   └── hospital/
+│   │   ├── hospital/
+│   │   └── foxglove/               # Vendored Foxglove OMG IDL schemas (V2 — plugin build dependency)
 │   ├── qos/
 │   │   ├── Snippets.xml
 │   │   ├── Patterns.xml
@@ -805,6 +830,8 @@ medtech-suite/
 │       └── README.md
 ├── services/
 │   ├── routing/                    # Routing Service configurations
+│   │   └── README.md
+│   ├── foxglove-bridge/            # Foxglove Bridge plugins (Transformation + Adapter + Storage) (V2)
 │   │   └── README.md
 │   ├── recording/                  # RTI Recording Service + RTI Replay Service configurations
 │   │   └── README.md

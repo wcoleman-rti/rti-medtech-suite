@@ -253,7 +253,7 @@ Contains the phased work plan. Each phase file describes the deliverables, step-
 | Debugging a cross-module behavior | `vision/system-architecture.md` + `spec/common-behaviors.md` |
 | Authoring or modifying IDL or QoS | `vision/data-model.md` |
 | Modifying the build system | `vision/technology.md` + `implementation/phase-1-foundation.md` |
-| Security design or implementation | `vision/security.md` + `spec/security.md` + `implementation/phase-5-security.md` |
+| Security design or implementation | `vision/security.md` + `spec/security.md` + `implementation/phase-6-security.md` |
 | Release versioning or milestone scoping | `vision/versioning.md` + `vision/capabilities.md` |
 | Quick reference on non-negotiable rules | `vision/README.md` — System Contracts section |
 | Understanding agent conduct during implementation | [workflow.md](workflow.md) — process policies, session discipline, escalation, quality gates |

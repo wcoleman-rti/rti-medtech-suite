@@ -129,6 +129,7 @@ writer and reader detects stream interruption.
 |-------|------|-----------|
 | `OperatorInput` | 500 Hz | Haptic/joystick control — continuous actuation |
 | `RobotState` | 100 Hz | Closed-loop feedback — must be continuously fresh |
+| `RobotFrameTransform` | 100 Hz | Kinematic frame hierarchy — published at same rate as `RobotState` for synchronized 3D visualization *(V1.1)* |
 | `WaveformData` | 50 Hz (10-sample blocks) | Physiological signal reconstruction requires gapless stream |
 | `CameraFrame` | 30 Hz | Video feed — continuous frame delivery |
 
@@ -235,6 +236,7 @@ Data streams that cross a risk class boundary must not operate within the same d
 | `CameraFrame` | `Imaging::CameraFrame` | `operational` | `camera_id` | Endoscope/surgical camera compressed frame data (inline bytes). Deadline-enforced (66 ms). Foxglove `CompressedImage` field-semantically aligned (not wire-compatible due to `@key camera_id`). |
 | `CameraConfig` | `Imaging::CameraConfig` | `operational` | `camera_id` | Camera stream configuration state (resolution, encoding, exposure). Write-on-change, TRANSIENT_LOCAL. Late joiners correlate with `CameraFrame` via `camera_id`. |
 | `ProcedureContext` | `Surgery::ProcedureContext` | `operational` | `procedure_id` | Hospital, room, bed, patient, surgeon, procedure type. TRANSIENT_LOCAL. |
+| `RobotFrameTransform` | `Surgery::RobotFrameTransform` | `control` | `robot_id` | *(V1.1)* Kinematic frame hierarchy for 3D visualization. Continuous stream at 100 Hz, synchronized with `RobotState`. Foxglove `FrameTransforms` aligned. |
 | `ProcedureStatus` | `Surgery::ProcedureStatus` | `operational` | `procedure_id` | Running status (in-progress, completing, alert). Published by each instance. TRANSIENT_LOCAL. Bridged to Hospital domain. |
 
 ### Domain 11 — Hospital
@@ -396,6 +398,7 @@ Deadline is applied to every topic that publishes at a **fixed rate** — contin
 |-------|-------------------|-------------|----------------|--------|
 | `OperatorInput` | Continuous Stream | 500 Hz (2 ms) | 4 ms | `Deadline4ms` |
 | `RobotState` | Continuous Stream | 100 Hz (10 ms) | 20 ms | `Deadline20ms` |
+| `RobotFrameTransform` | Continuous Stream | 100 Hz (10 ms) | 20 ms | `Deadline20ms` |
 | `WaveformData` | Continuous Stream | 50 Hz (20 ms) | 40 ms | `Deadline40ms` |
 | `CameraFrame` | Continuous Stream | 30 Hz (~33 ms) | 66 ms | `Deadline66ms` |
 | `PatientVitals` | Periodic Snapshot | 1 Hz (1000 ms) | 2 s | `Deadline2s` |
@@ -468,6 +471,13 @@ Example structure:
     <qos_profile name="CameraFrame" base_name="Patterns::Stream">
         <base_name>
             <element>Snippets::Deadline66ms</element>
+        </base_name>
+    </qos_profile>
+
+    <!-- V1.1: RobotFrameTransform — same deadline as RobotState -->
+    <qos_profile name="RobotFrameTransform" base_name="Patterns::Stream">
+        <base_name>
+            <element>Snippets::Deadline20ms</element>
         </base_name>
     </qos_profile>
 
@@ -552,8 +562,19 @@ interfaces/idl/
 │   └── devices.idl         # module Devices { DeviceTelemetry, PumpStatus, VentilatorCommands }
 ├── clinical_alerts/
 │   └── clinical_alerts.idl             # module ClinicalAlerts { ClinicalAlert, RiskScore }
-└── hospital/
-    └── hospital.idl        # module Hospital { ResourceAvailability }
+├── hospital/
+│   └── hospital.idl        # module Hospital { ResourceAvailability }
+└── foxglove/                       # (V1.1) Vendored Foxglove OMG IDL schemas (plugin build dependency only)
+    ├── Time.idl
+    ├── Quaternion.idl
+    ├── Vector3.idl
+    ├── Pose.idl
+    ├── PoseInFrame.idl
+    ├── JointState.idl
+    ├── JointStates.idl
+    ├── FrameTransform.idl
+    ├── FrameTransforms.idl
+    └── CompressedImage.idl
 ```
 
 ### Module / Namespace Convention
@@ -838,13 +859,50 @@ Dependencies: `#include "common/common.idl"`
 
 #### Helper Structs
 
-**`Surgery::CartesianPosition`** — `@nested` `@appendable`
+**`Surgery::CartesianPosition`** — `@nested` `@final`
+
+ Retained for `RobotCommand.target_position` where only position (no
+ orientation) is commanded. For combined position + orientation, see
+ `Common::Pose`.
 
 | Member | Type | Key | Notes |
 |--------|------|-----|-------|
 | `x` | `double` | — | X position (mm) |
 | `y` | `double` | — | Y position (mm) |
 | `z` | `double` | — | Z position (mm) |
+
+**`Surgery::JointState`** — `@nested` `@appendable` *(V1.1)*
+
+Per-joint state. Field-semantically aligned with
+[`foxglove::JointState`](https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/JointState.idl).
+See [Foxglove Schema Alignment](#foxglove-schema-alignment).
+
+| Member | Type | Key | Notes |
+|--------|------|-----|-------|
+| `name` | `string<Common::MAX_NAME_LENGTH>` | — | Joint name (e.g., `"shoulder_pan"`, `"elbow_flex"`) — Foxglove requires named joints for URDF binding |
+| `position` | `double` | — | Joint position: radians for revolute, meters for prismatic |
+| `velocity` | `double` | — | Joint velocity: rad/s or m/s (0.0 if unavailable) |
+| `effort` | `double` | — | Joint torque (Nm) or force (N) (0.0 if unavailable) |
+
+> **Foxglove `@optional` note:** Foxglove's `JointState` uses `@optional`
+> for numeric fields. The medtech type uses non-optional `double` fields
+> defaulting to 0.0 because `@optional` is not idiomatic in the existing
+> data model and adds serialization overhead. The Routing Service
+> Transformation plugin maps 0.0 values appropriately.
+
+**`Surgery::FrameTransformEntry`** — `@nested` `@appendable` *(V1.1)*
+
+Single parent → child coordinate frame transform. Field-semantically
+aligned with
+[`foxglove::FrameTransform`](https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/FrameTransform.idl)
+(minus `timestamp`, conveyed via `SampleInfo.source_timestamp`).
+
+| Member | Type | Key | Notes |
+|--------|------|-----|-------|
+| `parent_frame_id` | `string<Common::MAX_NAME_LENGTH>` | — | Parent coordinate frame (e.g., `"base_link"`, `"shoulder"`) |
+| `child_frame_id` | `string<Common::MAX_NAME_LENGTH>` | — | Child coordinate frame (e.g., `"shoulder"`, `"elbow"`) |
+| `translation` | `Common::Vector3` | — | Position of child origin in parent frame |
+| `rotation` | `Common::Quaternion` | — | Orientation of child frame relative to parent |
 
 #### `Surgery::RobotCommand`
 
@@ -865,8 +923,8 @@ Topic: `RobotState` | Domain Tag: `control` | Pattern: `State`
 | Member | Type | Key | Notes |
 |--------|------|-----|-------|
 | `robot_id` | `Common::EntityId` | @key | Robot instance identifier |
-| `joint_positions` | `sequence<double, Common::MAX_JOINT_COUNT>` | — | Current joint angles (radians) |
-| `tool_tip_position` | `CartesianPosition` | — | Computed tool-tip position |
+| `joints` | `sequence<JointState, Common::MAX_JOINT_COUNT>` | — | *(V1.1 — replaces `joint_positions`)* Per-joint state: name, position, velocity, effort. Foxglove `JointStates` aligned. |
+| `tool_tip_pose` | `Common::Pose` | — | *(V1.1 — replaces `tool_tip_position`)* Tool-tip position + orientation. Foxglove `PoseInFrame` aligned. |
 | `operational_mode` | `RobotMode` | — | Current robot mode |
 | `error_state` | `int32` | — | Error code (0 = no error) |
 
@@ -1275,3 +1333,444 @@ interfaces/security/
 ```
 
 The security posture and policies must be scoped and documented here before implementation begins.
+
+---
+
+## Foxglove Schema Alignment
+
+The medtech suite adopts **field-semantic alignment** with selected
+[Foxglove message schemas](https://docs.foxglove.dev/docs/sdk/schemas)
+(OMG IDL variants from the
+[foxglove-sdk](https://github.com/foxglove/foxglove-sdk/tree/main/schemas/omgidl/foxglove))
+to enable visualization of DDS data in
+[Foxglove Studio](https://foxglove.dev/) with minimal adapter code.
+
+### Alignment Strategy
+
+**Field-semantic alignment** means medtech IDL types use field names,
+nesting, and value conventions that match their Foxglove equivalents
+wherever doing so does not compromise the DDS data model's functional
+requirements. Specifically:
+
+- **`@key` fields are never removed or changed** to satisfy Foxglove
+  compatibility. DDS instance lifecycle, content filtering, and
+  ownership semantics depend on keys.
+- **Domain-specific fields** (e.g., `operational_mode`, `error_state`,
+  `alarm_code`) that have no Foxglove analog are retained. Foxglove
+  ignores fields it does not recognize.
+- **Nested helper structs** (`Quaternion`, `Pose`, `Vector3`) are
+  added to the `Common` module with field names matching their
+  `foxglove::` counterparts. Medtech types embed these helpers where
+  the data semantically matches.
+- **Types are NOT wire-compatible** with `foxglove::` types. Foxglove
+  types lack `@key` fields, use unbounded `string` and `sequence`,
+  carry no DDS extensibility annotations, and live in the `foxglove`
+  IDL module. The medtech types remain in their own modules with
+  bounded members and full DDS annotations.
+
+The gap between field-aligned medtech types and Foxglove-native types
+is bridged by the **Foxglove Bridge plugin pipeline** (V2) — see
+[Foxglove Bridge Plugins](#foxglove-bridge-plugins) below.
+
+### Alignment Tiers and Milestones
+
+The alignment is split into **data model** work (updating medtech IDL
+types) and **plugin integration** work (transformation, adapter, and
+storage plugins). Data model alignment for Tier 1 is delivered in
+V1.1; all plugin infrastructure and Foxglove Studio connectivity is
+delivered in V2.
+
+| Tier | Foxglove Schema(s) | Medtech Type(s) | Foxglove Panel | Data Model | Plugin Integration |
+|------|---------------------|-----------------|----------------|------------|--------------------|
+| 1 | `JointStates` / `JointState` | `Surgery::RobotState` (`joints` field) | 3D (URDF model) | V1.1 | V2 |
+| 1 | `FrameTransform` / `FrameTransforms` | New: `Surgery::RobotFrameTransform` | 3D (TF tree) | V1.1 | V2 |
+| 1 | `PoseInFrame` | `Surgery::RobotState` (`tool_tip_pose` field) | 3D (pose marker) | V1.1 | V2 |
+| 1 | `CompressedImage` | `Imaging::CameraFrame` (strengthen existing) | Image | V1.1 | V2 |
+| 2 | `SceneUpdate` / `SceneEntity` | New: `Visualization::SceneUpdate` | 3D (primitives) | V2 | V2 |
+| 2 | `CameraCalibration` | New: `Imaging::CameraCalibration` | 3D + Image | V2 | V2 |
+| 2 | `ImageAnnotations` | New: `Imaging::ImageAnnotations` | Image (overlays) | V2 | V2 |
+| 2 | `CompressedVideo` | New: `Imaging::CompressedVideo` | Image (video) | V2 | V2 |
+| 2 | `Log` | New: `Diagnostics::LogMessage` | Log | V2 | V2 |
+| 3 | `PointCloud` | New (TBD) | 3D (point cloud) | V3 | V3 |
+| 3 | `Grid` | New (TBD) | 3D (heatmap) | V3 | V3 |
+| 3 | `LocationFix` | New (TBD) | Map | V3 | V3 |
+| 3 | `RawAudio` | New (TBD) | Plot | V3 | V3 |
+
+Tier 3 types are placeholders — their IDL definitions will be authored
+when V3 scope is finalized.
+
+### Common Helper Structs (V1.1)
+
+Three new helper structs are added to `Common` (`common/common.idl`)
+for reuse across modules. Field names match their `foxglove::`
+counterparts.
+
+**`Common::Quaternion`** — `@nested` `@final`
+
+Aligned with
+[`foxglove::Quaternion`](https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/Quaternion.idl).
+
+| Member | Type | Notes |
+|--------|------|-------|
+| `x` | `double` | Quaternion x component |
+| `y` | `double` | Quaternion y component |
+| `z` | `double` | Quaternion z component |
+| `w` | `double` | Quaternion w component (default: 1.0 = identity rotation) |
+
+**`Common::Vector3`** — `@nested` `@final`
+
+Aligned with
+[`foxglove::Vector3`](https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/Vector3.idl).
+Used for translation components in transforms and directional vectors.
+
+| Member | Type | Notes |
+|--------|------|-------|
+| `x` | `double` | X component |
+| `y` | `double` | Y component |
+| `z` | `double` | Z component |
+
+**`Common::Pose`** — `@nested` `@final`
+
+Aligned with
+[`foxglove::Pose`](https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/Pose.idl).
+Combines position and orientation for 3D spatial representation.
+
+| Member | Type | Notes |
+|--------|------|-------|
+| `position` | `Vector3` | Position in 3D space |
+| `orientation` | `Quaternion` | Orientation as quaternion |
+
+> **Relationship to `CartesianPosition`:** The existing
+> `Surgery::CartesianPosition` struct (x, y, z only) is retained for
+> `RobotCommand.target_position` where orientation is not commanded.
+> `Common::Pose` is used where both position and orientation are
+> semantically meaningful (e.g., robot tool tip state in `RobotState`).
+
+### V1.1 Field Alignments
+
+The following types are updated or added in V1.1 to enable Tier 1
+Foxglove visualization.
+
+#### `Surgery::RobotState` (Updated)
+
+Two field changes for Foxglove alignment:
+
+1. `joint_positions` (`sequence<double>`) → `joints`
+   (`sequence<JointState, MAX_JOINT_COUNT>`) — provides named joints
+   with velocity and effort, aligned with `foxglove::JointStates`.
+2. `tool_tip_position` (`CartesianPosition`) → `tool_tip_pose`
+   (`Common::Pose`) — adds orientation, aligned with
+   `foxglove::PoseInFrame`.
+
+See the updated field inventory in the
+[Surgery::RobotState](#surgeryrobotstate) section above. All existing
+consumers (`RobotState` subscribers in Digital Twin Display, Hospital
+Dashboard robot status panel) must be updated to use the new field
+names and types.
+
+#### `Surgery::RobotFrameTransform` (New Topic Type)
+
+Topic: `RobotFrameTransform` | Domain Tag: `control` | Pattern:
+`Stream` | `@appendable`
+
+Publishes the robot's kinematic frame hierarchy as individual
+parent → child transform pairs. The robot controller publishes one
+sample containing all transforms for the kinematic chain at the
+`RobotState` publication rate (100 Hz). Aligned with
+[`foxglove::FrameTransforms`](https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/FrameTransforms.idl).
+
+| Member | Type | Key | Notes |
+|--------|------|-----|-------|
+| `robot_id` | `Common::EntityId` | @key | Robot instance identifier — correlates with `RobotState` |
+| `transforms` | `sequence<FrameTransformEntry, Common::MAX_JOINT_COUNT>` | — | Ordered kinematic chain: base → link1 → … → tool_tip |
+
+QoS: inherits the `Stream` pattern base with `Deadline20ms` (same as
+`RobotState`) via a new `TopicProfiles::RobotFrameTransform` profile.
+
+#### `Imaging::CameraFrame` (Alignment Strengthened)
+
+No field changes. The existing field-semantic alignment with
+`foxglove::CompressedImage` is already complete:
+
+| Medtech Field | Foxglove Field | Status |
+|---------------|----------------|--------|
+| `timestamp` (`Common::Time_t`) | `timestamp` (`foxglove::Time`) | Aligned |
+| `frame_id` (`string<128>`) | `frame_id` (`string`) | Aligned |
+| `data` (`sequence<uint8, MAX_FRAME_SIZE>`) | `data` (`sequence<uint8>`) | Aligned (bounded vs unbounded) |
+| `format` (`string<16>`) | `format` (`string`) | Aligned |
+| `camera_id` (`@key EntityId`) | *(no equivalent)* | Medtech-only — stripped by Transformation |
+
+The Routing Service Transformation plugin maps `CameraFrame` →
+`foxglove::CompressedImage` by copying the four aligned fields and
+dropping `camera_id`.
+
+### V2 Alignment Types (Deferred)
+
+The following types will be fully defined when V2 scope is finalized.
+Placeholder descriptions are provided for design continuity.
+
+| Type | Foxglove Schema | Purpose |
+|------|-----------------|--------|
+| `Imaging::CameraCalibration` | `foxglove::CameraCalibration` | Intrinsic matrix (K), distortion model, projection matrix (P). Extends camera config for 3D image projection and lens correction. |
+| `Imaging::ImageAnnotations` | `foxglove::ImageAnnotations` | 2D circle, point, and text annotations overlaid on `CameraFrame`. Tool tracking markers, safety zone indicators. |
+| `Imaging::CompressedVideo` | `foxglove::CompressedVideo` | H.264/H.265 compressed video stream. Bandwidth reduction (10–50×) over per-frame JPEG. Coexists with `CameraFrame` for backward compatibility. |
+| `Visualization::SceneUpdate` | `foxglove::SceneUpdate` | 3D scene description with entity primitives (cubes, cylinders, arrows, text). OR environment, robot arm schematic, safety zone boundaries. |
+| `Diagnostics::LogMessage` | `foxglove::Log` | Structured log messages (timestamp, level, message, module name, file, line). Bridge from RTI Logging API / Monitoring Library 2.0 output for Foxglove Log panel visualization. |
+
+V2 types will be defined in new IDL modules (`visualization/`,
+`diagnostics/`) under `interfaces/idl/`. Their domain assignment,
+QoS profiles, and topic registrations will be authored as part of
+the V2 extension cycle.
+
+### V3 Alignment Types (Placeholder)
+
+| Foxglove Schema | Potential Medtech Use |
+|-----------------|-----------------------|
+| `foxglove::PointCloud` | Depth camera / 3D scanner data for surgical navigation |
+| `foxglove::Grid` | 2D occupancy or heatmap overlay (e.g., radiation exposure map, thermal map) |
+| `foxglove::LocationFix` | Facility-level indoor positioning / asset tracking |
+| `foxglove::RawAudio` | OR ambient audio monitoring / communication recording |
+
+These are not scoped. IDL definitions will be authored when V3
+capability scope is finalized.
+
+### Foxglove Bridge Plugins
+
+The Foxglove Bridge is a set of three C++ shared-library plugins that
+form a pipeline between the medtech DDS data model and Foxglove Studio.
+All plugin infrastructure is delivered in **V2**; V1.1 delivers only
+the data model field-semantic alignment described above.
+
+The three plugins are:
+
+1. **Routing Service Transformation plugin** —
+   `libmedtech_foxglove_transf.so` implementing
+   [`rti::routing::transf::DynamicDataTransformation`](https://community.rti.com/static/documentation/connext-dds/7.6.0/doc/api/routing_service/api_cpp/group__RTI__RoutingServiceTransformationModule.html).
+   Reshapes medtech DDS types into Foxglove-native types.
+
+2. **Routing Service Adapter plugin** —
+   `libfoxglove_ws_adapter.so` implementing
+   [`rti::routing::adapter::AdapterPlugin`](https://community.rti.com/static/documentation/connext-dds/7.6.0/doc/api/routing_service/api_cpp/group__RTI__RoutingServiceAdapterModule.html)
+   → `Connection` → `DynamicDataStreamWriter`.
+   Output-only adapter that serializes transformed Foxglove
+   DynamicData to a Foxglove Studio live WebSocket connection.
+
+3. **Recording Service Storage plugin** —
+   `libmedtech_mcap_storage.so` implementing
+   [`rti::recording::storage::StorageWriter`](https://community.rti.com/static/documentation/connext-dds/7.6.0/doc/api/recording_service/api_cpp/group__RTI__RecordingServiceStorageModule.html)
+   → `DynamicDataStorageStreamWriter`.
+   Custom storage backend that writes transformed Foxglove-native
+   samples to MCAP files.
+
+#### Architecture (V2)
+
+```
+  Routing Service Pipeline (live):
+
+  Procedure Domain (10)         Transformation Plugin     Adapter Plugin (WS)
+  ┌─────────────────────┐   ┌─────────────────────┐   ┌─────────────────────┐
+  │ RobotState           │──▶│ DDS → foxglove::*    │──▶│ DynamicData → WS   │──▶ Foxglove
+  │ RobotFrameTransform  │   │ (strip @key, map    │   │ StreamWriter       │    Studio
+  │ CameraFrame          │   │  fields, set ts)    │   │ write()            │    (live)
+  │ ...                  │   └─────────────────────┘   └─────────────────────┘
+  └─────────────────────┘
+         │
+         │
+  Recording Service Pipeline (offline):
+         │
+         │                   Transformation Plugin     Storage Plugin (MCAP)
+         │                   ┌─────────────────────┐   ┌─────────────────────┐
+         └─────────────────▶│ DDS → foxglove::*    │──▶│ DynamicData → MCAP │──▶ .mcap
+                            │ (same plugin lib)    │   │ StorageStreamWriter│    file
+                            │                      │   │ store()            │
+                            └─────────────────────┘   └─────────────────────┘
+                                                              │
+                                                    Foxglove Studio (offline)
+```
+
+1. **RTI Routing Service (live)** — reads medtech DDS data via the
+   built-in DDS input adapter, applies the Transformation plugin to
+   reshape it into Foxglove-native types, then delivers the
+   transformed samples to the Adapter plugin's
+   `DynamicDataStreamWriter::write()`, which serializes and forwards
+   them over a Foxglove Studio live WebSocket connection.
+2. **RTI Recording Service (offline)** — subscribes to medtech DDS
+   data, applies the same Transformation plugin to produce
+   Foxglove-native types, then delivers the transformed samples to
+   the Storage plugin's `DynamicDataStorageStreamWriter::store()`,
+   which writes them to MCAP files. Foxglove Studio opens the MCAP
+   files directly for offline visualization and replay.
+
+Both pipelines can run concurrently — Routing Service feeds live
+visualization while Recording Service simultaneously captures the
+same data to MCAP.
+
+#### Plugin Design
+
+**Transformation plugin** (`libmedtech_foxglove_transf.so`):
+- One transformation class per target Foxglove type (e.g.,
+  `ToCompressedImage`, `ToJointStates`, `ToFrameTransforms`,
+  `ToPoseInFrame`) — selected via XML `<property>` on each route
+- Uses generated C++ types on both sides for type-safe field
+  mapping via `rti::core::xtypes::convert<T>()`
+- Foxglove IDL types compiled from the
+  [foxglove-sdk OMG IDL schemas](https://github.com/foxglove/foxglove-sdk/tree/main/schemas/omgidl/foxglove)
+  and linked into the shared library
+- Unit conversions applied during transformation where needed
+  (e.g., millimeters → meters for position fields)
+
+**Adapter plugin** (`libfoxglove_ws_adapter.so`):
+- `FoxgloveWebSocketAdapter` (`AdapterPlugin`) →
+  `FoxgloveWebSocketConnection` (`Connection`) →
+  `FoxgloveWebSocketStreamWriter` (`DynamicDataStreamWriter`)
+- Output-only — no input-side implementation needed
+- `StreamWriter::write()` receives post-transformation Foxglove
+  DynamicData and serializes it to the WebSocket connection
+- `StreamInfo` metadata maps DDS stream identity to Foxglove channel
+  advertisement
+- Connection-level properties (`ws_uri`) configure the WebSocket
+  endpoint; per-output properties (`channel`) map to Foxglove channels
+
+**Storage plugin** (`libmedtech_mcap_storage.so`):
+- `McapStorageWriter` (`StorageWriter`) →
+  `McapDynamicDataWriter` (`DynamicDataStorageStreamWriter`)
+- `StorageStreamWriter::store()` receives post-transformation
+  Foxglove DynamicData + `SampleInfo` and writes MCAP records
+- Each DDS stream maps to an MCAP channel/schema pair via
+  `StreamInfo`
+- Stores reception timestamp and valid-data flag for Replay
+  compatibility
+
+#### Routing Service XML Pattern (V2)
+
+```xml
+<!-- Plugin registration -->
+<plugin_library name="MedtechPlugins">
+    <transformation_plugin name="MedtechToFoxglove">
+        <dll>medtech_foxglove_transf</dll>
+        <create_function>
+            MedtechToFoxglovePlugin_create_transformation_plugin
+        </create_function>
+    </transformation_plugin>
+</plugin_library>
+
+<adapter_library name="FoxgloveAdapterLib">
+    <adapter_plugin name="FoxgloveWsAdapter">
+        <dll>foxglove_ws_adapter</dll>
+        <create_function>
+            FoxgloveWebSocketAdapter_create_adapter_plugin
+        </create_function>
+    </adapter_plugin>
+</adapter_library>
+```
+
+Each topic route reads from DDS, transforms, and writes to the
+WebSocket adapter:
+
+```xml
+<domain_route name="ProcedureToFoxglove">
+    <connection name="FoxgloveConnection"
+                plugin_name="FoxgloveAdapterLib::FoxgloveWsAdapter">
+        <property>
+            <value>
+                <element>
+                    <name>ws_uri</name>
+                    <value>ws://127.0.0.1:8765</value>
+                </element>
+            </value>
+        </property>
+    </connection>
+
+    <session name="FoxgloveBridge">
+        <route name="RobotStateToJointStates">
+            <input connection="ProcedureParticipant">
+                <topic_name>RobotState</topic_name>
+                <registered_type_name>Surgery::RobotState</registered_type_name>
+            </input>
+            <output connection="FoxgloveConnection">
+                <transformation plugin_name="MedtechPlugins::MedtechToFoxglove">
+                    <property>
+                        <value>
+                            <element>
+                                <name>mapping</name>
+                                <value>joint_states</value>
+                            </element>
+                        </value>
+                    </property>
+                </transformation>
+            </output>
+        </route>
+    </session>
+</domain_route>
+```
+
+#### Recording Service XML Pattern (V2)
+
+```xml
+<plugin_library name="McapStorageLib">
+    <storage_plugin name="McapStoragePlugin">
+        <dll>medtech_mcap_storage</dll>
+        <create_function>McapStorageWriter_get_storage_writer</create_function>
+    </storage_plugin>
+</plugin_library>
+
+<recording_service name="McapRecorder">
+    <storage>
+        <plugin plugin_name="McapStorageLib::McapStoragePlugin">
+            <property>
+                <value>
+                    <element>
+                        <name>mcap.filename</name>
+                        <value>recording.mcap</value>
+                    </element>
+                </value>
+            </property>
+        </plugin>
+    </storage>
+    <!-- domain/session/topic selection configured here -->
+</recording_service>
+```
+
+The Transformation plugin is referenced in the Recording Service
+configuration alongside the Storage plugin — the transformation
+runs before data reaches the storage writer's `store()` method.
+
+#### Deployment Modes
+
+The plugin pipeline supports two independent deployment modes
+that can be used separately or simultaneously:
+
+- **Live visualization** — Routing Service pipeline: DDS input
+  adapter → Transformation plugin → Adapter plugin (WebSocket
+  `StreamWriter`) → Foxglove Studio live WebSocket connection.
+  Real-time monitoring during a procedure.
+- **Offline recording** — Recording Service pipeline: DDS
+  subscriber → Transformation plugin → Storage plugin (MCAP
+  `StorageStreamWriter`) → `.mcap` file. Foxglove Studio opens
+  the MCAP for post-procedure review, training, incident
+  investigation, and regression testing.
+
+Both modes can run concurrently — Routing Service feeds live
+visualization while Recording Service simultaneously captures the
+same data to MCAP.
+
+#### V2 Mappings (Tier 1)
+
+| Route | Input Type | Output Type | Key Handling |
+|-------|-----------|-------------|-------------|
+| `RobotStateToJointStates` | `Surgery::RobotState` | `foxglove::JointStates` | Drop `robot_id`; map `joints[]` → `foxglove::JointState[]`; populate `timestamp` from `SampleInfo.source_timestamp` |
+| `RobotStateToToolPose` | `Surgery::RobotState` | `foxglove::PoseInFrame` | Drop `robot_id`; extract `tool_tip_pose` → `foxglove::Pose`; set `frame_id` to `"tool_tip"` |
+| `RobotFrameTransformToFoxglove` | `Surgery::RobotFrameTransform` | `foxglove::FrameTransforms` | Drop `robot_id`; map `transforms[]` → `foxglove::FrameTransform[]` adding `timestamp` from `SampleInfo.source_timestamp` per entry |
+| `CameraFrameToCompressedImage` | `Imaging::CameraFrame` | `foxglove::CompressedImage` | Drop `camera_id`; copy `timestamp`, `frame_id`, `data`, `format` directly |
+
+#### V2 Mappings (Tier 2)
+
+Additional routes defined alongside Tier 2 IDL types:
+
+| Route | Input Type | Output Type |
+|-------|-----------|-------------|
+| `CameraConfigToCalibration` | `Imaging::CameraCalibration` | `foxglove::CameraCalibration` |
+| `ImageAnnotationsToFoxglove` | `Imaging::ImageAnnotations` | `foxglove::ImageAnnotations` |
+| `CompressedVideoToFoxglove` | `Imaging::CompressedVideo` | `foxglove::CompressedVideo` |
+| `SceneUpdateToFoxglove` | `Visualization::SceneUpdate` | `foxglove::SceneUpdate` |
+| `LogMessageToFoxglove` | `Diagnostics::LogMessage` | `foxglove::Log` |

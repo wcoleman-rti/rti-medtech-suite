@@ -54,6 +54,7 @@ Scenarios are tagged to enable selective test execution. Tags also communicate w
 | `@observability` | Tests Monitoring Library 2.0 telemetry delivery, Collector Service integration, Prometheus metrics, and Grafana dashboard visibility | V1.0+ |
 | `@benchmark` | Tests performance benchmark harness: metric collection, baseline comparison, regression detection, threshold enforcement | V1.0+ |
 | `@simulation` | Tests simulation fidelity: scenario profiles, cross-signal correlation, temporal realism, seeded reproducibility | V1.0+ |
+| `@foxglove` | Tests Foxglove Bridge plugin pipeline: transformation correctness, adapter plugin WebSocket delivery, storage plugin MCAP output, concurrent operation | V2.0+ |
 
 ---
 
@@ -68,5 +69,6 @@ Scenarios are tagged to enable selective test execution. Tags also communicate w
 | [documentation.md](documentation.md) | Documentation Standard | V1.0 | README structure compliance, markdownlint rules, required sections, CI enforcement |
 | [security.md](security.md) | Security | V2.0 | Authentication, access control, topic encryption/signing, CRL, PSK, origin authentication, governance enforcement |
 | [performance-baseline.md](performance-baseline.md) | Performance Baseline | V1.0 | Benchmark harness, metric collection, baseline recording, regression detection, threshold enforcement |
+| [foxglove-bridge.md](foxglove-bridge.md) | Foxglove Visualization Bridge | V2.0 | Transformation correctness, adapter plugin (WebSocket), storage plugin (MCAP), concurrent live + offline operation |
 
 *When V1.1 and V2 implementation begins, new spec files will be added for Recording/Replay and each integration gateway module. V3 will add specs for instrument tracking, imaging, inter-OR communication, ClinicalAlerts HA, and the Cloud Command Center. Each new file must follow the conventions above and will require operator approval before scenarios are authored (per the Approval Rule in [docs/agent/README.md](../README.md)).*

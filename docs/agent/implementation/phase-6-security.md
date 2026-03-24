@@ -1,4 +1,4 @@
-# Phase 5: Security
+# Phase 6: Security
 
 **Goal:** Enable RTI Connext Security Plugins across all domains, establish governance and permissions infrastructure, and verify all security spec scenarios from `spec/security.md`.
 
@@ -7,7 +7,7 @@
 
 ---
 
-## Step 5.1 — PKI Setup & Certificate Issuance
+## Step 6.1 — PKI Setup & Certificate Issuance
 
 **Work:** Author the `scripts/generate_pki.py` Python script and run the initial PKI ceremony. See [vision/security.md — Security Artifact Generation](../vision/security.md#security-artifact-generation) for the generation architecture.
 
@@ -33,7 +33,7 @@
 
 ---
 
-## Step 5.2 — Governance Documents
+## Step 6.2 — Governance Documents
 
 **Work:** Author the three governance XML files and sign them with the Permissions CA.
 
@@ -59,7 +59,7 @@
 
 ---
 
-## Step 5.3 — Participant Permissions
+## Step 6.3 — Participant Permissions
 
 **Work:** Author per-participant permissions files and sign them with the Permissions CA.
 
@@ -81,7 +81,7 @@
 
 ---
 
-## Step 5.4 — Enable Security in All Modules
+## Step 6.4 — Enable Security in All Modules
 
 **Work:** Wire the `dds.sec.*` QoS properties into every participant's XML configuration.
 
@@ -101,7 +101,7 @@
 
 ---
 
-## Step 5.5 — Routing Service Security
+## Step 6.5 — Routing Service Security
 
 **Work:** Configure Routing Service as an authenticated, authorized secure bridge.
 
@@ -119,7 +119,7 @@
 
 ---
 
-## Step 5.6 — Cloud Discovery Service Security
+## Step 6.6 — Cloud Discovery Service Security
 
 **Work:** Secure the discovery relay to prevent unauthorized discovery injection.
 
@@ -136,7 +136,7 @@
 
 ---
 
-## Step 5.7 — Certificate Lifecycle
+## Step 6.7 — Certificate Lifecycle
 
 **Work:** Validate dynamic CRL revocation and certificate rotation.
 
@@ -152,7 +152,7 @@
 
 ---
 
-## Step 5.8 — Security Spec Verification
+## Step 6.8 — Security Spec Verification
 
 **Work:** Execute every scenario in `spec/security.md` and confirm all pass.
 

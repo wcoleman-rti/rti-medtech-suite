@@ -109,13 +109,17 @@ Additive within the V1 milestone. No structural changes to V1 modules.
   Deferred from V1.0 to keep the initial release scope focused. Spec scenarios and a new
   implementation step will be authored when this milestone is approved for implementation.
 
+#### Foxglove Data Model Alignment
+- **Foxglove schema alignment (Tier 1 — data model only)** — `Surgery::RobotState` updated with Foxglove-aligned fields (`joints` as `sequence<JointState>`, `tool_tip_pose` as `Common::Pose`); new helper structs (`Common::Quaternion`, `Common::Vector3`, `Common::Pose`); new `Surgery::RobotFrameTransform` topic publishing the kinematic frame hierarchy at 100 Hz. See [data-model.md — Foxglove Schema Alignment](data-model.md#foxglove-schema-alignment).
+- **Data model alignment only** — V1.1 prepares the DDS types for future Foxglove integration by adopting field-semantic alignment (matching field names, nesting, and value conventions with Foxglove schema equivalents). No Foxglove IDL compilation, no transformation plugins, no adapter/storage plugins, and no Foxglove Studio connectivity are included in V1.1. The full integration infrastructure is delivered in V2.
+
 ---
 
 ### V2.0.0 — Security & Hospital Integration Gateways
 
 **Theme:** Harden the data bus with Connext Security Plugins and introduce simulated external hospital system integrations, demonstrating the open pub/sub model for hospital IT interoperability.
 
-#### Security (Phase 5)
+#### Security (Phase 6)
 - Connext Security Plugins with per-participant identity (leaf certificates issued from a central CA)
 - Domain-level governance documents per functional domain (`Governance_Procedure.xml`, `Governance_Hospital.xml`)
 - Topic-level protection: encryption for `clinical`-tag data, encrypt + sign for `control`-tag data, signing for `operational` data
@@ -154,6 +158,18 @@ Additive within the V1 milestone. No structural changes to V1 modules.
 - Bidirectional integration for infusion pump and anesthesia machine: command/control (start, stop, rate adjust) + telemetry
 - Exclusive ownership primary/backup gateway failover
 - Upgrades V1's read-only `DeviceTelemetry` to a full command/response data path
+
+#### Foxglove Visualization Bridge
+- **Foxglove integration infrastructure** — full Foxglove Studio connectivity delivered in V2, building on the V1.1 data model alignment. Three C++ shared-library plugins form the bridge pipeline:
+  1. **Routing Service Transformation plugin** (`libmedtech_foxglove_transf.so`) — implements `rti::routing::transf::DynamicDataTransformation`. One transformation class per target Foxglove type. Converts medtech DDS types to Foxglove-native types by stripping `@key` fields, restructuring nested members, and populating timestamps from `SampleInfo.source_timestamp`. Uses generated C++ types on both sides via `rti::core::xtypes::convert<T>()`.
+  2. **Routing Service Adapter plugin** (`libfoxglove_ws_adapter.so`) — implements `rti::routing::adapter::AdapterPlugin` → `Connection` → `DynamicDataStreamWriter`. Output-only adapter: receives transformed Foxglove DynamicData from the Routing Service pipeline and serializes it to a Foxglove Studio live WebSocket connection. The transformation runs before the adapter's `write()` call.
+  3. **Recording Service Storage plugin** (`libmedtech_mcap_storage.so`) — implements `rti::recording::storage::StorageWriter` → `DynamicDataStorageStreamWriter`. Custom storage backend that writes transformed Foxglove-native samples to MCAP files. The transformation runs before the storage writer's `store()` call.
+- **Foxglove IDL compilation** — selected [foxglove-sdk OMG IDL schemas](https://github.com/foxglove/foxglove-sdk/tree/main/schemas/omgidl/foxglove) (`CompressedImage`, `JointState`, `JointStates`, `FrameTransform`, `FrameTransforms`, `PoseInFrame`, `Pose`, `Quaternion`, `Vector3`, `Time`) compiled with `rtiddsgen` and linked into the transformation plugin.
+- **V2 topic routes (Tier 1 + Tier 2)** — Tier 1: `RobotStateToJointStates`, `RobotStateToToolPose`, `RobotFrameTransformToFoxglove`, `CameraFrameToCompressedImage`. Tier 2: `CameraConfigToCalibration`, `ImageAnnotationsToFoxglove`, `CompressedVideoToFoxglove`, `SceneUpdateToFoxglove`, `LogMessageToFoxglove`.
+- **Foxglove schema alignment (Tier 2)** — new IDL types aligned with Foxglove schemas for advanced visualization: `Imaging::CameraCalibration` (3D image projection, lens correction), `Imaging::ImageAnnotations` (2D camera overlays: tool tracking, safety zones), `Imaging::CompressedVideo` (H.264/H.265 video streaming, 10–50× bandwidth reduction over per-frame JPEG), `Visualization::SceneUpdate` (3D scene primitives: OR environment, robot schematic, safety boundaries), `Diagnostics::LogMessage` (structured logs for Foxglove Log panel, bridged from RTI Logging API / Monitoring Library 2.0)
+- **New IDL modules** — `interfaces/idl/visualization/` and `interfaces/idl/diagnostics/` created to host V2 Foxglove-aligned types; `interfaces/idl/foxglove/` added for vendored Foxglove OMG IDL schemas.
+- **Deployment modes** — live visualization (Routing Service: DDS → Transformation → Adapter Plugin → Foxglove Studio WebSocket) and offline recording (Recording Service: DDS → Transformation → Storage Plugin → MCAP file → Foxglove Studio). Both modes can run concurrently.
+- `@foxglove` spec scenarios added to cover transformation correctness, adapter plugin WebSocket delivery, storage plugin MCAP output, and concurrent operation.
 
 ---
 
@@ -196,3 +212,8 @@ Additive within the V1 milestone. No structural changes to V1 modules.
 - **Cloud-domain topics** — `FacilityStatus`, `AggregatedAlerts`, `ResourceUtilization`, `OperationalKPIs`
 - **Cloud Discovery Service** — enterprise-level multicast-free discovery across WAN-connected sites
 - Demonstrates the layered databus model at full scale: Procedure → Hospital → Cloud, each boundary bridged by a Routing Service tier with zero changes to lower layers
+
+#### Foxglove Visualization Bridge (Tier 3)
+- **Foxglove schema alignment (Tier 3)** — new IDL types for advanced spatial and sensor visualization: `foxglove::PointCloud` alignment (depth camera / 3D scanner for surgical navigation), `foxglove::Grid` alignment (2D heatmap overlays — radiation, thermal), `foxglove::LocationFix` alignment (facility-level indoor positioning / asset tracking), `foxglove::RawAudio` alignment (OR ambient audio monitoring)
+- **Transformation plugin expansion** — additional mapping classes for V3 Foxglove types
+- Specific IDL definitions authored when V3 capability scope is finalized

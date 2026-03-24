@@ -11,6 +11,7 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 | Domain partition format | `room/<room_id>/procedure/<procedure_id>` |
 | `OperatorInput` deadline (DDS Deadline QoS) | 4 ms — enforced on both writer and reader; detects stream interruption per instance |
 | `RobotState` deadline (DDS Deadline QoS) | 20 ms — enforced on both writer and reader; detects stream interruption per instance |
+| `RobotFrameTransform` deadline (DDS Deadline QoS) | 20 ms — enforced on both writer and reader; detects stream interruption per instance (V1.1) |
 | `WaveformData` deadline (DDS Deadline QoS) | 40 ms — enforced on both writer and reader; detects stream interruption per instance |
 | `CameraFrame` deadline (DDS Deadline QoS) | 66 ms — enforced on both writer and reader; detects stream interruption per instance |
 | `PatientVitals` deadline (DDS Deadline QoS) | 2 s — enforced on both writer and reader; detects periodic-snapshot interruption per instance |

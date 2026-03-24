@@ -463,8 +463,8 @@ step gate — not just the new tests. If an existing test fails:
 ### Phase Numbering for Extensions
 
 New phases added during evolution continue the existing phase numbering
-sequence. For example, if the original plan had Phases 1–5, the first
-extension phase is Phase 6.
+sequence. For example, if the original plan had Phases 1–6, the first
+extension phase is Phase 7.
 
 Update `implementation/README.md` to include the new phase in the phase
 structure and dependency graph.

@@ -280,4 +280,4 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 
 ---
 
-*All scenarios above are tagged `@security` and are gated on V2.0. They must all pass before Phase 5 (Security) is considered complete.*
+*All scenarios above are tagged `@security` and are gated on V2.0. They must all pass before Phase 6 (Security) is considered complete.*

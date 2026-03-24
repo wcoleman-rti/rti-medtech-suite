@@ -17,6 +17,8 @@ All scenarios assume the participant operates within a room partition (e.g., `ro
 | `OperatorInput` lifespan (stale discard threshold) | 20 ms |
 | `RobotState` publication rate | 100 Hz (one sample every 10 ms) |
 | `RobotState` deadline (DDS Deadline QoS) | 20 ms — enforced on both writer and reader |
+| `RobotFrameTransform` publication rate | 100 Hz (one sample every 10 ms) — V1.1 |
+| `RobotFrameTransform` deadline (DDS Deadline QoS) | 20 ms — enforced on both writer and reader (V1.1) |
 | `SafetyInterlock` response — robot reaches safe-stopped state | ≤ 40 ms after receiving interlock sample |
 | `SafetyInterlock` liveliness lease | 500 ms — writer health detection via `Liveliness500ms` snippet |
 | `PatientVitals` publication rate | 1 Hz |
