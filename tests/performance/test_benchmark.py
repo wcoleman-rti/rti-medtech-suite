@@ -16,11 +16,15 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 # Add the performance directory to sys.path so we can import directly
 sys.path.insert(0, str(Path(__file__).parent))
 
 from benchmark import build_result, compare_metric, compare_results, run
 from metrics import ALL_METRICS, Threshold, ThresholdKind
+
+pytestmark = [pytest.mark.benchmark]
 
 # ── Comparison logic: PASS ───────────────────────────────────────────
 

@@ -7,6 +7,8 @@ import pytest
 from medtech_gui import init_theme
 from PySide6.QtGui import QFontDatabase
 
+pytestmark = [pytest.mark.gui, pytest.mark.integration]
+
 REQUIRED_FAMILIES = {"Roboto Condensed", "Montserrat", "Roboto Mono"}
 
 

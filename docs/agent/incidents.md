@@ -825,7 +825,7 @@ after closure. They form the project's decision log.
 
 ## INC-028: Common::Time_t uses uint32 sec — Y2038 limitation accepted for Foxglove alignment
 
-- **Status:** Open
+- **Status:** Closed
 - **Category:** Design Decision
 - **Date opened:** 2026-03-24
 - **Phase/Step:** Extension — timestamp field removal / Foxglove alignment
@@ -868,7 +868,12 @@ after closure. They form the project's decision log.
   breaking type evolution — all publishers and subscribers must be
   redeployed together. This is acceptable given the project's
   containerized deployment model.
-- **Date closed:** —
+- **Resolution:** Design decision promoted into `vision/data-model.md`
+  (`Common::Time_t` section) as a self-contained Y2038 limitation note
+  with full rationale and migration plan. The incident reference has
+  been removed from the design doc — the doc is now the authoritative
+  source for this decision.
+- **Date closed:** 2026-03-24
 
 ---
 

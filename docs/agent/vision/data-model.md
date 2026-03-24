@@ -359,7 +359,6 @@ Isolated, composable, no inheritance. Each enables/disables a single concern.
 | Snippet | Applies To | What It Does |
 |---------|-----------|--------------|
 | `Volatile` | DW + DR | Sets VOLATILE durability |
-| `KeepLast4` | DW + DR | KEEP_LAST history, depth 4 |
 | `ExclusiveOwnership` | DW + DR | Sets EXCLUSIVE_OWNERSHIP |
 | `Liveliness2s` | DW + DR | Automatic liveliness, 2-second lease |
 | `Deadline4ms` | DW + DR | Deadline period = 4 ms. Writer: detects publish stall. Reader: detects stream interruption. See *Deadline QoS* below. |
@@ -796,12 +795,19 @@ Standard timestamp. `@final`. Aligned with
 (`uint32 sec` + `uint32 nsec`) for field-semantic compatibility with
 Foxglove's `CompressedImage` type (used by `Imaging::CameraFrame`).
 
-> **Y2038 limitation (INC-028):** `uint32 sec` overflows on
-> 2038-01-19 03:14:07 UTC. This trade-off is accepted for Foxglove
-> alignment. When Foxglove migrates to a wider seconds field, update
-> `Common::Time_t` to match. Because the struct is `@final`, any
-> field-type change is a breaking type evolution requiring coordinated
-> redeployment.
+> **Y2038 limitation:** `uint32 sec` overflows on 2038-01-19 03:14:07 UTC.
+> The previous representation used `int64 seconds` (no practical overflow).
+> This trade-off is accepted because Foxglove alignment is a higher priority
+> than Y2038 safety for this project's simulation-focused deployment. The
+> affected fields are `CameraFrame.timestamp` (Foxglove-aligned, primary
+> motivation), `ProcedureContext.start_time` (wall-clock procedure start),
+> and `AlarmMessage.onset_time` (wall-clock alarm onset). **Migration plan:**
+> when Foxglove migrates `foxglove::Time` to a wider seconds field (e.g.,
+> `int64 sec`), update `Common::Time_t` to match. Because the struct is
+> `@final`, any field-type change is a breaking type evolution requiring
+> coordinated redeployment of all publishers and subscribers — acceptable
+> given the project's containerized deployment model. Monitor the upstream
+> schema at the Foxglove SDK repository.
 
 > **`source_timestamp` convention:** Most top-level types no longer
 > carry an explicit `timestamp` member. Sample publication time is
@@ -813,7 +819,7 @@ Foxglove's `CompressedImage` type (used by `Imaging::CameraFrame`).
 
 | Member | Type | Key | Notes |
 |--------|------|-----|-------|
-| `sec` | `uint32` | — | Seconds since epoch (Y2038 — see INC-028) |
+| `sec` | `uint32` | — | Seconds since epoch (Y2038 — see limitation note above) |
 | `nsec` | `uint32` | — | Sub-second nanoseconds |
 
 #### `Common::EntityIdentity`

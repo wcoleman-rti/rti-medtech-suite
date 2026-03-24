@@ -7,8 +7,11 @@ Tags: @integration @partition
 import time
 
 import monitoring
+import pytest
 import rti.connextdds as dds
 from conftest import wait_for_data, wait_for_discovery
+
+pytestmark = [pytest.mark.integration, pytest.mark.partition]
 
 TEST_DOMAIN = 0
 PatientVitals = monitoring.Monitoring.PatientVitals

@@ -10,8 +10,11 @@ primary failure, and primary reclaim on recovery using DeviceTelemetry.
 import time
 
 import devices
+import pytest
 import rti.connextdds as dds
 from conftest import wait_for_data, wait_for_discovery
+
+pytestmark = [pytest.mark.integration, pytest.mark.failover]
 
 TEST_DOMAIN = 0
 DeviceTelemetry = devices.Devices.DeviceTelemetry

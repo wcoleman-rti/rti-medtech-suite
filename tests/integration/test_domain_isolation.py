@@ -15,6 +15,8 @@ import pytest
 import rti.connextdds as dds
 from conftest import wait_for_discovery
 
+pytestmark = [pytest.mark.integration, pytest.mark.isolation]
+
 TEST_DOMAIN_A = 0
 TEST_DOMAIN_B = 1  # Second test domain for cross-domain isolation
 PatientVitals = monitoring.Monitoring.PatientVitals

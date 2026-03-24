@@ -9,9 +9,12 @@ using generated types (ProcedureContext, RobotCommand).
 
 import time
 
+import pytest
 import rti.connextdds as dds
 import surgery
 from conftest import wait_for_data, wait_for_discovery
+
+pytestmark = [pytest.mark.integration, pytest.mark.durability]
 
 TEST_DOMAIN = 0
 ProcedureContext = surgery.Surgery.ProcedureContext

@@ -10,4 +10,11 @@ line-length = 88
 [tool.pytest.ini_options]
 markers = [
     "benchmark: performance benchmark tests (require observability stack)",
+    "integration: tests requiring two or more DDS participants",
+    "partition: tests for partition-based isolation",
+    "isolation: tests for domain tag or domain ID isolation",
+    "failover: tests for exclusive ownership failover",
+    "durability: tests for TRANSIENT_LOCAL and VOLATILE behavior",
+    "gui: tests involving PySide6 GUI verification",
+    "unit: tests runnable with a single component in isolation",
 ]
