@@ -33,6 +33,7 @@ generated/
 
 # Docker
 *.log
+.env
 
 # Test artifacts
 .pytest_cache/

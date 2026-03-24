@@ -7,7 +7,7 @@
 
 ---
 
-## Step 1.1 — Project Skeleton & CMake Build
+## Step 1.1 — Project Skeleton & CMake Build ✅ `5afc0d7`
 
 ### Work
 
@@ -48,16 +48,16 @@
 
 ### Test Gate
 
-- [ ] `cmake -B build -S .` configures without errors
-- [ ] `cmake --build build` succeeds (no-op build, no source yet)
-- [ ] `cmake --install build` populates `install/` with `setup.bash` and empty directory structure
-- [ ] `source install/setup.bash` completes without errors and sets `NDDS_QOS_PROFILES`, `MEDTECH_CONFIG_DIR`, `PATH`, `LD_LIBRARY_PATH`, `PYTHONPATH`
-- [ ] `.venv/bin/python -c "import rti.connext"` succeeds
-- [ ] `.venv/bin/python -c "import PySide6"` succeeds
+- [x] `cmake -B build -S .` configures without errors
+- [x] `cmake --build build` succeeds (no-op build, no source yet)
+- [x] `cmake --install build` populates `install/` with `setup.bash` and empty directory structure
+- [x] `source install/setup.bash` completes without errors and sets `NDDS_QOS_PROFILES`, `MEDTECH_CONFIG_DIR`, `PATH`, `LD_LIBRARY_PATH`, `PYTHONPATH`
+- [x] `.venv/bin/python -c "import rti.connext"` succeeds
+- [x] `.venv/bin/python -c "import PySide6"` succeeds
 
 ---
 
-## Step 1.2 — IDL Type Definitions
+## Step 1.2 — IDL Type Definitions ✅ `208cc6d`
 
 ### Work
 
@@ -77,15 +77,15 @@
 
 ### Test Gate
 
-- [ ] `cmake --build build` generates type-support code from all IDL files without errors
-- [ ] C++ generated headers compile: a minimal C++ test file includes each generated header
-- [ ] `cmake --install build` installs generated Python modules into `install/lib/python/site-packages/` with `__init__.py` markers
-- [ ] Python generated modules import after sourcing `setup.bash`: `python -c "import surgery; print(surgery.Surgery.RobotCommand)"` for each module
-- [ ] Type instantiation works: `python -c "import surgery; cmd = surgery.Surgery.RobotCommand(); print(cmd)"`
+- [x] `cmake --build build` generates type-support code from all IDL files without errors
+- [x] C++ generated headers compile: a minimal C++ test file includes each generated header
+- [x] `cmake --install build` installs generated Python modules into `install/lib/python/site-packages/` with `__init__.py` markers
+- [x] Python generated modules import after sourcing `setup.bash`: `python -c "import surgery; print(surgery.Surgery.RobotCommand)"` for each module
+- [x] Type instantiation works: `python -c "import surgery; cmd = surgery.Surgery.RobotCommand(); print(cmd)"`
 
 ---
 
-## Step 1.3 — QoS Profile Library
+## Step 1.3 — QoS Profile Library ✅ `10f7c6b`
 
 ### Work
 
@@ -113,15 +113,15 @@
 
 ### Test Gate
 
-- [ ] All QoS XML files validate against `https://community.rti.com/schema/7.6.0/rti_dds_profiles.xsd` with zero errors
-- [ ] Domain library XML validates against the same schema
-- [ ] A minimal C++ program using `dds::core::QosProvider::Default()` loads all profiles via `NDDS_QOS_PROFILES` without errors
-- [ ] A minimal Python program using `dds.QosProvider.default` loads all profiles via `NDDS_QOS_PROFILES` without errors
-- [ ] Topic-filter resolution works: creating a DataWriter on topic `PatientVitals` with `NDDS_QOS_PROFILES` set resolves to the State pattern QoS automatically
+- [x] All QoS XML files validate against `https://community.rti.com/schema/7.6.0/rti_dds_profiles.xsd` with zero errors
+- [x] Domain library XML validates against the same schema
+- [x] A minimal C++ program using `dds::core::QosProvider::Default()` loads all profiles via `NDDS_QOS_PROFILES` without errors
+- [x] A minimal Python program using `dds.QosProvider.default` loads all profiles via `NDDS_QOS_PROFILES` without errors
+- [x] Topic-filter resolution works: creating a DataWriter on topic `PatientVitals` with `NDDS_QOS_PROFILES` set resolves to the State pattern QoS automatically
 
 ---
 
-## Step 1.3b — DDS Design Review via rti-chatbot-mcp
+## Step 1.3b — DDS Design Review via rti-chatbot-mcp ✅ `98d1306`
 
 ### Work
 
@@ -144,11 +144,11 @@
 
 ### Test Gate
 
-- [ ] `rti-chatbot-mcp` review completed for all artifacts
-- [ ] All identified QoS compatibility issues resolved
-- [ ] All identified type design issues resolved
-- [ ] All identified transport/discovery configuration issues resolved
-- [ ] If re-review was needed after changes, re-review completed with no remaining issues
+- [x] `rti-chatbot-mcp` review completed for all artifacts
+- [x] All identified QoS compatibility issues resolved
+- [x] All identified type design issues resolved
+- [x] All identified transport/discovery configuration issues resolved
+- [x] If re-review was needed after changes, re-review completed with no remaining issues
 
 ---
 
@@ -182,17 +182,17 @@
 
 ### Test Gate
 
-- [ ] `docker compose build` succeeds for all base images
-- [ ] `docker compose up` starts placeholder containers
-- [ ] Container on `surgical-net` can reach other containers on `surgical-net`
-- [ ] Container on `surgical-net` cannot reach containers on `hospital-net` (unless dual-homed)
-- [ ] `NDDS_QOS_PROFILES` is set and QoS XML files are accessible inside each container
-- [ ] Cloud Discovery Service container starts and passes its TCP health check on port 7400
-- [ ] Cloud Discovery Service is reachable from both `surgical-net` and `hospital-net` containers
-- [ ] Application placeholder containers do not start until Cloud Discovery Service is healthy (`depends_on` ordering verified)
-- [ ] `docker compose --profile observability up` starts Collector Service, Prometheus, Grafana Loki, and Grafana
-- [ ] Grafana is accessible at its configured port and loads the RTI Observability Dashboards
-- [ ] Prometheus targets page shows Collector Service as a scrape target
+- [x] `docker compose build` succeeds for all base images
+- [ ] `docker compose up` starts placeholder containers — **blocked by INC-005** (CDS license; placeholders depend on CDS healthy)
+- [x] Container on `surgical-net` can reach other containers on `surgical-net`
+- [x] Container on `surgical-net` cannot reach containers on `hospital-net` (unless dual-homed)
+- [x] `NDDS_QOS_PROFILES` is set and QoS XML files are accessible inside each container
+- [ ] Cloud Discovery Service container starts and passes its TCP health check on port 7400 — **blocked by INC-005**
+- [ ] Cloud Discovery Service is reachable from both `surgical-net` and `hospital-net` containers — **blocked by INC-005**
+- [ ] Application placeholder containers do not start until Cloud Discovery Service is healthy (`depends_on` ordering verified) — **blocked by INC-005** (verified structurally: compose config validates, depends_on present)
+- [ ] `docker compose --profile observability up` starts Collector Service, Prometheus, Grafana Loki, and Grafana — **Collector Service blocked by INC-005**; Prometheus, Loki, Grafana verified healthy
+- [x] Grafana is accessible at its configured port and loads the RTI Observability Dashboards (38 dashboards loaded)
+- [x] Prometheus targets page shows Collector Service as a scrape target (target configured; status 'down' pending INC-005)
 
 ---
 

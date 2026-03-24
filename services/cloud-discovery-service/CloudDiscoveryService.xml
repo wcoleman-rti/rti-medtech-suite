@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:noNamespaceSchemaLocation="https://community.rti.com/schema/7.6.0/rti_cloud_discovery_service.xsd">
+
+    <cloud_discovery_service name="DockerCDS">
+
+        <transport>
+            <element>
+                <alias>builtin.udpv4</alias>
+                <receive_port>7400</receive_port>
+            </element>
+        </transport>
+
+        <domain_list>
+            <allow_domain_id>10,11,20</allow_domain_id>
+        </domain_list>
+
+        <forwarder>
+            <thread_pool>
+                <size>2</size>
+            </thread_pool>
+        </forwarder>
+
+        <database>
+            <cleanup_period>
+                <sec>50</sec>
+            </cleanup_period>
+        </database>
+
+    </cloud_discovery_service>
+
+</dds>

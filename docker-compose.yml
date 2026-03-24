@@ -1,0 +1,173 @@
+# Docker Compose configuration for medtech-suite simulation
+#
+# Usage:
+#   docker compose --profile build build             Build all base images
+#   docker compose up -d                             Start CDS + placeholders
+#   docker compose --profile observability up -d     Start observability stack
+#
+# Prerequisites:
+#   - NDDSHOME set in environment (source rtisetenv before running)
+#   - RTI license file: set RTI_LICENSE_FILE in .env (see .env.example)
+
+x-medtech-env: &medtech-env
+  NDDS_QOS_PROFILES: "/opt/medtech/share/qos/Snippets.xml;/opt/medtech/share/qos/Patterns.xml;/opt/medtech/share/qos/Topics.xml;/opt/medtech/share/qos/Participants.xml;/opt/medtech/share/domains/domains.xml"
+  NDDS_DISCOVERY_PEERS: "rtps@udpv4://cloud-discovery-service:7400"
+
+x-qos-volumes: &qos-volumes
+  - ./interfaces/qos:/opt/medtech/share/qos:ro
+  - ./interfaces/domains:/opt/medtech/share/domains:ro
+
+x-build-args: &build-args
+  CONNEXT_VERSION: "7.6.0"
+  CONNEXT_ARCH: "x64Linux4gcc8.5.0"
+
+networks:
+  surgical-net:
+    driver: bridge
+  hospital-net:
+    driver: bridge
+
+services:
+
+  # ─── Infrastructure ─────────────────────────────────────────────
+
+  cloud-discovery-service:
+    image: rticom/cloud-discovery-service:latest
+    container_name: cloud-discovery-service
+    command: ["-cfgName", "DockerCDS", "-verbosity", "WARN"]
+    volumes:
+      - ./services/cloud-discovery-service/CloudDiscoveryService.xml:/home/rtiuser/rti_workspace/7.6.0/user_config/cloud_discovery_service/USER_CLOUD_DISCOVERY_SERVICE.xml:ro
+      - ${RTI_LICENSE_FILE:-./rti_license.dat}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro
+    networks:
+      surgical-net:
+      hospital-net:
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "7400"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # ─── Base Images (build-only profile) ───────────────────────────
+
+  build-base:
+    image: medtech/build-base
+    build:
+      context: .
+      dockerfile: docker/build-base.Dockerfile
+      additional_contexts:
+        connext: "${NDDSHOME:-/opt/rti.com/rti_connext_dds-7.6.0}"
+      args:
+        <<: *build-args
+    profiles: ["build"]
+
+  runtime-cpp:
+    image: medtech/runtime-cpp
+    build:
+      context: .
+      dockerfile: docker/runtime-cpp.Dockerfile
+      additional_contexts:
+        connext: "${NDDSHOME:-/opt/rti.com/rti_connext_dds-7.6.0}"
+      args:
+        <<: *build-args
+    profiles: ["build"]
+
+  runtime-python:
+    image: medtech/runtime-python
+    build:
+      context: .
+      dockerfile: docker/runtime-python.Dockerfile
+      additional_contexts:
+        connext: "${NDDSHOME:-/opt/rti.com/rti_connext_dds-7.6.0}"
+      args:
+        <<: *build-args
+    profiles: ["build"]
+
+  # ─── Observability (--profile observability) ────────────────────
+
+  collector-service:
+    image: rticom/collector-service:latest
+    container_name: collector-service
+    profiles: ["observability"]
+    environment:
+      CFG_NAME: NonSecureLAN
+      OBSERVABILITY_DOMAIN: "20"
+      OBSERVABILITY_PROMETHEUS_EXPORTER_PORT: "19090"
+      OBSERVABILITY_LOKI_HOSTNAME: loki
+      OBSERVABILITY_LOKI_EXPORTER_PORT: "3100"
+      NDDS_DISCOVERY_PEERS: "rtps@udpv4://cloud-discovery-service:7400"
+    volumes:
+      - ${RTI_LICENSE_FILE:-./rti_license.dat}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro
+    networks:
+      hospital-net:
+      surgical-net:
+    depends_on:
+      cloud-discovery-service:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    profiles: ["observability"]
+    volumes:
+      - ./services/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      hospital-net:
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    profiles: ["observability"]
+    ports:
+      - "3100:3100"
+    networks:
+      hospital-net:
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    profiles: ["observability"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./services/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ${NDDSHOME:-/opt/rti.com/rti_connext_dds-7.6.0}/resource/app/app_support/observability/templates/grafana/dashboards/General:/var/lib/grafana/dashboards:ro
+    networks:
+      hospital-net:
+    depends_on:
+      - prometheus
+      - loki
+
+  # ─── Placeholder Services (network verification) ───────────────
+
+  surgical-placeholder:
+    image: ubuntu:22.04
+    container_name: surgical-placeholder
+    command: ["sleep", "infinity"]
+    environment:
+      <<: *medtech-env
+    volumes: *qos-volumes
+    networks:
+      - surgical-net
+    depends_on:
+      cloud-discovery-service:
+        condition: service_healthy
+
+  hospital-placeholder:
+    image: ubuntu:22.04
+    container_name: hospital-placeholder
+    command: ["sleep", "infinity"]
+    environment:
+      <<: *medtech-env
+    volumes: *qos-volumes
+    networks:
+      - hospital-net
+    depends_on:
+      cloud-discovery-service:
+        condition: service_healthy

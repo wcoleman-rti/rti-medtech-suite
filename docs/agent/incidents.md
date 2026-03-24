@@ -146,3 +146,44 @@ after closure. They form the project's decision log.
 - **Resolution:** All actionable findings addressed. Tests pass
   (C++ 15/15, Python 19/19). IDL codegen and type imports verified.
 - **Date closed:** 2026-03-23
+
+---
+
+## INC-005: RTI license missing CDS and Collector Service features
+
+- **Status:** Open
+- **Category:** Environment / Licensing
+- **Date opened:** 2026-03-24
+- **Phase/Step:** Phase 1 / Step 1.4
+- **Documents involved:** `docker-compose.yml`,
+  `services/cloud-discovery-service/CloudDiscoveryService.xml`
+- **Description:** The RTI license file at `/opt/rti.com/rti_license.dat`
+  contains `RTIPRO` and `RTISECURITY` features but does not include the
+  Cloud Discovery Service or Collector Service feature licenses. Both
+  `rticom/cloud-discovery-service` and `rticom/collector-service` Docker
+  Hub images require feature-specific licenses and refuse to start:
+  ```
+  RTI Cloud Discovery Service feature license not found
+  ```
+  This blocks three Step 1.4 test gates:
+  - CDS container starts and passes TCP health check on port 7400
+  - CDS reachable from both `surgical-net` and `hospital-net`
+  - Application containers depend on CDS healthy
+  And two observability test gates:
+  - Collector Service starts
+  - Prometheus scrape target shows Collector Service as UP
+- **Impact:** Docker infrastructure is otherwise complete and verified:
+  base images build successfully, Docker networks provide correct
+  isolation, QoS XML files are mounted and accessible, Prometheus/
+  Loki/Grafana start and are healthy, 38 RTI Observability Dashboards
+  load in Grafana, data sources provisioned.
+- **Options:**
+  1. Obtain an updated license with CDS and Collector Service features
+     from the RTI Customer Portal or RTI Support.
+  2. Copy a valid license that includes these features to
+     `/opt/rti.com/rti_license.dat` or update `RTI_LICENSE_FILE` in
+     `.env` to point to one.
+  3. For local development without Docker, `NDDS_DISCOVERY_PEERS` can
+     substitute for CDS by listing explicit peer addresses.
+- **Resolution:** Pending operator action — license update required.
+- **Date closed:** —
