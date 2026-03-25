@@ -17,7 +17,7 @@ import time
 import common
 import rti.connextdds as dds
 import surgery
-from dds_init import initialize_connext
+from medtech_dds_init.dds_init import initialize_connext
 from medtech_logging import ModuleName, init_logging
 
 ProcedureContext = surgery.Surgery.ProcedureContext

@@ -94,6 +94,10 @@ install(DIRECTORY modules/shared/medtech_gui/
 install(DIRECTORY modules/shared/medtech_logging/
     DESTINATION lib/python/site-packages/medtech_logging
     FILES_MATCHING PATTERN "*.py")
+install(DIRECTORY modules/shared/medtech_dds_init/
+    DESTINATION lib/python/site-packages/medtech_dds_init
+    FILES_MATCHING PATTERN "*.py"
+    PATTERN "include" EXCLUDE)
 
 # --- Install shared C++ headers ---
 install(DIRECTORY modules/shared/medtech_logging/include/
