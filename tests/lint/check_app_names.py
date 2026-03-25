@@ -23,7 +23,6 @@ def _extract_xml_names():
     """Extract all participant, writer, and reader names from XML."""
     tree = ET.parse(XML_PATH)
     root = tree.getroot()
-    ns = ""
 
     lib_name = None
     participants = []

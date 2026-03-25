@@ -151,6 +151,55 @@ if grep -rn --include='*.cpp' --include='*.hpp' \
     violations=$((violations + 1))
 fi
 
+# 6d: AP-8 — Custom QosProvider (only QosProvider::Default / QosProvider.default allowed)
+if grep -rn --include='*.py' 'QosProvider(' "$APP_DIRS" 2>/dev/null | grep -v '__pycache__' | grep -v 'QosProvider.default'; then
+    echo "  VIOLATION [AP-8]: custom QosProvider constructor found in Python application code" >&2
+    violations=$((violations + 1))
+fi
+if grep -rn --include='*.cpp' --include='*.hpp' 'QosProvider(' "$APP_DIRS" 2>/dev/null | grep -v 'QosProvider::Default()'; then
+    echo "  VIOLATION [AP-8]: custom QosProvider constructor found in C++ application code" >&2
+    violations=$((violations + 1))
+fi
+
+# 6e: AP-9 — Publisher/subscriber partition QoS (only participant-level allowed)
+if grep -rn --include='*.py' --include='*.cpp' --include='*.hpp' \
+    'publisher.*partition\|subscriber.*partition\|Publisher.*partition\|Subscriber.*partition' \
+    "$APP_DIRS" interfaces/qos/ 2>/dev/null | grep -v '__pycache__' | grep -v '\.participant'; then
+    echo "  VIOLATION [AP-9]: publisher/subscriber-level partition QoS found" >&2
+    violations=$((violations + 1))
+fi
+
+# 6f: AP-10 — DDS entity types in public class APIs (headers / class-level hints)
+if grep -rn --include='*.hpp' \
+    'public:' -A 50 "$APP_DIRS" 2>/dev/null | grep -E 'DataWriter|DataReader|DomainParticipant|Publisher|Subscriber' | grep -v 'private:' | grep -v '//' | grep -v 'find_data'; then
+    echo "  VIOLATION [AP-10]: DDS entity types found in public class API (C++)" >&2
+    violations=$((violations + 1))
+fi
+if grep -rn --include='*.py' \
+    -E '^\s*(def |.*->)\s*.*(DataWriter|DataReader|DomainParticipant)\b' \
+    "$APP_DIRS" 2>/dev/null | grep -v '__pycache__' | grep -v '_'; then
+    echo "  VIOLATION [AP-10]: DDS entity types found in public class API (Python)" >&2
+    violations=$((violations + 1))
+fi
+
+# 6g: AP-11 — Raw string literals for known entity names in application code
+# Extract all entity name values from app_names.idl and check for raw usage
+_IDL_FILE="interfaces/idl/app_names.idl"
+if [ -f "$_IDL_FILE" ]; then
+    _entity_names=$(grep -oP '=\s*"\K[^"]+' "$_IDL_FILE" || true)
+    _ap11_found=false
+    for _name in $_entity_names; do
+        if grep -rn --include='*.py' --include='*.cpp' --include='*.hpp' \
+            "\"$_name\"" "$APP_DIRS" 2>/dev/null | grep -v '__pycache__'; then
+            _ap11_found=true
+        fi
+    done
+    if [ "$_ap11_found" = true ]; then
+        echo "  VIOLATION [AP-11]: raw string literals for entity names found in application code" >&2
+        violations=$((violations + 1))
+    fi
+fi
+
 if [ "$violations" -gt 0 ]; then
     fail "$violations prohibited pattern violation(s) found"
 fi

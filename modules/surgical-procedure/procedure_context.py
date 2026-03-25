@@ -63,21 +63,13 @@ class ProcedureContextPublisher:
         self._participant.qos = qos
 
         # Look up XML-created writers by entity name
-        ctx_any = self._participant.find_datawriter(
-            names.PROCEDURE_CONTEXT_WRITER
-        )
-        status_any = self._participant.find_datawriter(
-            names.PROCEDURE_STATUS_WRITER
-        )
+        ctx_any = self._participant.find_datawriter(names.PROCEDURE_CONTEXT_WRITER)
+        status_any = self._participant.find_datawriter(names.PROCEDURE_STATUS_WRITER)
 
         if ctx_any is None:
-            raise RuntimeError(
-                f"Writer not found: {names.PROCEDURE_CONTEXT_WRITER}"
-            )
+            raise RuntimeError(f"Writer not found: {names.PROCEDURE_CONTEXT_WRITER}")
         if status_any is None:
-            raise RuntimeError(
-                f"Writer not found: {names.PROCEDURE_STATUS_WRITER}"
-            )
+            raise RuntimeError(f"Writer not found: {names.PROCEDURE_STATUS_WRITER}")
 
         self._context_writer = dds.DataWriter(ctx_any)
         self._status_writer = dds.DataWriter(status_any)

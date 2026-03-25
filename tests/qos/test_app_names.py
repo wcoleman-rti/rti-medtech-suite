@@ -40,10 +40,16 @@ class TestWriterNames:
     """Verify writer entity name constants."""
 
     def test_procedure_context_writer(self):
-        assert names.PROCEDURE_CONTEXT_WRITER == "OperationalPublisher::ProcedureContextWriter"
+        assert (
+            names.PROCEDURE_CONTEXT_WRITER
+            == "OperationalPublisher::ProcedureContextWriter"
+        )
 
     def test_procedure_status_writer(self):
-        assert names.PROCEDURE_STATUS_WRITER == "OperationalPublisher::ProcedureStatusWriter"
+        assert (
+            names.PROCEDURE_STATUS_WRITER
+            == "OperationalPublisher::ProcedureStatusWriter"
+        )
 
     def test_camera_frame_writer(self):
         assert names.CAMERA_FRAME_WRITER == "OperationalPublisher::CameraFrameWriter"
@@ -61,7 +67,9 @@ class TestWriterNames:
         assert names.ROBOT_COMMAND_WRITER == "OperatorPublisher::RobotCommandWriter"
 
     def test_safety_interlock_writer(self):
-        assert names.SAFETY_INTERLOCK_WRITER == "OperatorPublisher::SafetyInterlockWriter"
+        assert (
+            names.SAFETY_INTERLOCK_WRITER == "OperatorPublisher::SafetyInterlockWriter"
+        )
 
     def test_patient_vitals_writer(self):
         assert names.PATIENT_VITALS_WRITER == "MonitorPublisher::PatientVitalsWriter"
@@ -92,10 +100,16 @@ class TestReaderNames:
         assert names.ROBOT_STATE_READER == "OperatorSubscriber::RobotStateReader"
 
     def test_procedure_context_reader(self):
-        assert names.PROCEDURE_CONTEXT_READER == "OperationalSubscriber::ProcedureContextReader"
+        assert (
+            names.PROCEDURE_CONTEXT_READER
+            == "OperationalSubscriber::ProcedureContextReader"
+        )
 
     def test_procedure_status_reader(self):
-        assert names.PROCEDURE_STATUS_READER == "OperationalSubscriber::ProcedureStatusReader"
+        assert (
+            names.PROCEDURE_STATUS_READER
+            == "OperationalSubscriber::ProcedureStatusReader"
+        )
 
     def test_patient_vitals_reader(self):
         assert names.PATIENT_VITALS_READER == "MonitorSubscriber::PatientVitalsReader"
@@ -107,7 +121,10 @@ class TestReaderNames:
         assert names.TWIN_OPERATOR_INPUT_READER == "TwinSubscriber::OperatorInputReader"
 
     def test_twin_safety_interlock_reader(self):
-        assert names.TWIN_SAFETY_INTERLOCK_READER == "TwinSubscriber::SafetyInterlockReader"
+        assert (
+            names.TWIN_SAFETY_INTERLOCK_READER
+            == "TwinSubscriber::SafetyInterlockReader"
+        )
 
     def test_twin_robot_command_reader(self):
         assert names.TWIN_ROBOT_COMMAND_READER == "TwinSubscriber::RobotCommandReader"

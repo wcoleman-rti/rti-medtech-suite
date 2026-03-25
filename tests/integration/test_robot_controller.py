@@ -15,7 +15,6 @@ import time
 
 import pytest
 import rti.connextdds as dds
-
 import surgery
 from conftest import wait_for_data, wait_for_discovery
 
@@ -52,12 +51,8 @@ class TestRobotStateQoS:
         topic_w = dds.Topic(writer_p, "RobotState", RobotState)
         topic_r = dds.Topic(reader_p, "RobotState", RobotState)
 
-        writer_qos = provider.datawriter_qos_from_profile(
-            "TopicProfiles::RobotState"
-        )
-        reader_qos = provider.datareader_qos_from_profile(
-            "TopicProfiles::RobotState"
-        )
+        writer_qos = provider.datawriter_qos_from_profile("TopicProfiles::RobotState")
+        reader_qos = provider.datareader_qos_from_profile("TopicProfiles::RobotState")
 
         writer = writer_factory(writer_p, topic_w, qos=writer_qos)
         reader = reader_factory(reader_p, topic_r, qos=reader_qos)
@@ -67,9 +62,7 @@ class TestRobotStateQoS:
         state = RobotState(
             robot_id="robot-001",
             joint_positions=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
-            tool_tip_position=surgery.Surgery.CartesianPosition(
-                x=1.0, y=2.0, z=3.0
-            ),
+            tool_tip_position=surgery.Surgery.CartesianPosition(x=1.0, y=2.0, z=3.0),
             operational_mode=RobotMode.OPERATIONAL,
             error_state=0,
         )
@@ -99,9 +92,7 @@ class TestRobotStateQoS:
         provider = dds.QosProvider.default
 
         topic_w = dds.Topic(writer_p, "RobotState", RobotState)
-        writer_qos = provider.datawriter_qos_from_profile(
-            "TopicProfiles::RobotState"
-        )
+        writer_qos = provider.datawriter_qos_from_profile("TopicProfiles::RobotState")
         writer = writer_factory(writer_p, topic_w, qos=writer_qos)
 
         # Publish BEFORE reader exists
@@ -119,9 +110,7 @@ class TestRobotStateQoS:
             domain_id=0, domain_tag="control", partition=partition
         )
         topic_r = dds.Topic(reader_p, "RobotState", RobotState)
-        reader_qos = provider.datareader_qos_from_profile(
-            "TopicProfiles::RobotState"
-        )
+        reader_qos = provider.datareader_qos_from_profile("TopicProfiles::RobotState")
         reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
         received = wait_for_data(reader, timeout_sec=5)
@@ -151,12 +140,8 @@ class TestOperatorInputQoS:
 
         topic_w = dds.Topic(writer_p, "OperatorInput", OperatorInput)
         topic_r = dds.Topic(reader_p, "OperatorInput", OperatorInput)
-        w_qos = provider.datawriter_qos_from_profile(
-            "TopicProfiles::OperatorInput"
-        )
-        r_qos = provider.datareader_qos_from_profile(
-            "TopicProfiles::OperatorInput"
-        )
+        w_qos = provider.datawriter_qos_from_profile("TopicProfiles::OperatorInput")
+        r_qos = provider.datareader_qos_from_profile("TopicProfiles::OperatorInput")
 
         writer = writer_factory(writer_p, topic_w, qos=w_qos)
         reader = reader_factory(reader_p, topic_r, qos=r_qos)
@@ -213,12 +198,8 @@ class TestOperatorInputQoS:
 
         topic_w = dds.Topic(writer_p, "OperatorInput", OperatorInput)
         topic_r = dds.Topic(reader_p, "OperatorInput", OperatorInput)
-        w_qos = provider.datawriter_qos_from_profile(
-            "TopicProfiles::OperatorInput"
-        )
-        r_qos = provider.datareader_qos_from_profile(
-            "TopicProfiles::OperatorInput"
-        )
+        w_qos = provider.datawriter_qos_from_profile("TopicProfiles::OperatorInput")
+        r_qos = provider.datareader_qos_from_profile("TopicProfiles::OperatorInput")
 
         writer = writer_factory(writer_p, topic_w, qos=w_qos)
         reader = reader_factory(reader_p, topic_r, qos=r_qos)
@@ -238,9 +219,9 @@ class TestOperatorInputQoS:
         # Any samples should have expired — take() returns nothing valid
         samples = reader.take()
         valid = [s for s in samples if s.info.valid]
-        assert len(valid) == 0, (
-            f"Expected 0 valid samples after lifespan expiry, got {len(valid)}"
-        )
+        assert (
+            len(valid) == 0
+        ), f"Expected 0 valid samples after lifespan expiry, got {len(valid)}"
 
 
 class TestSafetyInterlockQoS:
@@ -264,12 +245,8 @@ class TestSafetyInterlockQoS:
 
         topic_w = dds.Topic(writer_p, "SafetyInterlock", SafetyInterlock)
         topic_r = dds.Topic(reader_p, "SafetyInterlock", SafetyInterlock)
-        w_qos = provider.datawriter_qos_from_profile(
-            "TopicProfiles::SafetyInterlock"
-        )
-        r_qos = provider.datareader_qos_from_profile(
-            "TopicProfiles::SafetyInterlock"
-        )
+        w_qos = provider.datawriter_qos_from_profile("TopicProfiles::SafetyInterlock")
+        r_qos = provider.datareader_qos_from_profile("TopicProfiles::SafetyInterlock")
 
         writer = writer_factory(writer_p, topic_w, qos=w_qos)
         reader = reader_factory(reader_p, topic_r, qos=r_qos)
@@ -312,12 +289,8 @@ class TestRobotCommandQoS:
 
         topic_w = dds.Topic(writer_p, "RobotCommand", RobotCommand)
         topic_r = dds.Topic(reader_p, "RobotCommand", RobotCommand)
-        w_qos = provider.datawriter_qos_from_profile(
-            "TopicProfiles::RobotCommand"
-        )
-        r_qos = provider.datareader_qos_from_profile(
-            "TopicProfiles::RobotCommand"
-        )
+        w_qos = provider.datawriter_qos_from_profile("TopicProfiles::RobotCommand")
+        r_qos = provider.datareader_qos_from_profile("TopicProfiles::RobotCommand")
 
         writer = writer_factory(writer_p, topic_w, qos=w_qos)
         reader = reader_factory(reader_p, topic_r, qos=r_qos)
@@ -369,12 +342,8 @@ class TestRobotCommandQoS:
 
         topic_w = dds.Topic(writer_p, "OperatorInput", OperatorInput)
         topic_r = dds.Topic(reader_p, "OperatorInput", OperatorInput)
-        w_qos = provider.datawriter_qos_from_profile(
-            "TopicProfiles::OperatorInput"
-        )
-        r_qos = provider.datareader_qos_from_profile(
-            "TopicProfiles::OperatorInput"
-        )
+        w_qos = provider.datawriter_qos_from_profile("TopicProfiles::OperatorInput")
+        r_qos = provider.datareader_qos_from_profile("TopicProfiles::OperatorInput")
 
         writer = writer_factory(writer_p, topic_w, qos=w_qos)
         reader = reader_factory(reader_p, topic_r, qos=r_qos)
