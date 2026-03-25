@@ -113,7 +113,7 @@
 
 ---
 
-## Step 2.4 — Camera Simulator
+## Step 2.4 — Camera Simulator ✅ `912b5c5`
 
 ### Work
 
@@ -123,8 +123,8 @@
 
 ### Test Gate (spec: surgical-procedure.md — Camera Feed)
 
-- [ ] Camera frame metadata published at configured rate
-- [ ] Best-effort delivery: subscriber continues on frame loss without stalling
+- [x] Camera frame metadata published at configured rate
+- [x] Best-effort delivery: subscriber continues on frame loss without stalling
 
 ---
 
