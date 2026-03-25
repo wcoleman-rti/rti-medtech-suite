@@ -86,7 +86,7 @@ class ProcedureContextPublisher:
         self._last_context: ProcedureContext | None = None
         self._last_phase: ProcedurePhase | None = None
 
-    def run(self) -> None:
+    def start(self) -> None:
         """Enable the participant to initiate DDS discovery.
 
         Call after construction, once all setup is complete.
@@ -141,16 +141,6 @@ class ProcedureContextPublisher:
             f"ProcedureStatus published: procedure={self._procedure_id}, "
             f"phase={phase}"
         )
-
-    @property
-    def context_writer(self) -> dds.DataWriter:
-        """Return the ProcedureContext DataWriter."""
-        return self._context_writer
-
-    @property
-    def status_writer(self) -> dds.DataWriter:
-        """Return the ProcedureStatus DataWriter."""
-        return self._status_writer
 
     @property
     def procedure_id(self) -> str:

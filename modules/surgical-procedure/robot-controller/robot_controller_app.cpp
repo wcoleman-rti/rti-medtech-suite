@@ -5,6 +5,13 @@
 // a 100 Hz publish loop on a dedicated timer thread alongside an
 // AsyncWaitSet for subscriber input processing.
 //
+// Canonical architecture pattern per vision/dds-consistency.md §3:
+//   - All DDS entities are private members
+//   - start() enables participant, starts AWS, spawns timer
+//   - wait_for_shutdown() blocks until running_ is false
+//   - Destructor follows canonical shutdown sequence
+//   - Member declaration order ensures correct destruction
+//
 // Environment variables:
 //   ROBOT_ID         — Robot numeric ID (default: "001"), prefixed to "robot-001"
 //   ROOM_ID          — Room identifier (e.g., "OR-3")
@@ -36,13 +43,6 @@ namespace names = MedtechEntityNames::SurgicalParticipants;
 
 namespace {
 
-std::atomic<bool> g_shutdown_requested{false};
-
-void signal_handler(int /*sig*/)
-{
-    g_shutdown_requested.store(true);
-}
-
 std::string env_or(const char* name, const char* fallback)
 {
     const char* val = std::getenv(name);
@@ -50,9 +50,11 @@ std::string env_or(const char* name, const char* fallback)
 }
 
 // ---------------------------------------------------------------------------
-// RobotControllerApp — owns all DDS entities and the controller state machine.
-// Destruction follows reverse-construction order and the DomainParticipant
-// destructor handles entity cleanup.
+// RobotControllerApp — canonical C++ service class per dds-consistency.md §3.
+//
+// Owns all DDS entities privately. Member declaration order ensures
+// reverse destruction: timer_thread_ → sub_aws_ → conditions → readers →
+// writer → participant_ → running_ → log_ → controller_.
 // ---------------------------------------------------------------------------
 class RobotControllerApp {
 public:
@@ -65,58 +67,53 @@ public:
         const std::string partition =
             "room/" + room_id + "/procedure/" + procedure_id;
 
-        // Centralized pre-participant initialization
         medtech::initialize_connext();
 
-        // Create participant from XML config
         auto provider = dds::core::QosProvider::Default();
         participant_ = provider.extensions().create_participant_from_config(
             std::string(names::CONTROL_ROBOT));
 
-        // Set participant-level partition from runtime context.
         auto dp_qos = participant_.qos();
         dp_qos << dds::core::policy::Partition(partition);
         participant_.qos(dp_qos);
 
         log_.notice("Participant created: " + std::string(names::CONTROL_ROBOT));
 
-        // Look up typed writers and readers
         state_writer_ =
             rti::pub::find_datawriter_by_name<
                 dds::pub::DataWriter<Surgery::RobotState>>(
                 participant_, std::string(names::ROBOT_STATE_WRITER));
 
-        auto interlock_reader =
+        interlock_reader_ =
             rti::sub::find_datareader_by_name<
                 dds::sub::DataReader<Surgery::SafetyInterlock>>(
                 participant_, std::string(names::SAFETY_INTERLOCK_READER));
 
-        auto command_reader =
+        command_reader_ =
             rti::sub::find_datareader_by_name<
                 dds::sub::DataReader<Surgery::RobotCommand>>(
                 participant_, std::string(names::ROBOT_COMMAND_READER));
 
-        auto input_reader =
+        input_reader_ =
             rti::sub::find_datareader_by_name<
                 dds::sub::DataReader<Surgery::OperatorInput>>(
                 participant_, std::string(names::OPERATOR_INPUT_READER));
 
         if (state_writer_ == dds::core::null
-            || interlock_reader == dds::core::null
-            || command_reader == dds::core::null
-            || input_reader == dds::core::null) {
+            || interlock_reader_ == dds::core::null
+            || command_reader_ == dds::core::null
+            || input_reader_ == dds::core::null) {
             throw std::runtime_error(
                 "Failed to find one or more named DDS entities");
         }
 
         log_.notice("All DDS entities found");
 
-        // Set up subscriber AsyncWaitSet with ReadConditions
         interlock_rc_ = dds::sub::cond::ReadCondition(
-            interlock_reader,
+            interlock_reader_,
             dds::sub::status::DataState::any(),
-            [&, interlock_reader]() mutable {
-                auto samples = interlock_reader.take();
+            [this]() {
+                auto samples = interlock_reader_.take();
                 std::unique_lock<std::shared_mutex> lock(controller_.mutex());
                 for (const auto& sample : samples) {
                     if (sample.info().valid()) {
@@ -126,10 +123,10 @@ public:
             });
 
         command_rc_ = dds::sub::cond::ReadCondition(
-            command_reader,
+            command_reader_,
             dds::sub::status::DataState::any(),
-            [&, command_reader]() mutable {
-                auto samples = command_reader.take();
+            [this]() {
+                auto samples = command_reader_.take();
                 std::unique_lock<std::shared_mutex> lock(controller_.mutex());
                 for (const auto& sample : samples) {
                     if (sample.info().valid()) {
@@ -139,10 +136,10 @@ public:
             });
 
         input_rc_ = dds::sub::cond::ReadCondition(
-            input_reader,
+            input_reader_,
             dds::sub::status::DataState::any(),
-            [&, input_reader]() mutable {
-                auto samples = input_reader.take();
+            [this]() {
+                auto samples = input_reader_.take();
                 std::unique_lock<std::shared_mutex> lock(controller_.mutex());
                 for (const auto& sample : samples) {
                     if (sample.info().valid()) {
@@ -156,27 +153,34 @@ public:
         sub_aws_.attach_condition(input_rc_);
     }
 
-    // Run the application: starts subscriber AsyncWaitSet, spawns the
-    // 100 Hz publisher timer thread, and blocks until shutdown is requested.
-    void run()
+    ~RobotControllerApp()
     {
-        // Enable participant now that all entities are created and
-        // conditions attached. Recursively enables all child entities
-        // and initiates DDS discovery.
-        participant_.enable();
+        // 1. Signal threads to stop
+        running_.store(false, std::memory_order_release);
+        // 2. Join timer thread
+        if (timer_thread_.joinable()) {
+            timer_thread_.join();
+        }
+        // 3. Stop AsyncWaitSet — blocks until no handlers are in flight
+        sub_aws_.stop();
+        // 4. Members destruct in reverse declaration order:
+        //    sub_aws_ → conditions → readers → writer → participant_
+    }
 
+    void start()
+    {
+        participant_.enable();
         sub_aws_.start();
+
         log_.notice("Robot controller running (100 Hz publish, robot_id="
                     + controller_.snapshot().state.robot_id + ")");
 
-        // Timer thread: write RobotState directly at 100 Hz.
-        // DataWriter::write() is thread-safe — no GuardCondition needed.
-        std::thread timer_thread([this]() {
+        timer_thread_ = std::thread([this]() {
             using clock = std::chrono::steady_clock;
             const auto period = std::chrono::microseconds(10000);  // 10 ms
             auto next_tick = clock::now() + period;
 
-            while (!g_shutdown_requested.load(std::memory_order_relaxed)) {
+            while (running_.load(std::memory_order_relaxed)) {
                 std::this_thread::sleep_until(next_tick);
                 medtech::surgical::ControllerSnapshot snap;
                 {
@@ -184,39 +188,62 @@ public:
                         controller_.mutex());
                     snap = controller_.snapshot();
                 }
-                state_writer_.write(snap.state);
+                if (running_.load(std::memory_order_relaxed)) {
+                    state_writer_.write(snap.state);
+                }
                 next_tick += period;
             }
         });
+    }
 
-        // Block until shutdown signal
-        while (!g_shutdown_requested.load(std::memory_order_relaxed)) {
+    void wait_for_shutdown()
+    {
+        while (running_.load(std::memory_order_relaxed)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-
         log_.notice("Shutting down robot controller");
-        timer_thread.join();
+    }
 
-        // Detach conditions before stopping to avoid
-        // "Precondition not met: waitset attached" errors.
-        sub_aws_.detach_condition(interlock_rc_);
-        sub_aws_.detach_condition(command_rc_);
-        sub_aws_.detach_condition(input_rc_);
-        sub_aws_.stop();
+    void request_shutdown()
+    {
+        running_.store(false, std::memory_order_release);
     }
 
 private:
+    // Members declared in construction order; destroyed in reverse.
+    // Pure logic — no DDS
     medtech::surgical::RobotController controller_;
     medtech::ModuleLogger& log_;
+    std::atomic<bool> running_{true};
 
+    // DDS entities (destroyed after AsyncWaitSet)
     dds::domain::DomainParticipant participant_{nullptr};
     dds::pub::DataWriter<Surgery::RobotState> state_writer_{nullptr};
+    dds::sub::DataReader<Surgery::SafetyInterlock> interlock_reader_{nullptr};
+    dds::sub::DataReader<Surgery::RobotCommand> command_reader_{nullptr};
+    dds::sub::DataReader<Surgery::OperatorInput> input_reader_{nullptr};
 
-    rti::core::cond::AsyncWaitSet sub_aws_;
+    // Conditions (destroyed before readers)
     dds::sub::cond::ReadCondition interlock_rc_{nullptr};
     dds::sub::cond::ReadCondition command_rc_{nullptr};
     dds::sub::cond::ReadCondition input_rc_{nullptr};
+
+    // AsyncWaitSet (destroyed first — declared last among DDS members)
+    rti::core::cond::AsyncWaitSet sub_aws_;
+
+    // Worker thread (joined in destructor before aws_.stop())
+    std::thread timer_thread_;
 };
+
+// File-level pointer for signal handler → app shutdown integration
+RobotControllerApp* g_app_ptr = nullptr;
+
+void signal_handler(int /*sig*/)
+{
+    if (g_app_ptr != nullptr) {
+        g_app_ptr->request_shutdown();
+    }
+}
 
 }  // anonymous namespace
 
@@ -233,7 +260,10 @@ int main()
         const std::string procedure_id = env_or("PROCEDURE_ID", "proc-001");
 
         RobotControllerApp app(robot_id, room_id, procedure_id, log);
-        app.run();
+        g_app_ptr = &app;
+        app.start();
+        app.wait_for_shutdown();
+        g_app_ptr = nullptr;
         return 0;
 
     } catch (const std::exception& ex) {
