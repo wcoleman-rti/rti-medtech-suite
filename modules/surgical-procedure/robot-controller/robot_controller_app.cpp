@@ -25,9 +25,8 @@
 #include <rti/domain/find.hpp>
 #include <rti/pub/findImpl.hpp>
 #include <rti/sub/findImpl.hpp>
-#include <rti/domain/PluginSupport.hpp>
 
-#include "surgery/surgery.hpp"
+#include "medtech/dds_init.hpp"
 #include "medtech/logging.hpp"
 #include "robot_controller.hpp"
 
@@ -61,13 +60,9 @@ public:
     {
         const std::string partition =
             "room/" + room_id + "/procedure/" + procedure_id;
-        // Register compiled types for XML Application Creation
-        rti::domain::register_type<Surgery::RobotState>("Surgery::RobotState");
-        rti::domain::register_type<Surgery::RobotCommand>("Surgery::RobotCommand");
-        rti::domain::register_type<Surgery::SafetyInterlock>(
-            "Surgery::SafetyInterlock");
-        rti::domain::register_type<Surgery::OperatorInput>(
-            "Surgery::OperatorInput");
+
+        // Centralized pre-participant initialization
+        medtech::initialize_connext();
 
         // Create participant from XML config
         auto provider = dds::core::QosProvider::Default();

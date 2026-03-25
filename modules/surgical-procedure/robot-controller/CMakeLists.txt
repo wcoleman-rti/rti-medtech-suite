@@ -7,6 +7,7 @@ add_executable(robot-controller
 target_include_directories(robot-controller PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/modules/shared/medtech_logging/include
+    ${CMAKE_SOURCE_DIR}/modules/shared/medtech_dds_init/include
 )
 
 target_link_libraries(robot-controller PRIVATE
