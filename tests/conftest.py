@@ -31,6 +31,10 @@ def _make_participant(domain_id, domain_tag=None, partition=None, qos=None):
 
     Partition is set at the DomainParticipant level (Connext 7.x extension)
     to control participant-level visibility.
+
+    The participant is created disabled (participant_factory_qos has
+    autoenable_created_entities=false) and explicitly enabled after QoS
+    configuration is complete.
     """
     if qos is None:
         qos = dds.DomainParticipant.default_participant_qos
@@ -43,7 +47,9 @@ def _make_participant(domain_id, domain_tag=None, partition=None, qos=None):
             partition = [partition]
         qos.partition.name = partition
 
-    return dds.DomainParticipant(domain_id, qos)
+    p = dds.DomainParticipant(domain_id, qos)
+    p.enable()
+    return p
 
 
 @pytest.fixture

@@ -13,6 +13,9 @@
         <qos_profile name="FactoryDefaults"
                      is_default_participant_factory_profile="true">
             <participant_factory_qos>
+                <entity_factory>
+                    <autoenable_created_entities>false</autoenable_created_entities>
+                </entity_factory>
                 <logging>
                     <verbosity>WARNING</verbosity>
                     <category>ALL</category>
