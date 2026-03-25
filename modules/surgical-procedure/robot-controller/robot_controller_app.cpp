@@ -155,18 +155,17 @@ public:
         sub_aws_.attach_condition(interlock_rc_);
         sub_aws_.attach_condition(command_rc_);
         sub_aws_.attach_condition(input_rc_);
-
-        // All entities created and conditions attached — enable participant
-        // to initiate DDS discovery. The participant_factory_qos has
-        // autoenable_created_entities=false so everything was created
-        // disabled; enable() recursively enables all child entities.
-        participant_.enable();
     }
 
     // Run the application: starts subscriber AsyncWaitSet, spawns the
     // 100 Hz publisher timer thread, and blocks until shutdown is requested.
     void run()
     {
+        // Enable participant now that all entities are created and
+        // conditions attached. Recursively enables all child entities
+        // and initiates DDS discovery.
+        participant_.enable();
+
         sub_aws_.start();
         log_.notice("Robot controller running (100 Hz publish, robot_id="
                     + controller_.snapshot().state.robot_id + ")");

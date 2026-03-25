@@ -7,17 +7,17 @@ The participant and all writers are created from XML configuration
 (SurgicalParticipants::OperationalPub). Writers are looked up by entity
 name using find_datawriter().
 
-Configuration is read from environment variables or defaults.
+Configuration is read from constructor parameters (atomic IDs).
 """
 
 from __future__ import annotations
 
-import os
 import time
 
 import common
 import rti.connextdds as dds
 import surgery
+from dds_init import initialize_connext
 from medtech_logging import ModuleName, init_logging
 
 ProcedureContext = surgery.Surgery.ProcedureContext
@@ -36,16 +36,34 @@ class ProcedureContextPublisher:
     Both topics use State pattern QoS (TRANSIENT_LOCAL, RELIABLE, KEEP_LAST 1)
     so late-joining subscribers receive the current state immediately.
 
-    The participant is created from XML configuration
-    (SurgicalParticipants::OperationalPub) and writers are looked up by name.
+    Owns its DomainParticipant (created from XML configuration
+    SurgicalParticipants::OperationalPub) and looks up writers by name.
     """
 
-    def __init__(self, participant: dds.DomainParticipant) -> None:
+    def __init__(
+        self,
+        room_id: str,
+        procedure_id: str,
+    ) -> None:
+        initialize_connext()
+
+        # Create participant from XML config
+        provider = dds.QosProvider.default
+        self._participant = provider.create_participant_from_config(
+            "SurgicalParticipants::OperationalPub"
+        )
+
+        # Set participant-level partition from runtime context
+        partition = f"room/{room_id}/procedure/{procedure_id}"
+        qos = self._participant.qos
+        qos.partition.name = [partition]
+        self._participant.qos = qos
+
         # Look up XML-created writers by entity name
-        ctx_any = participant.find_datawriter(
+        ctx_any = self._participant.find_datawriter(
             "OperationalPublisher::ProcedureContextWriter"
         )
-        status_any = participant.find_datawriter(
+        status_any = self._participant.find_datawriter(
             "OperationalPublisher::ProcedureStatusWriter"
         )
 
@@ -61,9 +79,17 @@ class ProcedureContextPublisher:
         self._context_writer = dds.DataWriter(ctx_any)
         self._status_writer = dds.DataWriter(status_any)
 
-        self._procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
+        self._procedure_id = procedure_id
         self._last_context: ProcedureContext | None = None
         self._last_phase: ProcedurePhase | None = None
+
+    def run(self) -> None:
+        """Enable the participant to initiate DDS discovery.
+
+        Call after construction, once all setup is complete.
+        """
+        self._participant.enable()
+        log.notice(f"ProcedureContextPublisher enabled: procedure={self._procedure_id}")
 
     def publish_context(
         self,
