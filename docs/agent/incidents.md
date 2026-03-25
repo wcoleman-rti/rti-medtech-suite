@@ -943,3 +943,65 @@ after closure. They form the project's decision log.
   environment variables via `$(VAR)` must have a default defined in the setup script, or
   the entire QoS provider will fail to load.
 - **Date closed:** 2026-03-24
+
+---
+
+## INC-031: AsyncWaitSet conditions must be detached before entity destruction
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-25
+- **Phase/Step:** Phase 2 / Step 2.2
+- **Documents involved:** `modules/surgical-procedure/robot-controller/main.cpp`
+- **Description:** When shutting down the robot-controller, calling `participant.close()`
+  with conditions still attached to AsyncWaitSet instances causes a fatal error:
+  "Precondition not met error: waitset attached". The ReadConditions and GuardCondition
+  must be explicitly detached from their respective AsyncWaitSets before `stop()` and
+  before any DDS entity they reference is destroyed.
+- **Resolution:** Added `pub_aws.detach_condition(publish_tick)` and
+  `sub_aws.detach_condition(...)` for all three ReadConditions before stopping the
+  AsyncWaitSets and closing the participant. Shutdown is now clean.
+- **Guideline:** Always detach all conditions from AsyncWaitSet instances before calling
+  `stop()` and before closing/destroying the DDS entities the conditions reference.
+- **Date closed:** 2026-03-25
+
+---
+
+## INC-032: OperatorInput lifespan interacts with test polling interval
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-25
+- **Phase/Step:** Phase 2 / Step 2.2
+- **Documents involved:** `tests/integration/test_robot_controller.py`, `tests/conftest.py`
+- **Description:** The `wait_for_data()` helper polls with 50 ms sleep intervals using
+  `reader.read()`. OperatorInput has a 20 ms lifespan (Lifespan20ms snippet). By the time
+  the helper reads the sample, it has already expired and been purged from the reader
+  queue. Tests for short-lifespan topics must use a tighter polling loop (2 ms) with
+  `reader.take()` to read samples before they expire.
+- **Resolution:** Replaced `wait_for_data()` call in `test_operator_input_delivery` with
+  an inline loop polling at 2 ms intervals using `reader.take()`.
+- **Guideline:** When testing topics with short lifespan QoS, poll at intervals shorter
+  than the lifespan. The generic `wait_for_data()` helper (50 ms interval) is only
+  suitable for topics without lifespan or with lifespan > 100 ms.
+- **Date closed:** 2026-03-25
+
+---
+
+## INC-033: DDS Python API returns integers for IDL boolean fields
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-25
+- **Phase/Step:** Phase 2 / Step 2.2
+- **Documents involved:** `tests/integration/test_robot_controller.py`
+- **Description:** IDL boolean fields (e.g., `SafetyInterlock.interlock_active`) are
+  returned as Python integers (`0` or `1`) by the RTI Connext Python API, not as Python
+  `bool` (`True`/`False`). This means `assert data.interlock_active is True` fails because
+  `1 is True` is `False` in Python. Use `== True` or truthiness checks instead of
+  identity checks for DDS boolean fields.
+- **Resolution:** Changed assertion from `is True` to `== True` with a `noqa: E712`
+  comment explaining the DDS integer return type.
+- **Guideline:** Always use equality (`==`) or truthiness checks for IDL boolean fields
+  in Python tests, never identity (`is`).
+- **Date closed:** 2026-03-25
