@@ -128,7 +128,7 @@
 
 ---
 
-## Step 2.5 — Device Telemetry Simulator
+## Step 2.5 — Device Telemetry Simulator ✅ `95eb016`
 
 ### Work
 
@@ -140,9 +140,9 @@
 
 ### Test Gate (spec: surgical-procedure.md — Device Telemetry)
 
-- [ ] Device telemetry published for each simulated device
-- [ ] Device telemetry uses write-on-change model — stable state produces no samples
-- [ ] Exclusive ownership failover: backup takes over when primary liveliness expires
+- [x] Device telemetry published for each simulated device
+- [x] Device telemetry uses write-on-change model — stable state produces no samples
+- [x] Exclusive ownership failover: backup takes over when primary liveliness expires
 
 ---
 

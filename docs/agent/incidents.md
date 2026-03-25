@@ -1116,3 +1116,41 @@ after closure. They form the project's decision log.
   for within-package references and absolute imports for cross-package
   references.
 - **Date closed:** 2026-03-25
+
+---
+
+## INC-039: DDS ownership kind is immutable after entity creation
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-25
+- **Phase/Step:** Phase 2 / Step 2.5
+- **Documents involved:** `vision/data-model.md`, `vision/dds-consistency.md`
+- **Description:** Attempted to set `OwnershipKind.EXCLUSIVE` on a
+  DataWriter created from XML configuration (`create_participant_from_config()`)
+  which defaults to `SHARED` ownership via the `Patterns::State` QoS profile.
+  The Connext Python API raises `rti.connextdds.ImmutablePolicyError` when
+  calling `writer.qos = modified_qos` with a changed ownership kind. This is
+  correct per the DDS specification — ownership kind is an immutable QoS policy
+  that must be set before entity creation.
+- **Possible resolutions:**
+  1. Create a separate XML QoS profile (`ExclusiveState`) with
+     `EXCLUSIVE_OWNERSHIP_QOS` and an `ownership_strength` parameter for
+     the primary/backup pattern. The DeviceGateway would reference this
+     profile when exclusive ownership is required.
+  2. Create the DataWriter manually (not from XML) when exclusive ownership
+     is needed, setting ownership QoS at construction time.
+  3. Keep the DeviceGateway using the standard State pattern (SHARED) and
+     test exclusive ownership failover independently using DDS fixtures
+     (which already passes in `test_exclusive_ownership.py`).
+- **Resolution:** Resolution 3 adopted for V1.0. The DeviceGateway uses
+  the standard State pattern from XML. Exclusive ownership failover for
+  DeviceTelemetry is validated at the DDS level using manually-created
+  writers in `test_exclusive_ownership.py`. For V2 device gateways that
+  require exclusive ownership in production, Resolution 1 (XML profile)
+  is the recommended approach.
+- **Guideline:** Never attempt to change ownership kind, reliability kind,
+  durability kind, or other immutable QoS policies after entity creation.
+  If different QoS is needed for deployment variants (e.g., exclusive
+  ownership failover), define separate XML profiles in Topics.xml.
+- **Date closed:** 2026-03-25
