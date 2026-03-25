@@ -16,6 +16,7 @@ markers = [
     "partition: tests for partition-based isolation",
     "isolation: tests for domain tag or domain ID isolation",
     "failover: tests for exclusive ownership failover",
+    "streaming: tests for high-rate best-effort streaming topics",
     "durability: tests for TRANSIENT_LOCAL and VOLATILE behavior",
     "gui: tests involving PySide6 GUI verification",
     "unit: tests runnable with a single component in isolation",
