@@ -14,11 +14,14 @@ from __future__ import annotations
 
 import time
 
+import app_names
 import common
 import rti.connextdds as dds
 import surgery
 from medtech_dds_init.dds_init import initialize_connext
 from medtech_logging import ModuleName, init_logging
+
+names = app_names.MedtechEntityNames.SurgicalParticipants
 
 ProcedureContext = surgery.Surgery.ProcedureContext
 ProcedureStatus = surgery.Surgery.ProcedureStatus
@@ -50,7 +53,7 @@ class ProcedureContextPublisher:
         # Create participant from XML config
         provider = dds.QosProvider.default
         self._participant = provider.create_participant_from_config(
-            "SurgicalParticipants::OperationalPub"
+            names.OPERATIONAL_PUB
         )
 
         # Set participant-level partition from runtime context
@@ -61,19 +64,19 @@ class ProcedureContextPublisher:
 
         # Look up XML-created writers by entity name
         ctx_any = self._participant.find_datawriter(
-            "OperationalPublisher::ProcedureContextWriter"
+            names.PROCEDURE_CONTEXT_WRITER
         )
         status_any = self._participant.find_datawriter(
-            "OperationalPublisher::ProcedureStatusWriter"
+            names.PROCEDURE_STATUS_WRITER
         )
 
         if ctx_any is None:
             raise RuntimeError(
-                "Writer not found: OperationalPublisher::ProcedureContextWriter"
+                f"Writer not found: {names.PROCEDURE_CONTEXT_WRITER}"
             )
         if status_any is None:
             raise RuntimeError(
-                "Writer not found: OperationalPublisher::ProcedureStatusWriter"
+                f"Writer not found: {names.PROCEDURE_STATUS_WRITER}"
             )
 
         self._context_writer = dds.DataWriter(ctx_any)

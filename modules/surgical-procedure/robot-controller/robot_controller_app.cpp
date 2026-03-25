@@ -30,6 +30,10 @@
 #include "medtech/logging.hpp"
 #include "robot_controller.hpp"
 
+#include <app_names/app_names.hpp>
+
+namespace names = MedtechEntityNames::SurgicalParticipants;
+
 namespace {
 
 std::atomic<bool> g_shutdown_requested{false};
@@ -67,35 +71,35 @@ public:
         // Create participant from XML config
         auto provider = dds::core::QosProvider::Default();
         participant_ = provider.extensions().create_participant_from_config(
-            "SurgicalParticipants::ControlRobot");
+            std::string(names::CONTROL_ROBOT));
 
         // Set participant-level partition from runtime context.
         auto dp_qos = participant_.qos();
         dp_qos << dds::core::policy::Partition(partition);
         participant_.qos(dp_qos);
 
-        log_.notice("Participant created: SurgicalParticipants::ControlRobot");
+        log_.notice("Participant created: " + std::string(names::CONTROL_ROBOT));
 
         // Look up typed writers and readers
         state_writer_ =
             rti::pub::find_datawriter_by_name<
                 dds::pub::DataWriter<Surgery::RobotState>>(
-                participant_, "RobotPublisher::RobotStateWriter");
+                participant_, std::string(names::ROBOT_STATE_WRITER));
 
         auto interlock_reader =
             rti::sub::find_datareader_by_name<
                 dds::sub::DataReader<Surgery::SafetyInterlock>>(
-                participant_, "RobotSubscriber::SafetyInterlockReader");
+                participant_, std::string(names::SAFETY_INTERLOCK_READER));
 
         auto command_reader =
             rti::sub::find_datareader_by_name<
                 dds::sub::DataReader<Surgery::RobotCommand>>(
-                participant_, "RobotSubscriber::RobotCommandReader");
+                participant_, std::string(names::ROBOT_COMMAND_READER));
 
         auto input_reader =
             rti::sub::find_datareader_by_name<
                 dds::sub::DataReader<Surgery::OperatorInput>>(
-                participant_, "RobotSubscriber::OperatorInputReader");
+                participant_, std::string(names::OPERATOR_INPUT_READER));
 
         if (state_writer_ == dds::core::null
             || interlock_reader == dds::core::null
