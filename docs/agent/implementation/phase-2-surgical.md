@@ -29,7 +29,7 @@
 
 ---
 
-## Step 2.2 — Robot Simulator (Procedure Domain, `control` Tag)
+## Step 2.2 — Robot Simulator (Procedure Domain, `control` Tag) ✅ `3627039`
 
 ### Work
 
@@ -62,12 +62,12 @@
 
 ### Test Gate (spec: surgical-procedure.md — Robot Teleop & Control)
 
-- [ ] Operator input reaches robot controller within deadline
-- [ ] Robot state is published at configured rate with correct fields
-- [ ] Safety interlock halts robot on violation (state → EMERGENCY_STOP)
-- [ ] Stale operator input (expired lifespan) is not applied
-- [ ] Robot command delivery is strictly reliable and ordered
-- [ ] RobotState publishes at 100 Hz ± tolerance regardless of input arrival rate
+- [x] Operator input reaches robot controller within deadline
+- [x] Robot state is published at configured rate with correct fields
+- [x] Safety interlock halts robot on violation (state → EMERGENCY_STOP)
+- [x] Stale operator input (expired lifespan) is not applied
+- [x] Robot command delivery is strictly reliable and ordered
+- [x] RobotState publishes at 100 Hz ± tolerance regardless of input arrival rate
 
 ---
 
