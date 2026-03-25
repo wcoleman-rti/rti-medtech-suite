@@ -2,9 +2,9 @@
 
 **Goal:** Implement the surgical procedure module — a multi-instance application set that simulates a robot controller, patient monitor, surgical camera, procedure context publisher, and device telemetry. Verify partition-based room isolation and all surgical spec scenarios.
 
-**Depends on:** Phase 1 (Foundation)
+**Depends on:** Phase 1 (Foundation); [revision-dds-consistency.md](revision-dds-consistency.md) (Steps 2.3+ require the revision to be complete — entity name constants, shared `dds_init.py`, expanded CI checks)
 **Blocks:** Phase 3 (Dashboard), Phase 4 (Clinical Decision Support)
-**Spec coverage:** [surgical-procedure.md](../spec/surgical-procedure.md) (Robot Teleop, Patient Vitals, Camera Feed, Device Telemetry, Procedure Context, Digital Twin Display, Multi-Instance Isolation), [common-behaviors.md](../spec/common-behaviors.md) (Partition Isolation)
+**Spec coverage:** [surgical-procedure.md](../spec/surgical-procedure.md) (Robot Teleop, Patient Vitals, Camera Feed, Device Telemetry, Procedure Context, Digital Twin Display, Multi-Instance Isolation), [common-behaviors.md](../spec/common-behaviors.md) (Partition Isolation, DDS Consistency Compliance)
 
 ---
 
@@ -72,6 +72,15 @@
 ---
 
 ## Step 2.3 — Patient Vitals & Alarm Simulator
+
+> **Prerequisite:** [revision-dds-consistency.md](revision-dds-consistency.md) must be
+> complete before starting this step. All new code from this step onward
+> must use generated entity name constants from `app_names.idl`, import
+> `initialize_connext()` from the shared `medtech_dds_init` package, and
+> follow the application architecture pattern in
+> [vision/dds-consistency.md §3](../vision/dds-consistency.md). Refer to
+> the [new module checklist](../vision/dds-consistency.md) (§9) for each
+> new service class.
 
 ### Work
 

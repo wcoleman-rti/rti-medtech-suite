@@ -188,6 +188,8 @@ code patterns, consult these additional resources (in priority order):
 | Use `print()`, `printf`, `std::cout`, or a custom logging framework | All logging must use the RTI Connext Logging API per `vision/technology.md` |
 | Use DynamicData / DynamicType in application code | All applications must use IDL-generated types. DynamicData is permitted only in developer tools (e.g., `tools/qos-checker.py`) and test utilities. See `vision/coding-standards.md`. |
 
+> **Consolidated reference:** All DDS-specific prohibited patterns above are cataloged with detailed risk assessments and approved alternatives in [vision/dds-consistency.md — Anti-Pattern Catalog](vision/dds-consistency.md). The initialization sequence, canonical data access patterns, and new module checklist in that document operationalize these prohibitions into actionable guidance.
+
 ### What the Agent May Decide Autonomously
 
 | Permitted decision | Scope |
@@ -397,6 +399,11 @@ This review is a **quality gate** — not a blocking approval. The agent proceed
 after addressing findings. The purpose is to catch DDS-specific design issues
 (QoS incompatibility, discovery misconfiguration, type system pitfalls) that
 functional tests may not reveal until much later.
+
+> **Implementation guidance:** After the design review clears, use
+> [vision/dds-consistency.md](vision/dds-consistency.md) as the operational
+> reference for implementing DDS entities — it provides the canonical
+> initialization sequence, data access patterns, and new module checklist.
 
 ### Subsequent Reviews
 

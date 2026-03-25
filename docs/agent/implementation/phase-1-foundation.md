@@ -69,6 +69,7 @@
   - `devices.idl` — `DeviceTelemetry`
   - `clinical_alerts.idl` — `ClinicalAlert`, `RiskScore` (module ClinicalAlerts — Clinical Decision Support)
   - `hospital.idl` — `ResourceAvailability`
+  - `app_names.idl` — entity name constants (`MedtechEntityNames` module) per [vision/dds-consistency.md §1 Step 2](../vision/dds-consistency.md) — deferred to [revision-dds-consistency.md](revision-dds-consistency.md) Step R.1
 - Add `connextdds_rtiddsgen_run()` calls in `interfaces/CMakeLists.txt` to generate C++ and Python type support from IDL
   - Use `-language C++11` and `-standard IDL4_CPP` for all C++ code generation targets (explicit even if IDL4_CPP is the default)
   - Use `-language Python` for Python code generation targets
@@ -284,7 +285,8 @@
   3. `markdownlint modules/*/README.md services/*/README.md` — README lint
   4. `python tests/lint/check_readme_sections.py` — section order lint
   5. `grep` checks for prohibited patterns: QoS setter API calls in application code, literal domain IDs (10, 11) in application code, `print()`/`printf`/`std::cout` in application code
-  6. Verify no generated files in source tree
+  6. Additional anti-pattern `grep` checks per [vision/dds-consistency.md §6](../vision/dds-consistency.md): AP-8 (custom QosProvider), AP-9 (pub/sub partition), AP-10 (DDS entities in public APIs), AP-11 (raw string literals for entity names) — deferred to [revision-dds-consistency.md](revision-dds-consistency.md) Step R.5
+  7. Verify no generated files in source tree
   7. `black --check modules/ tests/` + `isort --check modules/ tests/` + `ruff check modules/ tests/` — Python code style per `vision/coding-standards.md` (scoped to source dirs, excluding build artifacts and `.venv`)
   8. `python tests/performance/benchmark.py` — performance benchmark against latest baseline (from Phase 2 onward; Phase 1 produces the harness only)
 - The script must exit non-zero on the first gate failure

@@ -392,3 +392,70 @@ Requirements **not** subject to the 10× multiplier:
 **Given** a PySide6 GUI application displays a status indicator
 **When** the status changes to Normal, Warning, Critical, Info, or Disconnected
 **Then** the indicator uses the corresponding semantic color: Green (`#A4D65E`), Orange (`#ED8B00`), Red (`#D32F2F`), Light Blue (`#00B5E2`), or Light Gray (`#BBBCBC`) respectively
+
+---
+
+## DDS Consistency Compliance
+
+These scenarios enforce the contracts defined in
+[vision/dds-consistency.md](../vision/dds-consistency.md). They verify
+that every application module follows the canonical initialization
+sequence, entity naming, QoS provider usage, application architecture
+pattern, and anti-pattern prohibitions.
+
+### Scenario: All applications call shared initialization before participant creation `@integration` `@consistency`
+
+**Given** an application module starting up
+**When** the application creates its first DomainParticipant
+**Then** `initialize_connext()` (C++ or Python) was called before the creation call
+**And** the XTypes compliance mask includes `accept_unknown_enum_value`
+**And** all IDL-generated types referenced by XML `<register_type>` entries are registered with the factory
+
+### Scenario: All participants are created from XML configuration `@integration` `@consistency`
+
+**Given** an application module's DDS initialization
+**When** a DomainParticipant is created
+**Then** it is created via `create_participant_from_config()` with a name from the generated `app_names.idl` constants
+**And** no participant is created via the `DomainParticipant(domain_id, ...)` constructor
+
+### Scenario: All entity lookups use generated name constants `@lint` `@consistency`
+
+**Given** the compiled codebase under `modules/`
+**When** checking all calls to `find_datawriter_by_name()`, `find_datareader_by_name()`, `find_datawriter()`, `find_datareader()`, and `create_participant_from_config()`
+**Then** every name argument references a generated constant from `app_names.idl`
+**And** no raw string literals are used for entity names in application code
+
+### Scenario: Only default QosProvider is used `@lint` `@consistency`
+
+**Given** the compiled codebase under `modules/`
+**When** checking all QosProvider instantiations
+**Then** only `QosProvider::Default()` (C++) or `QosProvider.default` (Python) is used
+**And** no custom `QosProvider` constructors with explicit file paths appear
+
+### Scenario: DDS entity types are not exposed in public class APIs `@lint` `@consistency`
+
+**Given** a service or application class under `modules/`
+**When** examining the class's public interface (public methods, constructor parameters, return types)
+**Then** no DDS entity types (`DataWriter`, `DataReader`, `DomainParticipant`, `Publisher`, `Subscriber`) appear in the public API
+**And** the public interface uses only domain types (IDL-generated types, primitive types, standard library types)
+
+### Scenario: No publisher/subscriber partition QoS is used `@lint` `@consistency`
+
+**Given** the compiled codebase and QoS XML under `interfaces/`
+**When** checking for publisher-level or subscriber-level partition QoS settings
+**Then** no publisher or subscriber partition is set anywhere
+**And** only DomainParticipant-level partition is used for context isolation
+
+### Scenario: Application classes encapsulate DDS entities as private members `@integration` `@consistency`
+
+**Given** a service class (e.g., `RobotController`, `BedsideMonitor`, `DeviceGateway`)
+**When** the class is constructed with domain-level parameters (room ID, procedure ID)
+**Then** the class internally calls `initialize_connext()`, creates a participant from XML config, sets the partition, and looks up writers/readers by generated name constants
+**And** callers do not pass or receive DDS entity references
+
+### Scenario: Destructor shutdown sequence is correct `@integration` `@consistency`
+
+**Given** a C++ service class owning an `AsyncWaitSet` and DDS entities
+**When** the class is destroyed
+**Then** the destructor calls `aws_.stop()` before DDS entities are destroyed
+**And** the `AsyncWaitSet` is declared after DDS entities (reverse destruction order as defensive layer)

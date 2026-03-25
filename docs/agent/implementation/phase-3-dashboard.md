@@ -2,9 +2,14 @@
 
 **Goal:** Implement the PySide6 hospital dashboard GUI that displays real-time procedure status, patient vitals, alerts, and robot state across all active ORs. Configure Routing Service to bridge surgical domain data to the hospital domain.
 
-**Depends on:** Phase 2 (Surgical Procedure)
+**Depends on:** Phase 2 (Surgical Procedure), [revision-dds-consistency.md](revision-dds-consistency.md)
 **Can parallel with:** Phase 4 (Clinical Alerts)
-**Spec coverage:** [hospital-dashboard.md](../spec/hospital-dashboard.md) (Procedure List, Vitals Overview, Alert Feed, Robot Status, GUI Threading), [common-behaviors.md](../spec/common-behaviors.md) (Routing Service)
+**Spec coverage:** [hospital-dashboard.md](../spec/hospital-dashboard.md) (Procedure List, Vitals Overview, Alert Feed, Robot Status, GUI Threading), [common-behaviors.md](../spec/common-behaviors.md) (Routing Service, DDS Consistency Compliance)
+
+> **DDS Consistency:** All steps in this phase must follow the application
+> architecture pattern in [vision/dds-consistency.md §3](../vision/dds-consistency.md),
+> use generated entity name constants from `app_names.idl`, and pass the
+> [new module checklist](../vision/dds-consistency.md) (§9).
 
 ---
 
@@ -43,6 +48,9 @@ tag.
   - Procedure domain (`control` tag) → Hospital domain: `RobotState` (read-only)
 - Configure separate sessions per traffic class (StatusSession, StreamingSession)
 - Configure Routing Service partition handling per [system-architecture.md](../vision/system-architecture.md): input side uses wildcard partition `room/*/procedure/*`; output side preserves source partition so Hospital domain consumers see the same partition strings
+- Enable `<administration>` and `<monitoring>` in the Routing Service XML per [vision/dds-consistency.md §8](../vision/dds-consistency.md)
+- Use the Observability domain (Domain 20) for Routing Service monitoring traffic
+- Add TCP port health checks in Docker Compose for Routing Service startup ordering
 - Add Routing Service container to `docker-compose.yml` on both `surgical-net` and `hospital-net` (dual-homed)
 - Verify data flows from surgical containers to hospital network
 

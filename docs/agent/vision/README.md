@@ -33,6 +33,7 @@ These rules are non-negotiable across all modules and phases:
 | [documentation.md](documentation.md) | README standard: required section structure, markdownlint compliance rules, CI enforcement |
 | [security.md](security.md) | Security architecture: governance posture, participant identity model, permissions design, CRL, PSK, origin authentication |
 | [coding-standards.md](coding-standards.md) | Coding standards: C++/Python naming conventions, class vs struct, namespace rules, file organization, test patterns, CMake conventions |
+| [dds-consistency.md](dds-consistency.md) | DDS consistency contract: initialization sequence, canonical data access patterns, QoS provider usage, threading rules, anti-pattern catalog, Routing Service usage, new module checklist |
 | [performance-baseline.md](performance-baseline.md) | Performance baseline framework: benchmark harness, Connext metrics collection, phase-gate baselines, regression thresholds, stress testing roadmap |
 | [simulation-model.md](simulation-model.md) | Simulation fidelity: non-deterministic realistic data, seeded reproducibility, scenario profiles, cross-signal correlation, publication model integration |
 | [tooling.md](tooling.md) | Debugging & diagnostics: RTI Admin Console, DDS Spy, Grafana dashboards, project-specific diagnostic tools (medtech-diag, partition-inspector, QoS checker) |

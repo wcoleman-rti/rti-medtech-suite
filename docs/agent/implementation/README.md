@@ -30,7 +30,9 @@ Phases are grouped by release milestone. All phases within a milestone must be c
 
 Phase 1: Foundation
     │
-    ├──► Phase 2: Surgical Procedure
+    ├──► Revision: DDS Consistency Alignment (depends on Phase 1 + Phase 2 Steps 2.1–2.2)
+    │
+    ├──► Phase 2: Surgical Procedure (Steps 2.3+ depend on Revision)
     │        │
     │        ├──► Phase 3: Hospital Dashboard
     │        │        │
@@ -89,7 +91,8 @@ If an implementation session is interrupted, use this checklist to resume:
 | File | Phase | Depends On | Key Deliverables |
 |------|-------|------------|------------------|
 | [phase-1-foundation.md](phase-1-foundation.md) | Foundation | — | CMake build, IDL types, QoS profiles, Docker infra, Observability stack, Python venv, test harness, shared GUI bootstrap (`medtech_gui`), Logging initialization utility (Connext Logging API + Monitoring Library 2.0 forwarding), CI pipeline, performance benchmark harness, DDS design review (rti-chatbot-mcp), QoS compatibility checker, tool scaffolding |
-| [phase-2-surgical.md](phase-2-surgical.md) | Surgical Procedure | Phase 1 | Robot sim, vitals sim (simulation model with scenario profiles), camera sim, procedure context, device telemetry (write-on-change), digital twin display, partition isolation, diagnostic tools (medtech-diag, partition-inspector) |
+| [revision-dds-consistency.md](revision-dds-consistency.md) | DDS Consistency Alignment | Phase 1, Phase 2 Steps 2.1–2.2 | `app_names.idl` entity name constants, `dds_init.py` relocation, retrofit generated constants, architecture audit, expanded CI anti-pattern checks, `@consistency` spec tests |
+| [phase-2-surgical.md](phase-2-surgical.md) | Surgical Procedure | Phase 1, Revision | Robot sim, vitals sim (simulation model with scenario profiles), camera sim, procedure context, device telemetry (write-on-change), digital twin display, partition isolation, diagnostic tools (medtech-diag, partition-inspector) |
 | [phase-3-dashboard.md](phase-3-dashboard.md) | Hospital Dashboard | Phase 2 | PySide6 GUI, Routing Service config, multi-OR aggregation, alert feed, robot status |
 | [phase-4-alerts.md](phase-4-alerts.md) | Clinical Alerts & Decision Support | Phase 2, Phase 3 Step 3.1 | Risk scoring engine, alert generation, cross-domain subscription, configurable thresholds |
 

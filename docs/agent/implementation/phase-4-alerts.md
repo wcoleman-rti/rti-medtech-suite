@@ -2,9 +2,14 @@
 
 **Goal:** Implement the Clinical Decision Support (ClinicalAlerts module) engine that subscribes to patient vitals and procedure context via Routing Service, computes risk scores, generates clinical alerts, and publishes results on the hospital domain.
 
-**Depends on:** Phase 2 (Surgical Procedure), Phase 3 Step 3.1 (Routing Service)
+**Depends on:** Phase 2 (Surgical Procedure), Phase 3 Step 3.1 (Routing Service), [revision-dds-consistency.md](revision-dds-consistency.md)
 **Can parallel with:** Phase 3 Steps 3.2–3.8 (Dashboard GUI)
-**Spec coverage:** [clinical-alerts.md](../spec/clinical-alerts.md) (Risk Scoring, Alert Generation, Cross-Domain Subscription, Configuration)
+**Spec coverage:** [clinical-alerts.md](../spec/clinical-alerts.md) (Risk Scoring, Alert Generation, Cross-Domain Subscription, Configuration), [common-behaviors.md](../spec/common-behaviors.md) (DDS Consistency Compliance)
+
+> **DDS Consistency:** All steps in this phase must follow the application
+> architecture pattern in [vision/dds-consistency.md §3](../vision/dds-consistency.md),
+> use generated entity name constants from `app_names.idl`, and pass the
+> [new module checklist](../vision/dds-consistency.md) (§9).
 
 > **Parallelism note:** Steps 4.1–4.3 (ClinicalAlerts engine skeleton, risk scoring, alert generation)
 > do not require Routing Service and can proceed independently of Phase 3 Step 3.1.
