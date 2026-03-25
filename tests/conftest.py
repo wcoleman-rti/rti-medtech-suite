@@ -26,17 +26,22 @@ def provider():
     return dds.QosProvider.default
 
 
-def _make_participant(domain_id, domain_tag=None, qos=None):
-    """Create a DomainParticipant with optional domain tag.
+def _make_participant(domain_id, domain_tag=None, partition=None, qos=None):
+    """Create a DomainParticipant with optional domain tag and partition.
 
-    Partition is a Publisher/Subscriber QoS — set it via writer_factory
-    and reader_factory instead.
+    Partition is set at the DomainParticipant level (Connext 7.x extension)
+    to control participant-level visibility.
     """
     if qos is None:
         qos = dds.DomainParticipant.default_participant_qos
 
     if domain_tag is not None:
         qos.property["dds.domain_participant.domain_tag"] = domain_tag
+
+    if partition is not None:
+        if isinstance(partition, str):
+            partition = [partition]
+        qos.partition.name = partition
 
     return dds.DomainParticipant(domain_id, qos)
 
@@ -46,12 +51,13 @@ def participant_factory():
     """Factory fixture that creates participants and tracks them for cleanup.
 
     Usage:
-        p = participant_factory(domain_id=0, domain_tag="control")
+        p = participant_factory(domain_id=0, domain_tag="control",
+                                partition="room/OR-1")
     """
     participants = []
 
-    def _create(domain_id=0, domain_tag=None, qos=None):
-        p = _make_participant(domain_id, domain_tag, qos)
+    def _create(domain_id=0, domain_tag=None, partition=None, qos=None):
+        p = _make_participant(domain_id, domain_tag, partition, qos)
         participants.append(p)
         return p
 
@@ -67,21 +73,15 @@ def participant_factory():
 
 @pytest.fixture
 def writer_factory():
-    """Factory fixture that creates DataWriters with optional partition.
+    """Factory fixture that creates DataWriters.
 
     Usage:
-        w = writer_factory(participant, topic, qos=writer_qos,
-                           partition="room/OR-1")
+        w = writer_factory(participant, topic, qos=writer_qos)
     """
     writers = []
 
-    def _create(participant, topic, qos=None, partition=None):
-        pub_qos = dds.PublisherQos()
-        if partition is not None:
-            if isinstance(partition, str):
-                partition = [partition]
-            pub_qos.partition.name = partition
-        pub = dds.Publisher(participant, pub_qos)
+    def _create(participant, topic, qos=None):
+        pub = dds.Publisher(participant)
         if qos is None:
             qos = dds.DataWriterQos()
         w = dds.DataWriter(pub, topic, qos)
@@ -99,21 +99,15 @@ def writer_factory():
 
 @pytest.fixture
 def reader_factory():
-    """Factory fixture that creates DataReaders with optional partition.
+    """Factory fixture that creates DataReaders.
 
     Usage:
-        r = reader_factory(participant, topic, qos=reader_qos,
-                           partition="room/OR-1")
+        r = reader_factory(participant, topic, qos=reader_qos)
     """
     readers = []
 
-    def _create(participant, topic, qos=None, partition=None):
-        sub_qos = dds.SubscriberQos()
-        if partition is not None:
-            if isinstance(partition, str):
-                partition = [partition]
-            sub_qos.partition.name = partition
-        sub = dds.Subscriber(participant, sub_qos)
+    def _create(participant, topic, qos=None):
+        sub = dds.Subscriber(participant)
         if qos is None:
             qos = dds.DataReaderQos()
         r = dds.DataReader(sub, topic, qos)

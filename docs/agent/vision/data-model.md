@@ -43,7 +43,12 @@ Subscribers should create content-filtered topics wherever they consume a subset
 
 ### QoS as Interface — Strict XML-Only
 
-All QoS is defined in shared XML profiles under `interfaces/qos/`. **No QoS is constructed or modified programmatically.** Modules use the **default QosProvider** to access profiles — they never call QoS setter APIs or construct custom `QosProvider` instances with explicit file paths.
+All QoS is defined in shared XML profiles under `interfaces/qos/`. **No QoS is constructed or modified programmatically**, with two exceptions:
+
+1. **XTypes compliance mask** — the factory-level `accept_unknown_enum_value` bit (`0x00000020`) has no XML equivalent and must be set before any DomainParticipant is created.
+2. **Participant partition** — partition strings (e.g., `room/OR-3/procedure/proc-001`) are context-dependent startup configuration determined by the application's runtime environment (which room, which procedure). They are set programmatically on the `DomainParticipantQos` immediately after `create_participant_from_config()`. This is preferred over XML environment-variable substitution (`$(PARTITION)`) because the application already knows its context and can set it directly — no indirection through the shell environment is needed. Participant partition controls discovery-level visibility (Connext 7.x extension) and is independent of Publisher/Subscriber partition QoS, which is not used.
+
+Modules use the **default QosProvider** to access profiles — they never call QoS setter APIs or construct custom `QosProvider` instances with explicit file paths.
 
 - **C++:** `dds::core::QosProvider::Default()`
 - **Python:** `dds.QosProvider.default`

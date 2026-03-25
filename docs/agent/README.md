@@ -197,8 +197,9 @@ critical subset is here for immediate visibility:
   spec scenario, or reorder implementation steps.
 - **One step at a time.** Complete each step's test gate before starting the
   next. Commit at each test gate.
-- **All QoS is XML-only.** Sole exception: the XTypes compliance mask and type
-  registration — see `vision/data-model.md`.
+- **All QoS is XML-only.** Exceptions: XTypes compliance mask, type
+  registration, and participant partition (context-dependent startup config) —
+  see `vision/data-model.md`.
 - **No DDS I/O on the main/UI thread.** No `DataReaderListener` for data
   processing. No `print()`/`printf`/`std::cout` — use the RTI Connext Logging
   API only.

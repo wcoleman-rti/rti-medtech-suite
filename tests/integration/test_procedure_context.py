@@ -77,8 +77,12 @@ class TestProcedureContext:
               room, bed, patient ID, procedure type, surgeon, and start time.
         """
         partition = "room/OR-3/procedure/proc-001"
-        writer_p = participant_factory(domain_id=0, domain_tag="operational")
-        reader_p = participant_factory(domain_id=0, domain_tag="operational")
+        writer_p = participant_factory(
+            domain_id=0, domain_tag="operational", partition=partition
+        )
+        reader_p = participant_factory(
+            domain_id=0, domain_tag="operational", partition=partition
+        )
 
         provider = dds.QosProvider.default
         topic_w = dds.Topic(writer_p, "ProcedureContext", ProcedureContext)
@@ -91,8 +95,8 @@ class TestProcedureContext:
             "TopicProfiles::ProcedureContext"
         )
 
-        writer = writer_factory(writer_p, topic_w, qos=writer_qos, partition=partition)
-        reader = reader_factory(reader_p, topic_r, qos=reader_qos, partition=partition)
+        writer = writer_factory(writer_p, topic_w, qos=writer_qos)
+        reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
         assert wait_for_discovery(
             writer, reader, timeout_sec=10
@@ -125,14 +129,16 @@ class TestProcedureContext:
               Then the subscriber receives the ProcedureContext immediately.
         """
         partition = "room/OR-5/procedure/proc-002"
-        writer_p = participant_factory(domain_id=0, domain_tag="operational")
+        writer_p = participant_factory(
+            domain_id=0, domain_tag="operational", partition=partition
+        )
 
         provider = dds.QosProvider.default
         topic_w = dds.Topic(writer_p, "ProcedureContext", ProcedureContext)
         writer_qos = provider.datawriter_qos_from_profile(
             "TopicProfiles::ProcedureContext"
         )
-        writer = writer_factory(writer_p, topic_w, qos=writer_qos, partition=partition)
+        writer = writer_factory(writer_p, topic_w, qos=writer_qos)
 
         # Publish context BEFORE reader exists
         ctx = _make_context(
@@ -150,12 +156,14 @@ class TestProcedureContext:
         time.sleep(0.5)
 
         # Now create the late-joining reader
-        reader_p = participant_factory(domain_id=0, domain_tag="operational")
+        reader_p = participant_factory(
+            domain_id=0, domain_tag="operational", partition=partition
+        )
         topic_r = dds.Topic(reader_p, "ProcedureContext", ProcedureContext)
         reader_qos = provider.datareader_qos_from_profile(
             "TopicProfiles::ProcedureContext"
         )
-        reader = reader_factory(reader_p, topic_r, qos=reader_qos, partition=partition)
+        reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
         received = wait_for_data(reader, timeout_sec=5)
         assert len(received) >= 1, "Late joiner did not receive ProcedureContext"
@@ -174,8 +182,12 @@ class TestProcedureContext:
               And subscribers see the updated context as current state (KEEP_LAST 1).
         """
         partition = "room/OR-7/procedure/proc-003"
-        writer_p = participant_factory(domain_id=0, domain_tag="operational")
-        reader_p = participant_factory(domain_id=0, domain_tag="operational")
+        writer_p = participant_factory(
+            domain_id=0, domain_tag="operational", partition=partition
+        )
+        reader_p = participant_factory(
+            domain_id=0, domain_tag="operational", partition=partition
+        )
 
         provider = dds.QosProvider.default
         topic_w = dds.Topic(writer_p, "ProcedureContext", ProcedureContext)
@@ -188,8 +200,8 @@ class TestProcedureContext:
             "TopicProfiles::ProcedureContext"
         )
 
-        writer = writer_factory(writer_p, topic_w, qos=writer_qos, partition=partition)
-        reader = reader_factory(reader_p, topic_r, qos=reader_qos, partition=partition)
+        writer = writer_factory(writer_p, topic_w, qos=writer_qos)
+        reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
         assert wait_for_discovery(writer, reader, timeout_sec=10)
 
@@ -226,14 +238,16 @@ class TestProcedureStatus:
               via TRANSIENT_LOCAL durability.
         """
         partition = "room/OR-1/procedure/proc-010"
-        writer_p = participant_factory(domain_id=0, domain_tag="operational")
+        writer_p = participant_factory(
+            domain_id=0, domain_tag="operational", partition=partition
+        )
 
         provider = dds.QosProvider.default
         topic_w = dds.Topic(writer_p, "ProcedureStatus", ProcedureStatus)
         writer_qos = provider.datawriter_qos_from_profile(
             "TopicProfiles::ProcedureStatus"
         )
-        writer = writer_factory(writer_p, topic_w, qos=writer_qos, partition=partition)
+        writer = writer_factory(writer_p, topic_w, qos=writer_qos)
 
         # Publish in-progress status
         status = _make_status(procedure_id="proc-010")
@@ -241,12 +255,14 @@ class TestProcedureStatus:
         time.sleep(0.5)
 
         # Late-joining reader
-        reader_p = participant_factory(domain_id=0, domain_tag="operational")
+        reader_p = participant_factory(
+            domain_id=0, domain_tag="operational", partition=partition
+        )
         topic_r = dds.Topic(reader_p, "ProcedureStatus", ProcedureStatus)
         reader_qos = provider.datareader_qos_from_profile(
             "TopicProfiles::ProcedureStatus"
         )
-        reader = reader_factory(reader_p, topic_r, qos=reader_qos, partition=partition)
+        reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
         received = wait_for_data(reader, timeout_sec=5)
         assert len(received) >= 1, "Late joiner did not receive ProcedureStatus"
@@ -265,8 +281,12 @@ class TestProcedureStatus:
               And subscribers see the updated status (KEEP_LAST 1).
         """
         partition = "room/OR-2/procedure/proc-011"
-        writer_p = participant_factory(domain_id=0, domain_tag="operational")
-        reader_p = participant_factory(domain_id=0, domain_tag="operational")
+        writer_p = participant_factory(
+            domain_id=0, domain_tag="operational", partition=partition
+        )
+        reader_p = participant_factory(
+            domain_id=0, domain_tag="operational", partition=partition
+        )
 
         provider = dds.QosProvider.default
         topic_w = dds.Topic(writer_p, "ProcedureStatus", ProcedureStatus)
@@ -279,8 +299,8 @@ class TestProcedureStatus:
             "TopicProfiles::ProcedureStatus"
         )
 
-        writer = writer_factory(writer_p, topic_w, qos=writer_qos, partition=partition)
-        reader = reader_factory(reader_p, topic_r, qos=reader_qos, partition=partition)
+        writer = writer_factory(writer_p, topic_w, qos=writer_qos)
+        reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
         assert wait_for_discovery(writer, reader, timeout_sec=10)
 

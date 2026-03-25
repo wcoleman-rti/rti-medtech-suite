@@ -5,9 +5,9 @@
 // robot state publisher alongside input readers.
 //
 // Environment variables:
-//   PARTITION       — DDS partition (e.g., "room/OR-3/procedure/proc-001")
+//   PARTITION        — DDS participant partition (e.g., "room/OR-3/procedure/proc-001")
 //   MEDTECH_APP_NAME — Monitoring Library 2.0 application name
-//   ROBOT_ID        — Robot entity ID (default: "robot-001")
+//   ROBOT_ID         — Robot entity ID (default: "robot-001")
 //   NDDS_QOS_PROFILES — QoS XML files (set by setup.bash)
 
 #include <atomic>
@@ -55,6 +55,7 @@ int main()
 
     try {
         const std::string robot_id = env_or("ROBOT_ID", "robot-001");
+        const std::string partition = env_or("PARTITION", "");
 
         // --- Register compiled types for XML Application Creation ---
         rti::domain::register_type<Surgery::RobotState>("Surgery::RobotState");
@@ -68,6 +69,15 @@ int main()
         auto provider = dds::core::QosProvider::Default();
         auto participant = provider.extensions().create_participant_from_config(
             "SurgicalParticipants::ControlRobot");
+
+        // Set participant-level partition from runtime context.
+        // Partition is context-dependent startup configuration (room/procedure),
+        // so it is set in code rather than in XML.
+        if (!partition.empty()) {
+            auto dp_qos = participant.qos();
+            dp_qos << dds::core::policy::Partition(partition);
+            participant.qos(dp_qos);
+        }
 
         log.notice("Participant created: SurgicalParticipants::ControlRobot");
 

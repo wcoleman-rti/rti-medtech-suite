@@ -35,14 +35,14 @@ class TestSamePartition:
         reader_factory,
     ):
         partition = "room/OR-3/procedure/proc-001"
-        p1 = participant_factory(domain_id=TEST_DOMAIN)
-        p2 = participant_factory(domain_id=TEST_DOMAIN)
+        p1 = participant_factory(domain_id=TEST_DOMAIN, partition=partition)
+        p2 = participant_factory(domain_id=TEST_DOMAIN, partition=partition)
 
         topic1 = dds.Topic(p1, "TestVitals", PatientVitals)
         topic2 = dds.Topic(p2, "TestVitals", PatientVitals)
 
-        w = writer_factory(p1, topic1, partition=partition)
-        r = reader_factory(p2, topic2, partition=partition)
+        w = writer_factory(p1, topic1)
+        r = reader_factory(p2, topic2)
 
         assert wait_for_discovery(
             w, r, timeout_sec=10
@@ -55,14 +55,14 @@ class TestSamePartition:
         reader_factory,
     ):
         partition = "room/OR-3/procedure/proc-001"
-        p1 = participant_factory(domain_id=TEST_DOMAIN)
-        p2 = participant_factory(domain_id=TEST_DOMAIN)
+        p1 = participant_factory(domain_id=TEST_DOMAIN, partition=partition)
+        p2 = participant_factory(domain_id=TEST_DOMAIN, partition=partition)
 
         topic1 = dds.Topic(p1, "TestExchange", PatientVitals)
         topic2 = dds.Topic(p2, "TestExchange", PatientVitals)
 
-        w = writer_factory(p1, topic1, partition=partition)
-        r = reader_factory(p2, topic2, partition=partition)
+        w = writer_factory(p1, topic1)
+        r = reader_factory(p2, topic2)
 
         assert wait_for_discovery(w, r, timeout_sec=10)
 
@@ -83,22 +83,20 @@ class TestDifferentPartitions:
         writer_factory,
         reader_factory,
     ):
-        p1 = participant_factory(domain_id=TEST_DOMAIN)
-        p2 = participant_factory(domain_id=TEST_DOMAIN)
+        p1 = participant_factory(
+            domain_id=TEST_DOMAIN,
+            partition="room/OR-3/procedure/proc-001",
+        )
+        p2 = participant_factory(
+            domain_id=TEST_DOMAIN,
+            partition="room/OR-5/procedure/proc-002",
+        )
 
         topic1 = dds.Topic(p1, "TestIsolated", PatientVitals)
         topic2 = dds.Topic(p2, "TestIsolated", PatientVitals)
 
-        w = writer_factory(
-            p1,
-            topic1,
-            partition="room/OR-3/procedure/proc-001",
-        )
-        r = reader_factory(
-            p2,
-            topic2,
-            partition="room/OR-5/procedure/proc-002",
-        )
+        w = writer_factory(p1, topic1)
+        r = reader_factory(p2, topic2)
 
         # Give discovery time, then confirm no match
         time.sleep(2)
@@ -111,22 +109,20 @@ class TestDifferentPartitions:
         writer_factory,
         reader_factory,
     ):
-        p1 = participant_factory(domain_id=TEST_DOMAIN)
-        p2 = participant_factory(domain_id=TEST_DOMAIN)
+        p1 = participant_factory(
+            domain_id=TEST_DOMAIN,
+            partition="room/OR-3/procedure/proc-001",
+        )
+        p2 = participant_factory(
+            domain_id=TEST_DOMAIN,
+            partition="room/OR-5/procedure/proc-002",
+        )
 
         topic1 = dds.Topic(p1, "TestNoData", PatientVitals)
         topic2 = dds.Topic(p2, "TestNoData", PatientVitals)
 
-        w = writer_factory(
-            p1,
-            topic1,
-            partition="room/OR-3/procedure/proc-001",
-        )
-        r = reader_factory(
-            p2,
-            topic2,
-            partition="room/OR-5/procedure/proc-002",
-        )
+        w = writer_factory(p1, topic1)
+        r = reader_factory(p2, topic2)
 
         time.sleep(2)
 
@@ -147,25 +143,26 @@ class TestWildcardPartition:
         writer_factory,
         reader_factory,
     ):
-        p1 = participant_factory(domain_id=TEST_DOMAIN)
-        p2 = participant_factory(domain_id=TEST_DOMAIN)
-        p_agg = participant_factory(domain_id=TEST_DOMAIN)
+        p1 = participant_factory(
+            domain_id=TEST_DOMAIN,
+            partition="room/OR-3/procedure/proc-001",
+        )
+        p2 = participant_factory(
+            domain_id=TEST_DOMAIN,
+            partition="room/OR-5/procedure/proc-002",
+        )
+        p_agg = participant_factory(
+            domain_id=TEST_DOMAIN,
+            partition="room/*",
+        )
 
         topic1 = dds.Topic(p1, "TestWildcard", PatientVitals)
         topic2 = dds.Topic(p2, "TestWildcard", PatientVitals)
         topic_agg = dds.Topic(p_agg, "TestWildcard", PatientVitals)
 
-        w1 = writer_factory(
-            p1,
-            topic1,
-            partition="room/OR-3/procedure/proc-001",
-        )
-        w2 = writer_factory(
-            p2,
-            topic2,
-            partition="room/OR-5/procedure/proc-002",
-        )
-        r = reader_factory(p_agg, topic_agg, partition="room/*")
+        w1 = writer_factory(p1, topic1)
+        w2 = writer_factory(p2, topic2)
+        r = reader_factory(p_agg, topic_agg)
 
         assert wait_for_discovery(w1, r, timeout_sec=10), "Wildcard should match OR-3"
         assert wait_for_discovery(w2, r, timeout_sec=10), "Wildcard should match OR-5"
