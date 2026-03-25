@@ -42,12 +42,24 @@ class ProcedureContextPublisher:
 
     def __init__(self, participant: dds.DomainParticipant) -> None:
         # Look up XML-created writers by entity name
-        self._context_writer = dds.DataWriter(
-            participant.find_datawriter("OperationalPublisher::ProcedureContextWriter")
+        ctx_any = participant.find_datawriter(
+            "OperationalPublisher::ProcedureContextWriter"
         )
-        self._status_writer = dds.DataWriter(
-            participant.find_datawriter("OperationalPublisher::ProcedureStatusWriter")
+        status_any = participant.find_datawriter(
+            "OperationalPublisher::ProcedureStatusWriter"
         )
+
+        if ctx_any is None:
+            raise RuntimeError(
+                "Writer not found: OperationalPublisher::ProcedureContextWriter"
+            )
+        if status_any is None:
+            raise RuntimeError(
+                "Writer not found: OperationalPublisher::ProcedureStatusWriter"
+            )
+
+        self._context_writer = dds.DataWriter(ctx_any)
+        self._status_writer = dds.DataWriter(status_any)
 
         self._procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
         self._last_context: ProcedureContext | None = None

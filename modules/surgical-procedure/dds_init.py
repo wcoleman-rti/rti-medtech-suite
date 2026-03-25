@@ -12,7 +12,6 @@ and find_datareader().
 
 from __future__ import annotations
 
-
 import common  # noqa: F401  — generated; registers Common types
 import devices
 import imaging
@@ -77,25 +76,3 @@ def initialize_connext() -> None:
     dds.DomainParticipant.register_idl_type(
         devices.Devices.DeviceTelemetry, "Devices::DeviceTelemetry"
     )
-
-
-def create_participant_from_xml(
-    config_name: str,
-) -> dds.DomainParticipant:
-    """Create a DomainParticipant from XML configuration.
-
-    The PARTITION environment variable must be set before calling this
-    function — it is substituted into the publisher/subscriber QoS
-    partition in the XML configuration.
-
-    Args:
-        config_name: Fully qualified participant config name, e.g.
-            "SurgicalParticipants::OperationalPub".
-
-    Returns:
-        A configured DomainParticipant with all XML-defined publishers,
-        subscribers, writers, and readers already created.
-    """
-    initialize_connext()
-    provider = dds.QosProvider.default
-    return provider.create_participant_from_config(config_name)

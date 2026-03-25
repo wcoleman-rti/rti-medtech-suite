@@ -1,8 +1,9 @@
 // main.cpp — Robot controller DDS application.
 //
-// Creates a ControlRobot participant from XML config, sets up dual
-// AsyncWaitSet instances (publisher + subscriber), and runs the 100 Hz
-// robot state publisher alongside input readers.
+// Creates a ControlRobot participant from XML config, wraps all DDS
+// entities in a RobotControllerApp class for RAII lifecycle, and runs
+// a 100 Hz publish loop on a dedicated timer thread alongside an
+// AsyncWaitSet for subscriber input processing.
 //
 // Environment variables:
 //   PARTITION        — DDS participant partition (e.g., "room/OR-3/procedure/proc-001")
@@ -44,6 +45,173 @@ std::string env_or(const char* name, const char* fallback)
     return (val != nullptr) ? std::string(val) : std::string(fallback);
 }
 
+// ---------------------------------------------------------------------------
+// RobotControllerApp — owns all DDS entities and the controller state machine.
+// Destruction follows reverse-construction order and the DomainParticipant
+// destructor handles entity cleanup.
+// ---------------------------------------------------------------------------
+class RobotControllerApp {
+public:
+    RobotControllerApp(const std::string& robot_id,
+                       const std::string& partition,
+                       medtech::ModuleLogger& log)
+        : controller_(robot_id), log_(log)
+    {
+        // Register compiled types for XML Application Creation
+        rti::domain::register_type<Surgery::RobotState>("Surgery::RobotState");
+        rti::domain::register_type<Surgery::RobotCommand>("Surgery::RobotCommand");
+        rti::domain::register_type<Surgery::SafetyInterlock>(
+            "Surgery::SafetyInterlock");
+        rti::domain::register_type<Surgery::OperatorInput>(
+            "Surgery::OperatorInput");
+
+        // Create participant from XML config
+        auto provider = dds::core::QosProvider::Default();
+        participant_ = provider.extensions().create_participant_from_config(
+            "SurgicalParticipants::ControlRobot");
+
+        // Set participant-level partition from runtime context.
+        if (!partition.empty()) {
+            auto dp_qos = participant_.qos();
+            dp_qos << dds::core::policy::Partition(partition);
+            participant_.qos(dp_qos);
+        }
+
+        log_.notice("Participant created: SurgicalParticipants::ControlRobot");
+
+        // Look up typed writers and readers
+        state_writer_ =
+            rti::pub::find_datawriter_by_name<
+                dds::pub::DataWriter<Surgery::RobotState>>(
+                participant_, "RobotPublisher::RobotStateWriter");
+
+        auto interlock_reader =
+            rti::sub::find_datareader_by_name<
+                dds::sub::DataReader<Surgery::SafetyInterlock>>(
+                participant_, "RobotSubscriber::SafetyInterlockReader");
+
+        auto command_reader =
+            rti::sub::find_datareader_by_name<
+                dds::sub::DataReader<Surgery::RobotCommand>>(
+                participant_, "RobotSubscriber::RobotCommandReader");
+
+        auto input_reader =
+            rti::sub::find_datareader_by_name<
+                dds::sub::DataReader<Surgery::OperatorInput>>(
+                participant_, "RobotSubscriber::OperatorInputReader");
+
+        if (state_writer_ == dds::core::null
+            || interlock_reader == dds::core::null
+            || command_reader == dds::core::null
+            || input_reader == dds::core::null) {
+            throw std::runtime_error(
+                "Failed to find one or more named DDS entities");
+        }
+
+        log_.notice("All DDS entities found");
+
+        // Set up subscriber AsyncWaitSet with ReadConditions
+        interlock_rc_ = dds::sub::cond::ReadCondition(
+            interlock_reader,
+            dds::sub::status::DataState::any(),
+            [&, interlock_reader]() mutable {
+                auto samples = interlock_reader.take();
+                std::unique_lock<std::shared_mutex> lock(controller_.mutex());
+                for (const auto& sample : samples) {
+                    if (sample.info().valid()) {
+                        controller_.apply_safety_interlock(sample.data());
+                    }
+                }
+            });
+
+        command_rc_ = dds::sub::cond::ReadCondition(
+            command_reader,
+            dds::sub::status::DataState::any(),
+            [&, command_reader]() mutable {
+                auto samples = command_reader.take();
+                std::unique_lock<std::shared_mutex> lock(controller_.mutex());
+                for (const auto& sample : samples) {
+                    if (sample.info().valid()) {
+                        controller_.apply_robot_command(sample.data());
+                    }
+                }
+            });
+
+        input_rc_ = dds::sub::cond::ReadCondition(
+            input_reader,
+            dds::sub::status::DataState::any(),
+            [&, input_reader]() mutable {
+                auto samples = input_reader.take();
+                std::unique_lock<std::shared_mutex> lock(controller_.mutex());
+                for (const auto& sample : samples) {
+                    if (sample.info().valid()) {
+                        controller_.apply_operator_input(sample.data());
+                    }
+                }
+            });
+
+        sub_aws_.attach_condition(interlock_rc_);
+        sub_aws_.attach_condition(command_rc_);
+        sub_aws_.attach_condition(input_rc_);
+    }
+
+    // Run the application: starts subscriber AsyncWaitSet, spawns the
+    // 100 Hz publisher timer thread, and blocks until shutdown is requested.
+    void run()
+    {
+        sub_aws_.start();
+        log_.notice("Robot controller running (100 Hz publish, robot_id="
+                    + controller_.snapshot().state.robot_id + ")");
+
+        // Timer thread: write RobotState directly at 100 Hz.
+        // DataWriter::write() is thread-safe — no GuardCondition needed.
+        std::thread timer_thread([this]() {
+            using clock = std::chrono::steady_clock;
+            const auto period = std::chrono::microseconds(10000);  // 10 ms
+            auto next_tick = clock::now() + period;
+
+            while (!g_shutdown_requested.load(std::memory_order_relaxed)) {
+                std::this_thread::sleep_until(next_tick);
+                medtech::surgical::ControllerSnapshot snap;
+                {
+                    std::shared_lock<std::shared_mutex> lock(
+                        controller_.mutex());
+                    snap = controller_.snapshot();
+                }
+                state_writer_.write(snap.state);
+                next_tick += period;
+            }
+        });
+
+        // Block until shutdown signal
+        while (!g_shutdown_requested.load(std::memory_order_relaxed)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        log_.notice("Shutting down robot controller");
+        timer_thread.join();
+
+        // Detach conditions before stopping to avoid
+        // "Precondition not met: waitset attached" errors.
+        sub_aws_.detach_condition(interlock_rc_);
+        sub_aws_.detach_condition(command_rc_);
+        sub_aws_.detach_condition(input_rc_);
+        sub_aws_.stop();
+    }
+
+private:
+    medtech::surgical::RobotController controller_;
+    medtech::ModuleLogger& log_;
+
+    dds::domain::DomainParticipant participant_{nullptr};
+    dds::pub::DataWriter<Surgery::RobotState> state_writer_{nullptr};
+
+    rti::core::cond::AsyncWaitSet sub_aws_;
+    dds::sub::cond::ReadCondition interlock_rc_{nullptr};
+    dds::sub::cond::ReadCondition command_rc_{nullptr};
+    dds::sub::cond::ReadCondition input_rc_{nullptr};
+};
+
 }  // anonymous namespace
 
 int main()
@@ -57,172 +225,8 @@ int main()
         const std::string robot_id = env_or("ROBOT_ID", "robot-001");
         const std::string partition = env_or("PARTITION", "");
 
-        // --- Register compiled types for XML Application Creation ---
-        rti::domain::register_type<Surgery::RobotState>("Surgery::RobotState");
-        rti::domain::register_type<Surgery::RobotCommand>("Surgery::RobotCommand");
-        rti::domain::register_type<Surgery::SafetyInterlock>(
-            "Surgery::SafetyInterlock");
-        rti::domain::register_type<Surgery::OperatorInput>(
-            "Surgery::OperatorInput");
-
-        // --- Create participant from XML config ---
-        auto provider = dds::core::QosProvider::Default();
-        auto participant = provider.extensions().create_participant_from_config(
-            "SurgicalParticipants::ControlRobot");
-
-        // Set participant-level partition from runtime context.
-        // Partition is context-dependent startup configuration (room/procedure),
-        // so it is set in code rather than in XML.
-        if (!partition.empty()) {
-            auto dp_qos = participant.qos();
-            dp_qos << dds::core::policy::Partition(partition);
-            participant.qos(dp_qos);
-        }
-
-        log.notice("Participant created: SurgicalParticipants::ControlRobot");
-
-        // --- Look up typed writers and readers ---
-        auto state_writer =
-            rti::pub::find_datawriter_by_name<
-                dds::pub::DataWriter<Surgery::RobotState>>(
-                participant, "RobotPublisher::RobotStateWriter");
-
-        auto interlock_reader =
-            rti::sub::find_datareader_by_name<
-                dds::sub::DataReader<Surgery::SafetyInterlock>>(
-                participant, "RobotSubscriber::SafetyInterlockReader");
-
-        auto command_reader =
-            rti::sub::find_datareader_by_name<
-                dds::sub::DataReader<Surgery::RobotCommand>>(
-                participant, "RobotSubscriber::RobotCommandReader");
-
-        auto input_reader =
-            rti::sub::find_datareader_by_name<
-                dds::sub::DataReader<Surgery::OperatorInput>>(
-                participant, "RobotSubscriber::OperatorInputReader");
-
-        if (state_writer == dds::core::null
-            || interlock_reader == dds::core::null
-            || command_reader == dds::core::null
-            || input_reader == dds::core::null) {
-            log.error("Failed to find one or more named DDS entities");
-            return 1;
-        }
-
-        log.notice("All DDS entities found");
-
-        // --- Robot controller state machine ---
-        medtech::surgical::RobotController controller(robot_id);
-
-        // --- Publisher AsyncWaitSet (100 Hz RobotState output) ---
-        rti::core::cond::AsyncWaitSet pub_aws;
-
-        dds::core::cond::GuardCondition publish_tick;
-        publish_tick.handler([&]() {
-            // Read shared state under read-lock
-            medtech::surgical::ControllerSnapshot snap;
-            {
-                std::shared_lock<std::shared_mutex> lock(controller.mutex());
-                snap = controller.snapshot();
-            }
-            state_writer.write(snap.state);
-            publish_tick.trigger_value(false);
-        });
-
-        pub_aws.attach_condition(publish_tick);
-
-        // --- Subscriber AsyncWaitSet (all input readers) ---
-        rti::core::cond::AsyncWaitSet sub_aws;
-
-        // SafetyInterlock reader — highest priority
-        dds::sub::cond::ReadCondition interlock_rc(
-            interlock_reader,
-            dds::sub::status::DataState::any(),
-            [&]() {
-                auto samples = interlock_reader.take();
-                std::unique_lock<std::shared_mutex> lock(controller.mutex());
-                for (const auto& sample : samples) {
-                    if (sample.info().valid()) {
-                        controller.apply_safety_interlock(sample.data());
-                    }
-                }
-            });
-
-        // RobotCommand reader
-        dds::sub::cond::ReadCondition command_rc(
-            command_reader,
-            dds::sub::status::DataState::any(),
-            [&]() {
-                auto samples = command_reader.take();
-                std::unique_lock<std::shared_mutex> lock(controller.mutex());
-                for (const auto& sample : samples) {
-                    if (sample.info().valid()) {
-                        controller.apply_robot_command(sample.data());
-                    }
-                }
-            });
-
-        // OperatorInput reader
-        dds::sub::cond::ReadCondition input_rc(
-            input_reader,
-            dds::sub::status::DataState::any(),
-            [&]() {
-                auto samples = input_reader.take();
-                std::unique_lock<std::shared_mutex> lock(controller.mutex());
-                for (const auto& sample : samples) {
-                    if (sample.info().valid()) {
-                        controller.apply_operator_input(sample.data());
-                    }
-                }
-            });
-
-        sub_aws.attach_condition(interlock_rc);
-        sub_aws.attach_condition(command_rc);
-        sub_aws.attach_condition(input_rc);
-
-        // --- Start both AsyncWaitSets ---
-        pub_aws.start();
-        sub_aws.start();
-
-        log.notice("Robot controller running (100 Hz publish, robot_id="
-                   + robot_id + ")");
-
-        // --- Timer thread: trigger publish_tick at 100 Hz ---
-        std::thread timer_thread([&]() {
-            using clock = std::chrono::steady_clock;
-            const auto period = std::chrono::microseconds(10000);  // 10 ms
-            auto next_tick = clock::now() + period;
-
-            while (!g_shutdown_requested.load(std::memory_order_relaxed)) {
-                std::this_thread::sleep_until(next_tick);
-                publish_tick.trigger_value(true);
-                next_tick += period;
-            }
-        });
-
-        // --- Wait for shutdown signal ---
-        while (!g_shutdown_requested.load(std::memory_order_relaxed)) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-
-        log.notice("Shutting down robot controller");
-
-        // --- Cleanup ---
-        g_shutdown_requested.store(true);
-        timer_thread.join();
-
-        // Detach all conditions before stopping to avoid
-        // "Precondition not met: waitset attached" errors.
-        pub_aws.detach_condition(publish_tick);
-        sub_aws.detach_condition(interlock_rc);
-        sub_aws.detach_condition(command_rc);
-        sub_aws.detach_condition(input_rc);
-
-        pub_aws.stop();
-        sub_aws.stop();
-        participant.close();
-
+        RobotControllerApp app(robot_id, partition, log);
+        app.run();
         return 0;
 
     } catch (const std::exception& ex) {
