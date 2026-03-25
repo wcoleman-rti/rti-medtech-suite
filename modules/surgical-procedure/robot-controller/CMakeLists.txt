@@ -1,6 +1,6 @@
 # Robot controller — C++ executable with dual AsyncWaitSet pattern
 add_executable(robot-controller
-    main.cpp
+    robot_controller_app.cpp
     robot_controller.cpp
 )
 

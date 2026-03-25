@@ -1,4 +1,4 @@
-// main.cpp — Robot controller DDS application.
+// robot_controller_app.cpp — Robot controller DDS application entry point.
 //
 // Creates a ControlRobot participant from XML config, wraps all DDS
 // entities in a RobotControllerApp class for RAII lifecycle, and runs
@@ -6,9 +6,10 @@
 // AsyncWaitSet for subscriber input processing.
 //
 // Environment variables:
-//   PARTITION        — DDS participant partition (e.g., "room/OR-3/procedure/proc-001")
+//   ROBOT_ID         — Robot numeric ID (default: "001"), prefixed to "robot-001"
+//   ROOM_ID          — Room identifier (e.g., "OR-3")
+//   PROCEDURE_ID     — Procedure identifier (e.g., "proc-001")
 //   MEDTECH_APP_NAME — Monitoring Library 2.0 application name
-//   ROBOT_ID         — Robot entity ID (default: "robot-001")
 //   NDDS_QOS_PROFILES — QoS XML files (set by setup.bash)
 
 #include <atomic>
@@ -53,10 +54,13 @@ std::string env_or(const char* name, const char* fallback)
 class RobotControllerApp {
 public:
     RobotControllerApp(const std::string& robot_id,
-                       const std::string& partition,
+                       const std::string& room_id,
+                       const std::string& procedure_id,
                        medtech::ModuleLogger& log)
-        : controller_(robot_id), log_(log)
+        : controller_("robot-" + robot_id), log_(log)
     {
+        const std::string partition =
+            "room/" + room_id + "/procedure/" + procedure_id;
         // Register compiled types for XML Application Creation
         rti::domain::register_type<Surgery::RobotState>("Surgery::RobotState");
         rti::domain::register_type<Surgery::RobotCommand>("Surgery::RobotCommand");
@@ -71,11 +75,9 @@ public:
             "SurgicalParticipants::ControlRobot");
 
         // Set participant-level partition from runtime context.
-        if (!partition.empty()) {
-            auto dp_qos = participant_.qos();
-            dp_qos << dds::core::policy::Partition(partition);
-            participant_.qos(dp_qos);
-        }
+        auto dp_qos = participant_.qos();
+        dp_qos << dds::core::policy::Partition(partition);
+        participant_.qos(dp_qos);
 
         log_.notice("Participant created: SurgicalParticipants::ControlRobot");
 
@@ -222,10 +224,11 @@ int main()
     auto log = medtech::init_logging(medtech::ModuleName::SurgicalProcedure);
 
     try {
-        const std::string robot_id = env_or("ROBOT_ID", "robot-001");
-        const std::string partition = env_or("PARTITION", "");
+        const std::string robot_id = env_or("ROBOT_ID", "001");
+        const std::string room_id = env_or("ROOM_ID", "OR-1");
+        const std::string procedure_id = env_or("PROCEDURE_ID", "proc-001");
 
-        RobotControllerApp app(robot_id, partition, log);
+        RobotControllerApp app(robot_id, room_id, procedure_id, log);
         app.run();
         return 0;
 
