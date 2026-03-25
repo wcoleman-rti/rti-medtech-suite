@@ -10,7 +10,9 @@ line-length = 88
 [tool.pytest.ini_options]
 markers = [
     "benchmark: performance benchmark tests (require observability stack)",
+    "consistency: DDS consistency contract tests (vision/dds-consistency.md)",
     "integration: tests requiring two or more DDS participants",
+    "lint: static analysis / code pattern checks",
     "partition: tests for partition-based isolation",
     "isolation: tests for domain tag or domain ID isolation",
     "failover: tests for exclusive ownership failover",
