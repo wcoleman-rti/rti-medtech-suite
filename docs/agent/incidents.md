@@ -1005,3 +1005,62 @@ after closure. They form the project's decision log.
 - **Guideline:** Always use equality (`==`) or truthiness checks for IDL boolean fields
   in Python tests, never identity (`is`).
 - **Date closed:** 2026-03-25
+
+---
+
+## INC-034: app_names.idl generates flat Python module — no package import
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-25
+- **Phase/Step:** Revision / Step R.1
+- **Documents involved:** `interfaces/idl/app_names.idl`, `interfaces/CMakeLists.txt`
+- **Description:** `rtiddsgen -language Python` generates `app_names.py` as a flat file, not
+  a package with submodules. The nested IDL module `MedtechEntityNames::SurgicalParticipants`
+  becomes a nested class attribute, not a subpackage. This means
+  `from app_names.MedtechEntityNames import SurgicalParticipants` raises `ModuleNotFoundError`.
+  The correct import is `import app_names; names = app_names.MedtechEntityNames.SurgicalParticipants`.
+- **Resolution:** Adopted the attribute-access pattern in all Python consumers.
+- **Guideline:** For rtiddsgen Python output with nested IDL modules, use attribute access
+  (`import app_names; ns = app_names.Module.Submodule`) rather than `from ... import`.
+- **Date closed:** 2026-03-25
+
+---
+
+## INC-035: C++ string_view constants require std::string() wrapper for DDS API calls
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-25
+- **Phase/Step:** Revision / Step R.3
+- **Documents involved:** `interfaces/idl/app_names.idl`,
+  `modules/surgical-procedure/robot-controller/robot_controller_app.cpp`
+- **Description:** `rtiddsgen -language C++11` generates `@module` constants as
+  `::omg::types::string_view` (via `RTI_CONSTEXPR_OR_CONST_STRING`). DDS API functions like
+  `create_participant_from_config()` and `find_datawriter_by_name()` accept `const std::string&`,
+  not `string_view`. An explicit `std::string(names::CONSTANT)` wrapper is required at each
+  call site.
+- **Resolution:** All call sites wrap constants in `std::string()`.
+- **Guideline:** When using IDL-generated `string_view` constants in C++ DDS API calls,
+  always wrap with `std::string()`.
+- **Date closed:** 2026-03-25
+
+---
+
+## INC-036: is_type_registered() is instance method, not class method
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-25
+- **Phase/Step:** Revision / Step R.6
+- **Documents involved:** `tests/integration/test_dds_consistency.py`
+- **Description:** `dds.DomainParticipant.is_type_registered()` is an instance method in the
+  RTI Connext Python API. A `@consistency` test attempted to call it as a class method to verify
+  type registration without creating a participant. The correct approach is to create a
+  participant from XML config (which triggers `initialize_connext()` and type registration)
+  and then verify types are registered on the live participant instance.
+- **Resolution:** Rewrote test to create a participant from config and verify type registration
+  via the instance method.
+- **Guideline:** Use a live `DomainParticipant` instance to verify type registration in tests.
+  Creating the participant from XML config exercises the full initialization path.
+- **Date closed:** 2026-03-25
