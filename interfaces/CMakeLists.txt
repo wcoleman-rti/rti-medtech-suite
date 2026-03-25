@@ -21,6 +21,16 @@ foreach(mod ${IDL_MODULES})
     )
 endforeach()
 
+# --- app_names: entity name constants (standalone, no IDL dependencies) ---
+connextdds_rtiddsgen_run(
+    IDL_FILE "${IDL_DIR}/app_names.idl"
+    LANG "C++11"
+    OUTPUT_DIRECTORY "${CPP_GEN_DIR}/app_names"
+    INCLUDE_DIRS "${IDL_DIR}"
+    VAR "app_names_cpp"
+    EXTRA_ARGS -standard IDL4_CPP
+)
+
 # Aggregate all generated C++ sources
 set(ALL_CPP_SOURCES "")
 set(ALL_CPP_HEADERS "")
@@ -28,6 +38,8 @@ foreach(mod ${IDL_MODULES})
     list(APPEND ALL_CPP_SOURCES ${${mod}_cpp_CXX11_SOURCES})
     list(APPEND ALL_CPP_HEADERS ${${mod}_cpp_CXX11_HEADERS})
 endforeach()
+list(APPEND ALL_CPP_SOURCES ${app_names_cpp_CXX11_SOURCES})
+list(APPEND ALL_CPP_HEADERS ${app_names_cpp_CXX11_HEADERS})
 
 # Create a shared library target from all generated types
 add_library(medtech_types ${ALL_CPP_SOURCES} ${ALL_CPP_HEADERS})
@@ -60,6 +72,17 @@ foreach(mod ${IDL_MODULES})
     )
     list(APPEND ALL_PY_SOURCES ${${mod}_py_PYTHON_SOURCES})
 endforeach()
+
+# app_names Python codegen
+connextdds_rtiddsgen_run(
+    IDL_FILE "${IDL_DIR}/app_names.idl"
+    LANG "Python"
+    OUTPUT_DIRECTORY "${PY_GEN_DIR}"
+    INCLUDE_DIRS "${IDL_DIR}"
+    VAR "app_names_py"
+    EXTRA_ARGS -noSysPathGeneration
+)
+list(APPEND ALL_PY_SOURCES ${app_names_py_PYTHON_SOURCES})
 
 # Custom target to drive Python codegen (otherwise outputs are orphaned)
 add_custom_target(medtech_types_python ALL DEPENDS ${ALL_PY_SOURCES})

@@ -33,3 +33,13 @@ target_link_libraries(test_robot_controller
         RTIConnextDDS::cpp2_api
 )
 add_test(NAME robot_controller COMMAND test_robot_controller)
+
+# --- app_names entity name constants tests ---
+add_executable(test_app_names test_app_names.cpp)
+target_link_libraries(test_app_names
+    PRIVATE
+        GTest::gtest_main
+        medtech_types
+        RTIConnextDDS::cpp2_api
+)
+add_test(NAME app_names COMMAND test_app_names)

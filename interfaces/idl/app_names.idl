@@ -1,0 +1,54 @@
+/*
+ * Entity name constants for XML Application Creation.
+ *
+ * Each participant library XML gets its own nested module. Every
+ * participant, DataWriter, and DataReader name defined in an XML
+ * participant configuration file has a corresponding const string here.
+ *
+ * C++ (IDL4_CPP):  generates std::string_view constants
+ * Python:          generates module-level constants
+ *
+ * Application code references these constants — never raw string literals.
+ */
+
+module MedtechEntityNames {
+
+    // --- SurgicalParticipants library ---
+    module SurgicalParticipants {
+
+        // Participant config names — create_participant_from_config()
+        const string OPERATIONAL_PUB      = "SurgicalParticipants::OperationalPub";
+        const string CONTROL_ROBOT        = "SurgicalParticipants::ControlRobot";
+        const string CONTROL_OPERATOR     = "SurgicalParticipants::ControlOperator";
+        const string CLINICAL_MONITOR     = "SurgicalParticipants::ClinicalMonitor";
+        const string CLINICAL_DEVICE_GW   = "SurgicalParticipants::ClinicalDeviceGateway";
+        const string CONTROL_DIGITAL_TWIN = "SurgicalParticipants::ControlDigitalTwin";
+
+        // Writer names — find_datawriter_by_name() / find_datawriter()
+        const string PROCEDURE_CONTEXT_WRITER  = "OperationalPublisher::ProcedureContextWriter";
+        const string PROCEDURE_STATUS_WRITER   = "OperationalPublisher::ProcedureStatusWriter";
+        const string CAMERA_FRAME_WRITER       = "OperationalPublisher::CameraFrameWriter";
+        const string CAMERA_CONFIG_WRITER      = "OperationalPublisher::CameraConfigWriter";
+        const string ROBOT_STATE_WRITER        = "RobotPublisher::RobotStateWriter";
+        const string OPERATOR_INPUT_WRITER     = "OperatorPublisher::OperatorInputWriter";
+        const string ROBOT_COMMAND_WRITER      = "OperatorPublisher::RobotCommandWriter";
+        const string SAFETY_INTERLOCK_WRITER   = "OperatorPublisher::SafetyInterlockWriter";
+        const string PATIENT_VITALS_WRITER     = "MonitorPublisher::PatientVitalsWriter";
+        const string WAVEFORM_DATA_WRITER      = "MonitorPublisher::WaveformDataWriter";
+        const string ALARM_MESSAGES_WRITER     = "MonitorPublisher::AlarmMessagesWriter";
+        const string DEVICE_TELEMETRY_WRITER   = "DevicePublisher::DeviceTelemetryWriter";
+
+        // Reader names — find_datareader_by_name() / find_datareader()
+        const string ROBOT_COMMAND_READER      = "RobotSubscriber::RobotCommandReader";
+        const string OPERATOR_INPUT_READER     = "RobotSubscriber::OperatorInputReader";
+        const string SAFETY_INTERLOCK_READER   = "RobotSubscriber::SafetyInterlockReader";
+        const string ROBOT_STATE_READER        = "OperatorSubscriber::RobotStateReader";
+        const string PROCEDURE_CONTEXT_READER  = "OperationalSubscriber::ProcedureContextReader";
+        const string PROCEDURE_STATUS_READER   = "OperationalSubscriber::ProcedureStatusReader";
+        const string PATIENT_VITALS_READER     = "MonitorSubscriber::PatientVitalsReader";
+        const string TWIN_ROBOT_STATE_READER       = "TwinSubscriber::RobotStateReader";
+        const string TWIN_OPERATOR_INPUT_READER    = "TwinSubscriber::OperatorInputReader";
+        const string TWIN_SAFETY_INTERLOCK_READER  = "TwinSubscriber::SafetyInterlockReader";
+        const string TWIN_ROBOT_COMMAND_READER     = "TwinSubscriber::RobotCommandReader";
+    };
+};
