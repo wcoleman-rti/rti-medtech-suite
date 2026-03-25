@@ -71,7 +71,7 @@
 
 ---
 
-## Step 2.3 — Patient Vitals & Alarm Simulator
+## Step 2.3 — Patient Vitals & Alarm Simulator ✅ `2957486`
 
 > **Prerequisite:** [revision-dds-consistency.md](revision-dds-consistency.md) must be
 > complete before starting this step. All new code from this step onward
@@ -99,17 +99,17 @@
 
 ### Test Gate (spec: surgical-procedure.md — Patient Vitals)
 
-- [ ] Vitals snapshot published periodically with all required measurements
-- [ ] Waveform data streams at configured frequency with correct block size
-- [ ] Alarm raised when vital exceeds threshold
-- [ ] Alarm clears when vital returns to normal
-- [ ] Late-joining subscriber receives current vitals (TRANSIENT_LOCAL)
-- [ ] Simulator produces non-deterministic output by default (two runs differ)
-- [ ] Simulator produces deterministic output with fixed seed (`MEDTECH_SIM_SEED=42`)
-- [ ] Vitals trend smoothly — no discontinuities exceeding 3× noise amplitude
-- [ ] Cross-signal correlation: SBP drop triggers HR compensation within 1–3 s
-- [ ] Scenario profile `hemorrhage_onset` produces coordinated multi-signal deterioration
-- [ ] `AlarmMessages` publishes only on state transitions (write-on-change model)
+- [x] Vitals snapshot published periodically with all required measurements
+- [x] Waveform data streams at configured frequency with correct block size
+- [x] Alarm raised when vital exceeds threshold
+- [x] Alarm clears when vital returns to normal
+- [x] Late-joining subscriber receives current vitals (TRANSIENT_LOCAL)
+- [x] Simulator produces non-deterministic output by default (two runs differ)
+- [x] Simulator produces deterministic output with fixed seed (`MEDTECH_SIM_SEED=42`)
+- [x] Vitals trend smoothly — no discontinuities exceeding 3× noise amplitude
+- [x] Cross-signal correlation: SBP drop triggers HR compensation within 1–3 s
+- [x] Scenario profile `hemorrhage_onset` produces coordinated multi-signal deterioration
+- [x] `AlarmMessages` publishes only on state transitions (write-on-change model)
 
 ---
 

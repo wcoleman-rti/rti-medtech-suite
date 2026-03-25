@@ -1064,3 +1064,55 @@ after closure. They form the project's decision log.
 - **Guideline:** Use a live `DomainParticipant` instance to verify type registration in tests.
   Creating the participant from XML config exercises the full initialization path.
 - **Date closed:** 2026-03-25
+
+---
+
+## INC-037: Test readers require explicit enable() due to factory-level autoenable
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-25
+- **Phase/Step:** Phase 2 / Step 2.3
+- **Documents involved:** `tests/integration/test_vitals_sim.py`,
+  `interfaces/qos/Participants.xml`
+- **Description:** Integration test readers created via
+  `dds.DomainParticipant(domain_id, qos)` + `dds.DataReader(sub, topic, qos)`
+  failed with `NotEnabledError` on `take()`. The `participant_factory_qos`
+  in `Participants.xml` sets `entity_factory.autoenable_created_entities = FALSE`
+  (process-global), which affects all participants in the process — not just
+  those created from XML config. The existing `conftest.py` fixtures
+  (`_make_participant()`) already call `p.enable()` to handle this, but
+  test fixtures created inline in individual test files must do the same.
+- **Resolution:** Added explicit `dp.enable()` calls in all test fixtures
+  after creating the participant and its contained entities, matching the
+  pattern in `conftest.py`.
+- **Guideline:** When creating DDS participants in test code, always call
+  `enable()` explicitly after entity setup is complete. The factory-level
+  `autoenable_created_entities = FALSE` is global and affects all
+  participants in the process, regardless of how they were created.
+- **Date closed:** 2026-03-25
+
+---
+
+## INC-038: Relative imports required for installed Python subpackages
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-25
+- **Phase/Step:** Phase 2 / Step 2.3
+- **Documents involved:** `modules/surgical-procedure/vitals_sim/__init__.py`,
+  `modules/surgical-procedure/vitals_sim/bedside_monitor.py`
+- **Description:** The `vitals_sim` subpackage within `surgical_procedure`
+  initially used absolute imports (`from vitals_sim._alarm import ...`).
+  After CMake install, the package lives at
+  `lib/python/site-packages/surgical_procedure/vitals_sim/`, so the
+  top-level `vitals_sim` name is not resolvable. Relative imports
+  (`from ._alarm import ...`) resolve correctly within the installed
+  package hierarchy.
+- **Resolution:** Changed all within-package imports to relative form.
+  External consumers use `from surgical_procedure.vitals_sim import ...`.
+- **Guideline:** For Python subpackages installed under a parent package
+  (e.g., `surgical_procedure.vitals_sim`), always use relative imports
+  for within-package references and absolute imports for cross-package
+  references.
+- **Date closed:** 2026-03-25
