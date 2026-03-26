@@ -150,7 +150,7 @@
 
 ### Work
 
-- Create PySide6 application in `modules/surgical-procedure/digital-twin/`
+- Create PySide6 application in `modules/surgical-procedure/digital_twin/`
 - Load shared GUI theme: apply `resources/styles/medtech.qss`, register bundled fonts, display RTI logo in header bar (see `vision/technology.md` GUI Design Standard)
 - Create DomainParticipant on the Procedure domain (`control` tag) with partition derived from `ROOM_ID` and `PROCEDURE_ID`
 - Subscribe to `RobotState`, `RobotCommand`, `SafetyInterlock`, and `OperatorInput`
@@ -185,7 +185,7 @@
 ### Work
 
 - Author `modules/surgical-procedure/README.md` following all seven required sections per [vision/documentation.md](../vision/documentation.md): Title, Overview, Quick Start, Architecture, Configuration Reference, Testing, Going Further
-- Author `modules/surgical-procedure/digital-twin/README.md` (same structure) for the digital twin sub-module
+- Author `modules/surgical-procedure/digital_twin/README.md` (same structure) for the digital twin sub-module
 - Verify both READMEs pass `markdownlint` with zero errors/warnings using the project `.markdownlint.json`
 - Verify both pass the section-order lint script (`tests/lint/check_readme_sections.py`)
 

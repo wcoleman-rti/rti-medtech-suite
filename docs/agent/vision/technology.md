@@ -822,7 +822,7 @@ medtech-suite/
 │       └── governance/
 ├── modules/
 │   ├── surgical-procedure/         # C++ and Python components
-│   │   ├── digital-twin/           # PySide6 robot visualization GUI
+│   │   ├── digital_twin/           # PySide6 robot visualization GUI
 │   │   └── README.md               # Module purpose, usage, Connext features used
 │   ├── hospital-dashboard/         # PySide6 GUI
 │   │   └── README.md

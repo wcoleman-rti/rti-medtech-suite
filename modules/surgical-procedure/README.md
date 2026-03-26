@@ -99,7 +99,7 @@ docker compose up -d
 ```text
 modules/surgical-procedure/
 ├── procedure_context.py        Procedure context & status publisher
-├── robot-controller/           C++ robot controller (100 Hz state loop)
+├── robot_controller/            C++ robot controller (100 Hz state loop)
 │   ├── robot_controller.hpp    Pure logic state machine
 │   ├── robot_controller.cpp    State machine implementation
 │   └── robot_controller_app.cpp  DDS application entry point

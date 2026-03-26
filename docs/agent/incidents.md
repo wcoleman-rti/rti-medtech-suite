@@ -952,7 +952,7 @@ after closure. They form the project's decision log.
 - **Category:** Discovery
 - **Date opened:** 2026-03-25
 - **Phase/Step:** Phase 2 / Step 2.2
-- **Documents involved:** `modules/surgical-procedure/robot-controller/main.cpp`
+- **Documents involved:** `modules/surgical-procedure/robot_controller/main.cpp`
 - **Description:** When shutting down the robot-controller, calling `participant.close()`
   with conditions still attached to AsyncWaitSet instances causes a fatal error:
   "Precondition not met error: waitset attached". The ReadConditions and GuardCondition
@@ -1034,7 +1034,7 @@ after closure. They form the project's decision log.
 - **Date opened:** 2026-03-25
 - **Phase/Step:** Revision / Step R.3
 - **Documents involved:** `interfaces/idl/app_names.idl`,
-  `modules/surgical-procedure/robot-controller/robot_controller_app.cpp`
+  `modules/surgical-procedure/robot_controller/robot_controller_app.cpp`
 - **Description:** `rtiddsgen -language C++11` generates `@module` constants as
   `::omg::types::string_view` (via `RTI_CONSTEXPR_OR_CONST_STRING`). DDS API functions like
   `create_participant_from_config()` and `find_datawriter_by_name()` accept `const std::string&`,

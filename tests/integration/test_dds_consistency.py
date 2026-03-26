@@ -144,7 +144,7 @@ class TestDestructorShutdownSequence:
             ROOT
             / "modules"
             / "surgical-procedure"
-            / "robot-controller"
+            / "robot_controller"
             / "robot_controller_app.cpp"
         )
         content = cpp_path.read_text()
@@ -167,7 +167,7 @@ class TestDestructorShutdownSequence:
             ROOT
             / "modules"
             / "surgical-procedure"
-            / "robot-controller"
+            / "robot_controller"
             / "robot_controller_app.cpp"
         )
         content = cpp_path.read_text()

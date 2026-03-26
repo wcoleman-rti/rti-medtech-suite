@@ -53,7 +53,7 @@ endif()
 
 # --- Subdirectories ---
 add_subdirectory(interfaces)
-add_subdirectory(modules/surgical-procedure/robot-controller)
+add_subdirectory(modules/surgical-procedure/robot_controller)
 if(BUILD_TESTING)
     add_subdirectory(tests/qos)
     add_subdirectory(tests/logging)

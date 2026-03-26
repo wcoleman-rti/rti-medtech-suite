@@ -21,10 +21,10 @@ set_tests_properties(qos_loading PROPERTIES
 
 # --- Robot controller state machine unit tests ---
 add_executable(test_robot_controller test_robot_controller.cpp
-    ${CMAKE_SOURCE_DIR}/modules/surgical-procedure/robot-controller/robot_controller.cpp
+    ${CMAKE_SOURCE_DIR}/modules/surgical-procedure/robot_controller/robot_controller.cpp
 )
 target_include_directories(test_robot_controller PRIVATE
-    ${CMAKE_SOURCE_DIR}/modules/surgical-procedure/robot-controller
+    ${CMAKE_SOURCE_DIR}/modules/surgical-procedure/robot_controller
 )
 target_link_libraries(test_robot_controller
     PRIVATE
