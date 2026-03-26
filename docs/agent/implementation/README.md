@@ -12,7 +12,7 @@ These rules apply to all phases without exception:
 2. **Tests are never deleted.** A test represents a behavioral contract. If it breaks, the code is wrong.
 3. **Tests are never disabled.** No `@skip`, `DISABLED_`, `xfail`, or equivalent. A failing test blocks the phase.
 4. **Fix the code, not the test.** If a test fails, the implementation is fixed to match the spec. If the *desired behavior* genuinely changes, the spec is updated first (with justification), then the test is updated to match the new spec.
-5. **Tests run in CI and locally.** All tests must be runnable with a single command from the project root.
+5. **Tests run in CI and locally.** All tests must pass via a single command from the project root: `bash scripts/ci.sh`. This script is the authoritative quality gate sequence — see `docs/agent/workflow.md` Section 3 (Test Commands Reference) for the full command table.
 6. **Performance baselines are committed artifacts.** At the completion of each implementation phase, after all functional tests and quality gates pass, the implementing agent runs the performance benchmark harness and commits the resulting baseline file. A performance regression that exceeds the defined thresholds in [vision/performance-baseline.md](../vision/performance-baseline.md) blocks the phase, the same as a failing functional test.
 7. **Docker test execution.** Integration and E2E tests that run in Docker must use images built via the multi-stage Dockerfile (`docker/medtech-app.Dockerfile`), not host-mounted install trees. The `x-dev-volumes` pattern in `docker-compose.yml` is a local development convenience and must not be used in CI or as the basis for test results.
 

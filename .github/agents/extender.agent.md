@@ -38,9 +38,11 @@ Before any work, complete these steps in order:
 2. Read `docs/agent/workflow.md` — process policies.
 3. Read `docs/agent/implementation/README.md` — phase structure and test
    policy.
-4. Run the full test suite. **All existing tests must pass.** If any fail,
-   fix them before proceeding — the existing system is the foundation
-   the extension builds on.
+4. Run the full quality gate pipeline: `bash scripts/ci.sh`. **All
+   existing gates must pass.** If any fail, fix them before
+   proceeding — the existing system is the foundation the extension
+   builds on. See `docs/agent/workflow.md` Section 3 (Test Commands
+   Reference) for the full command table.
 5. Check `git log --oneline -20` to understand recent history and the
    current version.
 6. Check `docs/agent/incidents.md` for open incidents.

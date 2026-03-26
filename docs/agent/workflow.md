@@ -65,8 +65,10 @@ Section 5.
 2. Read this file (`workflow.md`).
 3. Read the current phase file to identify where work stopped (if
    resuming).
-4. Run the full test suite. Passing tests = completed work. Failing
-   tests = in-progress work now broken. Zero tests = fresh start.
+4. Run the full quality gate pipeline (`bash scripts/ci.sh`). Passing
+   gates = completed work. Failing gates = in-progress work now
+   broken. Zero tests = fresh start. See the **Test Commands
+   Reference** below for the exact commands and when to use each.
 5. Check `git status` and `git log --oneline -10` for uncommitted
    changes or recent commits.
 6. Check `docs/agent/incidents.md` for any open incidents from prior
@@ -156,7 +158,8 @@ code patterns, consult these additional resources (in priority order):
 
 ### Ending a Session
 
-1. Run the full test suite and confirm all tests pass.
+1. Run the full quality gate pipeline (`bash scripts/ci.sh`) and
+   confirm all gates pass.
 2. Commit any uncommitted work with an appropriate message.
 3. If work is incomplete, record in the commit message or a code
    comment exactly what remains (e.g.,
@@ -164,6 +167,59 @@ code patterns, consult these additional resources (in priority order):
 4. If any incidents were opened during the session and are now
    resolved, update `docs/agent/incidents.md` to mark them closed
    (see Section 5).
+
+### Test Commands Reference
+
+`scripts/ci.sh` is the **single authoritative quality gate script**.
+Whenever this document or any agent persona says "run the full test
+suite" or "run the quality gates," the concrete command is:
+
+```bash
+bash scripts/ci.sh
+```
+
+The script is self-contained — it sources its own environment
+(`install/setup.bash`) internally. No pre-sourcing is needed.
+
+The script runs 12 gates in order (fast lint → build → test → Docker).
+It exits non-zero on the first failure. Two convenience flags exist
+for faster feedback during mid-step iteration:
+
+| Context | Command | What it checks |
+|---------|---------|----------------|
+| **Full gate pipeline** (session start, session end, pre-commit) | `bash scripts/ci.sh` | All 12 quality gates from Section 7 |
+| **Fast lint only** (~5 s, before committing) | `bash scripts/ci.sh --lint` | Code style, markdownlint, README sections, prohibited patterns, generated files |
+| **Python tests only** (mid-step iteration, Python changed) | See below | Python unit + integration tests |
+| **C++ tests only** (mid-step iteration, C++/IDL/CMake changed) | See below | C++ GTest tests via CTest |
+| **Skip rebuild** (tests only, install tree already current) | `bash scripts/ci.sh --skip-build` | All gates except CMake build/install |
+
+#### Standalone test commands (require environment setup)
+
+The standalone `pytest` and `ctest` commands require
+`install/setup.bash` to be sourced first. This sets
+`NDDS_QOS_PROFILES`, `LD_LIBRARY_PATH`, `PYTHONPATH`, and activates
+the Python venv. Source it once per terminal session.
+
+**Python tests:**
+
+```bash
+source install/setup.bash
+python -m pytest tests/ -x -q
+```
+
+**C++ tests:**
+
+```bash
+source install/setup.bash
+cmake --build build && ctest --test-dir build --output-on-failure
+```
+
+**Expected result for every gate command:** zero failures, zero skips,
+zero expected-failures. Any non-zero exit code blocks the current step.
+
+During a step, agents may use the standalone commands for fast feedback.
+At the three mandatory checkpoints — session start, pre-commit, and
+session end — the full `bash scripts/ci.sh` is required.
 
 ---
 

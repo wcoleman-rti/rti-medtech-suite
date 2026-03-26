@@ -23,8 +23,11 @@ Before writing or modifying any code, complete these steps in order:
 3. Read `docs/agent/implementation/README.md` — test policy, phase
    dependency graph, resumption guide.
 4. Identify the current phase — read the phase file listed as in-progress.
-5. Run the full test suite. Passing = completed. Failing = broken.
-   Zero = fresh start.
+5. Run the full quality gate pipeline: `bash scripts/ci.sh`.
+   Passing = completed work. Failing = in-progress work now broken.
+   Zero tests = fresh start. See `docs/agent/workflow.md` Section 3
+   (Test Commands Reference) for the full command table, including
+   faster mid-step commands (`pytest`, `ctest`, `--lint`).
 6. Check `git status` and `git log --oneline -10`.
 7. Check `docs/agent/incidents.md` for open incidents.
 8. Only then begin implementation work.
@@ -56,7 +59,12 @@ Before writing or modifying any code, complete these steps in order:
 3. **Build** — implement the step. Consult `rti-chatbot-mcp` for RTI
    Connext domain expertise when the planning docs leave a decision to
    your discretion.
-4. **Test** — run the step's tests. All must pass.
+4. **Test** — run the step's tests. During mid-step iteration, use
+   the standalone test commands from `docs/agent/workflow.md` Section 3
+   (Test Commands Reference) — these require `source install/setup.bash`
+   first. Before committing a completed step, run the full gate
+   pipeline: `bash scripts/ci.sh`. All gates must pass before the
+   commit.
 5. **Commit** — one commit per step (or logical sub-unit). Commit message
    references the step ID (e.g., `Phase 1, Step 1.3 — QoS Architecture`).
 6. **Advance** — mark the step complete, move to the next.
