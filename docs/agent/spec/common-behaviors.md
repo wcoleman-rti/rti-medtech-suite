@@ -62,7 +62,7 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 
 ### Scenario: Domain partition is assigned at startup from configuration `@integration` `@partition`
 
-**Given** a surgical application is launched with environment variable `PARTITION=room/OR-7/procedure/proc-099`
+**Given** a surgical application is launched with `ROOM_ID=OR-7` and `PROCEDURE_ID=proc-099`
 **When** the application creates its DomainParticipant
 **Then** the participant's domain partition is set to `room/OR-7/procedure/proc-099`
 **And** the application operates identically to any other instance in any other room

@@ -6,7 +6,6 @@ Usage:
 Environment:
     ROOM_ID          Procedure room identifier (default: OR-1)
     PROCEDURE_ID     Procedure identifier (default: proc-001)
-    PARTITION        DDS partition (derived from ROOM_ID/PROCEDURE_ID if unset)
 """
 
 from __future__ import annotations

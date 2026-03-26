@@ -15,7 +15,7 @@
 - Implement `ProcedureContext` publisher (Python or C++)
 - Reads room, patient, procedure, surgeon info from configuration (file or environment)
 - Publishes on the Procedure domain (`operational` tag) with `State` pattern QoS and TRANSIENT_LOCAL durability
-- Partition assigned from `PARTITION` environment variable at startup
+- Partition derived programmatically from `ROOM_ID` and `PROCEDURE_ID` at startup
 - Implement `ProcedureStatus` publisher alongside `ProcedureContext`
 - Publishes running status (in-progress, completing, alert) on the Procedure domain (`operational` tag) with `State` pattern QoS and TRANSIENT_LOCAL durability
 - Status is updated as the procedure progresses through its lifecycle
@@ -152,7 +152,7 @@
 
 - Create PySide6 application in `modules/surgical-procedure/digital-twin/`
 - Load shared GUI theme: apply `resources/styles/medtech.qss`, register bundled fonts, display RTI logo in header bar (see `vision/technology.md` GUI Design Standard)
-- Create DomainParticipant on the Procedure domain (`control` tag) with partition from `PARTITION` environment variable
+- Create DomainParticipant on the Procedure domain (`control` tag) with partition derived from `ROOM_ID` and `PROCEDURE_ID`
 - Subscribe to `RobotState`, `RobotCommand`, `SafetyInterlock`, and `OperatorInput`
   - QoS loaded automatically via the default QosProvider (`NDDS_QOS_PROFILES`)
   - Apply time-based filter (~16 ms minimum separation for 60 Hz rendering) on **high-rate streaming readers only**: `RobotState` and `OperatorInput`
