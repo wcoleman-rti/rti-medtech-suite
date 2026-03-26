@@ -207,7 +207,22 @@
                 </time_based_filter>
             </datareader_qos>
         </qos_profile>
-
+        <!-- GUI reader deadline relaxation for topics with strict writer-side
+             deadlines (e.g., OperatorInput at 4 ms). The GUI display does not
+             need sub-millisecond stream-interruption detection. 100 ms is
+             sufficient for display-level "stream gone" detection and satisfies
+             the DDS constraint: time_based_filter (16 ms) <= deadline (100 ms).
+             Reader-only — writer keeps its original deadline. -->
+        <qos_profile name="GuiDeadline100ms">
+            <datareader_qos>
+                <deadline>
+                    <period>
+                        <sec>0</sec>
+                        <nanosec>100000000</nanosec>
+                    </period>
+                </deadline>
+            </datareader_qos>
+        </qos_profile>
     </qos_library>
 
 </dds>

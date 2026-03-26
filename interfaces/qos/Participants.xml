@@ -50,39 +50,13 @@
     </qos_library>
 
     <!--
-        Participants: participant-level profiles for discovery, transport,
-        and resource configuration. Separate from Factory because these apply
-        to DomainParticipants, not to the DomainParticipantFactory.
+        Participants: participant-level transport profiles are in
+        interfaces/qos/transport/ — one file per deployment environment.
+        Deployment selects the transport profile via NDDS_QOS_PROFILES:
+          - transport/Default.xml  (SHMEM + UDPv4, multicast enabled)
+          - transport/Docker.xml   (SHMEM + UDPv4, multicast disabled, CDS peers)
+        Both define Participants::Transport; participants reference that
+        single name. See vision/data-model.md — Participant Configuration.
     -->
-    <qos_library name="Participants">
-
-        <!--
-            SimulationTransport: participant QoS for local simulation.
-            Disables shared memory (UDPv4 only), disables multicast.
-        -->
-        <qos_profile name="SimulationTransport"
-                     is_default_qos="true">
-            <base_name>
-                <element>BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation</element>
-            </base_name>
-            <domain_participant_qos>
-                <transport_builtin>
-                    <mask>UDPv4</mask>
-                </transport_builtin>
-                <discovery>
-                    <multicast_receive_addresses/>
-                </discovery>
-                <property>
-                    <value>
-                        <element>
-                            <name>dds.transport.UDPv4.builtin.multicast_enabled</name>
-                            <value>0</value>
-                        </element>
-                    </value>
-                </property>
-            </domain_participant_qos>
-        </qos_profile>
-
-    </qos_library>
 
 </dds>

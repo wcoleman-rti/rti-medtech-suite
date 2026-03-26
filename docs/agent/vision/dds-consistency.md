@@ -1019,8 +1019,7 @@ consistency with the existing system:
       `interfaces/domains/Domains.xml`
 - [ ] Set the domain tag in the participant QoS XML (`<discovery><domain_tag>`)
       — never in application code
-- [ ] Verify transport configuration matches the deployment context
-      (simulation: UDPv4 only, no SHMEM; production: as appropriate)
+- [ ] Verify transport configuration: participant references `Participants::Transport`\n      (defined in `transport/Default.xml` or `transport/Docker.xml`, selected via `NDDS_QOS_PROFILES`)
 
 ### Initialization
 

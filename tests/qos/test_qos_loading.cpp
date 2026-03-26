@@ -121,8 +121,8 @@ TEST_F(QosLoadingTest, TopicFilterRobotCommand) {
 
 // --- Participant profiles ---
 
-TEST_F(QosLoadingTest, ParticipantSimulationTransport) {
-    auto qos = provider_.participant_qos("Participants::SimulationTransport");
+TEST_F(QosLoadingTest, ParticipantTransport) {
+    auto qos = provider_.participant_qos("Participants::Transport");
     (void)qos; // Loading without error is the test
 }
 

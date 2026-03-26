@@ -34,7 +34,7 @@
         -->
         <domain_participant name="OperationalPub"
                             domain_ref="MedtechDomains::Procedure_operational">
-            <domain_participant_qos base_name="Participants::SimulationTransport">
+            <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
                         <element>
@@ -89,7 +89,7 @@
         -->
         <domain_participant name="ControlRobot"
                             domain_ref="MedtechDomains::Procedure_control">
-            <domain_participant_qos base_name="Participants::SimulationTransport">
+            <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
                         <element>
@@ -134,7 +134,7 @@
         -->
         <domain_participant name="ControlOperator"
                             domain_ref="MedtechDomains::Procedure_control">
-            <domain_participant_qos base_name="Participants::SimulationTransport">
+            <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
                         <element>
@@ -178,7 +178,7 @@
         -->
         <domain_participant name="ClinicalMonitor"
                             domain_ref="MedtechDomains::Procedure_clinical">
-            <domain_participant_qos base_name="Participants::SimulationTransport">
+            <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
                         <element>
@@ -222,7 +222,7 @@
         -->
         <domain_participant name="ClinicalDeviceGateway"
                             domain_ref="MedtechDomains::Procedure_clinical">
-            <domain_participant_qos base_name="Participants::SimulationTransport">
+            <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
                         <element>
@@ -249,7 +249,7 @@
         -->
         <domain_participant name="ControlDigitalTwin"
                             domain_ref="MedtechDomains::Procedure_control">
-            <domain_participant_qos base_name="Participants::SimulationTransport">
+            <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
                         <element>

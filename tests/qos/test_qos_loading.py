@@ -160,8 +160,8 @@ class TestTopicFilters:
 
 
 class TestParticipants:
-    def test_simulation_transport_loads(self, provider):
-        qos = provider.participant_qos_from_profile("Participants::SimulationTransport")
+    def test_transport_loads(self, provider):
+        qos = provider.participant_qos_from_profile("Participants::Transport")
         assert qos is not None
 
     def test_factory_defaults_loads(self, provider):

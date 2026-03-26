@@ -29,6 +29,7 @@ export PYTHONPATH="$_DIR/lib/python/site-packages:${PYTHONPATH:-}"
 export NDDS_QOS_PROFILES="$_DIR/share/qos/Snippets.xml;\
 $_DIR/share/qos/Patterns.xml;\
 $_DIR/share/qos/Topics.xml;\
+$_DIR/share/qos/transport/Default.xml;\
 $_DIR/share/qos/Participants.xml;\
 $_DIR/share/domains/Domains.xml;\
 $_DIR/share/participants/SurgicalParticipants.xml"

@@ -369,27 +369,42 @@ Health checks use the simplest reliable method per service:
 
 ### Transport Configuration
 
-Transport behavior is configured via XML QoS profiles, never in application code. The appropriate profile is selected per deployment context (simulation vs. production).
+Transport behavior is configured via XML QoS profiles, never in application code. The appropriate profile is selected per deployment context by loading the corresponding transport XML file in `NDDS_QOS_PROFILES`.
 
-#### Simulation (Docker containers — inter-host traffic)
+Two transport profiles are provided, both named `Participants::Transport` (so participant XML is deployment-neutral):
 
-Containers simulating separate hosts use:
-- **Shared memory disabled** — forces traffic through the Docker network stack, simulating real network behavior
-- **UDPv4 only** — no SHMEM, no UDPv6 unless explicitly needed
-- **Explicit discovery peers** — `hospital-net` may not support multicast; all participants configured with explicit peer addresses or Cloud Discovery Service
-- **Interface restrictions** — each participant binds only to its container's relevant network interface
+| File | SHMEM | UDPv4 | Multicast | Discovery Peers |
+|------|-------|-------|-----------|----------------|
+| `transport/Default.xml` | Enabled | Enabled | Enabled | Connext defaults |
+| `transport/Docker.xml` | Enabled | Enabled | Disabled | `builtin.shmem://`, `builtin.udpv4://localhost`, CDS |
+
+SHMEM is enabled in both — it benefits intra-container (Docker) and intra-host (production) communication.
+
+#### Docker Containers
+
+Containers use `transport/Docker.xml` which:
+- Disables multicast (`multicast_receive_addresses` cleared, `dds.transport.UDPv4.builtin.multicast_enabled=0`)
+- Sets explicit discovery peers: SHMEM and localhost for intra-container, CDS for cross-container
+- Composes `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation`
 
 ```xml
 <domain_participant_qos>
-    <transport_builtin>
-        <mask>UDPv4</mask>
-    </transport_builtin>
     <discovery>
         <initial_peers>
+            <element>builtin.shmem://</element>
+            <element>builtin.udpv4://localhost</element>
             <element>rtps@udpv4://cloud-discovery-service:7400</element>
         </initial_peers>
-        <multicast_receive_addresses/>  <!-- empty = no multicast -->
+        <multicast_receive_addresses/>
     </discovery>
+    <property>
+        <value>
+            <element>
+                <name>dds.transport.UDPv4.builtin.multicast_enabled</name>
+                <value>0</value>
+            </element>
+        </value>
+    </property>
 </domain_participant_qos>
 ```
 

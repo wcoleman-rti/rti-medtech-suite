@@ -94,7 +94,7 @@
   - `Snippets.xml` — custom QoS policy snippets for policies with no builtin equivalent (Volatile, ExclusiveOwnership, Liveliness2s, Liveliness500ms, Deadline*, Lifespan20ms, GuiSubsample). Policies with builtin equivalents (Reliable, BestEffort, TransientLocal, KeepLast1, KeepAll) use `BuiltinQosSnippetLib::` directly.
   - `Patterns.xml` — data-pattern base profiles (State, Command, Stream, GuiState, GuiStream) inheriting from semantically appropriate `BuiltinQosLib` profiles (`Generic.KeepLastReliable.TransientLocal`, `Generic.KeepLastReliable`, `Generic.BestEffort`)
   - `Topics.xml` — two libraries: `TopicProfiles` (per-topic profiles as single source of truth for topic-specific tuning) and `Topics` (domain-scoped topic-filter bindings referencing `TopicProfiles::` profiles with no nested content)
-  - `Participants.xml` — two libraries: `Factory` (process-level `participant_factory_qos`) and `Participants` (participant-level discovery/transport/resource config). Simulation profile: SHMEM disabled, UDPv4 only, multicast fully disabled (three-step per RTI howto), `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation`, discovery peers via `NDDS_DISCOVERY_PEERS` env var
+  - `Participants.xml` — `Factory` library (process-level `participant_factory_qos`). Transport profiles are in `interfaces/qos/transport/`: `Default.xml` (SHMEM + UDPv4, multicast enabled) and `Docker.xml` (SHMEM + UDPv4, multicast disabled, explicit CDS peers). Both define `Participants::Transport`. Deployment selects via `NDDS_QOS_PROFILES`. Both compose `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation`.
 - Each XML file must declare the RTI schema in its root element for validation:
   ```xml
   <dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

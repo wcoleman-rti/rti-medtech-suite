@@ -1270,3 +1270,60 @@ after closure. They form the project's decision log.
 - **Resolution:** Deferred to Phase 3 — does not block Phase 2 completion.
   Diagnostic tools function correctly for Observability domain and
   infrastructure checks.
+
+---
+
+## INC-043: Transport profile revision — dual profiles, SHMEM enabled, is_default_qos removed
+
+- **Status:** Closed
+- **Category:** Discovery (operator-directed revision)
+- **Date opened:** 2026-03-26
+- **Phase/Step:** Post-V1.0 revision (operator review)
+- **Documents involved:** `interfaces/qos/Participants.xml`,
+  `interfaces/qos/transport/Default.xml` (new),
+  `interfaces/qos/transport/Docker.xml` (new),
+  `interfaces/participants/SurgicalParticipants.xml`,
+  `vision/data-model.md`, `vision/system-architecture.md`,
+  `vision/dds-consistency.md`, `implementation/phase-1-foundation.md`
+- **Description:** Operator review identified three issues with the
+  `Participants::SimulationTransport` profile:
+  1. **`is_default_qos="true"`** — all participants already reference
+     the profile explicitly. The default flag is redundant and can
+     silently apply simulation transport to participants that forget
+     to specify a profile, masking configuration errors.
+  2. **SHMEM disabled** — the profile set `<mask>UDPv4</mask>`,
+     excluding SHMEM. SHMEM is beneficial for intra-container
+     communication (multiple participants or processes within the
+     same container) and should be enabled in both Docker and
+     bare-metal deployments.
+  3. **Single profile for all environments** — no path to enable
+     multicast for bare-metal / production without editing XML.
+  Additionally, the inline `<datareader_qos>` deadline override in
+  `GuiOperatorInput` was moved to a `GuiDeadline100ms` snippet for
+  consistency with the snippet composition model.
+- **Resolution:**
+  1. Removed `is_default_qos="true"` from the transport profile.
+  2. Created two transport files under `interfaces/qos/transport/`:
+     - `Default.xml` — SHMEM + UDPv4, multicast enabled, Connext
+       default discovery.
+     - `Docker.xml` — SHMEM + UDPv4, multicast disabled, explicit
+       initial peers (`builtin.shmem://`, `builtin.udpv4://localhost`,
+       CDS locator). Clears `multicast_receive_addresses`.
+     Both define `Participants::Transport`. Deployment selects via
+     `NDDS_QOS_PROFILES` (setup.bash loads Default, docker-compose
+     loads Docker).
+  3. Removed the `Participants` QoS library from `Participants.xml`
+     (now contains only the `Factory` library).
+  4. Renamed all 6 participant references from
+     `Participants::SimulationTransport` → `Participants::Transport`.
+  5. Added `Snippets::GuiDeadline100ms` (reader-only, 100 ms deadline)
+     and replaced the inline override in `GuiOperatorInput`.
+  6. Updated `setup.bash.in`, `build/setup.bash`, `docker-compose.yml`,
+     `CMakeLists.txt`, and CTest environment.
+  7. Updated vision docs: `data-model.md`, `system-architecture.md`,
+     `dds-consistency.md`, `phase-1-foundation.md`.
+- **Guideline:** Transport profiles should be deployment-selected
+  via `NDDS_QOS_PROFILES` path, not environment-switched within a
+  single file. SHMEM should remain enabled in all profiles — it is
+  always beneficial for co-located participants.
+- **Date closed:** 2026-03-26
