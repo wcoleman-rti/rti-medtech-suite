@@ -176,7 +176,7 @@ All current development, CI, Docker images, and runtime scripts target **Linux x
 |----------|----------------------|
 | `setup.bash` | Bash syntax, `LD_LIBRARY_PATH`, `source` activation |
 | `rtisetenv_x64Linux4gcc8.5.0.bash` | Architecture-specific Connext env script |
-| Docker base images | Ubuntu 22.04 |
+| Docker base images | Ubuntu 24.04 |
 | `NDDS_QOS_PROFILES` separator | `;` (same on all platforms, no issue) |
 | Shared library extension | `.so` |
 
@@ -561,13 +561,13 @@ Every CMake target must define `install()` rules. Missing install rules are a bu
 
 ### Docker Base Images
 
-All Dockerfiles use pinned Ubuntu 22.04 LTS as the base (`FROM ubuntu:22.04`). No `latest` tags.
+All Dockerfiles use pinned Ubuntu 24.04 LTS as the base (`FROM ubuntu:24.04`). No `latest` tags. All Dockerfiles must use the same Ubuntu LTS release to guarantee ABI consistency across base images. Mixing Ubuntu versions (e.g., 22.04 build-base with 24.04 runtime) risks glibc/libstdc++ mismatches.
 
 | Image | Purpose | Contents |
 |-------|---------|----------|
-| `build-base` | Compile C++ targets | Ubuntu 22.04, GCC toolchain, CMake, Connext 7.6.0 host libraries (`x64Linux4gcc8.5.0`) |
-| `runtime-cpp` | Run compiled C++ apps | Ubuntu 22.04 minimal, Connext 7.6.0 shared libraries only — no compiler |
-| `runtime-python` | Run Python apps | Ubuntu 22.04, Python 3.10, project venv, `rti.connext==7.6.0`, PySide6 |
+| `build-base` | Compile C++ targets | Ubuntu 24.04, GCC toolchain, CMake, Connext 7.6.0 host libraries (`x64Linux4gcc8.5.0`) |
+| `runtime-cpp` | Run compiled C++ apps | Ubuntu 24.04 minimal, Connext 7.6.0 shared libraries only — no compiler |
+| `runtime-python` | Run Python apps | Ubuntu 24.04, Python 3.12, project venv, `rti.connext==7.6.0`, PySide6 |
 
 ## Testing
 
