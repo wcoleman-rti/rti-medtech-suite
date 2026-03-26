@@ -114,10 +114,23 @@
             </base_name>
         </qos_profile>
 
+        <!-- GuiOperatorInput: display reader at 60 Hz.
+             The base OperatorInput profile has a 4 ms deadline (for the
+             robot controller). The GUI reader does not need that strict
+             deadline. Override the deadline to 100 ms so the TBF (16 ms)
+             satisfies the DDS constraint: time_based_filter <= deadline. -->
         <qos_profile name="GuiOperatorInput" base_name="TopicProfiles::OperatorInput">
             <base_name>
                 <element>Snippets::GuiSubsample</element>
             </base_name>
+            <datareader_qos>
+                <deadline>
+                    <period>
+                        <sec>0</sec>
+                        <nanosec>100000000</nanosec>
+                    </period>
+                </deadline>
+            </datareader_qos>
         </qos_profile>
 
         <qos_profile name="GuiClinicalAlert" base_name="TopicProfiles::ClinicalAlert">

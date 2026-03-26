@@ -194,13 +194,15 @@
             </datawriter_qos>
         </qos_profile>
 
-        <!-- GUI time-based filter for downsampled readers -->
+        <!-- 60 Hz GUI rendering: min_separation ~16 ms.
+             Must be &lt;= the deadline of any topic that uses this snippet
+             (RobotState deadline = 20 ms). -->
         <qos_profile name="GuiSubsample">
             <datareader_qos>
                 <time_based_filter>
                     <minimum_separation>
                         <sec>0</sec>
-                        <nanosec>100000000</nanosec>
+                        <nanosec>16000000</nanosec>
                     </minimum_separation>
                 </time_based_filter>
             </datareader_qos>

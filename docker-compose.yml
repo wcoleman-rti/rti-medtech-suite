@@ -151,6 +151,26 @@ services:
       - prometheus
       - loki
 
+  # ─── Surgical Procedure Module ──────────────────────────────────
+
+  digital-twin-or1:
+    image: medtech/runtime-python
+    container_name: digital-twin-or1
+    command: ["python", "-m", "surgical_procedure.digital_twin"]
+    environment:
+      <<: *medtech-env
+      ROOM_ID: "OR-1"
+      PROCEDURE_ID: "OR1-001"
+      PARTITION: "room/OR-1/procedure/OR1-001"
+      # Headless rendering — no display required for DDS-only operation
+      QT_QPA_PLATFORM: offscreen
+    volumes: *qos-volumes
+    networks:
+      - surgical-net
+    depends_on:
+      cloud-discovery-service:
+        condition: service_healthy
+
   # ─── Placeholder Services (network verification) ───────────────
 
   surgical-placeholder:
