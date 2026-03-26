@@ -146,7 +146,7 @@
 
 ---
 
-## Step 2.6 — Digital Twin Display
+## Step 2.6 — Digital Twin Display ✅ `eb7f142`
 
 ### Work
 
@@ -169,14 +169,14 @@
 
 ### Test Gate (spec: surgical-procedure.md — Digital Twin Display)
 
-- [ ] Digital twin renders current robot state (joint positions, mode)
-- [ ] Active command displayed as visual annotation
-- [ ] Safety interlock prominently rendered when active
-- [ ] Time-based filter limits updates to rendering frame rate on `RobotState` and `OperatorInput` readers
-- [ ] `SafetyInterlock` and `RobotCommand` readers have no time-based filter (every sample delivered)
-- [ ] Late-joining display receives current state via TRANSIENT_LOCAL
-- [ ] Robot disconnect detected via liveliness (grayed out)
-- [ ] DDS reads do not block the Qt main thread
+- [x] Digital twin renders current robot state (joint positions, mode)
+- [x] Active command displayed as visual annotation
+- [x] Safety interlock prominently rendered when active
+- [x] Time-based filter limits updates to rendering frame rate on `RobotState` and `OperatorInput` readers
+- [x] `SafetyInterlock` and `RobotCommand` readers have no time-based filter (every sample delivered)
+- [x] Late-joining display receives current state via TRANSIENT_LOCAL
+- [x] Robot disconnect detected via liveliness (grayed out)
+- [x] DDS reads do not block the Qt main thread
 
 ---
 

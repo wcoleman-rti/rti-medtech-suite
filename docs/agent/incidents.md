@@ -1154,3 +1154,37 @@ after closure. They form the project's decision log.
   If different QoS is needed for deployment variants (e.g., exclusive
   ownership failover), define separate XML profiles in Topics.xml.
 - **Date closed:** 2026-03-25
+
+
+---
+
+## INC-040: GuiSubsample TBF exceeded RobotState deadline — inconsistent QoS
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-26
+- **Phase/Step:** Phase 2 / Step 2.6
+- **Documents involved:** `interfaces/qos/Snippets.xml`, `interfaces/qos/Topics.xml`, `spec/surgical-procedure.md`
+- **Description:** The `Snippets::GuiSubsample` QoS snippet was set to
+  `time_based_filter.minimum_separation = 100 ms`. The `TopicProfiles::RobotState`
+  profile uses `Snippets::Deadline20ms` (deadline = 20 ms). The DDS QoS
+  consistency rule requires `time_based_filter.minimum_separation <= deadline.period`.
+  With TBF = 100 ms > deadline = 20 ms, creating a DataReader from the
+  `ControlDigitalTwin` participant (which uses `TopicProfiles::GuiRobotState`)
+  failed with `rti.connextdds.Error: Failed to create DataReader` and the message
+  `inconsistent QoS policies: deadline.period and time_based_filter.minimum_separation`.
+  A second inconsistency: `TopicProfiles::OperatorInput` has a 4 ms deadline,
+  so `GuiOperatorInput` (which adds GuiSubsample) was also inconsistent.
+- **Resolution:**
+  1. Changed `GuiSubsample` TBF from 100 ms to 16 ms (matching the spec's
+     stated ~16 ms (~60 Hz) rendering interval), which is <= the 20 ms
+     RobotState deadline.
+  2. Added an explicit `deadline.period = 100 ms` override to `GuiOperatorInput`
+     to satisfy the constraint for the OperatorInput reader (whose base profile
+     has a 4 ms deadline that is stricter than needed for a display reader).
+- **Guideline:** When composing a GUI QoS profile that adds a time-based filter
+  on top of a topic profile with a strict deadline, always verify that
+  `time_based_filter.minimum_separation <= deadline.period`. Display readers
+  that observe data opportunistically should override the deadline to a relaxed
+  value appropriate for their rendering rate.
+- **Date closed:** 2026-03-26
