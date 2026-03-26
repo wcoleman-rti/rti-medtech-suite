@@ -25,22 +25,15 @@ Uses generated entity name constants from app_names.idl.
 from __future__ import annotations
 
 import asyncio
-import os
 from typing import Optional
 
 import app_names
-import rti.asyncio  # enables take_data_async() on DataReader
 import rti.connextdds as dds
 import surgery
 from medtech_dds_init.dds_init import initialize_connext
-from medtech_logging import ModuleName, init_logging
 from medtech_gui import init_theme
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QMainWindow,
-    QVBoxLayout,
-    QWidget,
-)
+from medtech_logging import ModuleName, init_logging
+from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 
 from ._robot_widget import RobotWidget
 
@@ -107,9 +100,7 @@ class DigitalTwinDisplay(QMainWindow):
         if injected:
             self._robot_state_reader = dds.DataReader(robot_state_reader)
             self._robot_command_reader = dds.DataReader(robot_command_reader)
-            self._safety_interlock_reader = dds.DataReader(
-                safety_interlock_reader
-            )
+            self._safety_interlock_reader = dds.DataReader(safety_interlock_reader)
             self._operator_input_reader = dds.DataReader(operator_input_reader)
         else:
             self._init_dds(room_id, procedure_id)
@@ -143,15 +134,9 @@ class DigitalTwinDisplay(QMainWindow):
             return dds.DataReader(r)
 
         self._robot_state_reader = _find_reader(names.TWIN_ROBOT_STATE_READER)
-        self._robot_command_reader = _find_reader(
-            names.TWIN_ROBOT_COMMAND_READER
-        )
-        self._safety_interlock_reader = _find_reader(
-            names.TWIN_SAFETY_INTERLOCK_READER
-        )
-        self._operator_input_reader = _find_reader(
-            names.TWIN_OPERATOR_INPUT_READER
-        )
+        self._robot_command_reader = _find_reader(names.TWIN_ROBOT_COMMAND_READER)
+        self._safety_interlock_reader = _find_reader(names.TWIN_SAFETY_INTERLOCK_READER)
+        self._operator_input_reader = _find_reader(names.TWIN_OPERATOR_INPUT_READER)
 
     # ------------------------------------------------------------------ #
     # Qt widget setup                                                       #
@@ -177,6 +162,7 @@ class DigitalTwinDisplay(QMainWindow):
     @staticmethod
     def _qt_app():
         from PySide6.QtWidgets import QApplication
+
         return QApplication.instance()
 
     # ------------------------------------------------------------------ #

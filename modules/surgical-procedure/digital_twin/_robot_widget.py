@@ -14,16 +14,9 @@ All state mutations call ``self.update()`` to schedule a repaint.
 from __future__ import annotations
 
 import math
-from typing import Optional
 
-from PySide6.QtCore import QPoint, QRect, Qt
-from PySide6.QtGui import (
-    QBrush,
-    QColor,
-    QFont,
-    QPainter,
-    QPen,
-)
+from PySide6.QtCore import QRect, Qt
+from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
 # RTI brand colors
@@ -111,9 +104,8 @@ class RobotWidget(QWidget):
 
     @property
     def interlock_active(self) -> bool:
-        return (
-            self._interlock is not None
-            and getattr(self._interlock, "interlock_active", False)
+        return self._interlock is not None and getattr(
+            self._interlock, "interlock_active", False
         )
 
     @property
@@ -200,9 +192,7 @@ class RobotWidget(QWidget):
                 tp_r = max(5, int(r * 0.3))
                 p.drawEllipse(tip_x - tp_r, tip_y - tp_r, tp_r * 2, tp_r * 2)
 
-    def _draw_command_annotation(
-        self, p: QPainter, cx: int, cy: int, r: float
-    ) -> None:
+    def _draw_command_annotation(self, p: QPainter, cx: int, cy: int, r: float) -> None:
         """Draw RobotCommand target position annotation."""
         target = getattr(self._command, "target_position", None)
         if target is None:
@@ -263,4 +253,8 @@ class RobotWidget(QWidget):
         p.setPen(QPen(color))
         margin = 8
         label_rect = QRect(margin, h - 28, w - margin * 2, 24)
-        p.drawText(label_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, mode)
+        p.drawText(
+            label_rect,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+            mode,
+        )

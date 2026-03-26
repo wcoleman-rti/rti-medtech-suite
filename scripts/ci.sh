@@ -52,6 +52,17 @@ else
     pass
 fi
 
+# ─── Gate 1b: Docker multi-stage build ─────────────────────────────
+gate "Docker multi-stage build"
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    docker compose --profile build build 2>&1 | tail -5 \
+        || fail "docker compose build failed"
+    pass
+else
+    echo "  WARNING: Docker not available — skipping."
+    pass
+fi
+
 # ─── Gate 2: Full test suite (Python) ─────────────────────────────
 gate "Python test suite (pytest)"
 
@@ -245,6 +256,25 @@ if [ -f tools/qos-checker.py ]; then
     pass
 else
     echo "  QoS checker not yet implemented."
+    pass
+fi
+
+# ─── Gate 11: Container runtime smoke test ─────────────────────────
+gate "Container runtime smoke test"
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    # Verify C++ binary runs without GLIBCXX errors
+    docker run --rm medtech/app-cpp \
+        ldd /opt/medtech/bin/robot-controller 2>&1 \
+        | grep -q "not found" \
+        && fail "robot-controller has unresolved shared libraries" \
+        || true
+    # Verify Python imports resolve
+    docker run --rm medtech/app-python \
+        python3 -c "import surgery; import monitoring; print('OK')" 2>&1 \
+        || fail "Python type imports failed in container"
+    pass
+else
+    echo "  WARNING: Docker not available — skipping."
     pass
 fi
 

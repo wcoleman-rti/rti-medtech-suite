@@ -15,7 +15,6 @@ import os
 import sys
 
 import rti.asyncio  # noqa: F401 — enables async DataReader methods
-
 from PySide6 import QtAsyncio
 from PySide6.QtWidgets import QApplication
 
@@ -26,14 +25,12 @@ def main() -> None:
     room_id = os.environ.get("ROOM_ID", "OR-1")
     procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
 
-    app = QApplication(sys.argv)
+    app = QApplication(sys.argv)  # noqa: F841 — QApplication must exist before widgets
     display = DigitalTwinDisplay(room_id=room_id, procedure_id=procedure_id)
     display.show()
 
     # Schedule the async DDS task after the event loop starts
-    asyncio.get_event_loop().call_soon(
-        lambda: asyncio.ensure_future(display.start())
-    )
+    asyncio.get_event_loop().call_soon(lambda: asyncio.ensure_future(display.start()))
 
     QtAsyncio.run(handle_sigint=True)
 

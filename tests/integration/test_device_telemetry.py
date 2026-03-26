@@ -183,9 +183,9 @@ class TestDeviceTelemetryPublished:
             time.sleep(0.5)
 
             # Should have published initial state for both devices (pump + anesthesia)
-            assert gw.publish_count >= 2, (
-                f"Expected at least 2 initial publishes, got {gw.publish_count}"
-            )
+            assert (
+                gw.publish_count >= 2
+            ), f"Expected at least 2 initial publishes, got {gw.publish_count}"
 
             # Verify both device IDs are present
             device_ids = set(gw.devices.keys())
@@ -311,9 +311,7 @@ class TestWriteOnChange:
 
             published = gw.tick()
             # At least the faulted pump should have been published
-            pump_samples = [
-                s for s in published if s.device_id == "pump-001"
-            ]
+            pump_samples = [s for s in published if s.device_id == "pump-001"]
             assert len(pump_samples) >= 1, "Faulted device should trigger publish"
             assert pump_samples[0].operating_state == DeviceOperatingState.ALARM
             assert pump_samples[0].error_code == 101
@@ -369,9 +367,7 @@ class TestExclusiveOwnershipFailover:
     def test_writer_has_liveliness_configured(self, monkeypatch):
         """The DeviceTelemetry writer has AUTOMATIC liveliness with 2s lease,
         enabling writer health detection for write-on-change topics."""
-        _env_override(
-            monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable"
-        )
+        _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
         gw = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
         try:
@@ -386,9 +382,7 @@ class TestExclusiveOwnershipFailover:
         """The DeviceTelemetry writer uses RELIABLE + TRANSIENT_LOCAL QoS
         matching the State pattern required for late-joiner support and
         exclusive ownership failover."""
-        _env_override(
-            monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable"
-        )
+        _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
         gw = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
         try:
@@ -472,9 +466,9 @@ class TestExclusiveOwnershipFailover:
         received = r.take()
         valid = [s for s in received if s.info.valid]
         assert len(valid) >= 1, "Should receive data"
-        assert any(s.data.battery_percent == 90.0 for s in valid), (
-            "Primary should be delivering"
-        )
+        assert any(
+            s.data.battery_percent == 90.0 for s in valid
+        ), "Primary should be delivering"
 
         # Kill primary
         r.take()  # drain
@@ -488,9 +482,7 @@ class TestExclusiveOwnershipFailover:
 
         received = r.take()
         valid = [s for s in received if s.info.valid]
-        assert len(valid) >= 1, (
-            "Backup should deliver after primary failure"
-        )
+        assert len(valid) >= 1, "Backup should deliver after primary failure"
         assert any(s.data.battery_percent == 50.0 for s in valid)
 
 
@@ -542,7 +534,9 @@ class TestSeededReproducibility:
 
             assert len(samples1) == len(samples2), "Same seed should produce same count"
             for a, b in zip(samples1, samples2):
-                assert _samples_equal(a, b), "Same seed should produce identical samples"
+                assert _samples_equal(
+                    a, b
+                ), "Same seed should produce identical samples"
         finally:
             gw1.close()
             gw2.close()

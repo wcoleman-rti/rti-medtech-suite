@@ -34,8 +34,8 @@ def main() -> None:
     monitor = BedsideMonitor(room_id=room_id, procedure_id=procedure_id)
     monitor.start()
 
-    vitals_interval = 1.0       # 1 Hz
-    waveform_interval = 0.02    # 50 Hz
+    vitals_interval = 1.0  # 1 Hz
+    waveform_interval = 0.02  # 50 Hz
 
     next_vitals = time.monotonic()
     next_waveform = time.monotonic()

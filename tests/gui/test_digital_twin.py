@@ -17,7 +17,6 @@ Tags: @integration @gui @durability @streaming
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 import time
 
@@ -43,6 +42,7 @@ CartesianPosition = surgery.Surgery.CartesianPosition
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_robot_state(mode=RobotMode.OPERATIONAL, joints=None):
     s = RobotState()
@@ -78,6 +78,7 @@ def _make_safety_interlock(active: bool):
 # ---------------------------------------------------------------------------
 # TestRobotWidgetUpdate — pure widget tests (no DDS required)
 # ---------------------------------------------------------------------------
+
 
 class TestRobotWidgetUpdate:
     """Verify that the RobotWidget accepts state updates and tracks them."""
@@ -175,6 +176,7 @@ class TestRobotWidgetUpdate:
 # TestDisplayCreation — DigitalTwinDisplay widget integration
 # ---------------------------------------------------------------------------
 
+
 def _make_injected_readers(participant_factory):
     """Create four injected DataReaders for DigitalTwinDisplay tests.
 
@@ -211,6 +213,7 @@ class TestDisplayCreation:
 # TestQosConfiguration — Reader QoS verification
 # ---------------------------------------------------------------------------
 
+
 class TestQosConfiguration:
     """Verify that reader QoS matches the expected profiles from XML."""
 
@@ -218,6 +221,7 @@ class TestQosConfiguration:
     def twin_participant(self):
         """Create a ControlDigitalTwin participant (class scope, auto-cleanup)."""
         from medtech_dds_init.dds_init import initialize_connext
+
         initialize_connext()
         provider = dds.QosProvider.default
         p = provider.create_participant_from_config(names.CONTROL_DIGITAL_TWIN)
@@ -244,9 +248,9 @@ class TestQosConfiguration:
         reader = dds.DataReader(r)
         tbf_ns = self._tbf_ns(reader)
         # GuiSubsample snippet sets 16 ms = 16_000_000 ns
-        assert tbf_ns > 0, (
-            "RobotState reader must have a time-based filter (min_separation > 0)"
-        )
+        assert (
+            tbf_ns > 0
+        ), "RobotState reader must have a time-based filter (min_separation > 0)"
 
     def test_operator_input_reader_has_time_based_filter(self, twin_participant):
         """OperatorInput reader uses GuiOperatorInput QoS (TBF > 0)."""
@@ -254,40 +258,31 @@ class TestQosConfiguration:
         assert r is not None
         reader = dds.DataReader(r)
         tbf_ns = self._tbf_ns(reader)
-        assert tbf_ns > 0, (
-            "OperatorInput reader must have a time-based filter (min_separation > 0)"
-        )
+        assert (
+            tbf_ns > 0
+        ), "OperatorInput reader must have a time-based filter (min_separation > 0)"
 
-    def test_safety_interlock_reader_has_no_time_based_filter(
-        self, twin_participant
-    ):
+    def test_safety_interlock_reader_has_no_time_based_filter(self, twin_participant):
         """SafetyInterlock reader has no TBF — every sample must be delivered."""
-        r = twin_participant.find_datareader(
-            names.TWIN_SAFETY_INTERLOCK_READER
-        )
+        r = twin_participant.find_datareader(names.TWIN_SAFETY_INTERLOCK_READER)
         assert r is not None
         reader = dds.DataReader(r)
         tbf_ns = self._tbf_ns(reader)
-        assert tbf_ns == 0, (
-            "SafetyInterlock reader must NOT have a time-based filter"
-        )
+        assert tbf_ns == 0, "SafetyInterlock reader must NOT have a time-based filter"
 
-    def test_robot_command_reader_has_no_time_based_filter(
-        self, twin_participant
-    ):
+    def test_robot_command_reader_has_no_time_based_filter(self, twin_participant):
         """RobotCommand reader has no TBF — each command must be processed."""
         r = twin_participant.find_datareader(names.TWIN_ROBOT_COMMAND_READER)
         assert r is not None
         reader = dds.DataReader(r)
         tbf_ns = self._tbf_ns(reader)
-        assert tbf_ns == 0, (
-            "RobotCommand reader must NOT have a time-based filter"
-        )
+        assert tbf_ns == 0, "RobotCommand reader must NOT have a time-based filter"
 
 
 # ---------------------------------------------------------------------------
 # TestDurabilityLateJoin — TRANSIENT_LOCAL late-join behavior
 # ---------------------------------------------------------------------------
+
 
 class TestDurabilityLateJoin:
     """Digital twin receives current state on late join via TRANSIENT_LOCAL."""
@@ -303,9 +298,7 @@ class TestDurabilityLateJoin:
             partition="room/OR-1/procedure/proc-001",
         )
         rs_topic = dds.Topic(pub_p, "RobotState", RobotState)
-        writer_qos = provider.datawriter_qos_from_profile(
-            "TopicProfiles::RobotState"
-        )
+        writer_qos = provider.datawriter_qos_from_profile("TopicProfiles::RobotState")
         pub = dds.Publisher(pub_p)
         writer = dds.DataWriter(pub, rs_topic, writer_qos)
 
@@ -321,23 +314,22 @@ class TestDurabilityLateJoin:
             partition="room/OR-1/procedure/proc-001",
         )
         rs_top_sub = dds.Topic(sub_p, "RobotState", RobotState)
-        reader_qos = provider.datareader_qos_from_profile(
-            "TopicProfiles::RobotState"
-        )
+        reader_qos = provider.datareader_qos_from_profile("TopicProfiles::RobotState")
         sub = dds.Subscriber(sub_p)
         late_reader = dds.DataReader(sub, rs_top_sub, reader_qos)
 
         # Late joiner should receive without waiting for the next publish
         received = wait_for_data(late_reader, timeout_sec=5.0, count=1)
-        assert len(received) >= 1, (
-            "Late-joining RobotState reader should receive TRANSIENT_LOCAL data"
-        )
+        assert (
+            len(received) >= 1
+        ), "Late-joining RobotState reader should receive TRANSIENT_LOCAL data"
         assert received[0].data.operational_mode == RobotMode.OPERATIONAL
 
 
 # ---------------------------------------------------------------------------
 # TestLivelinessDetection — robot disconnect detection
 # ---------------------------------------------------------------------------
+
 
 class TestLivelinessDetection:
     """Digital twin detects robot controller disconnect via liveliness."""
@@ -353,11 +345,11 @@ class TestLivelinessDetection:
             partition="room/OR-1/procedure/proc-001",
         )
         rs_topic = dds.Topic(pub_p, "RobotState", RobotState)
-        writer_qos = provider.datawriter_qos_from_profile(
-            "TopicProfiles::RobotState"
-        )
+        writer_qos = provider.datawriter_qos_from_profile("TopicProfiles::RobotState")
         # Override liveliness to 400 ms for test speed
-        writer_qos.liveliness.lease_duration = dds.Duration(seconds=0, nanoseconds=400_000_000)
+        writer_qos.liveliness.lease_duration = dds.Duration(
+            seconds=0, nanoseconds=400_000_000
+        )
         pub = dds.Publisher(pub_p)
         writer = dds.DataWriter(pub, rs_topic, writer_qos)
 
@@ -368,10 +360,10 @@ class TestLivelinessDetection:
             partition="room/OR-1/procedure/proc-001",
         )
         rs_top_sub = dds.Topic(sub_p, "RobotState", RobotState)
-        reader_qos = provider.datareader_qos_from_profile(
-            "TopicProfiles::RobotState"
+        reader_qos = provider.datareader_qos_from_profile("TopicProfiles::RobotState")
+        reader_qos.liveliness.lease_duration = dds.Duration(
+            seconds=0, nanoseconds=400_000_000
         )
-        reader_qos.liveliness.lease_duration = dds.Duration(seconds=0, nanoseconds=400_000_000)
         sub = dds.Subscriber(sub_p)
         reader = dds.DataReader(sub, rs_top_sub, reader_qos)
 
@@ -396,14 +388,15 @@ class TestLivelinessDetection:
                 break
             time.sleep(0.1)
 
-        assert robot_widget.is_connected is False, (
-            "Widget should be disconnected after writer liveliness expires"
-        )
+        assert (
+            robot_widget.is_connected is False
+        ), "Widget should be disconnected after writer liveliness expires"
 
 
 # ---------------------------------------------------------------------------
 # TestNonBlockingReads — QtAsyncio integration
 # ---------------------------------------------------------------------------
+
 
 class TestNonBlockingReads:
     """DDS reads do not block the Qt main thread."""
@@ -417,26 +410,26 @@ class TestNonBlockingReads:
         readers = _make_injected_readers(participant_factory)
         disp = DigitalTwinDisplay(room_id="OR-1", procedure_id="proc-001", **readers)
 
-        assert inspect.iscoroutinefunction(disp._receive_robot_state), (
-            "_receive_robot_state must be a coroutine (async def)"
-        )
-        assert inspect.iscoroutinefunction(disp._receive_robot_command), (
-            "_receive_robot_command must be a coroutine (async def)"
-        )
-        assert inspect.iscoroutinefunction(disp._receive_safety_interlock), (
-            "_receive_safety_interlock must be a coroutine (async def)"
-        )
-        assert inspect.iscoroutinefunction(disp._receive_operator_input), (
-            "_receive_operator_input must be a coroutine (async def)"
-        )
-        assert inspect.iscoroutinefunction(disp._monitor_liveliness), (
-            "_monitor_liveliness must be a coroutine (async def)"
-        )
+        assert inspect.iscoroutinefunction(
+            disp._receive_robot_state
+        ), "_receive_robot_state must be a coroutine (async def)"
+        assert inspect.iscoroutinefunction(
+            disp._receive_robot_command
+        ), "_receive_robot_command must be a coroutine (async def)"
+        assert inspect.iscoroutinefunction(
+            disp._receive_safety_interlock
+        ), "_receive_safety_interlock must be a coroutine (async def)"
+        assert inspect.iscoroutinefunction(
+            disp._receive_operator_input
+        ), "_receive_operator_input must be a coroutine (async def)"
+        assert inspect.iscoroutinefunction(
+            disp._monitor_liveliness
+        ), "_monitor_liveliness must be a coroutine (async def)"
 
         disp.stop()
 
     def test_start_is_coroutine(self, qapp, participant_factory):
         """DigitalTwinDisplay.start() is an async coroutine."""
-        assert inspect.iscoroutinefunction(DigitalTwinDisplay.start), (
-            "DigitalTwinDisplay.start must be async — it schedules async tasks"
-        )
+        assert inspect.iscoroutinefunction(
+            DigitalTwinDisplay.start
+        ), "DigitalTwinDisplay.start must be async — it schedules async tasks"
