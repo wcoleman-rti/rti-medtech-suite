@@ -46,11 +46,35 @@ rtiddsspy -domainId 10 -printSample -maxWait 10
 
 ## Docker Usage
 
-When running inside Docker containers, ensure `rtiddsspy` is
-available in the container (it ships with Connext runtime):
+When the Docker Compose stack is running, `rtiddsspy` can connect
+via Cloud Discovery Service:
 
 ```bash
-docker exec -it <container> bash -c "source /app/install/setup.bash && rtiddsspy -domainId 10 -printSample"
+# From the host, discover through CDS
+rtiddsspy -domainId 10 -printSample -peer "rtps@udpv4://localhost:7400"
+
+# From inside a container on surgical-net
+docker exec -it vitals-sim-or1 bash -c "rtiddsspy -domainId 10 -printSample"
+```
+
+### Surgical Procedure Module Topics (Domain 10)
+
+```bash
+# Watch PatientVitals (1 Hz from each OR)
+rtiddsspy -domainId 10 -topic PatientVitals -printSample
+
+# Watch RobotState (100 Hz from each OR)
+rtiddsspy -domainId 10 -topic RobotState -printSample
+
+# Watch CameraFrame (30 Hz)
+rtiddsspy -domainId 10 -topic CameraFrame -printSample
+
+# Watch DeviceTelemetry (write-on-change)
+rtiddsspy -domainId 10 -topic DeviceTelemetry -printSample
+
+# Watch ProcedureContext and ProcedureStatus (TRANSIENT_LOCAL)
+rtiddsspy -domainId 10 -topic ProcedureContext -printSample
+rtiddsspy -domainId 10 -topic ProcedureStatus -printSample
 ```
 
 ## Notes

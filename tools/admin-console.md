@@ -23,8 +23,13 @@ visualization.
    7@builtin.udpv4://localhost:7400
    ```
 
+   This works because the Cloud Discovery Service container exposes
+   UDP port 7400 to the host by default. The `7@` prefix tells
+   Connext to discover on domain 0 through the CDS relay.
+
 4. Admin Console discovers all participants across all domains that
-   Cloud Discovery Service serves (Procedure and Hospital).
+   Cloud Discovery Service serves (Procedure domain 10 and Hospital
+   domain 11).
 
 ### Via Docker Host Networking
 

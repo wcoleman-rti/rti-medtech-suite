@@ -56,6 +56,8 @@ services:
     volumes:
       - ./services/cloud-discovery-service/CloudDiscoveryService.xml:/opt/medtech/config/CloudDiscoveryService.xml:ro
       - ${RTI_LICENSE_FILE:-./rti_license.dat}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro
+    ports:
+      - "7400:7400/udp"
     networks:
       surgical-net:
       hospital-net:

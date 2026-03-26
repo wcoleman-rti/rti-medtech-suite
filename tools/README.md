@@ -9,10 +9,10 @@ documentation and usage rationale.
 | Tool | Description | Status |
 |------|-------------|--------|
 | [qos-checker.py](qos-checker.py) | QoS RxO compatibility pre-flight checker | Available (Phase 1) |
+| [medtech-diag/](medtech-diag/) | System health diagnostic CLI | Available (Phase 2) |
+| [partition-inspector.py](partition-inspector.py) | Active partition scanner | Available (Phase 2) |
 | [admin-console.md](admin-console.md) | RTI Admin Console connection guide | Guide |
 | [dds-spy.md](dds-spy.md) | RTI DDS Spy usage examples | Guide |
-| `medtech-diag/` | System health diagnostic CLI | Phase 2 |
-| `partition-inspector.py` | Active partition scanner | Phase 2 |
 
 ## Quick Reference
 
@@ -49,3 +49,34 @@ python tools/qos-checker.py --verbose
 
 Exit codes: 0 (all compatible), 1 (incompatibilities found),
 2 (infrastructure error).
+
+### System Health Diagnostic
+
+```bash
+# Full health check (all domains, all checks)
+python tools/medtech-diag/diag.py
+
+# Check specific domain
+python tools/medtech-diag/diag.py --domain procedure
+
+# Check specific aspect
+python tools/medtech-diag/diag.py --check endpoints
+
+# JSON output (for CI integration)
+python tools/medtech-diag/diag.py --format json
+```
+
+Exit codes: 0 (all pass), 1 (failures found), 2 (infrastructure error).
+
+### Partition Inspector
+
+```bash
+# Scan all active partitions
+python tools/partition-inspector.py
+
+# Watch mode (continuous, updates every 5 s)
+python tools/partition-inspector.py --watch
+
+# Filter by room
+python tools/partition-inspector.py --filter "room/OR-3/*"
+```

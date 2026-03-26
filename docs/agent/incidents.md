@@ -1188,3 +1188,85 @@ after closure. They form the project's decision log.
   that observe data opportunistically should override the deadline to a relaxed
   value appropriate for their rendering rate.
 - **Date closed:** 2026-03-26
+
+---
+
+## INC-041: DomainParticipant partitions not discoverable via Python 7.6.0 builtin topics
+
+- **Status:** Open
+- **Category:** Discovery
+- **Date opened:** 2026-03-27
+- **Phase/Step:** Phase 2 / Step 2.11
+- **Documents involved:** `tools/medtech-diag/diag.py`,
+  `tools/partition-inspector.py`, `spec/surgical-procedure.md`
+- **Description:** This project sets partitions at the DomainParticipant
+  level (`DomainParticipantQos.partition.name`), but
+  `ParticipantBuiltinTopicData` in the RTI Connext Python 7.6.0 binding
+  does not expose a `partition` field.  `PublicationBuiltinTopicData` and
+  `SubscriptionBuiltinTopicData` do have a `partition` field, but it
+  reflects Publisher/Subscriber-level partitions, which are completely
+  independent from DomainParticipant-level partitions.  Since application
+  code does not set Publisher/Subscriber partitions, endpoint discovery
+  always returns empty partition lists.  The `property` field of
+  `ParticipantBuiltinTopicData` contains only `dds.sys_info.*` metadata
+  keys (8 total); there is no partition-related key.
+- **Impact:** The `medtech-diag` partition check and the
+  `partition-inspector.py` tool cannot introspect active partitions.
+  The partition check in `medtech-diag` has been made informational-only
+  (always passes) and `partition-inspector.py` includes a prominent
+  limitation notice.
+- **Possible resolutions:**
+  1. Wait for a future Connext Python API update that exposes
+     DomainParticipant partitions in `ParticipantBuiltinTopicData`.
+  2. Propagate partition names via `DomainParticipantQos.user_data` or
+     `DomainParticipantQos.property` at the application level and read
+     them back from builtin discovery data.
+  3. Use RTI Admin Console or `rtiddsspy` (C-based tools) which may
+     have access to the full discovery data including participant
+     partitions.
+- **Resolution:** Deferred — partition introspection skipped for now.
+  Tools document the limitation and reference this incident.
+
+---
+
+## INC-042: Cross-container CDS discovery fails on domain 10 (Procedure)
+
+- **Status:** Open
+- **Category:** Discovery
+- **Date opened:** 2026-03-27
+- **Phase/Step:** Phase 2 / Step 2.11
+- **Documents involved:** `docker-compose.yml`,
+  `services/cloud-discovery-service/CloudDiscoveryService.xml`,
+  `interfaces/qos/Participants.xml`, `tools/medtech-diag/diag.py`
+- **Description:** Cloud Discovery Service (CDS) on Docker correctly
+  relays SPDP announcements for domain 20 (Observability) — a test
+  participant discovers 11 monitoring participants.  However, CDS does not
+  relay discovery for domain 10 (Procedure) or domain 11 (Hospital). A test
+  participant on domain 10 returns 0 discovered participants regardless of
+  domain_tag setting (tested with "operational", "control", "clinical",
+  and no tag).  Same-process discovery on domain 10 works fine (two
+  participants in one process discover each other), confirming the issue is
+  cross-container CDS relay, not domain_tag handling.
+  The CDS config explicitly allows domains 10, 11, and 20.
+  All participants use `NDDS_DISCOVERY_PEERS=rtps@udpv4://cloud-discovery-service:7400`
+  and the SimulationTransport QoS profile (UDPv4 only, multicast disabled,
+  `AvoidIPFragmentation` message_size_max=1400).  The monitoring
+  participants on domain 20 are created by the ML2.0 middleware and may use
+  different transport settings (message_size_max=65507).  The
+  message_size_max mismatch is suspected but not confirmed as the root cause.
+- **Impact:** The `medtech-diag` tool cannot discover Procedure or Hospital
+  domain participants when run from a separate container.  It can only
+  verify infrastructure checks (CDS reachability, Prometheus) and
+  Observability domain discovery from outside the app containers.
+- **Possible resolutions:**
+  1. Set `message_size_max` in CDS transport config to match the
+     application's 1400 (AvoidIPFragmentation).
+  2. Remove `AvoidIPFragmentation` from application QoS (use default
+     65507) — acceptable in Docker bridge networks.
+  3. Investigate CDS verbosity logs at LOCAL level to trace domain 10
+     announcement handling.
+  4. Test with multicast enabled on the Docker bridge network instead
+     of CDS-only discovery.
+- **Resolution:** Deferred to Phase 3 — does not block Phase 2 completion.
+  Diagnostic tools function correctly for Observability domain and
+  infrastructure checks.
