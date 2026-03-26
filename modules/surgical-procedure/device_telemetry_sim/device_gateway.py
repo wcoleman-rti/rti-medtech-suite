@@ -23,7 +23,11 @@ import rti.connextdds as dds
 from medtech_dds_init.dds_init import initialize_connext
 from medtech_logging import ModuleName, init_logging
 
-from ._device_model import DEVICE_PROFILES, DeviceProfile, DeviceStateModel
+from ._device_model import (
+    DEVICE_PROFILES,
+    DeviceProfile,
+    DeviceStateModel,
+)
 
 names = app_names.MedtechEntityNames.SurgicalParticipants
 
@@ -118,9 +122,13 @@ class DeviceGateway:
         qos.partition.name = [partition]
         self._participant.qos = qos
 
-        writer_any = self._participant.find_datawriter(names.DEVICE_TELEMETRY_WRITER)
+        writer_any = self._participant.find_datawriter(
+            names.DEVICE_TELEMETRY_WRITER
+        )
         if writer_any is None:
-            raise RuntimeError(f"Writer not found: {names.DEVICE_TELEMETRY_WRITER}")
+            raise RuntimeError(
+                f"Writer not found: {names.DEVICE_TELEMETRY_WRITER}"
+            )
 
         self._writer = dds.DataWriter(writer_any)
 
