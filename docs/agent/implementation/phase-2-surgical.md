@@ -200,7 +200,7 @@
 
 ---
 
-## Step 2.8 — Multi-Instance Integration Test
+## Step 2.8 — Multi-Instance Integration Test ✅ `1ebb4e6`
 
 ### Work
 
@@ -211,14 +211,14 @@
 
 ### Test Gate
 
-- [ ] Two concurrent instances run without interference
-- [ ] Cross-partition isolation: subscriber in OR-1 receives zero samples from OR-3
-- [ ] All surgical spec scenarios pass under multi-instance conditions
-- [ ] Docker Compose launches and runs both instances successfully
+- [x] Two concurrent instances run without interference
+- [x] Cross-partition isolation: subscriber in OR-1 receives zero samples from OR-3
+- [x] All surgical spec scenarios pass under multi-instance conditions
+- [x] Docker Compose launches and runs both instances successfully
 
 ---
 
-## Step 2.9 — Observability Verification
+## Step 2.9 — Observability Verification ✅ `40819da`
 
 ### Work
 
@@ -230,11 +230,11 @@
 
 ### Test Gate (spec: common-behaviors.md — Observability)
 
-- [ ] Collector Service receives telemetry from surgical participants
-- [ ] Prometheus shows per-participant metrics within 30 s
-- [ ] Deadline-missed event is visible in Prometheus after induced deadline violation
-- [ ] Grafana dashboard displays system health overview with participant metrics and logs
-- [ ] All functional spec scenarios pass with observability profile disabled
+- [x] Collector Service receives telemetry from surgical participants
+- [x] Prometheus shows per-participant metrics within 30 s
+- [x] Deadline-missed event is visible in Prometheus after induced deadline violation
+- [x] Grafana dashboard displays system health overview with participant metrics and logs
+- [x] All functional spec scenarios pass with observability profile disabled
 
 ---
 

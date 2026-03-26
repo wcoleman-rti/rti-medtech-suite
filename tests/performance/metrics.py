@@ -88,6 +88,10 @@ class MetricDef:
 
 
 # ── Tier 1: Latency & Timing ────────────────────────────────────────
+# Note: RTI Monitoring Library 2.0 does not export per-sample latency
+# percentiles to Prometheus. L1-L4 are defined with placeholder queries;
+# they will return None and be skipped by the benchmark harness. Latency
+# profiling is done via RTI Admin Console or targeted DDS instrumentation.
 
 L1 = MetricDef(
     metric_id="L1",
@@ -150,7 +154,7 @@ L6 = MetricDef(
 T1 = MetricDef(
     metric_id="T1",
     description="OperatorInput received sample rate",
-    promql='rate(dds_datareader_samples_received_total{topic="OperatorInput"}[30s])',
+    promql='sum(rate(dds_data_reader_protocol_received_samples_total[30s]) * on(guid) group_left(topic_name) dds_data_reader_presence{topic_name="OperatorInput"})',
     unit="samples/s",
     query_type="range",
     threshold=Threshold(kind=ThresholdKind.PERCENTAGE, max_ratio=-0.10),
@@ -159,7 +163,7 @@ T1 = MetricDef(
 T2 = MetricDef(
     metric_id="T2",
     description="WaveformData received sample rate",
-    promql='rate(dds_datareader_samples_received_total{topic="WaveformData"}[30s])',
+    promql='sum(rate(dds_data_reader_protocol_received_samples_total[30s]) * on(guid) group_left(topic_name) dds_data_reader_presence{topic_name="WaveformData"})',
     unit="samples/s",
     query_type="range",
     threshold=Threshold(kind=ThresholdKind.PERCENTAGE, max_ratio=-0.10),
@@ -168,7 +172,7 @@ T2 = MetricDef(
 T3 = MetricDef(
     metric_id="T3",
     description="CameraFrame received sample rate",
-    promql='rate(dds_datareader_samples_received_total{topic="CameraFrame"}[30s])',
+    promql='sum(rate(dds_data_reader_protocol_received_samples_total[30s]) * on(guid) group_left(topic_name) dds_data_reader_presence{topic_name="CameraFrame"})',
     unit="samples/s",
     query_type="range",
     threshold=Threshold(kind=ThresholdKind.PERCENTAGE, max_ratio=-0.10),
@@ -177,7 +181,7 @@ T3 = MetricDef(
 T4 = MetricDef(
     metric_id="T4",
     description="PatientVitals received sample rate",
-    promql='rate(dds_datareader_samples_received_total{topic="PatientVitals"}[30s])',
+    promql='sum(rate(dds_data_reader_protocol_received_samples_total[30s]) * on(guid) group_left(topic_name) dds_data_reader_presence{topic_name="PatientVitals"})',
     unit="samples/s",
     query_type="range",
     threshold=Threshold(kind=ThresholdKind.PERCENTAGE, max_ratio=-0.10),
@@ -186,7 +190,7 @@ T4 = MetricDef(
 T5 = MetricDef(
     metric_id="T5",
     description="Total samples lost (all topics, all readers)",
-    promql="sum(dds_datareader_samples_lost_total)",
+    promql="sum(dds_data_reader_sample_lost_total)",
     unit="samples",
     query_type="instant",
     threshold=Threshold(kind=ThresholdKind.ABSOLUTE_DELTA_FRACTION, fraction=0.001),
@@ -195,7 +199,7 @@ T5 = MetricDef(
 T6 = MetricDef(
     metric_id="T6",
     description="Deadline missed events (all readers)",
-    promql="sum(dds_datareader_deadline_missed_total)",
+    promql="sum(dds_data_reader_deadline_missed_total)",
     unit="count",
     query_type="instant",
     threshold=Threshold(kind=ThresholdKind.ABSOLUTE_ZERO),
@@ -206,7 +210,7 @@ T6 = MetricDef(
 R1 = MetricDef(
     metric_id="R1",
     description="Total DDS participant count",
-    promql="count(dds_domainparticipant_up)",
+    promql="count(dds_domain_participant_presence)",
     unit="count",
     query_type="instant",
     threshold=Threshold(kind=ThresholdKind.EXACT_MATCH),
@@ -214,8 +218,8 @@ R1 = MetricDef(
 
 R2 = MetricDef(
     metric_id="R2",
-    description="Total matched endpoint pairs",
-    promql="sum(dds_datawriter_matched_subscriptions_total)",
+    description="Total data writer count",
+    promql="count(dds_data_writer_presence)",
     unit="count",
     query_type="instant",
     threshold=Threshold(kind=ThresholdKind.EXACT_MATCH),
@@ -223,28 +227,28 @@ R2 = MetricDef(
 
 R3 = MetricDef(
     metric_id="R3",
-    description="Peak heap memory — surgical container",
-    promql='container_memory_usage_bytes{name=~"surgical.*"}',
-    unit="MB",
+    description="Peak resident memory — surgical applications",
+    promql="max(dds_application_process_memory_usage_resident_memory_bytes)",
+    unit="bytes",
     query_type="instant",
     threshold=Threshold(kind=ThresholdKind.PERCENTAGE, max_ratio=0.25),
 )
 
 R4 = MetricDef(
     metric_id="R4",
-    description="Peak heap memory — dashboard container",
-    promql='container_memory_usage_bytes{name=~"dashboard.*"}',
-    unit="MB",
+    description="Virtual memory usage — all applications",
+    promql="max(dds_application_process_memory_usage_virtual_memory_bytes)",
+    unit="bytes",
     query_type="instant",
     threshold=Threshold(kind=ThresholdKind.PERCENTAGE, max_ratio=0.25),
 )
 
 R5 = MetricDef(
     metric_id="R5",
-    description="Collector Service telemetry ingestion rate",
-    promql="rate(collector_samples_received_total[30s])",
-    unit="samples/s",
-    query_type="range",
+    description="Total data reader count",
+    promql="count(dds_data_reader_presence)",
+    unit="count",
+    query_type="instant",
     threshold=Threshold(kind=ThresholdKind.PERCENTAGE, max_ratio=0.50),
 )
 

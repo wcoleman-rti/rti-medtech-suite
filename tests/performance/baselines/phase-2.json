@@ -1,0 +1,51 @@
+{
+  "version": "1.0",
+  "phase": "phase-2",
+  "timestamp": "2026-03-26T11:47:30.125617+00:00",
+  "git_commit": "40819da",
+  "environment": {
+    "connext_version": "7.6.0",
+    "docker_compose_profile": "observability",
+    "surgical_instances": 2,
+    "measurement_duration_s": 60,
+    "warmup_s": 15
+  },
+  "metrics": {
+    "R1": {
+      "value": 19.0,
+      "unit": "count"
+    },
+    "R2": {
+      "value": 49.0,
+      "unit": "count"
+    },
+    "R3": {
+      "value": 132440064.0,
+      "unit": "bytes"
+    },
+    "R4": {
+      "value": 1879633920.0,
+      "unit": "bytes"
+    },
+    "R5": {
+      "value": 31.0,
+      "unit": "count"
+    },
+    "T1": {
+      "value": 0.0,
+      "unit": "samples/s"
+    },
+    "T4": {
+      "value": 1.0153856431453039,
+      "unit": "samples/s"
+    },
+    "T5": {
+      "value": 0.0,
+      "unit": "samples"
+    },
+    "T6": {
+      "value": 0.0,
+      "unit": "count"
+    }
+  }
+}

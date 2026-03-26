@@ -50,7 +50,7 @@ class BedsideMonitor:
         room_id: str,
         procedure_id: str,
         patient_id: str = "patient-001",
-        device_id: str = "bedside-monitor-001",
+        device_id: str = "vital-mon-001",
     ) -> None:
         initialize_connext()
 

@@ -138,3 +138,28 @@ class ProcedureContextPublisher:
     def procedure_id(self) -> str:
         """Return the procedure ID."""
         return self._procedure_id
+
+
+if __name__ == "__main__":
+    import os
+    import signal
+
+    _running = True
+
+    def _shutdown(signum: int, frame: object) -> None:
+        global _running
+        _running = False
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
+    room_id = os.environ.get("ROOM_ID", "OR-1")
+    procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
+
+    pub = ProcedureContextPublisher(room_id=room_id, procedure_id=procedure_id)
+    pub.start()
+    pub.publish_context(room=room_id)
+    pub.publish_status(ProcedurePhase.PRE_OP, message="Initializing")
+
+    while _running:
+        time.sleep(1.0)

@@ -34,6 +34,14 @@
                             <user_forwarding_level>NOTICE</user_forwarding_level>
                             <middleware_forwarding_level>WARNING</middleware_forwarding_level>
                         </logs>
+                        <metrics>
+                            <element>
+                                <resource_selection>//*</resource_selection>
+                                <enabled_metrics_selection>
+                                    <element>*</element>
+                                </enabled_metrics_selection>
+                            </element>
+                        </metrics>
                     </telemetry_data>
                 </monitoring>
             </participant_factory_qos>

@@ -46,7 +46,9 @@ def get_prometheus_url() -> str:
 
 def _prometheus_get(path: str, params: dict) -> dict:
     """Make a GET request to the Prometheus HTTP API."""
-    query_string = "&".join(f"{k}={v}" for k, v in params.items())
+    from urllib.parse import urlencode
+
+    query_string = urlencode(params)
     url = f"{get_prometheus_url()}{path}?{query_string}"
     req = Request(url, headers={"Accept": "application/json"})
     with urlopen(req, timeout=10) as resp:  # noqa: S310 — URL from env config

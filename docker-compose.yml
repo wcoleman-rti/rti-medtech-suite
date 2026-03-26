@@ -24,7 +24,9 @@ x-install-volumes: &install-volumes
   - ./install/share/participants:/opt/medtech/share/participants:ro
   - ./install/share/resources:/opt/medtech/share/resources:ro
   - ./install/lib/python/site-packages:/opt/medtech/lib/python/site-packages:ro
+  - ./install/lib:/opt/medtech/lib:ro
   - ./install/bin:/opt/medtech/bin:ro
+  - ${RTI_LICENSE_FILE:-./rti_license.dat}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro
 
 x-build-args: &build-args
   CONNEXT_VERSION: "7.6.0"
@@ -189,6 +191,7 @@ services:
       ROOM_ID: "OR-1"
       PROCEDURE_ID: "OR1-001"
       MEDTECH_APP_NAME: "robot-controller-or1"
+      LD_LIBRARY_PATH: "/opt/rti.com/rti_connext_dds-7.6.0/lib/x64Linux4gcc8.5.0:/opt/medtech/lib"
     volumes: *install-volumes
     networks:
       - surgical-net
@@ -288,6 +291,7 @@ services:
       ROOM_ID: "OR-3"
       PROCEDURE_ID: "OR3-001"
       MEDTECH_APP_NAME: "robot-controller-or3"
+      LD_LIBRARY_PATH: "/opt/rti.com/rti_connext_dds-7.6.0/lib/x64Linux4gcc8.5.0:/opt/medtech/lib"
     volumes: *install-volumes
     networks:
       - surgical-net
