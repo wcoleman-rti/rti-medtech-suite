@@ -11,8 +11,10 @@ line-length = 88
 markers = [
     "benchmark: performance benchmark tests (require observability stack)",
     "consistency: DDS consistency contract tests (vision/dds-consistency.md)",
+    "e2e: end-to-end tests requiring full Docker Compose environment",
     "integration: tests requiring two or more DDS participants",
     "lint: static analysis / code pattern checks",
+    "observability: tests requiring Prometheus/Grafana/Collector Service",
     "partition: tests for partition-based isolation",
     "isolation: tests for domain tag or domain ID isolation",
     "failover: tests for exclusive ownership failover",
