@@ -459,3 +459,20 @@ pattern, and anti-pattern prohibitions.
 **When** the class is destroyed
 **Then** the destructor calls `aws_.stop()` before DDS entities are destroyed
 **And** the `AsyncWaitSet` is declared after DDS entities (reverse destruction order as defensive layer)
+
+---
+
+## Container Build Integrity
+
+### Scenario: C++ binary built inside Docker runs without ABI errors `@e2e`
+
+**Given** the project is built inside a Docker multi-stage build using `docker/medtech-app.Dockerfile`
+**When** `robot-controller` starts in the `cpp-runtime` container
+**Then** it does not encounter GLIBCXX, GLIBC, or other shared library resolution errors
+**And** it successfully creates a DDS DomainParticipant
+
+### Scenario: Python modules import successfully in Docker `@e2e`
+
+**Given** the project is built inside a Docker multi-stage build using `docker/medtech-app.Dockerfile`
+**When** the `python-runtime` container executes `import surgery; import monitoring`
+**Then** all generated type modules import without errors

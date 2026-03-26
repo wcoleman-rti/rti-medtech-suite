@@ -18,17 +18,6 @@ x-qos-volumes: &qos-volumes
   - ./interfaces/qos:/opt/medtech/share/qos:ro
   - ./interfaces/domains:/opt/medtech/share/domains:ro
 
-# DEV ONLY — host-mount for local iteration; never use for CI or integration tests
-x-dev-volumes: &dev-volumes
-  - ./interfaces/qos:/opt/medtech/share/qos:ro
-  - ./interfaces/domains:/opt/medtech/share/domains:ro
-  - ./install/share/participants:/opt/medtech/share/participants:ro
-  - ./install/share/resources:/opt/medtech/share/resources:ro
-  - ./install/lib/python/site-packages:/opt/medtech/lib/python/site-packages:ro
-  - ./install/lib:/opt/medtech/lib:ro
-  - ./install/bin:/opt/medtech/bin:ro
-  - ${RTI_LICENSE_FILE:-./rti_license.dat}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro
-
 x-config-volumes: &config-volumes
   - ./interfaces/qos:/opt/medtech/share/qos:ro
   - ./interfaces/domains:/opt/medtech/share/domains:ro

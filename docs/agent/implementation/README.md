@@ -14,6 +14,7 @@ These rules apply to all phases without exception:
 4. **Fix the code, not the test.** If a test fails, the implementation is fixed to match the spec. If the *desired behavior* genuinely changes, the spec is updated first (with justification), then the test is updated to match the new spec.
 5. **Tests run in CI and locally.** All tests must be runnable with a single command from the project root.
 6. **Performance baselines are committed artifacts.** At the completion of each implementation phase, after all functional tests and quality gates pass, the implementing agent runs the performance benchmark harness and commits the resulting baseline file. A performance regression that exceeds the defined thresholds in [vision/performance-baseline.md](../vision/performance-baseline.md) blocks the phase, the same as a failing functional test.
+7. **Docker test execution.** Integration and E2E tests that run in Docker must use images built via the multi-stage Dockerfile (`docker/medtech-app.Dockerfile`), not host-mounted install trees. The `x-dev-volumes` pattern in `docker-compose.yml` is a local development convenience and must not be used in CI or as the basis for test results.
 
 ---
 
@@ -93,6 +94,7 @@ If an implementation session is interrupted, use this checklist to resume:
 | [phase-1-foundation.md](phase-1-foundation.md) | Foundation | — | CMake build, IDL types, QoS profiles, Docker infra, Observability stack, Python venv, test harness, shared GUI bootstrap (`medtech_gui`), Logging initialization utility (Connext Logging API + Monitoring Library 2.0 forwarding), CI pipeline, performance benchmark harness, DDS design review (rti-chatbot-mcp), QoS compatibility checker, tool scaffolding |
 | [revision-dds-consistency.md](revision-dds-consistency.md) | DDS Consistency Alignment | Phase 1, Phase 2 Steps 2.1–2.2 | `app_names.idl` entity name constants, `dds_init.py` relocation, retrofit generated constants, architecture audit, expanded CI anti-pattern checks, `@consistency` spec tests |
 | [phase-2-surgical.md](phase-2-surgical.md) | Surgical Procedure | Phase 1, Revision | Robot sim, vitals sim (simulation model with scenario profiles), camera sim, procedure context, device telemetry (write-on-change), digital twin display, partition isolation, diagnostic tools (medtech-diag, partition-inspector) |
+| [revision-docker-build-workflow.md](revision-docker-build-workflow.md) | Docker Build Workflow | Phase 1 | Multi-stage Dockerfile, in-container compilation, compose update, CI Docker gates, doc guardrails |
 | [phase-3-dashboard.md](phase-3-dashboard.md) | Hospital Dashboard | Phase 2 | PySide6 GUI, Routing Service config, multi-OR aggregation, alert feed, robot status |
 | [phase-4-alerts.md](phase-4-alerts.md) | Clinical Alerts & Decision Support | Phase 2, Phase 3 Step 3.1 | Risk scoring engine, alert generation, cross-domain subscription, configurable thresholds |
 
