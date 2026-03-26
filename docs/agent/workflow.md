@@ -187,6 +187,7 @@ code patterns, consult these additional resources (in priority order):
 | Push code without running the full test suite | See Section 3 commit discipline |
 | Use `print()`, `printf`, `std::cout`, or a custom logging framework | All logging must use the RTI Connext Logging API per `vision/technology.md` |
 | Use DynamicData / DynamicType in application code | All applications must use IDL-generated types. DynamicData is permitted only in developer tools (e.g., `tools/qos-checker.py`) and test utilities. See `vision/coding-standards.md`. |
+| Mount host-compiled C++ binaries or shared libraries into Docker containers | Host toolchain ABI may differ from container runtime libraries, causing GLIBCXX/GLIBC mismatches. Compile inside the container. |
 
 > **Consolidated reference:** All DDS-specific prohibited patterns above are cataloged with detailed risk assessments and approved alternatives in [vision/dds-consistency.md — Anti-Pattern Catalog](vision/dds-consistency.md). The initialization sequence, canonical data access patterns, and new module checklist in that document operationalize these prohibitions into actionable guidance.
 
@@ -352,6 +353,7 @@ or at any point to catch compliance drift.
 | **Third-party notices** | Every third-party component — whether fetched during configure/build (FetchContent, `file(DOWNLOAD)`), installed via pip (`requirements.txt`), or pulled as a Docker image — is documented in `THIRD_PARTY_NOTICES.md` at the repository root. CMake/Docker components list: name, version/pin, SPDX license, source URL, fetching mechanism, and usage. Python pip packages list: name, SPDX license, and usage (version pins live in `requirements.txt`). When adding a new dependency of any kind, update `THIRD_PARTY_NOTICES.md` in the same commit. |
 | **Performance baseline** | Run `python tests/performance/benchmark.py` against the latest committed baseline. All metrics within regression thresholds per `vision/performance-baseline.md`. At phase completion, record a new baseline with `--record --phase <phase>`. |
 | **Publication model** | Every topic's publisher uses the correct publication model (continuous-stream, periodic-snapshot, or write-on-change) as defined in `vision/data-model.md` Publication Model section. Write-on-change topics must not publish on a fixed timer. |
+| **Docker build** | `docker compose --profile build build` succeeds. Multi-stage application images build without errors. `robot-controller` runs inside `cpp-runtime` container without library version mismatches. |
 
 These gates are not aspirational. A phase step is not complete until
 every gate passes. If a gate cannot pass, escalate per Section 5.

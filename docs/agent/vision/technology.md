@@ -535,6 +535,35 @@ ENV MEDTECH_CONFIG_DIR="/opt/medtech/etc"
 
 Docker containers do not use `setup.bash` — they set env vars directly in the Dockerfile or `docker-compose.yml`.
 
+#### Container Build Integrity Rule
+
+C++ binaries and project shared libraries must be compiled inside the Docker build stage using the container's toolchain. Mounting host-compiled binaries into containers (`-v ./install/bin:/opt/medtech/bin`) is prohibited for CI, integration tests, and deployment.
+
+The host-mount pattern is permitted **only** for:
+
+- XML configuration files (QoS, domain, participant XML)
+- Python source files during local development iteration
+- The RTI license file
+
+Rationale: the host toolchain's GCC/libstdc++ version may differ from the container's runtime libraries, causing ABI mismatches (GLIBCXX_x.y.z not found, segmentation faults from vtable incompatibility). Building inside the container eliminates this class of error entirely.
+
+#### Development Inner Loop
+
+For development iteration without rebuilding the full Docker image, compile inside the build-base container:
+
+```bash
+docker run --rm \
+  -v "$(pwd)":/workspace \
+  -w /workspace \
+  medtech/build-base \
+  bash -c "cmake -B /tmp/build -S . \
+    -DCMAKE_INSTALL_PREFIX=/workspace/install && \
+    cmake --build /tmp/build -j && \
+    cmake --install /tmp/build"
+```
+
+This uses the container's toolchain while writing output to the host filesystem. The resulting `install/` tree is ABI-compatible with the runtime containers.
+
 ### Install Rules
 
 Every CMake target must define `install()` rules. Missing install rules are a build defect.
