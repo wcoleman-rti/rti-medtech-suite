@@ -180,7 +180,7 @@
 
 ---
 
-## Step 2.7 — Module README & Documentation Compliance
+## Step 2.7 — Module README & Documentation Compliance ✅ `e626ff6`
 
 ### Work
 
@@ -191,12 +191,12 @@
 
 ### Test Gate (spec: documentation.md)
 
-- [ ] `markdownlint modules/surgical-procedure/README.md` — zero errors, zero warnings
-- [ ] `python tests/lint/check_readme_sections.py` — all required sections present and in order
-- [ ] Architecture section documents all DDS entities (participants, writers, readers, topics, QoS profiles, domain tags)
-- [ ] Architecture section documents the threading model
-- [ ] Architecture section documents the publication model (continuous-stream, periodic-snapshot, write-on-change) for each topic
-- [ ] Documentation handoff verification: module README is self-sufficient without consulting `docs/agent/`
+- [x] `markdownlint modules/surgical-procedure/README.md` — zero errors, zero warnings
+- [x] `python tests/lint/check_readme_sections.py` — all required sections present and in order
+- [x] Architecture section documents all DDS entities (participants, writers, readers, topics, QoS profiles, domain tags)
+- [x] Architecture section documents the threading model
+- [x] Architecture section documents the publication model (continuous-stream, periodic-snapshot, write-on-change) for each topic
+- [x] Documentation handoff verification: module README is self-sufficient without consulting `docs/agent/`
 
 ---
 
