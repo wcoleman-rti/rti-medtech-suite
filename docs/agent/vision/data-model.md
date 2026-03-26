@@ -336,17 +336,14 @@ interfaces/qos/
 ├── Snippets.xml              # Isolated, reusable QoS policy chunks (no inheritance)
 ├── Patterns.xml              # Generic data-pattern base profiles (State, Command, Stream, + GUI variants)
 ├── Topics.xml                # Topic-filter-based profiles binding QoS to topics
-├── Participants.xml          # Factory (process-level) config — no transport profiles
-└── transport/
-    ├── Default.xml           # Participants::Transport — SHMEM + UDPv4, multicast ON
-    └── Docker.xml            # Participants::Transport — SHMEM + UDPv4, multicast OFF, CDS peers
+└── Participants.xml          # Transport, Factory, and Participants libraries
 ```
 
 - **Snippets** define isolated QoS policy chunks. Where a builtin equivalent exists in `BuiltinQosSnippetLib` (e.g., `QosPolicy.Reliability.Reliable`, `QosPolicy.Durability.TransientLocal`, `QosPolicy.History.KeepLast_1`, `QosPolicy.History.KeepAll`, `QosPolicy.Reliability.BestEffort`), the builtin is used directly — custom snippets are only defined for policies that have no builtin equivalent. Snippets do not inherit from other snippets or profiles.
 - **Patterns** are generic base profiles that inherit from semantically appropriate `BuiltinQosLib` profiles (e.g., `Generic.KeepLastReliable.TransientLocal` for state data, `Generic.BestEffort` for streaming) and compose additional custom snippets as needed. They represent reusable data-flow archetypes. GUI downsampling variants (composing the `GuiSubsample` snippet) are defined here alongside their base patterns.
 - **TopicProfiles** (within `Topics.xml`) define per-topic profiles that inherit from a pattern and add topic-specific tuning (deadline, lifespan, liveliness) in exactly one place. Each topic that requires tuning beyond its base pattern has a single `TopicProfiles::` profile that is the **single source of truth** for that topic's QoS. GUI variants inherit from the standard topic profile and add `GuiSubsample`.
 - **Topics** profiles (within `Topics.xml`) use `topic_filter` to bind QoS to specific topic names by referencing `TopicProfiles::` profiles. Topic-filter entries contain no nested `<base_name>` tags or explicit policy configuration — they are pure references. Applications use topic-aware QoS APIs so the correct QoS resolves automatically.
-- **Participants** profiles contain discovery, transport, and resource configuration. These are separate from data/topic profiles because they apply to DomainParticipants, not DataWriters/DataReaders. Transport profiles are defined in deployment-selected files under `interfaces/qos/transport/` (see *Participant Configuration* below). A `Factory` QoS library (within `Participants.xml`) contains the `participant_factory_qos` profile, which applies at the process level (above any individual participant).
+- **Participants** profiles contain discovery, transport, and resource configuration. These are separate from data/topic profiles because they apply to DomainParticipants, not DataWriters/DataReaders. `Participants.xml` contains three QoS libraries: `Transport` (deployment-specific transport overrides, selected via `$(MEDTECH_TRANSPORT_PROFILE)` variable substitution), `Factory` (process-level `participant_factory_qos`), and `Participants` (the `Transport` profile composing common transport QoS and the selected transport snippet).
 
 ### QoS Snippets (`Snippets.xml`)
 
@@ -535,33 +532,37 @@ Example structure:
 </qos_library>
 ```
 
-### Participant Configuration (`Participants.xml` + `transport/`)
+### Participant Configuration (`Participants.xml`)
 
 Discovery, transport, and resource settings for DomainParticipants. Separated from data/topic QoS because these apply to the participant entity, not to writers/readers.
 
-`Participants.xml` contains one QoS library:
+`Participants.xml` contains three QoS libraries and a `<configuration_variables>` block:
 
-1. **`Factory`** — process-level `participant_factory_qos` profile for logging, Monitoring Library 2.0, and other factory-scoped settings. This profile has `is_default_participant_factory_profile="true"` and applies to the global `DomainParticipantFactory` — above any individual participant. Separated into its own library to make the scope boundary explicit.
+1. **`<configuration_variables>`** — defines `MEDTECH_TRANSPORT_PROFILE` with a default value of `Default`. The environment variable `MEDTECH_TRANSPORT_PROFILE` overrides this at runtime. This variable is substituted into the `Participants::Transport` profile's `<base_name>` to select the active transport snippet.
 
-The **`Participants`** QoS library (containing the `Transport` profile) is defined in a **deployment-selected XML file** under `interfaces/qos/transport/`. Exactly one transport file is loaded via `NDDS_QOS_PROFILES` — the deployment environment selects which one:
+2. **`Transport`** — deployment-specific transport overrides as self-contained QoS profile snippets. Each snippet is named for its deployment context:
 
-| File | Profile Name | SHMEM | UDPv4 | Multicast | Discovery Peers | Use Case |
-|------|-------------|-------|-------|-----------|-----------------|----------|
-| `transport/Default.xml` | `Participants::Transport` | Enabled | Enabled | Enabled | Connext defaults (multicast + unicast) | Bare-metal, native development, production |
-| `transport/Docker.xml` | `Participants::Transport` | Enabled | Enabled | Disabled | `builtin.shmem://`, `builtin.udpv4://localhost`, CDS locator | Docker simulation |
+| Snippet | SHMEM | UDPv4 | Multicast | Discovery Peers | Use Case |
+|---------|-------|-------|-----------|-----------------|----------|
+| `Transport::Default` | Enabled | Enabled | Enabled | Connext defaults (multicast + unicast) | Bare-metal, native development, production |
+| `Transport::Docker` | Enabled | Enabled | Disabled | `builtin.shmem://`, `builtin.udpv4://localhost`, CDS locator | Docker simulation |
 
-Both profiles share the same name (`Participants::Transport`) so all participant XML references are deployment-neutral. SHMEM is enabled in both profiles — it benefits intra-container communication (multiple participants or processes within the same container). Both compose `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation` to prevent IP fragmentation.
+3. **`Factory`** — process-level `participant_factory_qos` profile for logging, Monitoring Library 2.0, and other factory-scoped settings. This profile has `is_default_participant_factory_profile="true"` and applies to the global `DomainParticipantFactory` — above any individual participant. Separated into its own library to make the scope boundary explicit.
 
-The Docker profile explicitly sets initial peers to:
+4. **`Participants`** — the `Transport` profile composes common participant QoS (currently `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation`) and the deployment-selected snippet (`Transport::$(MEDTECH_TRANSPORT_PROFILE)`). All participant XML references this single profile name.
+
+SHMEM is enabled in both transport snippets — it benefits intra-container communication (multiple participants or processes within the same container). Both snippets inherit `AvoidIPFragmentation` via the shared `Participants::Transport` base.
+
+The Docker snippet explicitly sets initial peers to:
 1. `builtin.shmem://` — intra-container SHMEM discovery
 2. `builtin.udpv4://localhost` — intra-container UDPv4 discovery
 3. `rtps@udpv4://cloud-discovery-service:7400` — CDS for cross-container discovery
 
 This excludes the default multicast discovery address, preventing warnings about multicast on Docker bridge networks.
 
-`setup.bash` loads `transport/Default.xml`; `docker-compose.yml` loads `transport/Docker.xml`. No other configuration change is needed to switch between environments.
+Deployment selection is a single environment variable: `MEDTECH_TRANSPORT_PROFILE=Docker` in `docker-compose.yml`. Bare-metal uses the XML default (`Default`) with no env var needed.
 
-- **Discovery peers** — Docker peers are configured in the transport profile XML. For the Default profile, peers use Connext defaults (including multicast). `NDDS_DISCOVERY_PEERS` can still be set to override/add peers in either environment.
+- **Discovery peers** — Docker peers are configured in the `Transport::Docker` snippet. For the Default snippet, peers use Connext defaults (including multicast). `NDDS_DISCOVERY_PEERS` can still be set to override/add peers in either environment.
 - **Resource limits** — participant-level resource bounds
 
 ---

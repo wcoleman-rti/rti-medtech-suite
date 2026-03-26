@@ -75,11 +75,7 @@ install(FILES
     interfaces/qos/Participants.xml
     DESTINATION share/qos
 )
-install(FILES
-    interfaces/qos/transport/Default.xml
-    interfaces/qos/transport/Docker.xml
-    DESTINATION share/qos/transport
-)
+
 install(FILES
     interfaces/domains/Domains.xml
     DESTINATION share/domains

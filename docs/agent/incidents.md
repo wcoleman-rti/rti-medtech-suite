@@ -1327,3 +1327,53 @@ after closure. They form the project's decision log.
   single file. SHMEM should remain enabled in all profiles — it is
   always beneficial for co-located participants.
 - **Date closed:** 2026-03-26
+
+---
+
+## INC-044: Unified transport profile — env-var-selected snippets in Participants.xml
+
+- **Status:** Closed
+- **Category:** Discovery (operator-directed revision)
+- **Date opened:** 2026-03-26
+- **Phase/Step:** Post-V1.0 revision (operator review, follows INC-043)
+- **Documents involved:** `interfaces/qos/Participants.xml`,
+  `interfaces/qos/transport/Default.xml` (deleted),
+  `interfaces/qos/transport/Docker.xml` (deleted),
+  `setup.bash.in`, `docker-compose.yml`, `CMakeLists.txt`,
+  `tests/qos/CMakeLists.txt`,
+  `vision/data-model.md`, `vision/system-architecture.md`,
+  `vision/dds-consistency.md`, `implementation/phase-1-foundation.md`
+- **Description:** Operator review of INC-043's dual-file transport design
+  identified two concerns:
+  1. **DRY violation** — `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation`
+     was duplicated in both `transport/Default.xml` and `transport/Docker.xml`.
+     As common participant QoS grows, duplication would increase.
+  2. **File-selection fragility** — deployment-specific `NDDS_QOS_PROFILES`
+     paths are error-prone and require coordinating two different profile
+     load orders (setup.bash vs docker-compose.yml).
+  Operator proposed consolidating all transport configuration into a single
+  `Participants.xml` using `<configuration_variables>` with
+  `$(MEDTECH_TRANSPORT_PROFILE)` variable substitution in `<base_name>`.
+  MCP confirmed that `$(VAR)` substitution works in `<base_name><element>`
+  text at parse time (RTI Connext 7.6.0).
+- **Resolution:**
+  1. Moved all transport snippets into `Participants.xml` as a `Transport`
+     QoS library with profiles `Default` (empty — Connext defaults) and
+     `Docker` (multicast disabled, explicit CDS peers).
+  2. Added `<configuration_variables>` with `MEDTECH_TRANSPORT_PROFILE`
+     defaulting to `Default`. Environment variable overrides the XML default.
+  3. `Participants::Transport` profile composes `AvoidIPFragmentation`
+     (common) and `Transport::$(MEDTECH_TRANSPORT_PROFILE)` (selected).
+  4. Deleted `interfaces/qos/transport/` directory and both files.
+  5. Simplified `NDDS_QOS_PROFILES` — same path everywhere (no transport
+     file variation). `docker-compose.yml` sets `MEDTECH_TRANSPORT_PROFILE=Docker`.
+  6. `setup.bash.in` drops `transport/Default.xml` from path (default
+     handled by `<configuration_variables>`).
+  7. Removed CMake install rules for `transport/` files.
+  8. Updated all vision/implementation docs.
+- **Guideline:** Use `<configuration_variables>` with `$(VAR)` substitution
+  in `<base_name><element>` to select deployment-specific QoS snippets from
+  a single file. This eliminates file-path coordination and keeps common
+  participant QoS in one place. Library names follow short PascalCase
+  convention (`Transport`, not `TransportSnippetLib`).
+- **Date closed:** 2026-03-26

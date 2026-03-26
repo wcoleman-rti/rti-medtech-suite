@@ -369,20 +369,22 @@ Health checks use the simplest reliable method per service:
 
 ### Transport Configuration
 
-Transport behavior is configured via XML QoS profiles, never in application code. The appropriate profile is selected per deployment context by loading the corresponding transport XML file in `NDDS_QOS_PROFILES`.
+Transport behavior is configured via XML QoS profiles, never in application code. The deployment-specific transport snippet is selected at XML parse time via the `MEDTECH_TRANSPORT_PROFILE` environment variable (defaulting to `Default` via `<configuration_variables>` in `Participants.xml`).
 
-Two transport profiles are provided, both named `Participants::Transport` (so participant XML is deployment-neutral):
+All transport snippets and the shared `Participants::Transport` profile live in a single file (`Participants.xml`). The `Transport` QoS library contains one snippet per deployment context:
 
-| File | SHMEM | UDPv4 | Multicast | Discovery Peers |
-|------|-------|-------|-----------|----------------|
-| `transport/Default.xml` | Enabled | Enabled | Enabled | Connext defaults |
-| `transport/Docker.xml` | Enabled | Enabled | Disabled | `builtin.shmem://`, `builtin.udpv4://localhost`, CDS |
+| Snippet | SHMEM | UDPv4 | Multicast | Discovery Peers |
+|---------|-------|-------|-----------|----------------|
+| `Transport::Default` | Enabled | Enabled | Enabled | Connext defaults |
+| `Transport::Docker` | Enabled | Enabled | Disabled | `builtin.shmem://`, `builtin.udpv4://localhost`, CDS |
 
 SHMEM is enabled in both — it benefits intra-container (Docker) and intra-host (production) communication.
 
+The `Participants::Transport` profile composes `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation` (common to all deployments) and `Transport::$(MEDTECH_TRANSPORT_PROFILE)` (selected at parse time).
+
 #### Docker Containers
 
-Containers use `transport/Docker.xml` which:
+Containers set `MEDTECH_TRANSPORT_PROFILE=Docker` which selects the Docker transport snippet. This snippet:
 - Disables multicast (`multicast_receive_addresses` cleared, `dds.transport.UDPv4.builtin.multicast_enabled=0`)
 - Sets explicit discovery peers: SHMEM and localhost for intra-container, CDS for cross-container
 - Composes `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation`
