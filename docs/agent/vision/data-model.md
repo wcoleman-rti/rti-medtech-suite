@@ -334,6 +334,16 @@ Types defined in `module Orchestration`:
   - `ServiceState` — `STOPPED`, `STARTING`, `RUNNING`, `STOPPING`, `FAILED`, `UNKNOWN`
   - `OperationResultCode` — `OK`, `INVALID_SERVICE`, `INVALID_CONFIG`, `BUSY`, `ALREADY_RUNNING`, `NOT_RUNNING`, `INTERNAL_ERROR`
 
+> **IDL-generated `ServiceState`:** This enum is the **single source of
+> truth** for service lifecycle state across both languages. The
+> `medtech::Service` abstract interface (see
+> [dds-consistency.md §3](dds-consistency.md)) returns it from its
+> `state()` property. Because it is IDL-defined, it can also appear
+> directly in DDS topic types (e.g., `ServiceStatus.state`) and RPC
+> return types without manual mapping — enabling on-wire service health
+> monitoring, inter-service status queries, and future health-check RPC
+> extensions.
+
 Partition format: `room/<room_id>` (e.g., `room/OR-1`). Service Hosts not yet assigned to an OR use the `unassigned` partition.
 
 ### Domain 20 — Observability

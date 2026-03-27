@@ -88,8 +88,8 @@ A deeper explanation of how the module works internally. Required content:
   data flow
 - A **DDS Entities** subsection listing every `DomainParticipant`, `DataWriter`, and
   `DataReader` the module creates, the topic and QoS profile each uses, and its domain tag
-- An explanation of the threading model: which thread creates DDS entities, which thread
-  performs DDS I/O (must not be the main thread per `vision/technology.md`)
+- An explanation of the threading model: which thread creates DDS entities, how the
+  service manages its internal concurrency (per `vision/dds-consistency.md` §5)
 
 ### 5. Configuration Reference (`## Configuration Reference`)
 

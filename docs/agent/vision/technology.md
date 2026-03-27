@@ -74,7 +74,7 @@ Additional Foxglove schemas (`CameraCalibration`, `ImageAnnotations`, `Compresse
 
 - **PySide6** — Qt 6 bindings for Python
 - **QtAsyncio** — used for integrating async DDS reads with the Qt event loop
-- DDS I/O must never occur on the main/UI thread (see DDS I/O Threading below)
+- DDS I/O must never occur on the Qt UI event loop thread (see DDS I/O Threading below)
 
 ### GUI Design Standard
 
@@ -371,17 +371,29 @@ The `requirements.txt` pins exact versions for all runtime and development depen
 
 ## DDS I/O Threading
 
-DDS I/O must never occur on the main thread or UI event loop in any application — Python or C++.
+Connext 7.6.0 DDS API calls (`write()`, `take()`, etc.) are safe from
+**any application thread**. There is no restriction tied to the process
+main thread. The sole thread restriction is for **GUI host applications**
+where a Qt event loop drives the UI — DDS I/O must not occur on the Qt
+event loop thread because `write()` can block under resource-limit
+pressure, risking frozen UIs.
+
+Services must not assume any properties of the thread that calls `run()`.
+If a service needs periodic publishing or subscriber dispatch, it creates
+its own concurrency primitives internally. See
+[dds-consistency.md §5](dds-consistency.md) for the full threading
+contract.
 
 ### Python
 - Use `async`/`await` with `rti.connext` async APIs
-- Integrate with the Qt event loop via **QtAsyncio** for GUI applications
-- Non-GUI applications use an asyncio event loop on a dedicated thread or as the main coroutine runner
+- Integrate with the Qt event loop via **QtAsyncio** for GUI host applications
+- Non-GUI services use an asyncio event loop (the `run()` coroutine is
+  gathered by the Service Host or driven by `asyncio.run()` in standalone mode)
 
 ### C++
-- Use **`rti::core::cond::AsyncWaitSet`** (thread pool size = 1) for non-blocking, callback-driven data reception on a background thread
+- Use **`rti::core::cond::AsyncWaitSet`** (thread pool size = 1) for non-blocking, callback-driven data reception
 - **`rti::sub::SampleProcessor`** is a convenience wrapper over `AsyncWaitSet` for simple per-sample dispatch. It is **experimental in Connext 7.6.0** and must not be used for safety-critical or latency-sensitive paths. Prefer explicit `AsyncWaitSet` + `ReadCondition` for production control flows.
-- The main thread handles initialization, configuration, and lifecycle; all DDS callbacks and reads occur on `AsyncWaitSet` threads
+- Services create their own `AsyncWaitSet` and worker threads inside `run()` — they do not assume the calling thread provides any concurrency
 - **I/O context isolation:** Each critical-path I/O context with an independent jitter budget gets its own `AsyncWaitSet` instance. Do not combine fixed-rate publishers and data-driven subscribers on the same `AsyncWaitSet` — see [vision/coding-standards.md](coding-standards.md) (`AsyncWaitSet` Isolation Principle) for the full rule.
 - **Never use `DataReaderListener` callbacks for data/sample processing** — listener callbacks run on the middleware's shared receive thread and block all other DataReaders in the participant. See [vision/coding-standards.md](coding-standards.md) for approved patterns and rationale.
 

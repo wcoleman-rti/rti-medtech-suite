@@ -520,7 +520,7 @@ modules/<module-name>/
 │   └── ...
 ├── src/                               # C++ implementation (.cpp)
 │   ├── <class_name>.cpp
-│   ├── main.cpp                       # Entry point (if applicable)
+│   ├── main.cpp                       # Host entry point (standalone mode)
 │   └── ...
 ├── python/                            # Python source
 │   └── <package_name>/

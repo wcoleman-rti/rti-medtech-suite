@@ -114,24 +114,47 @@ def initialize_connext() -> None:
     # ... all topic types — see dds_init.py for full list ...
 ```
 
-**Call site (both languages):**
+**Call site — Service constructor (standalone mode):**
+
+`initialize_connext()` is called inside the service constructor when the
+service creates its own participant (standalone mode). In hosted mode,
+the Service Host calls it once before creating any participants.
 
 ```cpp
-// C++
-#include <medtech/dds_init.hpp>
-
-int main() {
-    medtech::initialize_connext();
-    // ... create participants
+// C++ — inside a service constructor (standalone path)
+RobotController::RobotController(
+    const std::string& robot_id,
+    const std::string& room_id,
+    const std::string& procedure_id,
+    dds::domain::DomainParticipant participant)
+{
+    if (participant == dds::core::null) {
+        medtech::initialize_connext();
+        participant = dds::core::QosProvider::Default()
+            .extensions().create_participant_from_config(
+                std::string(names::CONTROL_ROBOT));
+        // ... set partition ...
+    }
+    // ...
 }
 ```
 
 ```python
-# Python
-from dds_init import initialize_connext
-
-initialize_connext()
-# ... create participants
+# Python — inside a service constructor (standalone path)
+class BedsideMonitor(Service):
+    def __init__(
+        self,
+        room_id: str,
+        procedure_id: str,
+        participant: dds.DomainParticipant | None = None,
+    ) -> None:
+        if participant is None:
+            initialize_connext()
+            participant = dds.QosProvider.default.create_participant_from_config(
+                names.CLINICAL_MONITOR
+            )
+            # ... set partition ...
+        # ...
 ```
 
 > **Structural note:** The Python `dds_init.py` currently resides in
@@ -363,7 +386,8 @@ reader_qos = provider.get_topic_datareader_qos("PatientVitals")
 
 ## 3. Application Architecture Pattern
 
-Application and service classes must encapsulate DDS entities behind a
+All DDS service classes implement `medtech::Service` (C++) or
+`medtech.Service` (Python) and encapsulate DDS entities behind a
 **domain-meaningful interface**. Writers, readers, participants, and DDS
 types should not appear in the class's public API. Callers interact with
 domain concepts (commands, state, telemetry) — never with DDS primitives.
@@ -379,11 +403,15 @@ show the **internal** implementation details within this architecture.
    the XML configuration name. Callers never see or pass DDS entity
    references.
 
-2. **The constructor accepts domain configuration, not DDS entities.**
-   Parameters are domain-level: room ID, procedure ID, participant config
-   name. The constructor calls `initialize_connext()`, creates the
-   participant from XML config, sets the partition, and looks up
-   writers/readers by their XML entity names.
+2. **The constructor accepts domain context, not DDS entities (except
+   the optional participant).** Parameters are domain-level: room ID,
+   procedure ID, and an optional `DomainParticipant` for dual-mode
+   support (see Dual-Mode Participant Pattern below). The constructor
+   calls `initialize_connext()` in standalone mode, creates or accepts
+   the participant, and looks up writers/readers by their XML entity
+   names. Services must not read environment variables, CLI arguments,
+   or config files — all context is injected (see Service Context
+   Injection Rule below).
 
 3. **State mutations drive writes internally.** Public setters (e.g.,
    `set_telemetry()`, `update_status()`) mutate internal state and write
@@ -395,11 +423,14 @@ show the **internal** implementation details within this architecture.
    update internal state and invoke domain-level callbacks or Qt signals.
    The callback signature uses domain types, not `dds::sub::LoanedSamples`.
 
-5. **Lifecycle is scoped to the class.** `start()` / `run()` first calls
-   `participant.enable()` to activate the participant and all its contained
-   entities, then starts the `AsyncWaitSet` or async event loop.
-   If the participant is already enabled the call is a safe no-op.
-   No explicit teardown method is needed — DDS entities are
+5. **Lifecycle is scoped to the class.** `run()` first calls
+   `participant.enable()` to activate the participant and all its
+   contained entities, then starts internal concurrency (e.g.,
+   `AsyncWaitSet`, worker threads, asyncio tasks). `run()` blocks
+   until `stop()` is called. The service manages its own concurrency
+   internally — it must not assume any properties of the thread that
+   calls `run()`. If the participant is already enabled the call is a
+   safe no-op. No explicit teardown method is needed — DDS entities are
    reference types (similar to `std::shared_ptr`) that automatically
    destroy the underlying middleware object when the last reference is
    released. When the owning class is destroyed, its member entities go
@@ -433,30 +464,53 @@ show the **internal** implementation details within this architecture.
 ### C++ Example — Service Class
 
 ```cpp
+#include <medtech/service.hpp>                                    // medtech::Service
+#include <orchestration/Orchestration.hpp>                        // IDL-generated ServiceState
 #include <app_names/MedtechEntityNames/SurgicalParticipants.hpp>  // generated
 namespace names = MedtechEntityNames::SurgicalParticipants;
 
-class RobotController {
+class RobotController : public medtech::Service {
 public:
-    RobotController(const std::string& room_id, const std::string& procedure_id)
+    RobotController(
+        const std::string& robot_id,
+        const std::string& room_id,
+        const std::string& procedure_id,
+        dds::domain::DomainParticipant participant = dds::core::null)
     {
-        medtech::initialize_connext();
+        // Dual-mode: standalone creates its own participant
+        if (participant == dds::core::null) {
+            medtech::initialize_connext();
+            participant = dds::core::QosProvider::Default()
+                .extensions().create_participant_from_config(
+                    std::string(names::CONTROL_ROBOT));
+            auto qos = participant.qos();
+            qos << dds::core::policy::Partition(
+                "room/" + room_id + "/procedure/" + procedure_id);
+            participant.qos(qos);
+        }
 
-        participant_ = dds::core::QosProvider::Default()
-            .create_participant_from_config(names::CONTROL_ROBOT);
+        if (participant == dds::core::null) {
+            throw std::runtime_error("Failed to create DomainParticipant");
+        }
 
-        auto qos = participant_.qos();
-        qos << dds::core::policy::Partition(dds::core::StringSeq(
-            {"room/" + room_id + "/procedure/" + procedure_id}));
-        participant_.qos(qos);
+        participant_ = std::move(participant);
 
-        // Look up writers/readers by generated name constant — no typo risk
+        // Validate entity lookup — same in standalone and hosted modes
         command_reader_ = rti::sub::find_datareader_by_name<
             dds::sub::DataReader<Surgery::RobotCommand>>(
-                participant_, names::ROBOT_COMMAND_READER);
+                participant_, std::string(names::ROBOT_COMMAND_READER));
+        if (command_reader_ == dds::core::null) {
+            throw std::runtime_error(
+                "Reader not found: " + std::string(names::ROBOT_COMMAND_READER));
+        }
+
         state_writer_ = rti::pub::find_datawriter_by_name<
             dds::pub::DataWriter<Surgery::RobotState>>(
-                participant_, names::ROBOT_STATE_WRITER);
+                participant_, std::string(names::ROBOT_STATE_WRITER));
+        if (state_writer_ == dds::core::null) {
+            throw std::runtime_error(
+                "Writer not found: " + std::string(names::ROBOT_STATE_WRITER));
+        }
 
         // Wire reader to internal handler via AsyncWaitSet
         read_condition_ = dds::sub::cond::ReadCondition(
@@ -467,42 +521,76 @@ public:
 
     ~RobotController()
     {
+        running_.store(false);
+        if (pub_thread_.joinable()) pub_thread_.join();
         aws_.stop();  // block until no handlers are in flight
-        // members destruct in reverse declaration order:
-        // aws_ → read_condition_ → state_writer_ → command_reader_ → participant_
+        // members destruct in reverse declaration order
     }
 
-    // Domain interface — no DDS types exposed
-    void start() {
+    // --- medtech::Service interface ---
+
+    void run() override {
+        state_.store(Orchestration::ServiceState::STARTING);
         participant_.enable();  // no-op if already enabled
         aws_.start();
+
+        // Service-internal periodic publisher thread
+        pub_thread_ = std::thread([this]() {
+            Surgery::RobotState sample{};
+            while (running_) {
+                sample = read_sensor_();     // application-specific
+                state_writer_.write(sample);
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        });
+
+        state_.store(Orchestration::ServiceState::RUNNING);
+
+        // Block until stop() is called
+        std::unique_lock lock(mtx_);
+        cv_.wait(lock, [this]() { return !running_.load(); });
+
+        state_.store(Orchestration::ServiceState::STOPPING);
+        pub_thread_.join();
+        aws_.stop();
+        state_.store(Orchestration::ServiceState::STOPPED);
     }
 
-    void set_on_command(std::function<void(const Surgery::RobotCommand&)> cb) {
-        on_command_ = std::move(cb);
+    void stop() override {
+        running_.store(false);
+        cv_.notify_one();
+    }
+
+    std::string_view name() const override { return "RobotController"; }
+
+    Orchestration::ServiceState state() const override {
+        return state_.load();
     }
 
 private:
     void on_command_received_() {
         for (const auto& sample : command_reader_.take()) {
-            if (sample.info().valid() && on_command_) {
-                on_command_(sample.data());
+            if (sample.info().valid()) {
+                // application-specific command handling
             }
         }
     }
 
-    void publish_state_(const Surgery::RobotState& state) {
-        state_writer_.write(state);
-    }
+    Surgery::RobotState read_sensor_();  // application-specific
 
     // Declaration order: DDS entities first, AsyncWaitSet last.
-    // Reverse destruction order ensures aws_ is destroyed before entities.
     dds::domain::DomainParticipant participant_{nullptr};
     dds::sub::DataReader<Surgery::RobotCommand> command_reader_{nullptr};
     dds::pub::DataWriter<Surgery::RobotState> state_writer_{nullptr};
     dds::sub::cond::ReadCondition read_condition_{nullptr};
     rti::core::cond::AsyncWaitSet aws_;  // destroyed first (declared last)
-    std::function<void(const Surgery::RobotCommand&)> on_command_;
+
+    std::atomic<bool> running_{true};
+    std::atomic<Orchestration::ServiceState> state_{
+        Orchestration::ServiceState::STOPPED};
+    std::thread pub_thread_;
+    std::mutex mtx_;
+    std::condition_variable cv_;
 };
 ```
 
@@ -510,43 +598,85 @@ private:
 
 ```python
 from app_names.MedtechEntityNames import SurgicalParticipants as names
+from orchestration.Orchestration import ServiceState  # IDL-generated
+from medtech.service import Service
 
-class BedsideMonitor:
-    def __init__(self, room_id: str, procedure_id: str) -> None:
-        initialize_connext()
+class BedsideMonitor(Service):
+    def __init__(
+        self,
+        room_id: str,
+        procedure_id: str,
+        participant: dds.DomainParticipant | None = None,
+    ) -> None:
+        # Dual-mode: standalone creates its own participant
+        if participant is None:
+            initialize_connext()
+            participant = dds.QosProvider.default.create_participant_from_config(
+                names.CLINICAL_MONITOR
+            )
+            qos = participant.qos
+            qos.partition.name = [f"room/{room_id}/procedure/{procedure_id}"]
+            participant.qos = qos
 
-        self._participant = dds.QosProvider.default.create_participant_from_config(
-            names.CLINICAL_MONITOR
-        )
-        qos = self._participant.qos
-        qos.partition.name = [f"room/{room_id}/procedure/{procedure_id}"]
-        self._participant.qos = qos
+        if participant is None:
+            raise RuntimeError("Failed to create DomainParticipant")
 
-        # Look up writers by generated name constant — no typo risk
-        self._vitals_writer = dds.DataWriter(
-            self._participant.find_datawriter(names.PATIENT_VITALS_WRITER))
-        self._alarm_writer = dds.DataWriter(
-            self._participant.find_datawriter(names.ALARM_MESSAGES_WRITER))
+        self._participant = participant
+        self._state = ServiceState.STOPPED
+        self._running = False
 
-        self._last_vitals: monitoring.Monitoring.PatientVitals | None = None
+        # Validate entity lookup — same in standalone and hosted modes
+        vitals_any = self._participant.find_datawriter(names.PATIENT_VITALS_WRITER)
+        if vitals_any is None:
+            raise RuntimeError(f"Writer not found: {names.PATIENT_VITALS_WRITER}")
+        self._vitals_writer = dds.DataWriter(vitals_any)
 
-    # Domain interface — no DDS types exposed to callers
+        alarm_any = self._participant.find_datawriter(names.ALARM_MESSAGES_WRITER)
+        if alarm_any is None:
+            raise RuntimeError(f"Writer not found: {names.ALARM_MESSAGES_WRITER}")
+        self._alarm_writer = dds.DataWriter(alarm_any)
+
+    # --- medtech.Service interface ---
+
+    async def run(self) -> None:
+        self._state = ServiceState.STARTING
+        self._running = True
+        self._participant.enable()  # no-op if already enabled
+        self._state = ServiceState.RUNNING
+        try:
+            await asyncio.gather(
+                self._publish_vitals_loop(),
+                # ... other async tasks
+            )
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._state = ServiceState.STOPPED
+
+    def stop(self) -> None:
+        self._running = False
+        self._state = ServiceState.STOPPING
+        # Cancels tasks gathered in run() — the Service Host or
+        # standalone runner is responsible for cancellation mechanics
+
+    @property
+    def name(self) -> str:
+        return "BedsideMonitor"
+
+    @property
+    def state(self) -> ServiceState:
+        return self._state
+
+    # --- Domain interface — no DDS types exposed to callers ---
+
     def update_vitals(self, vitals: monitoring.Monitoring.PatientVitals) -> None:
         self._vitals_writer.write(vitals)
-        self._last_vitals = vitals
 
     def raise_alarm(self, alarm: monitoring.Monitoring.AlarmMessage) -> None:
         self._alarm_writer.write(alarm)
 
-    async def run(self) -> None:
-        self._participant.enable()  # no-op if already enabled
-        await asyncio.gather(
-            self._publish_vitals_loop(),
-            # ... other async tasks
-        )
-
     async def _publish_vitals_loop(self) -> None:
-        while True:
+        while self._running:
             vitals = self._sample_sensors()  # application-specific
             self.update_vitals(vitals)
             await asyncio.sleep(1.0)  # 1 Hz periodic snapshot
@@ -566,9 +696,20 @@ interface that defines consistent lifecycle behavior across C++ and Python.
 This interface enables the Service Host framework to manage services
 uniformly regardless of language, domain tag, or internal complexity.
 
-#### `ServiceState` Enum
+#### `ServiceState` Enum (IDL-Defined)
 
-Every service exposes a pollable `state` property. The Service Host reads
+`ServiceState` is defined in IDL (`interfaces/idl/orchestration/`) as
+part of `module Orchestration`. Code-generated types are used in both
+languages — no hand-written enum is maintained. This keeps the enum
+consistent across C++ and Python and allows it to appear directly in DDS
+topic types (`ServiceStatus`), RPC interfaces (`ServiceHostControl`),
+and any future on-wire health or inter-service monitoring scenarios.
+
+See [data-model.md — Domain 15](data-model.md) for the authoritative
+enum values and the IDL module structure.
+
+Every service exposes a pollable `state` property that returns the
+IDL-generated `Orchestration::ServiceState`. The Service Host reads
 this property and publishes `ServiceStatus` on the Orchestration domain.
 The service itself manages its own state transitions.
 
@@ -584,24 +725,18 @@ The service itself manages its own state transitions.
 #### C++ Interface
 
 ```cpp
-namespace medtech {
+#include <orchestration/Orchestration.hpp>  // IDL-generated
 
-enum class ServiceState {
-    Stopped,
-    Starting,
-    Running,
-    Stopping,
-    Failed,
-    Unknown
-};
+namespace medtech {
 
 class Service {
 public:
     virtual ~Service() = default;
 
     /// Run the service. Blocks the calling thread until stop() is called
-    /// or an unrecoverable error occurs. The Service Host spawns a thread
-    /// for each hosted service — the service does not manage its own thread.
+    /// or an unrecoverable error occurs. The service manages its own
+    /// internal concurrency (AsyncWaitSet, worker threads) — it must not
+    /// assume any properties of the thread that calls run().
     virtual void run() = 0;
 
     /// Signal the service to stop. Thread-safe, non-blocking.
@@ -613,7 +748,8 @@ public:
 
     /// Current lifecycle state. Polled by the Service Host for status
     /// reporting. The service manages its own state transitions internally.
-    virtual ServiceState state() const = 0;
+    /// Returns the IDL-generated Orchestration::ServiceState enum.
+    virtual Orchestration::ServiceState state() const = 0;
 };
 
 }  // namespace medtech
@@ -624,17 +760,9 @@ public:
 ```python
 from __future__ import annotations
 
-import enum
 from abc import ABC, abstractmethod
 
-
-class ServiceState(enum.Enum):
-    STOPPED = "STOPPED"
-    STARTING = "STARTING"
-    RUNNING = "RUNNING"
-    STOPPING = "STOPPING"
-    FAILED = "FAILED"
-    UNKNOWN = "UNKNOWN"
+from orchestration.Orchestration import ServiceState  # IDL-generated
 
 
 class Service(ABC):
@@ -660,8 +788,8 @@ class Service(ABC):
     @property
     @abstractmethod
     def state(self) -> ServiceState:
-        """Current lifecycle state. Polled by the Service Host for
-        status reporting on the Orchestration domain."""
+        """Current lifecycle state (IDL-generated enum). Polled by the
+        Service Host for status reporting on the Orchestration domain."""
         ...
 ```
 
@@ -694,6 +822,31 @@ await asyncio.gather(
 )
 # Service Host polls service.state and publishes ServiceStatus
 ```
+
+#### Service Context Injection Rule
+
+Services receive **all** operational context via constructor parameters or
+configuration methods. A service must never read environment variables, CLI
+arguments, or external configuration files. The Service Host (or standalone
+`main()`) is the boundary that resolves external context and passes it
+down.
+
+| Context source | Allowed in Service | Allowed in Service Host |
+|---|---|---|
+| Constructor parameters | Yes (primary) | N/A |
+| Setter / configuration methods | Yes (runtime updates) | N/A |
+| Environment variables | **No** | Yes |
+| CLI arguments | **No** | Yes |
+| Config files / YAML / JSON | **No** | Yes |
+| UI input | **No** | Yes (GUI hosts) |
+| Orchestration domain commands | **No** (host handles RPC) | Yes |
+
+This rule ensures services are deployment-agnostic — they can be tested
+in isolation, hosted in any process topology, or migrated between
+containers without code changes. The Dual-Mode Participant Pattern below
+is a specific application of this principle: the participant is either
+injected (hosted) or self-created (standalone), never resolved from
+environment state by the service itself.
 
 ### Dual-Mode Participant Pattern (V1.1)
 
@@ -836,36 +989,29 @@ Topics: `OperatorInput`, `RobotState`, `WaveformData`, `CameraFrame`,
 The publisher calls `write()` at a fixed rate regardless of whether the
 value changed. DDS Deadline QoS detects stream interruption.
 
-**C++ — dedicated publisher thread (primary pattern):**
+**C++ — service-internal publisher thread (primary pattern):**
 
-When the periodic publish loop runs on its own dedicated thread, call
-`write()` directly from that thread. No `AsyncWaitSet` or
-`GuardCondition` indirection is needed — the dedicated thread is already
-off the main thread, and writing directly avoids unnecessary context
-switching.
+When a service needs periodic publishing, it spawns a dedicated worker
+thread inside `run()`. The thread calls `write()` directly — no
+`AsyncWaitSet` or `GuardCondition` indirection is needed.
 
 ```cpp
-void publish_loop(
-    dds::pub::DataWriter<Surgery::RobotState>& writer,
-    std::atomic<bool>& running)
-{
+// Inside a service's run() method:
+pub_thread_ = std::thread([this]() {
     Surgery::RobotState sample{};
-    while (running) {
-        sample = read_sensor();      // application-specific
-        writer.write(sample);
+    while (running_) {
+        sample = read_sensor_();       // application-specific
+        state_writer_.write(sample);
         std::this_thread::sleep_for(std::chrono::milliseconds(10)); // 100 Hz
     }
-}
-
-// Launch from main after entities are enabled:
-std::thread pub_thread(publish_loop, std::ref(writer), std::ref(running));
+});
 ```
 
 **C++ — GuardCondition + AsyncWaitSet (event delegation only):**
 
 Use this pattern only when a **non-periodic event** originates on a
-thread that should not perform DDS I/O directly (e.g., the main thread
-or a UI thread) and the write must be delegated to an `AsyncWaitSet`
+thread that should not perform DDS I/O directly (e.g., a GUI host's
+UI thread) and the write must be delegated to an `AsyncWaitSet`
 thread. **Do not use `GuardCondition` as a periodic timer mechanism** —
 use standard language threading primitives (dedicated thread +
 `sleep_for`, `asyncio.sleep`, etc.) for periodic writes.
@@ -901,13 +1047,14 @@ event_signal.trigger_value(true);
 event_signal.trigger_value(false);
 ```
 
-**Python — asyncio:**
+**Python — asyncio (service-internal coroutine):**
 
 ```python
-async def publish_fixed_rate(writer: dds.DataWriter) -> None:
-    while True:
-        sample = read_sensor()   # application-specific
-        writer.write(sample)
+# Inside a service class:
+async def _publish_fixed_rate(self) -> None:
+    while self._running:
+        sample = self._read_sensor()  # application-specific
+        self._state_writer.write(sample)
         await asyncio.sleep(0.01)  # 100 Hz
 ```
 
@@ -995,25 +1142,32 @@ aws.start();
 
 Use the standard `asyncio` module for the event loop. Use
 `asyncio.gather()` when multiple async tasks (readers, periodic
-publishers) need to run concurrently.
+publishers) need to run concurrently inside a service's `run()` method.
 
 ```python
 import asyncio
 import rti.connextdds as dds
 
-async def read_vitals(reader: dds.DataReader) -> None:
-    async for data in reader.take_data_async():
-        process(data)  # application-specific
+# Inside a service class:
 
-async def main() -> None:
-    # ... create participant, look up entities ...
-    await asyncio.gather(
-        read_vitals(vitals_reader),
-        read_alarms(alarm_reader),
-        publish_fixed_rate(vitals_writer),
-    )
+async def _read_vitals(self) -> None:
+    async for data in self._vitals_reader.take_data_async():
+        self._process(data)  # application-specific
 
-asyncio.run(main())
+async def run(self) -> None:
+    self._state = ServiceState.STARTING
+    self._participant.enable()
+    self._state = ServiceState.RUNNING
+    try:
+        await asyncio.gather(
+            self._read_vitals(),
+            self._read_alarms(),
+            self._publish_fixed_rate(),
+        )
+    except asyncio.CancelledError:
+        pass
+    finally:
+        self._state = ServiceState.STOPPED
 ```
 
 ### 4.4 Status Change Handling
@@ -1087,16 +1241,50 @@ status_cond.enabled_statuses = (
 
 ## 5. Threading Contract
 
-DDS I/O must never occur on the main thread or UI event loop. The threading
-model is defined in [technology.md — DDS I/O Threading](technology.md).
+Services must not assume any properties of the thread that calls `run()`.
+A service may be invoked on the process main thread (standalone mode), a
+Service Host worker thread (hosted C++), or an asyncio event loop task
+(hosted Python). DDS `write()`, `take()`, and other API calls are safe
+from **any application thread** — the Connext 7.6.0 API has no
+restriction tied to the process main thread.
 
-### Rules
+The threading model is defined in
+[technology.md — DDS I/O Threading](technology.md).
+
+### Service-Internal Concurrency Rules
+
+1. **Services own their own concurrency.** If a service needs periodic
+   publishing, subscriber dispatch, or other concurrent work, it creates
+   its own threads (C++) or spawns asyncio tasks (Python) inside `run()`.
+   The service does not assume the calling thread provides ticks,
+   periodicity, or an event loop.
+
+2. **DDS I/O is allowed on the `run()` thread.** A service may perform
+   `write()` or `take()` directly on the thread that invoked `run()`.
+   There is no blanket "no I/O on main thread" rule — that restriction
+   applies only to GUI event loops (see GUI Applications below).
+
+3. **C++ services must join all spawned threads in `stop()` / destructor.**
+   Any threads or `AsyncWaitSet` instances created by the service must be
+   stopped and joined before DDS entities are destroyed. See §3
+   Structural Rule 6.
+
+4. **Python services use asyncio concurrency.** `run()` is an async
+   coroutine. Internal concurrent work is spawned via
+   `asyncio.create_task()` or `asyncio.gather()`. The service cancels
+   all tasks when `stop()` is called.
+
+### Patterns
 
 | Language | Publisher Pattern | Subscriber Pattern |
 |----------|------------------|--------------------|
-| C++ | Dedicated publisher thread for periodic writes; `AsyncWaitSet` + `GuardCondition` when delegating from a non-DDS thread | `AsyncWaitSet` + `ReadCondition` (thread pool size = 1) |
+| C++ | Dedicated worker thread for periodic writes; `AsyncWaitSet` for event-driven dispatch | `AsyncWaitSet` + `ReadCondition` (thread pool size = 1) |
+| C++ | Direct `write()` on the `run()` thread for simple request-response or on-change publishing | — |
 | Python | `asyncio` periodic task or event-driven coroutine | `async for data in reader.take_data_async()` via `asyncio` |
-| Python GUI | QtAsyncio event loop integration | Same async pattern, integrated with Qt via `QtAsyncio` |
+
+`GuardCondition` + `AsyncWaitSet` remains available for delegating work
+from a non-DDS context (e.g., a GUI thread) to a DDS thread — see §4.1
+for the pattern.
 
 ### AsyncWaitSet Isolation Principle (C++)
 
@@ -1151,7 +1339,11 @@ govern its lifecycle within the service class pattern (§3):
 > class’s destructor to avoid use-after-destruction races between
 > in-flight handlers and DDS entity teardown.
 
-### GUI Applications
+### GUI Host Applications
+
+The **sole thread restriction** is for GUI hosts (Procedure Controller,
+Hospital Dashboard, etc.) where a Qt event loop drives the UI.
+DDS I/O must not occur on the Qt event loop thread.
 
 ```
 ┌─────────────────────┐     signals/slots     ┌─────────────────────┐
@@ -1164,7 +1356,8 @@ govern its lifecycle within the service class pattern (§3):
 
 DDS threads own DDS entities. The UI thread owns widgets. Communication
 between them uses thread-safe signals/slots or queues — never direct
-DDS API calls from the UI thread.
+DDS API calls from the UI thread. This is a **Qt constraint**, not a
+DDS constraint — Connext API calls are safe from any application thread.
 
 > **`rti-chatbot-mcp` guidance:** RTI explicitly warns that `write()` can
 > block under certain QoS/resource-limit conditions. Performing writes on
@@ -1187,7 +1380,7 @@ validated against `rti-chatbot-mcp` RTI best-practice guidance.
 | AP-10 | **DDS entities in public class APIs** | Leaks middleware abstractions into domain interfaces; couples callers to DDS imports; makes testing harder. | Encapsulate all DDS entities as private members. Public interface uses domain types only (see §3). |
 | AP-3 | **`DynamicData` / `DynamicType` in application code** | Runtime field-name errors (stringly-typed); no compile-time safety; weaker IDE support; higher runtime overhead; fragile refactoring. | IDL-generated types (`rtiddsgen`). DynamicData permitted only in developer tools (`tools/`) and test utilities. |
 | AP-4 | **Hardcoded domain IDs in source code** | Deployment collisions; recompilation for environment changes; test contamination; hidden assumptions. | Domain IDs live exclusively in `Domains.xml` and [data-model.md](data-model.md). Code references domains by name (e.g., "Procedure domain"). |
-| AP-5 | **DDS I/O on main/UI thread** | Frozen UI; jittery UX; deadlocks; priority inversion; unbounded latency from reliable writes or resource-limit pressure. | Dedicated DDS worker threads (see §5). UI thread only renders state received via signals/queues. |
+| AP-5 | **DDS I/O on the Qt UI event loop** | Frozen UI; jittery UX; deadlocks; priority inversion; unbounded latency from reliable writes or resource-limit pressure. | GUI hosts: dedicated DDS worker threads; UI thread only renders state received via signals/queues (see §5). Non-GUI services: DDS I/O is permitted on any application thread including the `run()` thread. |
 | AP-6 | **`print()` / `printf` / `std::cout` for logging** | No integration with Connext verbosity categories; blocking console I/O; interleaved unstructured output; dangerous in listener/internal-thread contexts. | RTI Connext Logging API for middleware-level logging. Application-level logging uses the project’s approved logging interface — see [technology.md — Logging Standard](technology.md) for the authoritative logging guidance. No `print()` / `printf` / `std::cout` in production code. |
 | AP-7 | **Hardcoded XML file paths in application code** | Breaks install-tree portability; couples code to file layout; prevents `NDDS_QOS_PROFILES`-based loading. | Use default `QosProvider` which loads from `NDDS_QOS_PROFILES`. See [data-model.md — QoS XML Loading](data-model.md). |
 | AP-8 | **Custom `QosProvider` instances** | Bypasses the shared QoS hierarchy; risks loading partial or inconsistent XML; fragments configuration. | Always use `dds::core::QosProvider::Default()` (C++) or `dds.QosProvider.default` (Python). |
@@ -1309,7 +1502,8 @@ consistency with the existing system:
       for reading — no `DataReaderListener`
 - [ ] Use the correct publication model for each topic (continuous-stream,
       periodic-snapshot, or write-on-change) per [data-model.md](data-model.md)
-- [ ] Keep all DDS I/O off the main/UI thread
+- [ ] Keep DDS I/O off the Qt UI event loop (GUI hosts only); services
+      manage their own concurrency per §5
 - [ ] Separate DDS code from business logic (thin DDS boundary pattern) per
       [coding-standards.md — DDS Code Separation](coding-standards.md)
 
