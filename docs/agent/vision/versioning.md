@@ -40,39 +40,25 @@ A version may only be cut when **all** of the following are true:
 
 ### V1.0.0 — Core DDS Demo
 
-**Implementation phases:** 1 (Foundation), 2 (Surgical Procedure), 3 (Hospital Dashboard), 4 (Clinical Alerts & Decision Support)
+**Implementation phases:** 1 (Foundation), 2 (Surgical Procedure), 5 (Procedure Orchestration), 3 (Hospital Dashboard), 4 (Clinical Alerts & Decision Support)
 
-**Theme:** Establish the full live DDS data bus — multi-domain isolation, domain tags, domain partitions, Routing Service cross-domain bridge, ClinicalAlerts (Clinical Decision Support), and Cloud Discovery Service. No security, no external integrations.
+**Theme:** Establish the full live DDS data bus — multi-domain isolation, domain tags, domain partitions, Routing Service cross-domain bridge, ClinicalAlerts (Clinical Decision Support), Cloud Discovery Service, and service-oriented procedure orchestration. No security, no external integrations.
 
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|
 | Surgical Procedure (multi-instance) | Domain tags, domain partitions, `control`/`clinical`/`operational` QoS patterns, exclusive ownership failover |
+| Procedure Orchestration | DDS RPC, Orchestration domain, `medtech::Service` interface, dual-mode services, Service Host framework |
 | Hospital Dashboard (PySide6) | Hospital domain subscription, TRANSIENT_LOCAL late-join, content-filtered topics, QtAsyncio DDS integration |
 | Clinical Alerts & Decision Support | Risk scoring, alert generation, cross-domain subscription via Routing Service |
 | Routing Service | Selective Procedure → Hospital topic bridging, multiple sessions by traffic class |
-| Cloud Discovery Service | Multicast-free discovery on `hospital-net` |
+| Cloud Discovery Service | Multicast-free discovery on `hospital-net` and `orchestration-net` |
 | CMake unified build | C++17, Python, rtiddsgen C++11/Python, `RTIConnextDDS::cpp2_api`, build-dir generated code |
 
 ---
 
-### V1.1.0 — Procedure Orchestration
+### V1.1.0 — Recording & Replay
 
-**Theme:** Service-oriented orchestration layer for distributed procedure lifecycle management. New Orchestration domain, DDS RPC, dual-mode services, `medtech::Service` interface.
-
-| Module / Capability | Connext Features Demonstrated |
-|---------------------|-------------------------------|
-| Procedure Controller (PySide6 GUI) | DDS RPC client, multi-domain participant, QtAsyncio + RPC integration |
-| Service Host framework (C++ and Python) | DDS RPC service, per-host unique service naming, dual-mode service lifecycle |
-| Orchestration domain | Dedicated infrastructure domain, `Pattern.Status` for state topics, `Pattern.RPC` for command channel |
-| `HostCatalog` + `ServiceStatus` topics | TRANSIENT_LOCAL state reconstruction, liveliness-based failure detection |
-| `ServiceHostControl` RPC interface | IDL `@service` interface, typed request/reply in C++ and Python |
-| `medtech::Service` interface | Consistent service contract across C++ and Python, pollable `ServiceState` |
-
----
-
-### V1.2.0 — Recording & Replay
-
-**Theme:** Add zero-code compliance capture across the live DDS bus. No structural changes to V1 modules.
+**Theme:** Add zero-code compliance capture across the live DDS bus. No structural changes to V1.0 modules.
 
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|

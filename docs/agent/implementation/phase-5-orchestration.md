@@ -5,12 +5,12 @@
 framework, Procedure Controller GUI, and the Orchestration domain
 (Domain 15) with DDS RPC and pub/sub state distribution.
 
-**Depends on:** Phases 1–4 (all V1.0 phases complete)
-**Blocks:** Phase 6 (Recording & Replay)
+**Depends on:** Phases 1–2 (Foundation + Surgical Procedure complete)
+**Blocks:** Phase 3 (Hospital Dashboard), Phase 4 (Clinical Alerts)
 
 **Spec file:** [spec/procedure-orchestration.md](../spec/procedure-orchestration.md)
 **Vision references:**
-- [vision/capabilities.md — V1.1.0](../vision/capabilities.md)
+- [vision/capabilities.md — V1.0.0](../vision/capabilities.md)
 - [vision/system-architecture.md — Orchestration Domain](../vision/system-architecture.md)
 - [vision/data-model.md — Domain 15](../vision/data-model.md)
 - [vision/dds-consistency.md — §3 Service Interface, Dual-Mode Participant](../vision/dds-consistency.md)
@@ -253,7 +253,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
   - DDS Entities table documenting all Orchestration domain participants, writers, readers, RPC endpoints
   - Threading model description for each Service Host type
   - Environment Variables table
-- Update project root `README.md` if needed to reference V1.1 capabilities
+- Update project root `README.md` if needed to reference V1.0 orchestration capabilities
 - Run the performance benchmark harness and record the Phase 5 baseline:
   - `tests/performance/baselines/phase-5.json`
 - Verify all documentation lint passes
@@ -262,23 +262,25 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 - [ ] All module READMEs pass `markdownlint` and section-order lint
 - [ ] `tests/performance/baselines/phase-5.json` committed
-- [ ] No performance regression against Phase 4 baseline (within defined thresholds)
+- [ ] No performance regression against Phase 2 baseline (within defined thresholds)
 - [ ] `bash scripts/ci.sh` passes — all 12 quality gates green
 
 ---
 
-## V1.1.0 Release Gate
+## V1.0.0 Release Gate (Phase 5 contribution)
 
-After Phase 5 is complete, a **final regression gate** must pass before the
-V1.1.0 version is cut:
+Phase 5 is part of the V1.0.0 release. The full V1.0.0 release gate
+(covering Phases 1–5 and 3–4) is defined in
+[implementation/README.md](README.md#v100-release-gate). Phase 5’s
+contribution to that gate:
 
 - [ ] Full test suite passes (`bash scripts/ci.sh`) — zero failures, zero skips
 - [ ] All `@orchestration` spec scenarios pass
-- [ ] All V1.0 spec scenarios still pass (no regressions)
-- [ ] Full Docker Compose environment runs end-to-end: standalone V1.0 deployment + orchestrated V1.1 deployment
+- [ ] All V1.0 spec scenarios from Phases 1–2 still pass (no regressions)
+- [ ] Full Docker Compose environment runs end-to-end: standalone deployment + orchestrated deployment
 - [ ] Procedure Controller discovers, starts, stops, and monitors services across all three Service Host types
 - [ ] Orchestration domain is fully isolated from Procedure and Hospital domains
 - [ ] All module READMEs pass lint
 - [ ] Performance benchmark passes against Phase 5 baseline
 - [ ] No open incidents in `docs/agent/incidents.md`
-- [ ] `tests/performance/baselines/v1.1.0.json` committed
+- [ ] `tests/performance/baselines/phase-5.json` committed

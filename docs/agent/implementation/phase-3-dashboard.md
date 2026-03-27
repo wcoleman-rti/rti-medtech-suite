@@ -2,7 +2,7 @@
 
 **Goal:** Implement the PySide6 hospital dashboard GUI that displays real-time procedure status, patient vitals, alerts, and robot state across all active ORs. Configure Routing Service to bridge surgical domain data to the hospital domain.
 
-**Depends on:** Phase 2 (Surgical Procedure), [revision-dds-consistency.md](revision-dds-consistency.md)
+**Depends on:** Phase 5 (Procedure Orchestration), [revision-dds-consistency.md](revision-dds-consistency.md)
 **Can parallel with:** Phase 4 (Clinical Alerts)
 **Spec coverage:** [hospital-dashboard.md](../spec/hospital-dashboard.md) (Procedure List, Vitals Overview, Alert Feed, Robot Status, GUI Threading), [common-behaviors.md](../spec/common-behaviors.md) (Routing Service, DDS Consistency Compliance)
 

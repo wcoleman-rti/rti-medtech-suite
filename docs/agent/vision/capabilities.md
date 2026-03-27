@@ -97,9 +97,9 @@ The full release version policy — including version increment rules, release c
 
 ---
 
-### V1.1.0 — Procedure Orchestration
+### V1.0.0 — Procedure Orchestration (merged into V1.0)
 
-**Theme:** Introduce a service-oriented orchestration layer for managing the lifecycle of surgical procedure services across distributed Service Hosts, using DDS RPC for directed commands and pub/sub for asynchronous state distribution on a dedicated Orchestration domain.
+**Theme:** Introduce a service-oriented orchestration layer for managing the lifecycle of surgical procedure services across distributed Service Hosts, using DDS RPC for directed commands and pub/sub for asynchronous state distribution on a dedicated Orchestration domain. Implemented before Phase 3 (Hospital Dashboard) to establish the `medtech::Service` interface and apply IDL breaking changes (Foxglove translatability) while the consumer surface is minimal.
 
 #### Service Interface & Dual-Mode Services
 - **`medtech::Service` abstract interface** (C++ abstract class, Python ABC) defining the contract for all DDS service classes: `run()`, `stop()`, `name`, `state` — enabling consistent lifecycle management across languages
@@ -141,9 +141,9 @@ The full release version policy — including version increment rules, release c
 
 ---
 
-### V1.2.0 — Recording & Replay
+### V1.1.0 — Recording & Replay
 
-Additive within the V1 milestone. No structural changes to V1 modules.
+Additive within the V1 milestone. No structural changes to V1.0 modules.
 
 - **RTI Recording Service** — passive multi-domain capture of all DDS traffic across Procedure, Hospital, and Orchestration domains. Recording Service operates as a multi-domain subscriber, joining the Procedure domain (all domain tags), the Hospital domain, and the Orchestration domain simultaneously. A single Recording Service instance captures the complete system state.
 - **RTI Replay Service** — deterministic replay into subscriber applications for training, incident review, and regression testing
@@ -155,7 +155,7 @@ Additive within the V1 milestone. No structural changes to V1 modules.
 
 #### Foxglove Data Model Alignment
 - **Foxglove schema translatability (Tier 1 — data model only)** — `Surgery::RobotState` updated with Foxglove-compatible fields (`joints` as `sequence<JointState>`, `tool_tip_pose` as `Common::Pose`); new helper structs (`Common::Quaternion`, `Common::Vector3`, `Common::Pose`); new `Surgery::RobotFrameTransform` topic publishing the kinematic frame hierarchy at 100 Hz; `Imaging::CameraFrame` streamlined (timestamp and frame_id removed, format changed to enum). See [data-model.md — Foxglove Schema Alignment](data-model.md#foxglove-schema-alignment).
-- **Translatable, not aligned** — V1.2 ensures all DDS types destined for Foxglove visualization are *translatable*: every field required by the target Foxglove schema is assemblable from medtech DDS data, `SampleInfo` metadata, or configuration lookups. Types are DDS-native first (enums over strings, no redundant payload fields). No Foxglove IDL compilation, no transformation plugins, no adapter/storage plugins, and no Foxglove Studio connectivity are included in V1.2. The full integration infrastructure is delivered in V2.
+- **Translatable, not aligned** — V1.1 ensures all DDS types destined for Foxglove visualization are *translatable*: every field required by the target Foxglove schema is assemblable from medtech DDS data, `SampleInfo` metadata, or configuration lookups. Types are DDS-native first (enums over strings, no redundant payload fields). No Foxglove IDL compilation, no transformation plugins, no adapter/storage plugins, and no Foxglove Studio connectivity are included in V1.1. The full integration infrastructure is delivered in V2.
 
 ---
 
@@ -204,7 +204,7 @@ Additive within the V1 milestone. No structural changes to V1 modules.
 - Upgrades V1's read-only `DeviceTelemetry` to a full command/response data path
 
 #### Foxglove Visualization Bridge
-- **Foxglove integration infrastructure** — full Foxglove Studio connectivity delivered in V2, building on the V1.2 data model translatability work. Three C++ shared-library plugins form the bridge pipeline:
+- **Foxglove integration infrastructure** — full Foxglove Studio connectivity delivered in V2, building on the V1.1 data model translatability work. Three C++ shared-library plugins form the bridge pipeline:
   1. **Routing Service Transformation plugin** (`libmedtech_foxglove_transf.so`) — implements `rti::routing::transf::DynamicDataTransformation`. One transformation class per target Foxglove type. Converts medtech DDS types to Foxglove-native types by stripping `@key` fields, restructuring nested members, and populating timestamps from `SampleInfo.source_timestamp`. Uses generated C++ types on both sides via `rti::core::xtypes::convert<T>()`.
   2. **Routing Service Adapter plugin** (`libfoxglove_ws_adapter.so`) — implements `rti::routing::adapter::AdapterPlugin` → `Connection` → `DynamicDataStreamWriter`. Output-only adapter: receives transformed Foxglove DynamicData from the Routing Service pipeline and serializes it to a Foxglove Studio live WebSocket connection. The transformation runs before the adapter's `write()` call.
   3. **Recording Service Storage plugin** (`libmedtech_mcap_storage.so`) — implements `rti::recording::storage::StorageWriter` → `DynamicDataStorageStreamWriter`. Custom storage backend that writes transformed Foxglove-native samples to MCAP files. The transformation runs before the storage writer's `store()` call.

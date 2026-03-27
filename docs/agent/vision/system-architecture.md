@@ -153,13 +153,13 @@ The WAN Routing Service bridge uses the **RTI Real-Time WAN Transport** (`UDPv4_
 
 This layer is deferred to V3.0. The Procedure and Hospital layers are designed so that adding the Cloud layer above them requires **zero changes** to existing modules — only new Routing Service configurations and the Command Center application are added.
 
-### Orchestration Domain (V1.1)
+### Orchestration Domain
 
 Infrastructure lifecycle layer for managing Service Hosts and procedure service deployment. The Orchestration domain is architecturally distinct from the Procedure domain because orchestration has a fundamentally different lifecycle — Service Hosts and the Procedure Controller persist across multiple procedures, shift changes, and OR reassignments, whereas Procedure domain data is scoped to a single active procedure.
 
 ```
 ╔═══════════════════════════════════════════════════════════════════════╗
-║  Orchestration Domain (V1.1)                                         ║
+║  Orchestration Domain                                                 ║
 ║  ─────────────────────────────────────────────────────────────────── ║
 ║  Host catalog │ Service status │ ServiceHostControl RPC              ║
 ║  (no domain tags — infrastructure control-plane, not clinical data)  ║
@@ -413,7 +413,7 @@ Each logical host is a Docker container. Custom Docker networks simulate the net
 |----------------|-----------|------------|
 | `surgical-net` | Per-OR surgical LAN | Robot sim, surgeon console, digital twin display, bedside monitors, procedure context sim, Service Hosts, Routing Service |
 | `hospital-net` | Hospital backbone | Dashboard, ClinicalAlerts engine, Cloud Discovery Service, Routing Service, Collector Service, Prometheus, Grafana Loki, Grafana |
-| `orchestration-net` **(V1.1)** | Orchestration control-plane | Procedure Controller, Service Hosts (dual-homed: surgical-net + orchestration-net), Cloud Discovery Service — Service Hosts bridge both networks to host surgical services on `surgical-net` while receiving orchestration commands on `orchestration-net` |
+| `orchestration-net` | Orchestration control-plane | Procedure Controller, Service Hosts (dual-homed: surgical-net + orchestration-net), Cloud Discovery Service — Service Hosts bridge both networks to host surgical services on `surgical-net` while receiving orchestration commands on `orchestration-net` |
 | `cloud-net` **(V3.0)** | Enterprise WAN | WAN Routing Service (dual-homed: hospital-net + cloud-net), Command Center dashboard, Cloud Discovery Service — **not created until V3.0 implementation** |
 
 ### Docker Compose Service Startup Ordering

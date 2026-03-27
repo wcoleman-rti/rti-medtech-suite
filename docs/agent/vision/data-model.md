@@ -134,7 +134,7 @@ writer and reader detects stream interruption.
 |-------|------|-----------|
 | `OperatorInput` | 500 Hz | Haptic/joystick control — continuous actuation |
 | `RobotState` | 100 Hz | Closed-loop feedback — must be continuously fresh |
-| `RobotFrameTransform` | 100 Hz | Kinematic frame hierarchy — published at same rate as `RobotState` for synchronized 3D visualization *(V1.2)* |
+| `RobotFrameTransform` | 100 Hz | Kinematic frame hierarchy — published at same rate as `RobotState` for synchronized 3D visualization *(V1.1)* |
 | `WaveformData` | 50 Hz (10-sample blocks) | Physiological signal reconstruction requires gapless stream |
 | `CameraFrame` | 30 Hz | Video feed — continuous frame delivery |
 
@@ -241,7 +241,7 @@ Data streams that cross a risk class boundary must not operate within the same d
 | `CameraFrame` | `Imaging::CameraFrame` | `operational` | `camera_id` | Endoscope/surgical camera compressed frame data (inline bytes). Deadline-enforced (66 ms). Translatable to Foxglove `CompressedImage` via Transformation plugin. |
 | `CameraConfig` | `Imaging::CameraConfig` | `operational` | `camera_id` | Camera stream configuration state (resolution, encoding, exposure). Write-on-change, TRANSIENT_LOCAL. Late joiners correlate with `CameraFrame` via `camera_id`. |
 | `ProcedureContext` | `Surgery::ProcedureContext` | `operational` | `procedure_id` | Hospital, room, bed, patient, surgeon, procedure type. TRANSIENT_LOCAL. |
-| `RobotFrameTransform` | `Surgery::RobotFrameTransform` | `control` | `robot_id` | *(V1.2)* Kinematic frame hierarchy for 3D visualization. Continuous stream at 100 Hz, synchronized with `RobotState`. Foxglove `FrameTransforms` aligned. |
+| `RobotFrameTransform` | `Surgery::RobotFrameTransform` | `control` | `robot_id` | *(V1.1)* Kinematic frame hierarchy for 3D visualization. Continuous stream at 100 Hz, synchronized with `RobotState`. Foxglove `FrameTransforms` aligned. |
 | `ProcedureStatus` | `Surgery::ProcedureStatus` | `operational` | `procedure_id` | Running status (in-progress, completing, alert). Published by each instance. TRANSIENT_LOCAL. Bridged to Hospital domain. |
 
 ### Domain 11 — Hospital
@@ -267,11 +267,11 @@ rationale and escalation trigger.
 | `ProcedureContext` | `Surgery::ProcedureContext` | `procedure_id` | Hospital, room, bed, patient, surgeon, procedure type. Bridged from Procedure domain (`operational` tag) — not published directly on this domain. TRANSIENT_LOCAL — late-joining dashboards receive current context immediately. |
 | `PatientVitals` | `Monitoring::PatientVitals` | `patient.id` | Real-time vital signs snapshot per patient. Bridged from Procedure domain (`clinical` tag) — not published directly on this domain. Consumed by the Dashboard vitals overview and the ClinicalAlerts engine. |
 | `AlarmMessages` | `Monitoring::AlarmMessage` | `alarm_id` | Device-level alarms (Pathway 1). Bridged from Procedure domain (`clinical` tag) — not published directly on this domain. Consumed by the Dashboard alert feed. |
-| `DeviceTelemetry` | `Devices::DeviceTelemetry` | `device_id` | Device status. Bridged from Procedure domain (`clinical` tag) — not published directly on this domain. Available on this domain in V1.0; not displayed by the V1.0 dashboard — reserved for V1.2+. |
+| `DeviceTelemetry` | `Devices::DeviceTelemetry` | `device_id` | Device status. Bridged from Procedure domain (`clinical` tag) — not published directly on this domain. Available on this domain in V1.0; not displayed by the V1.0 dashboard — reserved for V1.1+. |
 | `RobotState` | `Surgery::RobotState` | `robot_id` | Read-only robot state for the Dashboard robot status panel. Bridged from Procedure domain (`control` tag) — not published directly on this domain. |
 | `ClinicalAlert` | `ClinicalAlerts::ClinicalAlert` | `alert_id` | Risk-based alerts from ClinicalAlerts engine. |
 | `RiskScore` | `ClinicalAlerts::RiskScore` | `patient.id`, `score_kind` | Computed risk scores (sepsis, hemorrhage, etc.). |
-| `ResourceAvailability` | `Hospital::ResourceAvailability` | `resource_id` | *(V1.2)* OR, bed, equipment, and staff availability. Deferred to V1.2 — no simulator or dashboard panel in V1.0. |
+| `ResourceAvailability` | `Hospital::ResourceAvailability` | `resource_id` | *(V1.1)* OR, bed, equipment, and staff availability. Deferred to V1.1 — no simulator or dashboard panel in V1.0. |
 
 ### Domain 12 — Cloud / Enterprise (V3.0)
 
@@ -288,7 +288,7 @@ The multi-facility command center layer. Aggregated operational data bridged fro
 
 Partition format: `facility/<hospital_id>` (e.g., `facility/HOSP-NYC-01`).
 
-### Domain 15 — Orchestration (V1.1)
+### Domain 15 — Orchestration
 
 Infrastructure lifecycle management layer for procedure service orchestration. The Procedure Controller and Service Hosts communicate on this domain using a hybrid of DDS RPC (directed commands) and pub/sub (asynchronous state distribution).
 
@@ -538,7 +538,7 @@ Example structure:
         </base_name>
     </qos_profile>
 
-    <!-- V1.2: RobotFrameTransform — same deadline as RobotState -->
+    <!-- V1.1: RobotFrameTransform — same deadline as RobotState -->
     <qos_profile name="RobotFrameTransform" base_name="Patterns::Stream">
         <base_name>
             <element>Snippets::Deadline20ms</element>
@@ -646,7 +646,7 @@ interfaces/idl/
 │   └── clinical_alerts.idl             # module ClinicalAlerts { ClinicalAlert, RiskScore }
 ├── hospital/
 │   └── hospital.idl        # module Hospital { ResourceAvailability }
-└── foxglove/                       # (V1.2) Vendored Foxglove OMG IDL schemas (plugin build dependency only)
+└── foxglove/                       # (V1.1) Vendored Foxglove OMG IDL schemas (plugin build dependency only)
     ├── Time.idl
     ├── Quaternion.idl
     ├── Vector3.idl
@@ -944,7 +944,7 @@ Dependencies: `#include "common/common.idl"`
 | `y` | `double` | — | Y position (mm) |
 | `z` | `double` | — | Z position (mm) |
 
-**`Surgery::JointState`** — `@nested` `@appendable` *(V1.2)*
+**`Surgery::JointState`** — `@nested` `@appendable` *(V1.1)*
 
 Per-joint state. Field-semantically aligned with
 [`foxglove::JointState`](https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/JointState.idl).
@@ -963,7 +963,7 @@ See [Foxglove Schema Alignment](#foxglove-schema-alignment).
 > data model and adds serialization overhead. The Routing Service
 > Transformation plugin maps 0.0 values appropriately.
 
-**`Surgery::FrameTransformEntry`** — `@nested` `@appendable` *(V1.2)*
+**`Surgery::FrameTransformEntry`** — `@nested` `@appendable` *(V1.1)*
 
 Single parent → child coordinate frame transform. Field-semantically
 aligned with
@@ -996,8 +996,8 @@ Topic: `RobotState` | Domain Tag: `control` | Pattern: `State`
 | Member | Type | Key | Notes |
 |--------|------|-----|-------|
 | `robot_id` | `Common::EntityId` | @key | Robot instance identifier |
-| `joints` | `sequence<JointState, Common::MAX_JOINT_COUNT>` | — | *(V1.2 — replaces `joint_positions`)* Per-joint state: name, position, velocity, effort. Foxglove `JointStates` aligned. |
-| `tool_tip_pose` | `Common::Pose` | — | *(V1.2 — replaces `tool_tip_position`)* Tool-tip position + orientation. Foxglove `PoseInFrame` aligned. |
+| `joints` | `sequence<JointState, Common::MAX_JOINT_COUNT>` | — | *(V1.1 — replaces `joint_positions`)* Per-joint state: name, position, velocity, effort. Foxglove `JointStates` aligned. |
+| `tool_tip_pose` | `Common::Pose` | — | *(V1.1 — replaces `tool_tip_position`)* Tool-tip position + orientation. Foxglove `PoseInFrame` aligned. |
 | `operational_mode` | `RobotMode` | — | Current robot mode |
 | `error_state` | `int32` | — | Error code (0 = no error) |
 
@@ -1475,15 +1475,15 @@ the **Foxglove Bridge plugin pipeline** (V2) — see
 The alignment is split into **data model** work (updating medtech IDL
 types) and **plugin integration** work (transformation, adapter, and
 storage plugins). Data model alignment for Tier 1 is delivered in
-V1.2; all plugin infrastructure and Foxglove Studio connectivity is
+V1.1; all plugin infrastructure and Foxglove Studio connectivity is
 delivered in V2.
 
 | Tier | Foxglove Schema(s) | Medtech Type(s) | Foxglove Panel | Data Model | Plugin Integration |
-|------|---------------------|-----------------|----------------|------------|--------------------|
-| 1 | `JointStates` / `JointState` | `Surgery::RobotState` (`joints` field) | 3D (URDF model) | V1.2 | V2 |
-| 1 | `FrameTransform` / `FrameTransforms` | New: `Surgery::RobotFrameTransform` | 3D (TF tree) | V1.2 | V2 |
-| 1 | `PoseInFrame` | `Surgery::RobotState` (`tool_tip_pose` field) | 3D (pose marker) | V1.2 | V2 |
-| 1 | `CompressedImage` | `Imaging::CameraFrame` (strengthen existing) | Image | V1.2 | V2 |
+|------|---------------------|-----------------|----------------|------------|--------------------||
+| 1 | `JointStates` / `JointState` | `Surgery::RobotState` (`joints` field) | 3D (URDF model) | V1.1 | V2 |
+| 1 | `FrameTransform` / `FrameTransforms` | New: `Surgery::RobotFrameTransform` | 3D (TF tree) | V1.1 | V2 |
+| 1 | `PoseInFrame` | `Surgery::RobotState` (`tool_tip_pose` field) | 3D (pose marker) | V1.1 | V2 |
+| 1 | `CompressedImage` | `Imaging::CameraFrame` (strengthen existing) | Image | V1.1 | V2 |
 | 2 | `SceneUpdate` / `SceneEntity` | New: `Visualization::SceneUpdate` | 3D (primitives) | V2 | V2 |
 | 2 | `CameraCalibration` | New: `Imaging::CameraCalibration` | 3D + Image | V2 | V2 |
 | 2 | `ImageAnnotations` | New: `Imaging::ImageAnnotations` | Image (overlays) | V2 | V2 |
@@ -1497,7 +1497,7 @@ delivered in V2.
 Tier 3 types are placeholders — their IDL definitions will be authored
 when V3 scope is finalized.
 
-### Common Helper Structs (V1.2)
+### Common Helper Structs (V1.1)
 
 Three new helper structs are added to `Common` (`common/common.idl`)
 for reuse across modules. Field names match their `foxglove::`
@@ -1544,9 +1544,9 @@ Combines position and orientation for 3D spatial representation.
 > `Common::Pose` is used where both position and orientation are
 > semantically meaningful (e.g., robot tool tip state in `RobotState`).
 
-### V1.2 Field Alignments
+### V1.1 Field Alignments
 
-The following types are updated or added in V1.2 to enable Tier 1
+The following types are updated or added in V1.1 to enable Tier 1
 Foxglove visualization.
 
 #### `Surgery::RobotState` (Updated)
@@ -1637,7 +1637,7 @@ capability scope is finalized.
 
 The Foxglove Bridge is a set of three C++ shared-library plugins that
 form a pipeline between the medtech DDS data model and Foxglove Studio.
-All plugin infrastructure is delivered in **V2**; V1.2 delivers only
+All plugin infrastructure is delivered in **V2**; V1.1 delivers only
 the data model translatability work described above.
 
 The three plugins are:

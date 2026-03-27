@@ -1,6 +1,6 @@
 # Spec: Procedure Orchestration
 
-Behavioral specifications for the V1.1 Procedure Orchestration milestone:
+Behavioral specifications for the V1.0 Procedure Orchestration milestone:
 the `medtech::Service` interface, dual-mode participant pattern, Service
 Host framework, Procedure Controller GUI, Orchestration domain (Domain 15)
 communication, and DDS RPC lifecycle management.
@@ -112,7 +112,7 @@ is added or changed.*
 ### Scenario: Standalone service is backward-compatible with V1.0 deployment `@integration` `@orchestration`
 
 **Given** an existing V1.0 Docker Compose deployment with standalone services
-**When** V1.1 service classes are deployed in standalone mode (no Service Host, no Orchestration domain)
+**When** V1.0 service classes are deployed in standalone mode (no Service Host, no Orchestration domain)
 **Then** all V1.0 spec scenarios continue to pass without modification
 **And** the service operates identically to its V1.0 predecessor
 

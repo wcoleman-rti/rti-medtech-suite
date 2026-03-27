@@ -689,9 +689,9 @@ class BedsideMonitor(Service):
 > public interface — DDS entity types (`DataWriter`, `DataReader`,
 > `DomainParticipant`) are not.
 
-### Service Interface (V1.1)
+### Service Interface
 
-Starting with V1.1, all DDS service classes implement a minimal abstract
+Starting with Phase 5, all DDS service classes implement a minimal abstract
 interface that defines consistent lifecycle behavior across C++ and Python.
 This interface enables the Service Host framework to manage services
 uniformly regardless of language, domain tag, or internal complexity.
@@ -848,9 +848,9 @@ is a specific application of this principle: the participant is either
 injected (hosted) or self-created (standalone), never resolved from
 environment state by the service itself.
 
-### Dual-Mode Participant Pattern (V1.1)
+### Dual-Mode Participant Pattern
 
-Starting with V1.1, all DDS service classes support two deployment modes
+Starting with Phase 5, all DDS service classes support two deployment modes
 via a nullable `DomainParticipant` constructor parameter:
 
 1. **Standalone mode** (`None` / `dds::core::null`) — the service creates

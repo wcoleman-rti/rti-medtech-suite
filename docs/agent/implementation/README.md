@@ -23,8 +23,8 @@ These rules apply to all phases without exception:
 Phases are grouped by release milestone. All phases within a milestone must be complete before that version can be cut. See [vision/versioning.md](../vision/versioning.md) for release criteria.
 
 > **Implementation order:** Execute phases in **milestone order**, which now
-> matches phase numbering: V1.0 phases (1–4) → V1.1 phase (5) → V1.2
-> phase (6) → V2.0 phases (7–14) → V3.0 phases (15–19).
+> matches phase numbering: V1.0 phases (1–5) → V1.1 phase (6) →
+> V2.0 phases (7–14) → V3.0 phases (15–19).
 
 ```
 ── V1.0.0 ──────────────────────────────────────────────────────────────────
@@ -35,20 +35,20 @@ Phase 1: Foundation
     │
     ├──► Phase 2: Surgical Procedure (Steps 2.3+ depend on Revision)
     │        │
-    │        ├──► Phase 3: Hospital Dashboard
-    │        │        │
-    │        │        └── Step 3.1 (Routing Service) ──► Phase 4: Clinical Alerts & Decision Support
-    │        │
-    │        (Phase 4 depends on Phase 3 Step 3.1 for Routing Service;
-    │         Phase 4 can proceed in parallel with Phase 3 Steps 3.2–3.8)
+    │        └──► Phase 5: Procedure Orchestration + IDL Breaking Changes
+    │                  (Foxglove translatability, Timestamp_t, ImageFormat enum)
+    │                  Service interface, dual-mode services, Service Host,
+    │                  Procedure Controller, Orchestration domain, DDS RPC
+    │                  │
+    │                  ├──► Phase 3: Hospital Dashboard
+    │                  │        │    (services born as medtech::Service)
+    │                  │        │
+    │                  │        └── Step 3.1 (Routing Service) ──► Phase 4: Clinical Alerts
+    │                  │
+    │                  (Phase 4 depends on Phase 3 Step 3.1 for Routing Service;
+    │                   Phase 4 can proceed in parallel with Phase 3 Steps 3.2–3.8)
 
 ── V1.1.0 ──────────────────────────────────────────────────────────────────
-
-Phase 5: Procedure Orchestration     (depends on: Phases 1–4)
-         Service interface, dual-mode services, Service Host, Procedure
-         Controller, Orchestration domain, DDS RPC
-
-── V1.2.0 ──────────────────────────────────────────────────────────────────
 
 Phase 6: Recording & Replay          (depends on: Phases 1–5)
          + Foxglove Data Model Translatability (Tier 1)
@@ -101,35 +101,33 @@ If an implementation session is interrupted, use this checklist to resume:
 | [revision-dds-consistency.md](revision-dds-consistency.md) | DDS Consistency Alignment | Phase 1, Phase 2 Steps 2.1–2.2 | `app_names.idl` entity name constants, `dds_init.py` relocation, retrofit generated constants, architecture audit, expanded CI anti-pattern checks, `@consistency` spec tests |
 | [phase-2-surgical.md](phase-2-surgical.md) | Surgical Procedure | Phase 1, Revision | Robot sim, vitals sim (simulation model with scenario profiles), camera sim, procedure context, device telemetry (write-on-change), digital twin display, partition isolation, diagnostic tools (medtech-diag, partition-inspector) |
 | [revision-docker-build-workflow.md](revision-docker-build-workflow.md) | Docker Build Workflow | Phase 1 | Multi-stage Dockerfile, in-container compilation, compose update, CI Docker gates, doc guardrails |
-| [phase-3-dashboard.md](phase-3-dashboard.md) | Hospital Dashboard | Phase 2 | PySide6 GUI, Routing Service config, multi-OR aggregation, alert feed, robot status |
-| [phase-4-alerts.md](phase-4-alerts.md) | Clinical Alerts & Decision Support | Phase 2, Phase 3 Step 3.1 | Risk scoring engine, alert generation, cross-domain subscription, configurable thresholds |
+| [phase-5-orchestration.md](phase-5-orchestration.md) | Procedure Orchestration | Phase 2 | IDL breaking changes (Foxglove translatability: `Timestamp_t`, `ImageFormat` enum, `CameraFrame` streamlined), `medtech::Service` interface (C++ / Python ABC), dual-mode participant, Service Host framework (C++ and Python), Procedure Controller GUI (PySide6), Orchestration domain (Domain 15), `ServiceHostControl` DDS RPC, `HostCatalog` + `ServiceStatus` pub/sub, `@orchestration` test coverage |
+| [phase-3-dashboard.md](phase-3-dashboard.md) | Hospital Dashboard | Phase 5 | PySide6 GUI, Routing Service config, multi-OR aggregation, alert feed, robot status — services implement `medtech::Service` |
+| [phase-4-alerts.md](phase-4-alerts.md) | Clinical Alerts & Decision Support | Phase 5, Phase 3 Step 3.1 | Risk scoring engine, alert generation, cross-domain subscription, configurable thresholds — service implements `medtech::Service` |
+
+> **Prerequisite:** Phase 5 spec file [spec/procedure-orchestration.md](../spec/procedure-orchestration.md) must be operator-approved before implementation begins.
 
 ### V1.0.0 Release Gate
 
-After all V1.0.0 phases (1–4) are complete, a **final regression gate** must pass before the V1.0.0 version is cut:
+After all V1.0.0 phases (1–5, plus 3–4) are complete, a **final regression gate** must pass before the V1.0.0 version is cut:
 
-- [ ] Full test suite passes (`pytest tests/` — zero failures, zero skips, zero expected-failures)
-- [ ] Full Docker Compose environment runs end-to-end: 2+ surgical instances + Routing Service + Dashboard + ClinicalAlerts engine
+- [ ] Full test suite passes (`bash scripts/ci.sh`) — zero failures, zero skips, zero expected-failures
+- [ ] Full Docker Compose environment runs end-to-end: 2+ surgical instances + Routing Service + Dashboard + ClinicalAlerts engine + Orchestration (Service Hosts + Procedure Controller)
 - [ ] All quality gates from [workflow.md](../workflow.md) Section 7 pass (build, install, lint, QoS checks, domain ID checks, logging checks)
-- [ ] All spec scenarios from all four phases pass simultaneously in the Docker Compose environment
+- [ ] All spec scenarios from all five phases pass simultaneously in the Docker Compose environment
+- [ ] All `@orchestration` spec scenarios pass
+- [ ] Procedure Controller discovers, starts, stops, and monitors services across all three Service Host types
+- [ ] Orchestration domain is fully isolated from Procedure and Hospital domains
 - [ ] No open incidents in `docs/agent/incidents.md`
 - [ ] All module/service READMEs pass markdownlint and section-order lint
-- [ ] Performance benchmark passes against the Phase 3 baseline (or records the V1.0.0 baseline if this is the first complete run)
+- [ ] Performance benchmark passes against the Phase 5 baseline
 - [ ] `tests/performance/baselines/v1.0.0.json` is committed
 
 ### V1.1.0 Phases (planned)
 
 | Phase | Depends On | Key Deliverables |
 |-------|------------|------------------|
-| [phase-5-orchestration.md](phase-5-orchestration.md) | Phases 1–4 | `medtech::Service` interface (C++ / Python ABC), dual-mode participant, Service Host framework (C++ and Python), Procedure Controller GUI (PySide6), Orchestration domain (Domain 15), `ServiceHostControl` DDS RPC, `HostCatalog` + `ServiceStatus` pub/sub, `@orchestration` test coverage |
-
-> **Prerequisite:** Phase 5 spec file [spec/procedure-orchestration.md](../spec/procedure-orchestration.md) must be operator-approved before implementation begins.
-
-### V1.2.0 Phases (planned)
-
-| Phase | Depends On | Key Deliverables |
-|-------|------------|------------------|
-| Phase 6: Recording & Replay *(file not yet authored)* | Phases 1–5 | RTI Recording Service config, RTI Replay Service config, Foxglove data model alignment (Tier 1 — `RobotState` field updates, `Common::Quaternion`/`Vector3`/`Pose` helpers, `RobotFrameTransform` topic), `@recording`/`@replay` test coverage |
+| Phase 6: Recording & Replay *(file not yet authored)* | Phases 1–5 | RTI Recording Service config, RTI Replay Service config, Foxglove data model translatability (Tier 1 — `RobotState` field updates, `Common::Quaternion`/`Vector3`/`Pose` helpers, `RobotFrameTransform` topic), `@recording`/`@replay` test coverage |
 
 > **Prerequisite:** Phase 6 requires `spec/recording-replay.md` to be authored and operator-approved before implementation begins. The spec file does not yet exist.
 

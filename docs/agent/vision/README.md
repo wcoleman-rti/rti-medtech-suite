@@ -28,7 +28,7 @@ These rules are non-negotiable across all modules and phases:
 | [system-architecture.md](system-architecture.md) | Domain layout, partition strategy, network topology, Docker simulation, Routing Service |
 | [data-model.md](data-model.md) | IDL type definitions, QoS profiles, topic design, content filtering strategy |
 | [technology.md](technology.md) | Tech stack, build system, dependencies, toolchain, integrated CMake build |
-| [capabilities.md](capabilities.md) | V1 feature scope, module descriptions, versioned milestone roadmap (V1.1, V2, V3) |
+| [capabilities.md](capabilities.md) | V1 feature scope, module descriptions, versioned milestone roadmap (V1.0, V1.1, V2, V3) |
 | [versioning.md](versioning.md) | Release version policy: Major.Minor.Patch scheme, release criteria, milestone-to-version mapping, version boundary rules |
 | [documentation.md](documentation.md) | README standard: required section structure, markdownlint compliance rules, CI enforcement |
 | [security.md](security.md) | Security architecture: governance posture, participant identity model, permissions design, CRL, PSK, origin authentication |
