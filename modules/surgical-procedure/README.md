@@ -73,6 +73,9 @@ python -m surgical_procedure.procedure_context
 # Robot controller (C++)
 robot-controller
 
+# Operator console simulator (joystick/haptic input)
+python -m surgical_procedure.operator_sim
+
 # Bedside monitor (vitals + waveforms + alarms)
 python -m surgical_procedure.vitals_sim
 
@@ -103,6 +106,8 @@ modules/surgical-procedure/
 │   ├── robot_controller.hpp    Pure logic state machine
 │   ├── robot_controller.cpp    State machine implementation
 │   └── robot_controller_app.cpp  DDS application entry point
+├── operator_sim/               Operator console simulator
+│   └── operator_console.py     OperatorInput + RobotCommand + SafetyInterlock
 ├── vitals_sim/                 Bedside monitor simulator
 │   ├── bedside_monitor.py      PatientVitals + WaveformData + AlarmMessages
 │   ├── _signal.py              Signal model (convergence, noise, correlation)

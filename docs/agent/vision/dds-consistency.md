@@ -41,6 +41,7 @@ in [data-model.md — Pre-Participant Initialization](data-model.md).
 1. Call the shared medtech::initialize_connext() function
 2. Create DomainParticipant from XML configuration
 3. Set participant-level partition (before enabling entities)
+4. Enable the participant (mandatory — discovery does not begin until enable)
 ```
 
 ### Step 1 — Shared Initialization (`initialize_connext()`)
@@ -269,6 +270,7 @@ auto qos = participant.qos();
 qos << dds::core::policy::Partition(
     dds::core::StringSeq({"room/OR-3/procedure/proc-001"}));
 participant.qos(qos);
+participant.enable();
 ```
 
 **Python:**
@@ -277,6 +279,7 @@ participant.qos(qos);
 qos = participant.qos
 qos.partition.name = ["room/OR-3/procedure/proc-001"]
 participant.qos = qos
+participant.enable()
 ```
 
 The partition format is `room/<room_id>/procedure/<procedure_id>`. See

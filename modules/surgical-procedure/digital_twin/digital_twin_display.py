@@ -126,6 +126,7 @@ class DigitalTwinDisplay(QMainWindow):
         qos = self._participant.qos
         qos.partition.name = [partition]
         self._participant.qos = qos
+        self._participant.enable()
 
         def _find_reader(entity_name: str) -> dds.DataReader:
             r = self._participant.find_datareader(entity_name)

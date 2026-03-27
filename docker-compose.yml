@@ -222,6 +222,22 @@ services:
       cloud-discovery-service:
         condition: service_healthy
 
+  operator-sim-or1:
+    image: medtech/app-python
+    container_name: operator-sim-or1
+    command: ["python", "-m", "surgical_procedure.operator_sim"]
+    environment:
+      <<: *medtech-env
+      ROOM_ID: "OR-1"
+      PROCEDURE_ID: "OR1-001"
+      MEDTECH_APP_NAME: "operator-sim-or1"
+    volumes: *config-volumes
+    networks:
+      - surgical-net
+    depends_on:
+      cloud-discovery-service:
+        condition: service_healthy
+
   vitals-sim-or1:
     image: medtech/app-python
     container_name: vitals-sim-or1
@@ -314,6 +330,22 @@ services:
       ROOM_ID: "OR-3"
       PROCEDURE_ID: "OR3-001"
       MEDTECH_APP_NAME: "robot-controller-or3"
+    volumes: *config-volumes
+    networks:
+      - surgical-net
+    depends_on:
+      cloud-discovery-service:
+        condition: service_healthy
+
+  operator-sim-or3:
+    image: medtech/app-python
+    container_name: operator-sim-or3
+    command: ["python", "-m", "surgical_procedure.operator_sim"]
+    environment:
+      <<: *medtech-env
+      ROOM_ID: "OR-3"
+      PROCEDURE_ID: "OR3-001"
+      MEDTECH_APP_NAME: "operator-sim-or3"
     volumes: *config-volumes
     networks:
       - surgical-net

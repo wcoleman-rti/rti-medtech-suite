@@ -1377,3 +1377,118 @@ after closure. They form the project's decision log.
   participant QoS in one place. Library names follow short PascalCase
   convention (`Transport`, not `TransportSnippetLib`).
 - **Date closed:** 2026-03-26
+
+---
+
+## INC-045: alarm_id exceeds EntityId string bound (16 chars)
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-27
+- **Phase/Step:** Phase 2 / Step 2.3
+- **Documents involved:** `interfaces/idl/common/common.idl`,
+  `interfaces/idl/monitoring/monitoring.idl`,
+  `modules/surgical-procedure/vitals_sim/_alarm.py`
+- **Description:** The `AlarmMessage.alarm_id` field uses
+  `Common::EntityId` (bounded `string<16>`). The alarm evaluator
+  generated IDs as `f"{patient_id}-{alarm_code}"` — e.g.,
+  `"patient-001-RR_LOW"` (18 chars), causing a `ValueError` at
+  serialisation time. The default `patient_id` of `"patient-001"`
+  (11 chars) plus separator plus any alarm code longer than 4 chars
+  overflows the bound.
+- **Resolution:** Introduced `_make_alarm_id()` helper that truncates
+  the patient_id prefix from the right to guarantee the composite key
+  fits within `MAX_ID_LENGTH`. Added regression test
+  `test_alarm_id_fits_entity_id_bound` that triggers every default
+  alarm rule with the production patient_id.
+- **Guideline:** Any code that constructs composite entity IDs must
+  validate the total length against the IDL string bound. Consider
+  increasing `MAX_ID_LENGTH` in a future revision if composite IDs
+  become common.
+- **Date closed:** 2026-03-27
+
+---
+
+## INC-046: Digital twin DomainParticipant never enabled
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-27
+- **Phase/Step:** Phase 2 / Step 2.6
+- **Documents involved:**
+  `modules/surgical-procedure/digital_twin/digital_twin_display.py`,
+  `vision/dds-consistency.md` §3
+- **Description:** The digital twin display's `_init_dds()` method
+  created the `ControlDigitalTwin` participant and set its partition,
+  but never called `participant.enable()`. Since
+  `create_participant_from_config()` returns a disabled participant
+  (to allow partition assignment first), the readers never discovered
+  any writers and the GUI showed "UNKNOWN" with no data.
+  Every other Python simulator in the module (camera_sim,
+  vitals_sim, device_telemetry_sim, procedure_context) correctly
+  calls `enable()` after setting the partition. The C++ robot
+  controller also calls `enable()`. This was a unique omission in
+  the digital twin.
+- **Resolution:** Added `self._participant.enable()` after partition
+  assignment in `_init_dds()`.
+- **Guideline:** The canonical participant lifecycle documented in
+  `vision/dds-consistency.md` §3 should explicitly list
+  `participant.enable()` as a mandatory step after partition
+  assignment. Consider adding an anti-pattern check to CI that
+  greps for `create_participant_from_config` without a corresponding
+  `.enable()` call.
+- **Date closed:** 2026-03-27
+
+---
+
+## INC-047: QtAsyncio.run() event loop mismatch — DDS tasks never started
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-27
+- **Phase/Step:** Phase 2 / Step 2.6
+- **Documents involved:**
+  `modules/surgical-procedure/digital_twin/__main__.py`
+- **Description:** The digital twin entry point used
+  `asyncio.get_event_loop().call_soon(...)` to schedule
+  `display.start()`, then called `QtAsyncio.run()`.
+  `QtAsyncio.run()` creates a **new** Qt-integrated event loop,
+  orphaning the `call_soon` callback on the original default loop.
+  The DDS reader tasks were never started.
+- **Resolution:** Replaced with `QtAsyncio.run(display.start(), ...)`,
+  which passes the coroutine directly to the Qt event loop. Removed
+  unused `import asyncio`.
+- **Guideline:** When using `QtAsyncio.run()`, always pass coroutines
+  directly as the first argument — never pre-schedule on a separate
+  asyncio loop. The Qt async integration creates its own loop.
+- **Date closed:** 2026-03-27
+
+---
+
+## INC-048: Operator console simulator missing from Step 2.2 deliverables
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-27
+- **Phase/Step:** Phase 2 / Step 2.2
+- **Documents involved:** `docs/agent/implementation/phase-2-surgical.md`,
+  `interfaces/participants/SurgicalParticipants.xml`,
+  `interfaces/idl/app_names.idl`
+- **Description:** Phase 2 Step 2.2 specifies "Implement operator input
+  publisher", "Implement robot command publisher", and "Implement safety
+  interlock publisher" as deliverables. The `ControlOperator` participant
+  XML and all entity name constants were created, but no standalone
+  operator console application was implemented. The integration tests
+  created ad-hoc publishers inline, masking the gap. In a manual test,
+  the robot controller had no operator input and stayed in IDLE.
+- **Resolution:** Implemented `modules/surgical-procedure/operator_sim/`
+  as a proper module package following canonical patterns: `__init__.py`,
+  `__main__.py`, and `operator_console.py` (`OperatorConsole` class).
+  Added Docker Compose containers for OR-1 and OR-3. Updated module
+  README.
+- **Guideline:** Each publisher/subscriber role in the implementation
+  plan should map to a concrete launchable application, not just XML
+  configuration and test fixtures. Future steps should verify that all
+  `create_participant_from_config` participants in XML have a
+  corresponding application entry point.
+- **Date closed:** 2026-03-27

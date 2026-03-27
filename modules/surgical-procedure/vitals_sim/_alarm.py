@@ -20,6 +20,24 @@ AlarmState = monitoring.Monitoring.AlarmState
 PatientVitals = monitoring.Monitoring.PatientVitals
 Time_t = common.Common.Time_t
 
+_MAX_ID = common.Common.MAX_ID_LENGTH
+
+
+def _make_alarm_id(patient_id: str, alarm_code: str) -> str:
+    """Build a compact alarm_id that fits within EntityId (string<16>).
+
+    Format: ``<patient_suffix>-<alarm_code>``, truncated from the left
+    on the patient portion so the alarm_code is always preserved.
+    """
+    suffix_budget = _MAX_ID - len(alarm_code) - 1  # 1 for the separator
+    if suffix_budget < 1:
+        # alarm_code itself is too long — truncate the whole thing
+        return f"{patient_id}-{alarm_code}"[:_MAX_ID]
+    patient_suffix = (
+        patient_id[-suffix_budget:] if len(patient_id) > suffix_budget else patient_id
+    )
+    return f"{patient_suffix}-{alarm_code}"
+
 
 @dataclass
 class ThresholdRule:
@@ -136,7 +154,7 @@ class AlarmEvaluator:
             if violated and not was_active:
                 # New alarm — raise
                 alarm = AlarmMessage(
-                    alarm_id=f"{self._patient_id}-{rule.alarm_code}",
+                    alarm_id=_make_alarm_id(self._patient_id, rule.alarm_code),
                     patient_id=self._patient_id,
                     source_device_id=self._device_id,
                     severity=rule.severity,

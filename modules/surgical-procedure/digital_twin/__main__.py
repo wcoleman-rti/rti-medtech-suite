@@ -10,7 +10,6 @@ Environment:
 
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 
@@ -29,10 +28,7 @@ def main() -> None:
     display = DigitalTwinDisplay(room_id=room_id, procedure_id=procedure_id)
     display.show()
 
-    # Schedule the async DDS task after the event loop starts
-    asyncio.get_event_loop().call_soon(lambda: asyncio.ensure_future(display.start()))
-
-    QtAsyncio.run(handle_sigint=True)
+    QtAsyncio.run(display.start(), handle_sigint=True)
 
 
 if __name__ == "__main__":

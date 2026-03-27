@@ -22,6 +22,7 @@ import os
 import random
 import time
 
+import common
 import monitoring
 import pytest
 import rti.connextdds as dds
@@ -206,6 +207,34 @@ class TestAlarmEvaluator:
         # Second eval with same high reading — should not re-raise
         t2 = evaluator.evaluate(high)
         assert len([a for a in t2 if a.alarm_code == "HR_HIGH"]) == 0
+
+    def test_alarm_id_fits_entity_id_bound(self):
+        """All generated alarm_ids must fit within EntityId (string<MAX_ID_LENGTH>).
+
+        Regression test: the default patient_id 'patient-001' combined with
+        longer alarm codes like 'TEMP_HIGH' previously exceeded 16 characters,
+        causing a serialization crash at runtime.
+        """
+        max_len = common.Common.MAX_ID_LENGTH
+        # Use the production default patient_id
+        evaluator = AlarmEvaluator(patient_id="patient-001")
+        # Build vitals that trigger every single default alarm rule
+        vitals = PatientVitals(
+            patient_id="patient-001",
+            heart_rate=200.0,  # HR_HIGH
+            spo2=50.0,  # SPO2_LOW
+            systolic_bp=40.0,  # SBP_LOW
+            diastolic_bp=80.0,
+            temperature=42.0,  # TEMP_HIGH
+            respiratory_rate=3.0,  # RR_LOW (and not RR_HIGH)
+        )
+        transitions = evaluator.evaluate(vitals)
+        assert len(transitions) > 0, "Expected at least one alarm"
+        for alarm in transitions:
+            assert len(alarm.alarm_id) <= max_len, (
+                f"alarm_id '{alarm.alarm_id}' ({len(alarm.alarm_id)} chars) "
+                f"exceeds EntityId bound ({max_len})"
+            )
 
 
 # -----------------------------------------------------------------------

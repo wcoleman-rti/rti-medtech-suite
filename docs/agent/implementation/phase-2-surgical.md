@@ -43,6 +43,13 @@
   - Publishes `RobotCommand` with `Command` pattern QoS
 - Implement safety interlock publisher on the Procedure domain (`control` tag)
   - Publishes `SafetyInterlock` with `State` pattern QoS
+- **Operator console simulator** (`modules/surgical-procedure/operator_sim/`)
+  - Standalone launchable application using `ControlOperator` participant
+  - Entry point: `python -m surgical_procedure.operator_sim`
+  - Sends initial `RobotCommand` (IDLE → OPERATIONAL), then publishes
+    `OperatorInput` at 50 Hz with simulated joystick motion
+  - Publishes `SafetyInterlock` togglable via `set_interlock()`
+  - Docker Compose containers for each OR instance
 - Robot controller subscriber receives `OperatorInput` and `RobotCommand`, responds to `SafetyInterlock`
 - **Robot controller threading pattern: dual `AsyncWaitSet` (pub/sub separation)**
   - Critical-path I/O contexts with tight jitter budgets must not share a dispatch thread with lower-priority processing. The 100 Hz `RobotState` publisher and the subscription readers are therefore separated into two independent `AsyncWaitSet` instances, each with **thread pool size = 1**.
