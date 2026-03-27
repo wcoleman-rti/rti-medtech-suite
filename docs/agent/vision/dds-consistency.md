@@ -823,6 +823,51 @@ await asyncio.gather(
 # Service Host polls service.state and publishes ServiceStatus
 ```
 
+#### Generic Service Host Framework
+
+All Service Hosts (robot, clinical, operational, and any future hosts) are
+built on the shared `ServiceHost` framework:
+
+- **C++**: `medtech/service_host.hpp` + `service_host.cpp`
+- **Python**: `medtech.service_host` module
+
+The framework provides the orchestration infrastructure (RPC endpoint,
+`HostCatalog` publisher, `ServiceStatus` publisher, lifecycle management)
+and is parameterized only by a `ServiceFactoryMap`. Concrete hosts are
+thin wrappers that register factories and delegate to `make_service_host`.
+
+**Rules for new Service Hosts and Services:**
+
+1. **ServiceFactory signature**: `(const Common::EntityId& service_id) →
+   unique_ptr<Service>` (C++) / `(str) → Service` (Python). The framework
+   passes the registered service_id as the single argument. All other
+   context (room, procedure, device IDs, logger) is captured in the
+   closure at registration time.
+
+2. **Domain-agnostic framework**: The generic `ServiceHost` creates an
+   Orchestration domain participant from XML configuration. It does **not**
+   set partitions, domain tags, or any domain-specific QoS — those
+   concerns belong to the concrete services or their domain participants.
+
+3. **Concrete hosts are header-only / trivial**: A concrete host (e.g.,
+   `make_robot_service_host`) should be an `inline` factory function that
+   populates a `ServiceFactoryMap` and calls `make_service_host<N>()`.
+   No subclassing or additional state.
+
+4. **Capacity is compile-time (C++)**: `make_service_host<N>()` enforces
+   the factory count at compile time via `static_assert` and at runtime
+   via a bounds check. The capacity appears in `CapabilityReport`.
+
+5. **`Common::EntityId` as service key**: The factory map, slot map,
+   `ServiceRequest`, `HostCatalog`, and `ServiceStatus` all use
+   `Common::EntityId` (IDL `string<MAX_ID_LENGTH>`) as the service
+   identifier. Service Hosts, Services, and Orchestration clients must
+   use consistent `EntityId` values.
+
+6. **C++/Python parity**: The C++ and Python implementations mirror each
+   other structurally. Changes to the framework must be applied to both
+   languages simultaneously.
+
 #### Service Context Injection Rule
 
 Services receive **all** operational context via constructor parameters or

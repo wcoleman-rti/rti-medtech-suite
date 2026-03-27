@@ -55,6 +55,7 @@ endif()
 
 # --- Subdirectories ---
 add_subdirectory(interfaces)
+add_subdirectory(modules/shared/medtech_dds_init)
 add_subdirectory(modules/surgical-procedure/robot_controller)
 add_subdirectory(modules/surgical-procedure/robot_service_host)
 if(BUILD_TESTING)

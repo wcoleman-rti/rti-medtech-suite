@@ -1,10 +1,12 @@
-// robot_service_host.cpp — Robot Service Host implementation.
+// service_host.cpp — Generic Service Host implementation.
 //
-// Manages a single RobotControllerService on the Procedure domain and
-// exposes a ServiceHostControl RPC endpoint on the Orchestration domain.
-// Publishes HostCatalog and ServiceStatus per the orchestration spec.
+// Contains ServiceHostControlImpl (the RPC handler) and ServiceHost
+// (the medtech::Service wrapper).  These are fully generic — each
+// concrete host (robot, clinical, operational) only provides factories.
+//
+// Mirrors modules/shared/medtech/service_host.py for the Python side.
 
-#include "robot_service_host.hpp"
+#include "medtech/service_host.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -23,34 +25,43 @@
 #include <rti/sub/findImpl.hpp>
 
 #include "medtech/dds_init.hpp"
-#include "../robot_controller/robot_controller_service.hpp"
 
 #include <app_names/app_names.hpp>
 #include <orchestration/orchestration.hpp>
 
 namespace orch_names = MedtechEntityNames::OrchestrationParticipants;
-namespace proc_names = MedtechEntityNames::SurgicalParticipants;
 
-namespace medtech::surgical {
+namespace medtech {
 
 namespace {
 
 // ---------------------------------------------------------------------------
-// ServiceHostControlImpl — concrete RPC service implementation.
+// ServiceSlot — a running service instance and its dedicated thread.
+// ---------------------------------------------------------------------------
+struct ServiceSlot {
+    std::unique_ptr<Service> service;
+    std::thread thread;
+};
+
+using ServiceSlotMap = std::unordered_map<Common::EntityId, ServiceSlot>;
+
+// ---------------------------------------------------------------------------
+// ServiceHostControlImpl — generic RPC service implementation.
 //
 // Implements the IDL-generated Orchestration::ServiceHostControl interface.
+// Manages zero or more services keyed by Common::EntityId via a factory map.
 // Dispatched by the RPC framework on the server thread pool.
 // ---------------------------------------------------------------------------
 class ServiceHostControlImpl : public Orchestration::ServiceHostControl {
 public:
     ServiceHostControlImpl(
         const std::string& host_id,
-        const std::string& room_id,
-        const std::string& procedure_id,
-        medtech::ModuleLogger& log)
+        int32_t capacity,
+        ServiceFactoryMap factories,
+        ModuleLogger& log)
         : host_id_(host_id),
-          room_id_(room_id),
-          procedure_id_(procedure_id),
+          capacity_(capacity),
+          factories_(std::move(factories)),
           log_(log)
     {
     }
@@ -60,50 +71,54 @@ public:
     {
         std::lock_guard<std::mutex> lock(mu_);
         Orchestration::OperationResult result;
+        const Common::EntityId svc_id(req.service_id);
 
-        if (service_ && service_->state() != Orchestration::ServiceState::STOPPED
-            && service_->state() != Orchestration::ServiceState::FAILED) {
-            result.code = Orchestration::OperationResultCode::ALREADY_RUNNING;
-            result.message = "Service is already running";
-            log_.notice("start_service rejected: ALREADY_RUNNING");
+        auto factory_it = factories_.find(svc_id);
+        if (factory_it == factories_.end()) {
+            result.code = Orchestration::OperationResultCode::INVALID_SERVICE;
+            result.message = "Unknown service: " + svc_id;
+            log_.notice("start_service rejected: INVALID_SERVICE ("
+                + svc_id + ")");
             return result;
         }
 
+        auto slot_it = slots_.find(svc_id);
+        if (slot_it != slots_.end()) {
+            auto st = slot_it->second.service->state();
+            if (st != Orchestration::ServiceState::STOPPED
+                && st != Orchestration::ServiceState::FAILED) {
+                result.code = Orchestration::OperationResultCode::ALREADY_RUNNING;
+                result.message = "Service is already running";
+                log_.notice("start_service rejected: ALREADY_RUNNING ("
+                    + svc_id + ")");
+                return result;
+            }
+            // Clear stale slot (STOPPED or FAILED)
+            if (slot_it->second.thread.joinable()) {
+                slot_it->second.thread.join();
+            }
+            slots_.erase(slot_it);
+        }
+
         try {
-            // Create a Procedure domain participant for the hosted service
-            auto provider = dds::core::QosProvider::Default();
-            hosted_participant_ = provider.extensions()
-                .create_participant_from_config(
-                    std::string(proc_names::CONTROL_ROBOT));
+            ServiceSlot slot;
+            slot.service = factory_it->second(svc_id);
 
-            const std::string partition =
-                "room/" + room_id_ + "/procedure/" + procedure_id_;
-            auto dp_qos = hosted_participant_.qos();
-            dp_qos << dds::core::policy::Partition(partition);
-            hosted_participant_.qos(dp_qos);
-
-            // Construct the service in hosted mode — it does NOT create
-            // its own participant since we pass a valid one.
-            // Note: The current RobotControllerService always creates its
-            // own participant (standalone only for now). We construct via
-            // the factory which creates in standalone mode.
-            service_ = make_robot_controller_service(
-                "001", room_id_, procedure_id_, log_);
-
-            // Spawn run() on a dedicated thread
-            service_thread_ = std::thread([this]() {
+            auto* svc_ptr = slot.service.get();
+            slot.thread = std::thread([svc_ptr, this]() {
                 try {
-                    service_->run();
+                    svc_ptr->run();
                 } catch (const std::exception& ex) {
                     log_.error(
                         std::string("Service run() threw: ") + ex.what());
                 }
             });
 
+            slots_.emplace(svc_id, std::move(slot));
+
             result.code = Orchestration::OperationResultCode::OK;
             result.message = "Service started";
-            log_.notice("start_service: OK (service_id="
-                + req.service_id + ")");
+            log_.notice("start_service: OK (service_id=" + svc_id + ")");
         } catch (const std::exception& ex) {
             result.code = Orchestration::OperationResultCode::INTERNAL_ERROR;
             result.message = std::string("Failed to start service: ") + ex.what();
@@ -118,30 +133,28 @@ public:
     {
         std::lock_guard<std::mutex> lock(mu_);
         Orchestration::OperationResult result;
+        const Common::EntityId svc_id(req.service_id);
 
-        if (!service_ || service_->state() == Orchestration::ServiceState::STOPPED) {
+        auto slot_it = slots_.find(svc_id);
+        if (slot_it == slots_.end()
+            || slot_it->second.service->state()
+                   == Orchestration::ServiceState::STOPPED) {
             result.code = Orchestration::OperationResultCode::NOT_RUNNING;
             result.message = "Service is not running";
-            log_.notice("stop_service rejected: NOT_RUNNING");
+            log_.notice("stop_service rejected: NOT_RUNNING ("
+                + svc_id + ")");
             return result;
         }
 
-        service_->stop();
-        if (service_thread_.joinable()) {
-            service_thread_.join();
+        slot_it->second.service->stop();
+        if (slot_it->second.thread.joinable()) {
+            slot_it->second.thread.join();
         }
-
-        // Release the service and hosted participant
-        service_.reset();
-        if (hosted_participant_ != dds::core::null) {
-            hosted_participant_.close();
-            hosted_participant_ = dds::core::null;
-        }
+        slots_.erase(slot_it);
 
         result.code = Orchestration::OperationResultCode::OK;
         result.message = "Service stopped";
-        log_.notice("stop_service: OK (service_id="
-            + req.service_id + ")");
+        log_.notice("stop_service: OK (service_id=" + svc_id + ")");
         return result;
     }
 
@@ -152,16 +165,20 @@ public:
         result.code = Orchestration::OperationResultCode::OK;
         result.message = "Configuration accepted (no-op in V1.0)";
         log_.notice("configure_service: OK (service_id="
-            + req.service_id + ")");
+            + std::string(req.service_id) + ")");
         return result;
     }
 
     Orchestration::CapabilityReport get_capabilities() override
     {
         Orchestration::CapabilityReport report;
-        report.supported_services.push_back("RobotControllerService");
-        report.capacity = 1;
-        log_.notice("get_capabilities: reported 1 service");
+        for (const auto& [name, _] : factories_) {
+            report.supported_services.push_back(name);
+        }
+        report.capacity = capacity_;
+        log_.notice("get_capabilities: reported "
+            + std::to_string(factories_.size()) + " service(s), capacity="
+            + std::to_string(capacity_));
         return report;
     }
 
@@ -171,82 +188,100 @@ public:
         report.alive = true;
 
         std::lock_guard<std::mutex> lock(mu_);
-        if (service_) {
-            auto st = service_->state();
-            report.summary =
-                std::string("RobotControllerService: ")
-                + std::to_string(static_cast<int>(st));
+        if (slots_.empty()) {
+            report.summary = "No services running";
         } else {
-            report.summary = "No service running";
+            std::string summary;
+            for (const auto& [id, slot] : slots_) {
+                if (!summary.empty()) summary += "; ";
+                summary += id + ": "
+                    + std::to_string(
+                          static_cast<int>(slot.service->state()));
+            }
+            report.summary = summary;
         }
         report.diagnostics = "";
         return report;
     }
 
-    /// Poll the current service state (called from the host's status thread).
-    Orchestration::ServiceState service_state() const
+    /// Return current state for every running service (for status polling).
+    ServiceStateMap service_states() const
     {
         std::lock_guard<std::mutex> lock(mu_);
-        if (service_) {
-            return service_->state();
+        ServiceStateMap states;
+        for (const auto& [id, slot] : slots_) {
+            states[id] = slot.service->state();
         }
-        return Orchestration::ServiceState::STOPPED;
+        return states;
     }
 
-    std::string service_name() const
+    /// Return factory-registered service IDs (for initial status publish).
+    std::vector<Common::EntityId> registered_service_ids() const
+    {
+        std::vector<Common::EntityId> ids;
+        ids.reserve(factories_.size());
+        for (const auto& [name, _] : factories_) {
+            ids.push_back(name);
+        }
+        return ids;
+    }
+
+    /// Stop all running services (called during host shutdown).
+    void stop_all()
     {
         std::lock_guard<std::mutex> lock(mu_);
-        if (service_) {
-            return std::string(service_->name());
+        for (auto& [id, slot] : slots_) {
+            slot.service->stop();
         }
-        return "";
+        for (auto& [id, slot] : slots_) {
+            if (slot.thread.joinable()) {
+                slot.thread.join();
+            }
+        }
+        slots_.clear();
     }
 
 private:
     std::string host_id_;
-    std::string room_id_;
-    std::string procedure_id_;
-    medtech::ModuleLogger& log_;
+    int32_t capacity_;
+    ServiceFactoryMap factories_;
+    ModuleLogger& log_;
 
     mutable std::mutex mu_;
-    std::unique_ptr<medtech::Service> service_;
-    std::thread service_thread_;
-    dds::domain::DomainParticipant hosted_participant_{nullptr};
+    ServiceSlotMap slots_;
 };
 
 
 // ---------------------------------------------------------------------------
-// RobotServiceHost — medtech::Service that wraps the orchestration layer.
+// ServiceHost — generic medtech::Service that wraps the orchestration layer.
 //
 // Creates an Orchestration domain participant, registers the RPC service,
 // publishes HostCatalog and ServiceStatus, and blocks in run().
+// Configured via ServiceFactoryMap — the only variation point between
+// robot, clinical, and operational service hosts.
 // ---------------------------------------------------------------------------
-class RobotServiceHost : public medtech::Service {
+class ServiceHost : public Service {
 public:
-    RobotServiceHost(
+    ServiceHost(
         const std::string& host_id,
-        const std::string& room_id,
-        const std::string& procedure_id,
-        medtech::ModuleLogger& log)
+        const std::string& host_name,
+        int32_t capacity,
+        ServiceFactoryMap factories,
+        ModuleLogger& log)
         : host_id_(host_id),
-          room_id_(room_id),
-          procedure_id_(procedure_id),
+          host_name_(host_name),
+          capacity_(capacity),
           log_(log),
           svc_state_(Orchestration::ServiceState::STOPPED)
     {
         // -- Create Orchestration domain participant from XML --
-        medtech::initialize_connext();
+        initialize_connext();
         auto provider = dds::core::QosProvider::Default();
         orch_participant_ = provider.extensions()
             .create_participant_from_config(
                 std::string(orch_names::ORCHESTRATION));
 
-        const std::string partition = "room/" + room_id;
-        auto dp_qos = orch_participant_.qos();
-        dp_qos << dds::core::policy::Partition(partition);
-        orch_participant_.qos(dp_qos);
-
-        log_.notice("Orchestration participant created, partition=" + partition);
+        log_.notice("Orchestration participant created");
 
         // -- Look up pub/sub entities --
         catalog_writer_ =
@@ -271,7 +306,8 @@ public:
 
         // -- Create the RPC implementation --
         rpc_impl_ = std::make_shared<ServiceHostControlImpl>(
-            host_id, room_id, procedure_id, log);
+            host_id,
+            capacity, std::move(factories), log);
     }
 
     void run() override
@@ -300,39 +336,43 @@ public:
         // -- Publish initial HostCatalog --
         publish_host_catalog();
 
-        // -- Publish initial ServiceStatus (STOPPED) --
-        publish_service_status(Orchestration::ServiceState::STOPPED);
+        // -- Publish initial ServiceStatus (STOPPED) for each service --
+        for (const auto& svc_id : rpc_impl_->registered_service_ids()) {
+            publish_service_status(svc_id,
+                Orchestration::ServiceState::STOPPED);
+        }
 
         svc_state_.store(Orchestration::ServiceState::RUNNING,
                          std::memory_order_release);
-        log_.notice("Robot Service Host running (host_id=" + host_id_ + ")");
+        log_.notice(host_name_ + " running (host_id=" + host_id_ + ")");
 
         // -- Status polling loop --
-        auto last_published_state = Orchestration::ServiceState::STOPPED;
+        ServiceStateMap last_published_states;
         while (running_.load(std::memory_order_relaxed)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-            auto current = rpc_impl_->service_state();
-            if (current != last_published_state) {
-                publish_service_status(current);
-                last_published_state = current;
+            auto states = rpc_impl_->service_states();
+            for (const auto& [svc_id, state] : states) {
+                auto it = last_published_states.find(svc_id);
+                if (it == last_published_states.end()
+                    || it->second != state) {
+                    publish_service_status(svc_id, state);
+                    last_published_states[svc_id] = state;
+                }
             }
         }
 
         // -- Shutdown --
         svc_state_.store(Orchestration::ServiceState::STOPPING,
                          std::memory_order_release);
-        log_.notice("Robot Service Host shutting down");
+        log_.notice(host_name_ + " shutting down");
 
-        // Close the RPC service before shutting down other entities
-        if (rpc_service_) {
-            rpc_service_->close();
-            rpc_service_.reset();
-        }
-        if (rpc_server_ != dds::core::null) {
-            rpc_server_.close();
-            rpc_server_ = dds::core::null;
-        }
+        // Stop all hosted services before tearing down RPC
+        rpc_impl_->stop_all();
+
+        // Release RPC references — RAII cleanup via reference counting.
+        rpc_service_.reset();
+        rpc_server_ = dds::core::null;
 
         svc_state_.store(Orchestration::ServiceState::STOPPED,
                          std::memory_order_release);
@@ -345,7 +385,7 @@ public:
 
     std::string_view name() const override
     {
-        return "RobotServiceHost";
+        return host_name_;
     }
 
     Orchestration::ServiceState state() const override
@@ -358,25 +398,24 @@ private:
     {
         Orchestration::HostCatalog catalog;
         catalog.host_id = host_id_;
-        catalog.supported_services.push_back("RobotControllerService");
-        catalog.capacity = 1;
+        for (const auto& svc_id : rpc_impl_->registered_service_ids()) {
+            catalog.supported_services.push_back(svc_id);
+        }
+        catalog.capacity = capacity_;
         catalog.health_summary = "OK";
         catalog_writer_.write(catalog);
         log_.notice("Published HostCatalog for host " + host_id_);
     }
 
-    void publish_service_status(Orchestration::ServiceState svc_state)
+    void publish_service_status(
+        const Common::EntityId& service_id,
+        Orchestration::ServiceState svc_state)
     {
         Orchestration::ServiceStatus status;
         status.host_id = host_id_;
-
-        auto svc_name = rpc_impl_->service_name();
-        status.service_id =
-            svc_name.empty() ? "RobotControllerService" : svc_name;
-
+        status.service_id = service_id;
         status.state = svc_state;
 
-        // Use system_clock for wall-clock timestamp
         auto now = std::chrono::system_clock::now();
         auto epoch = now.time_since_epoch();
         auto secs = std::chrono::duration_cast<std::chrono::seconds>(epoch);
@@ -391,14 +430,14 @@ private:
         status_writer_.write(status);
         log_.notice("Published ServiceStatus: "
             + std::to_string(static_cast<int>(svc_state))
-            + " for " + status.service_id);
+            + " for " + service_id);
     }
 
     // Configuration
     std::string host_id_;
-    std::string room_id_;
-    std::string procedure_id_;
-    medtech::ModuleLogger& log_;
+    std::string host_name_;
+    int32_t capacity_;
+    ModuleLogger& log_;
 
     // Lifecycle
     std::atomic<bool> running_{true};
@@ -418,14 +457,19 @@ private:
 
 }  // anonymous namespace
 
-std::unique_ptr<medtech::Service> make_robot_service_host(
+// ---------------------------------------------------------------------------
+// Factory implementation — called by the make_service_host<N> template.
+// ---------------------------------------------------------------------------
+std::unique_ptr<Service> make_service_host_impl(
     const std::string& host_id,
-    const std::string& room_id,
-    const std::string& procedure_id,
-    medtech::ModuleLogger& log)
+    const std::string& host_name,
+    int32_t capacity,
+    ServiceFactoryMap factories,
+    ModuleLogger& log)
 {
-    return std::make_unique<RobotServiceHost>(
-        host_id, room_id, procedure_id, log);
+    return std::make_unique<ServiceHost>(
+        host_id, host_name,
+        capacity, std::move(factories), log);
 }
 
-}  // namespace medtech::surgical
+}  // namespace medtech
