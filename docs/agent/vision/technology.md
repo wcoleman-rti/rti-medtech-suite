@@ -49,7 +49,7 @@ This design ensures that a non-breaking Connext version bump touches at most **5
 | C++ | C++17 | Terminal/background/service applications, Routing Service plugins (including Foxglove Bridge — V2), performance-critical data paths |
 | Python | 3.10+ | GUI applications, simulators, test harnesses |
 
-## Foxglove IDL Schemas (V1.1)
+## Foxglove IDL Schemas (V1.2)
 
 Selected [Foxglove OMG IDL schemas](https://github.com/foxglove/foxglove-sdk/tree/main/schemas/omgidl/foxglove) are compiled with `rtiddsgen` and linked into the Foxglove Transformation plugin. These schemas are **build-time dependencies of the plugin only** — they are not part of the medtech application data model and are not registered on application-domain participants.
 

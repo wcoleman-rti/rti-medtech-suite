@@ -97,11 +97,55 @@ The full release version policy — including version increment rules, release c
 
 ---
 
-### V1.1.0 — Recording & Replay
+### V1.1.0 — Procedure Orchestration
+
+**Theme:** Introduce a service-oriented orchestration layer for managing the lifecycle of surgical procedure services across distributed Service Hosts, using DDS RPC for directed commands and pub/sub for asynchronous state distribution on a dedicated Orchestration domain.
+
+#### Service Interface & Dual-Mode Services
+- **`medtech::Service` abstract interface** (C++ abstract class, Python ABC) defining the contract for all DDS service classes: `run()`, `stop()`, `name`, `state` — enabling consistent lifecycle management across languages
+- **`ServiceState` enum** — pollable state exposed by every service: `STOPPED`, `STARTING`, `RUNNING`, `STOPPING`, `FAILED`, `UNKNOWN` — the Service Host polls this and publishes `ServiceStatus` to the Orchestration domain
+- **Dual-mode constructor** — all existing V1.0 service classes (robot controller, bedside monitor, camera simulator, operator console, device gateway, procedure context publisher) refactored to accept a nullable `DomainParticipant` parameter:
+  - `None` / `dds::core::null` → standalone mode: service creates its own participant (backward-compatible with existing Docker Compose deployment)
+  - Valid participant → hosted mode: service uses the provided participant, lifecycle managed by Service Host
+- **Validation** — services validate participant creation succeeded and that all expected writers/readers are found, regardless of mode
+- **Reference-type lifecycle** — no `owns_participant` flag needed; DDS entities are reference types that self-clean when the last reference goes out of scope
+
+#### Procedure Controller
+- Surgeon-facing PySide6 GUI application for driving the procedure lifecycle: select patient, procedure type, equipment configuration, start procedure, monitor, stop
+- Subscribes to Hospital domain for scheduling context and patient information (read-only, via Routing Service bridge)
+- Issues service lifecycle commands via DDS RPC (`ServiceHostControl` interface) to targeted Service Hosts on the Orchestration domain
+- Subscribes to `HostCatalog` and `ServiceStatus` topics on the Orchestration domain for real-time visibility of host availability and service state
+- Reconstructs full orchestration state on restart via TRANSIENT_LOCAL status topics
+
+#### Service Host Framework
+- Distributed process that hosts and manages DDS services locally on behalf of the Procedure Controller
+- Exposes a `ServiceHostControl` RPC service (uniquely named per host instance) for receiving start/stop/configure commands
+- Polls hosted services' `state` property and publishes `HostCatalog` (capabilities, health) and `ServiceStatus` (per-service lifecycle state) on the Orchestration domain
+- Reconciliation loop: on startup or controller reconnection, compares desired state from RPC commands against actual local service state and converges
+- Specialized subtypes: Robot Service Host (C++, manages robot controller), Clinical Service Host (Python, manages vitals/alarms/telemetry), Operational Service Host (Python, manages camera/context)
+
+#### Orchestration Domain
+- New dedicated DDS domain (no domain tags) for infrastructure lifecycle management
+- Completely isolated from the Procedure domain's surgical data — different lifecycle (Service Hosts span multiple procedures)
+- Procedure domain continues to route directly to Hospital domain via Routing Service — Orchestration domain is **not** on that data path
+- Hybrid communication model: DDS RPC (`Pattern.RPC`) for directed commands, pub/sub (`Pattern.Status`) for asynchronous state
+
+| Module / Capability | Connext Features Demonstrated |
+|---------------------|-------------------------------|
+| Procedure Controller (PySide6 GUI) | DDS RPC client (Modern C++ and Python), multi-domain participant (Hospital + Orchestration), QtAsyncio integration |
+| Service Host framework | DDS RPC service, dual-mode service lifecycle, per-host unique service naming |
+| Orchestration domain | Dedicated domain for infrastructure control-plane, `Pattern.Status` for state topics, `Pattern.RPC` for command channel |
+| `HostCatalog` + `ServiceStatus` topics | TRANSIENT_LOCAL state reconstruction, write-on-change, liveliness-based host failure detection |
+| `ServiceHostControl` RPC interface | IDL `@service` interface, typed request/reply, generated client/service stubs for C++ and Python |
+| `medtech::Service` interface | Consistent service contract across C++ and Python, pollable `ServiceState` for lifecycle reporting |
+
+---
+
+### V1.2.0 — Recording & Replay
 
 Additive within the V1 milestone. No structural changes to V1 modules.
 
-- **RTI Recording Service** — passive multi-domain capture of all DDS traffic across both Procedure and Hospital domains. Recording Service operates as a multi-domain subscriber, joining the Procedure domain (all domain tags) and the Hospital domain simultaneously. A single Recording Service instance captures the complete system state.
+- **RTI Recording Service** — passive multi-domain capture of all DDS traffic across Procedure, Hospital, and Orchestration domains. Recording Service operates as a multi-domain subscriber, joining the Procedure domain (all domain tags), the Hospital domain, and the Orchestration domain simultaneously. A single Recording Service instance captures the complete system state.
 - **RTI Replay Service** — deterministic replay into subscriber applications for training, incident review, and regression testing
 - `@recording` and `@replay` spec scenarios added to cover capture completeness and replay fidelity
 - **Resource Status** — `ResourceAvailability` topic on the Hospital domain: OR, bed, equipment,
@@ -111,7 +155,7 @@ Additive within the V1 milestone. No structural changes to V1 modules.
 
 #### Foxglove Data Model Alignment
 - **Foxglove schema alignment (Tier 1 — data model only)** — `Surgery::RobotState` updated with Foxglove-aligned fields (`joints` as `sequence<JointState>`, `tool_tip_pose` as `Common::Pose`); new helper structs (`Common::Quaternion`, `Common::Vector3`, `Common::Pose`); new `Surgery::RobotFrameTransform` topic publishing the kinematic frame hierarchy at 100 Hz. See [data-model.md — Foxglove Schema Alignment](data-model.md#foxglove-schema-alignment).
-- **Data model alignment only** — V1.1 prepares the DDS types for future Foxglove integration by adopting field-semantic alignment (matching field names, nesting, and value conventions with Foxglove schema equivalents). No Foxglove IDL compilation, no transformation plugins, no adapter/storage plugins, and no Foxglove Studio connectivity are included in V1.1. The full integration infrastructure is delivered in V2.
+- **Data model alignment only** — V1.2 prepares the DDS types for future Foxglove integration by adopting field-semantic alignment (matching field names, nesting, and value conventions with Foxglove schema equivalents). No Foxglove IDL compilation, no transformation plugins, no adapter/storage plugins, and no Foxglove Studio connectivity are included in V1.2. The full integration infrastructure is delivered in V2.
 
 ---
 
@@ -160,7 +204,7 @@ Additive within the V1 milestone. No structural changes to V1 modules.
 - Upgrades V1's read-only `DeviceTelemetry` to a full command/response data path
 
 #### Foxglove Visualization Bridge
-- **Foxglove integration infrastructure** — full Foxglove Studio connectivity delivered in V2, building on the V1.1 data model alignment. Three C++ shared-library plugins form the bridge pipeline:
+- **Foxglove integration infrastructure** — full Foxglove Studio connectivity delivered in V2, building on the V1.2 data model alignment. Three C++ shared-library plugins form the bridge pipeline:
   1. **Routing Service Transformation plugin** (`libmedtech_foxglove_transf.so`) — implements `rti::routing::transf::DynamicDataTransformation`. One transformation class per target Foxglove type. Converts medtech DDS types to Foxglove-native types by stripping `@key` fields, restructuring nested members, and populating timestamps from `SampleInfo.source_timestamp`. Uses generated C++ types on both sides via `rti::core::xtypes::convert<T>()`.
   2. **Routing Service Adapter plugin** (`libfoxglove_ws_adapter.so`) — implements `rti::routing::adapter::AdapterPlugin` → `Connection` → `DynamicDataStreamWriter`. Output-only adapter: receives transformed Foxglove DynamicData from the Routing Service pipeline and serializes it to a Foxglove Studio live WebSocket connection. The transformation runs before the adapter's `write()` call.
   3. **Recording Service Storage plugin** (`libmedtech_mcap_storage.so`) — implements `rti::recording::storage::StorageWriter` → `DynamicDataStorageStreamWriter`. Custom storage backend that writes transformed Foxglove-native samples to MCAP files. The transformation runs before the storage writer's `store()` call.

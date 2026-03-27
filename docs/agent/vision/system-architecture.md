@@ -67,14 +67,18 @@ needs to interact with all three risk classes must create **three separate Domai
 
 In practice, not every process needs all three tags:
 
-| Process | DomainParticipants | Domain Tags |
+| Process | DomainParticipants | Domain Tags / Domains |
 |---------|--------------------|-------------|
-| Robot controller | 1 (+1 Observability) | `control` |
-| Bedside monitor / vitals sim | 1 (+1 Observability) | `clinical` |
-| Camera simulator | 1 (+1 Observability) | `operational` |
-| Procedure context + status publisher | 1 (+1 Observability) | `operational` |
-| Device telemetry gateway | 1 (+1 Observability) | `clinical` |
-| Digital twin display | 1 (+1 Observability) | `control` |
+| Robot controller (standalone) | 1 (+1 Observability) | Procedure `control` |
+| Robot Service Host | 1 Orchestration + 1 Procedure `control` (+1 Observability) | Orchestration domain + Procedure `control` |
+| Bedside monitor / vitals sim (standalone) | 1 (+1 Observability) | Procedure `clinical` |
+| Clinical Service Host | 1 Orchestration + 1 Procedure `clinical` (+1 Observability) | Orchestration domain + Procedure `clinical` |
+| Camera simulator (standalone) | 1 (+1 Observability) | Procedure `operational` |
+| Operational Service Host | 1 Orchestration + 1 Procedure `operational` (+1 Observability) | Orchestration domain + Procedure `operational` |
+| Procedure context + status publisher (standalone) | 1 (+1 Observability) | Procedure `operational` |
+| Device telemetry gateway (standalone) | 1 (+1 Observability) | Procedure `clinical` |
+| Digital twin display | 1 (+1 Observability) | Procedure `control` |
+| **Procedure Controller** | 1 Orchestration + 1 Hospital (+1 Observability) | Orchestration domain + Hospital domain |
 | **Routing Service** (Procedure → Hospital bridge) | **4** (+1 Observability) | `control` + `clinical` + `operational` (3 on Procedure domain) + 1 on Hospital domain (no tag) |
 
 Application logging uses the **RTI Connext Logging API** (`rti::config::Logger` / `rti.connextdds.Logger`), with log messages forwarded to Collector Service via Monitoring Library 2.0. See [technology.md — Logging Standard](technology.md) for details.
@@ -148,6 +152,76 @@ The Cloud domain aggregates across facilities the same way the Hospital domain a
 The WAN Routing Service bridge uses the **RTI Real-Time WAN Transport** (`UDPv4_WAN`) for NAT/firewall-traversal cross-site communication, with **Cloud Discovery Service** providing multicast-free discovery across WAN-connected sites. **Connext Security Plugins** are required on all WAN connections — mutual authentication, encrypted data, and governance enforcement. Each hospital runs its own WAN Routing Service instance that selectively forwards Hospital domain data to the Cloud domain.
 
 This layer is deferred to V3.0. The Procedure and Hospital layers are designed so that adding the Cloud layer above them requires **zero changes** to existing modules — only new Routing Service configurations and the Command Center application are added.
+
+### Orchestration Domain (V1.1)
+
+Infrastructure lifecycle layer for managing Service Hosts and procedure service deployment. The Orchestration domain is architecturally distinct from the Procedure domain because orchestration has a fundamentally different lifecycle — Service Hosts and the Procedure Controller persist across multiple procedures, shift changes, and OR reassignments, whereas Procedure domain data is scoped to a single active procedure.
+
+```
+╔═══════════════════════════════════════════════════════════════════════╗
+║  Orchestration Domain (V1.1)                                         ║
+║  ─────────────────────────────────────────────────────────────────── ║
+║  Host catalog │ Service status │ ServiceHostControl RPC              ║
+║  (no domain tags — infrastructure control-plane, not clinical data)  ║
+╚═══════════════════════════════════════════════════════════════════════╝
+       │                          │
+       ▼                          ▼
+  Procedure Controller      Service Hosts (distributed)
+  (also joins Hospital       each also joins Procedure
+   domain for scheduling      domain on its service's
+   context, read-only)        required domain tag
+```
+
+#### Why a Separate Domain (Not a Domain Tag)
+
+The Procedure domain's domain tags isolate **risk classes** of surgical data. Orchestration is not a risk class — it is an infrastructure control-plane with a different lifecycle, different failure modes, and different security posture:
+
+- **Lifecycle:** A Service Host on a robot cart persists across procedures, shift changes, and OR reassignments. Procedure domain data is ephemeral per-procedure.
+- **Scope:** Orchestration may eventually span multiple ORs or the entire facility (V3 upgrade path). Procedure domain data is always OR-local.
+- **Failure isolation:** An orchestration failure (controller crash, RPC timeout) must not disrupt an in-progress surgical procedure. Domain-level isolation guarantees this — orchestration discovery, transport, and resource contention are fully separated from surgical data paths.
+- **Security:** In V2, orchestration commands (`start_service`, `stop_service`) require different governance than surgical data (e.g., only an authenticated Procedure Controller may issue lifecycle commands).
+
+#### Routing Topology
+
+The Orchestration domain does **not** sit on the data path between the Procedure and Hospital domains. Surgical data routes directly:
+
+```
+Procedure Domain ──► Routing Service ──► Hospital Domain
+                      (unchanged)
+
+Orchestration Domain (independent — no Routing Service bridge to/from Procedure or Hospital)
+```
+
+If future requirements call for orchestration status summaries on the Hospital dashboard (e.g., "OR-1 procedure starting, services initializing"), a selective Routing Service bridge from Orchestration → Hospital can be added without affecting the surgical data path.
+
+#### The Orchestration Domain Has No Domain Tags
+
+All orchestration participants — the Procedure Controller and all Service Hosts — discover each other directly on the Orchestration domain. Domain tags are not needed because:
+
+- There is no risk-class separation concern — all orchestration traffic is infrastructure
+- The Procedure Controller needs to communicate with all Service Hosts regardless of their specialization
+- Adding tags would require Service Hosts to create additional participants with no isolation benefit
+
+#### Orchestration Partition Strategy
+
+Orchestration partitions scope communication to an OR context:
+
+| Partition Pattern | Who Uses It | Meaning |
+|-------------------|-------------|---------|
+| `room/OR-1` | Procedure Controller for OR-1, Service Hosts assigned to OR-1 | All orchestration for one OR |
+| `room/*` | Facility-level orchestration monitor (future) | All ORs |
+| `unassigned` | Service Hosts not yet assigned to an OR | Available host pool |
+
+A Service Host transitions from `unassigned` to `room/OR-n` when the Procedure Controller assigns it via RPC.
+
+#### Communication Model
+
+The Orchestration domain uses a **hybrid RPC + pub/sub** model:
+
+- **DDS RPC** (`ServiceHostControl` interface, `Pattern.RPC` QoS) — directed, transactional commands from Procedure Controller to a specific Service Host. Each Service Host exposes a uniquely-named RPC service instance (`ServiceHostControl/<host_id>`).
+- **Pub/sub** (`HostCatalog` and `ServiceStatus` topics, `Pattern.Status` QoS) — asynchronous state distribution. Service Hosts publish host capabilities and per-service lifecycle state. TRANSIENT_LOCAL durability enables state reconstruction by late-joining or restarting controllers.
+
+See [data-model.md — Domain 15](data-model.md) for topic definitions and RPC interface specification.
 
 ### Alert Data Flow — Two Independent Pathways
 
@@ -337,8 +411,9 @@ Each logical host is a Docker container. Custom Docker networks simulate the net
 
 | Docker Network | Simulates | Containers |
 |----------------|-----------|------------|
-| `surgical-net` | Per-OR surgical LAN | Robot sim, surgeon console, digital twin display, bedside monitors, procedure context sim, Routing Service |
+| `surgical-net` | Per-OR surgical LAN | Robot sim, surgeon console, digital twin display, bedside monitors, procedure context sim, Service Hosts, Routing Service |
 | `hospital-net` | Hospital backbone | Dashboard, ClinicalAlerts engine, Cloud Discovery Service, Routing Service, Collector Service, Prometheus, Grafana Loki, Grafana |
+| `orchestration-net` **(V1.1)** | Orchestration control-plane | Procedure Controller, Service Hosts (dual-homed: surgical-net + orchestration-net), Cloud Discovery Service — Service Hosts bridge both networks to host surgical services on `surgical-net` while receiving orchestration commands on `orchestration-net` |
 | `cloud-net` **(V3.0)** | Enterprise WAN | WAN Routing Service (dual-homed: hospital-net + cloud-net), Command Center dashboard, Cloud Discovery Service — **not created until V3.0 implementation** |
 
 ### Docker Compose Service Startup Ordering

@@ -559,6 +559,267 @@ class BedsideMonitor:
 > public interface — DDS entity types (`DataWriter`, `DataReader`,
 > `DomainParticipant`) are not.
 
+### Service Interface (V1.1)
+
+Starting with V1.1, all DDS service classes implement a minimal abstract
+interface that defines consistent lifecycle behavior across C++ and Python.
+This interface enables the Service Host framework to manage services
+uniformly regardless of language, domain tag, or internal complexity.
+
+#### `ServiceState` Enum
+
+Every service exposes a pollable `state` property. The Service Host reads
+this property and publishes `ServiceStatus` on the Orchestration domain.
+The service itself manages its own state transitions.
+
+| State | Meaning | Typical transition |
+|-------|---------|--------------------|
+| `STOPPED` | Service is not running | Initial state, or after `run()` returns normally |
+| `STARTING` | Service is initializing (creating entities, waiting for discovery) | Set at the beginning of `run()` |
+| `RUNNING` | Service is fully operational | Set by the service when initialization completes inside `run()` |
+| `STOPPING` | Service is shutting down (draining, joining threads) | Set when `stop()` is called |
+| `FAILED` | Service encountered an unrecoverable error | Set on exception or fatal condition |
+| `UNKNOWN` | State has not been determined | Should not persist — indicates a bug |
+
+#### C++ Interface
+
+```cpp
+namespace medtech {
+
+enum class ServiceState {
+    Stopped,
+    Starting,
+    Running,
+    Stopping,
+    Failed,
+    Unknown
+};
+
+class Service {
+public:
+    virtual ~Service() = default;
+
+    /// Run the service. Blocks the calling thread until stop() is called
+    /// or an unrecoverable error occurs. The Service Host spawns a thread
+    /// for each hosted service — the service does not manage its own thread.
+    virtual void run() = 0;
+
+    /// Signal the service to stop. Thread-safe, non-blocking.
+    /// run() must return promptly after stop() is called.
+    virtual void stop() = 0;
+
+    /// Service identifier for orchestration and logging.
+    virtual std::string_view name() const = 0;
+
+    /// Current lifecycle state. Polled by the Service Host for status
+    /// reporting. The service manages its own state transitions internally.
+    virtual ServiceState state() const = 0;
+};
+
+}  // namespace medtech
+```
+
+#### Python Interface
+
+```python
+from __future__ import annotations
+
+import enum
+from abc import ABC, abstractmethod
+
+
+class ServiceState(enum.Enum):
+    STOPPED = "STOPPED"
+    STARTING = "STARTING"
+    RUNNING = "RUNNING"
+    STOPPING = "STOPPING"
+    FAILED = "FAILED"
+    UNKNOWN = "UNKNOWN"
+
+
+class Service(ABC):
+    @abstractmethod
+    async def run(self) -> None:
+        """Run the service event loop. Awaits until stop() is called
+        or an unrecoverable error occurs. The Service Host gathers
+        this coroutine — the service does not manage the event loop."""
+        ...
+
+    @abstractmethod
+    def stop(self) -> None:
+        """Signal the service to stop. Non-blocking, safe to call
+        from any context. run() must return promptly after stop()."""
+        ...
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Service identifier for orchestration and logging."""
+        ...
+
+    @property
+    @abstractmethod
+    def state(self) -> ServiceState:
+        """Current lifecycle state. Polled by the Service Host for
+        status reporting on the Orchestration domain."""
+        ...
+```
+
+#### Service Host Usage Pattern
+
+The Service Host is responsible for threading/concurrency — the service
+does not know or care whether it is the only service in a process or one
+of many.
+
+**C++ — Service Host spawns a thread per service:**
+
+```cpp
+auto service = std::make_unique<RobotController>(robot_id, room_id, proc_id);
+std::thread t([&]() { service->run(); });
+
+// Service Host polls service->state() and publishes ServiceStatus
+
+// Shutdown:
+service->stop();   // non-blocking signal
+t.join();          // wait for run() to return
+```
+
+**Python — Service Host gathers coroutines:**
+
+```python
+await asyncio.gather(
+    vitals_service.run(),
+    telemetry_service.run(),
+    camera_service.run(),
+)
+# Service Host polls service.state and publishes ServiceStatus
+```
+
+### Dual-Mode Participant Pattern (V1.1)
+
+Starting with V1.1, all DDS service classes support two deployment modes
+via a nullable `DomainParticipant` constructor parameter:
+
+1. **Standalone mode** (`None` / `dds::core::null`) — the service creates
+   its own participant from XML configuration, sets its own partition, and
+   manages its own lifecycle. This is the V1.0 behavior and remains the
+   default for development, debugging, and backward-compatible Docker
+   Compose deployment.
+
+2. **Hosted mode** (valid participant) — a Service Host creates the
+   participant and passes it to the service. The service uses the provided
+   participant. DDS entities are reference types — the participant stays
+   alive as long as any holder retains a reference. No `owns_participant`
+   flag is needed.
+
+#### Constructor Pattern
+
+**Python:**
+
+```python
+class BedsideMonitor(Service):
+    def __init__(
+        self,
+        room_id: str,
+        procedure_id: str,
+        participant: dds.DomainParticipant | None = None,
+    ) -> None:
+        if participant is None:
+            initialize_connext()
+            participant = dds.QosProvider.default.create_participant_from_config(
+                names.CLINICAL_MONITOR
+            )
+            qos = participant.qos
+            qos.partition.name = [f"room/{room_id}/procedure/{procedure_id}"]
+            participant.qos = qos
+
+        if participant is None:
+            raise RuntimeError("Failed to create DomainParticipant")
+
+        self._participant = participant
+        self._state = ServiceState.STOPPED
+
+        # Validate entity lookup — same in both modes
+        vitals_any = self._participant.find_datawriter(names.PATIENT_VITALS_WRITER)
+        if vitals_any is None:
+            raise RuntimeError(f"Writer not found: {names.PATIENT_VITALS_WRITER}")
+        self._vitals_writer = dds.DataWriter(vitals_any)
+
+        alarm_any = self._participant.find_datawriter(names.ALARM_MESSAGES_WRITER)
+        if alarm_any is None:
+            raise RuntimeError(f"Writer not found: {names.ALARM_MESSAGES_WRITER}")
+        self._alarm_writer = dds.DataWriter(alarm_any)
+```
+
+**C++:**
+
+```cpp
+class RobotController : public medtech::Service {
+public:
+    RobotController(
+        const std::string& robot_id,
+        const std::string& room_id,
+        const std::string& procedure_id,
+        dds::domain::DomainParticipant participant = dds::core::null)
+    {
+        if (participant == dds::core::null) {
+            medtech::initialize_connext();
+            participant = dds::core::QosProvider::Default()
+                .extensions().create_participant_from_config(
+                    std::string(names::CONTROL_ROBOT));
+            auto qos = participant.qos();
+            qos << dds::core::policy::Partition(
+                "room/" + room_id + "/procedure/" + procedure_id);
+            participant.qos(qos);
+        }
+
+        if (participant == dds::core::null) {
+            throw std::runtime_error("Failed to create DomainParticipant");
+        }
+
+        participant_ = std::move(participant);
+
+        // Validate entity lookup — same in both modes
+        state_writer_ = rti::pub::find_datawriter_by_name<
+            dds::pub::DataWriter<Surgery::RobotState>>(
+                participant_, std::string(names::ROBOT_STATE_WRITER));
+        if (state_writer_ == dds::core::null) {
+            throw std::runtime_error(
+                "Writer not found: " + std::string(names::ROBOT_STATE_WRITER));
+        }
+        // ... remaining reader lookups with validation ...
+    }
+```
+
+#### Rules
+
+1. **Nullable participant = standalone.** `None` / `dds::core::null`
+   signals the service to create its own participant. A valid participant
+   signals hosted mode.
+2. **Always validate creation.** After the creation attempt (standalone
+   mode), verify the participant is not null. Throw/raise on failure.
+3. **Always validate entity lookup.** After `find_datawriter()` /
+   `find_datareader()`, verify the result is not null. Throw/raise with
+   the entity name on failure. This catches XML configuration mismatches
+   regardless of deployment mode.
+4. **Reference-type lifecycle.** DDS entities are reference types that
+   self-clean when the last reference goes out of scope. No
+   `owns_participant` flag or conditional cleanup is needed. In hosted
+   mode, the Service Host retains a reference to the participant — when
+   the service is destroyed, it releases its reference, but the
+   participant lives until the Service Host releases its own.
+5. **Writer/reader lookup is unchanged.** Both modes use
+   `find_datawriter_by_name()` / `find_datareader_by_name()` with the
+   same generated name constants from `app_names.idl`.
+6. **`run()` enables the participant.** `run()` calls
+   `participant.enable()` (no-op if already enabled) and starts the
+   service's async tasks or `AsyncWaitSet`. It also transitions
+   `state` from `STOPPED` → `STARTING` → `RUNNING`.
+7. **`stop()` is non-blocking.** It signals the service to shut down
+   (sets `running_` to false, cancels async tasks) and transitions
+   `state` to `STOPPING`. `run()` must return promptly after `stop()`
+   is called, at which point `state` transitions to `STOPPED`.
+
 ---
 
 ## 4. Data Access Patterns (Internal Implementation)

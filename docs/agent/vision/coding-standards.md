@@ -373,6 +373,9 @@ def start_procedure(room_id: str, procedure_id: str) -> bool:
 - Use `typing.NamedTuple` for immutable value types returned from functions.
 - Avoid inheritance unless the framework requires it (e.g., `QWidget`
   subclasses). Prefer composition.
+- **DDS service classes** must implement `medtech.Service` (the project's
+  abstract base class) — see [dds-consistency.md — Service Interface](dds-consistency.md)
+  for the interface definition, `ServiceState` enum, and lifecycle rules.
 
 ---
 

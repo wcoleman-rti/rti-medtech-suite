@@ -55,13 +55,28 @@ A version may only be cut when **all** of the following are true:
 
 ---
 
-### V1.1.0 — Recording & Replay
+### V1.1.0 — Procedure Orchestration
+
+**Theme:** Service-oriented orchestration layer for distributed procedure lifecycle management. New Orchestration domain, DDS RPC, dual-mode services, `medtech::Service` interface.
+
+| Module / Capability | Connext Features Demonstrated |
+|---------------------|-------------------------------|
+| Procedure Controller (PySide6 GUI) | DDS RPC client, multi-domain participant, QtAsyncio + RPC integration |
+| Service Host framework (C++ and Python) | DDS RPC service, per-host unique service naming, dual-mode service lifecycle |
+| Orchestration domain | Dedicated infrastructure domain, `Pattern.Status` for state topics, `Pattern.RPC` for command channel |
+| `HostCatalog` + `ServiceStatus` topics | TRANSIENT_LOCAL state reconstruction, liveliness-based failure detection |
+| `ServiceHostControl` RPC interface | IDL `@service` interface, typed request/reply in C++ and Python |
+| `medtech::Service` interface | Consistent service contract across C++ and Python, pollable `ServiceState` |
+
+---
+
+### V1.2.0 — Recording & Replay
 
 **Theme:** Add zero-code compliance capture across the live DDS bus. No structural changes to V1 modules.
 
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|
-| RTI Recording Service | Passive multi-domain capture of all DDS traffic |
+| RTI Recording Service | Passive multi-domain capture of all DDS traffic (including Orchestration domain) |
 | RTI Replay Service | Deterministic replay into subscriber applications |
 | Recording Service integration tests | `@recording` and `@replay` spec scenarios |
 
