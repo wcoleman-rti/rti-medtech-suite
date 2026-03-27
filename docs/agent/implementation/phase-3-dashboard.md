@@ -213,11 +213,20 @@ tag.
 - Run full Docker Compose environment: 2+ surgical instances + Routing Service + Dashboard
 - Verify all dashboard features with live simulated data
 - Run complete hospital-dashboard.md spec suite
+- **`@acceptance` test (Rule 8):** Author an acceptance test that exercises
+  the dashboard's primary user workflow end-to-end:
+  1. Docker Compose starts surgical instances + Routing Service + Dashboard
+  2. Surgical instances publish vitals, procedure status, and robot state
+  3. Dashboard receives bridged data → procedure list shows 2+ active procedures
+  4. Dashboard vitals overview displays current heart rate and blood pressure for each OR
+  5. An alarm is raised on the Procedure domain → Dashboard alert feed displays the alarm
+  - The test must fail if Dashboard, Routing Service, or any surgical instance is absent.
 
 ### Test Gate
 
 - [ ] All hospital-dashboard.md spec scenarios pass in Docker Compose environment
 - [ ] Dashboard operates correctly with 2+ concurrent surgical instances
+- [ ] `@acceptance` dashboard workflow test passes
 
 ---
 

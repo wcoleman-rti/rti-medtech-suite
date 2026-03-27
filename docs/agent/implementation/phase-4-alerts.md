@@ -135,6 +135,13 @@
 - Verify ClinicalAlerts engine alerts appear on the hospital dashboard alert feed
 - Verify risk scores appear in dashboard vitals detail view
 - Run complete clinical-alerts.md spec suite
+- **`@acceptance` test (Rule 8):** Author an acceptance test that exercises
+  the clinical alerts workflow end-to-end:
+  1. Docker Compose starts surgical instances + Routing Service + ClinicalAlerts engine + Dashboard
+  2. BedsideMonitor publishes vitals with values that trigger the hemorrhage risk model
+  3. ClinicalAlerts engine computes risk score → publishes `RiskScore` and `ClinicalAlert`
+  4. Dashboard receives and displays the alert in the alert feed
+  - The test must fail if ClinicalAlerts engine, Routing Service, or Dashboard is absent.
 
 ### Test Gate
 
@@ -142,6 +149,7 @@
 - [ ] ClinicalAlerts engine alerts are visible on hospital dashboard
 - [ ] Risk scores are visible on hospital dashboard
 - [ ] System operates correctly with 2+ concurrent surgical instances
+- [ ] `@acceptance` clinical alerts workflow test passes
 
 ---
 

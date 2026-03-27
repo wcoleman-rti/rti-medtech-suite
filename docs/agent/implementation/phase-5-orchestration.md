@@ -231,6 +231,21 @@ framework, Procedure Controller GUI, and the Orchestration domain
   7. Orchestration failure does not disrupt running Procedure domain data
 - Verify all existing V1.0 scenarios still pass in standalone mode alongside the new orchestration deployment
 - Verify all `@orchestration` spec scenarios pass
+- **`@acceptance` test (Rule 8):** Author an acceptance test that exercises
+  the orchestrated surgical workflow end-to-end:
+  1. Procedure Controller starts all services on all hosts via RPC
+  2. Operator Console sends a robot command → RobotController moves → RobotState updates
+  3. BedsideMonitor publishes vitals → subscriber receives on Procedure domain
+  4. Procedure Controller stops all services → all states return to STOPPED
+  - The test must fail if any component is missing or non-functional.
+- **`@acceptance` test (Phase 2 retroactive — Rule 8):** Author an acceptance
+  test for the standalone surgical-procedure module (no orchestration):
+  1. Docker Compose starts all surgical services in standalone mode
+  2. Operator Console publishes a `RobotCommand` → RobotController publishes
+     updated `RobotState` within 100 ms
+  3. BedsideMonitor publishes `PatientVitals` → subscriber receives
+  4. An alarm condition triggers an `AlarmMessage`
+  - This covers the gap identified in Step 2.8.
 
 ### Test Gate
 
@@ -240,6 +255,8 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - [ ] Orchestration domain isolation verified (no cross-domain data leakage)
 - [ ] Service Host crash → liveliness lost detected within 2 s
 - [ ] Procedure Controller crash → surgical data unaffected
+- [ ] `@acceptance` orchestration workflow test passes
+- [ ] `@acceptance` standalone surgical-procedure workflow test passes (Phase 2 retroactive)
 - [ ] All quality gates pass: `bash scripts/ci.sh`
 
 ---

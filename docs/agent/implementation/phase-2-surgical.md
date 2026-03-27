@@ -223,6 +223,15 @@
 - [x] All surgical spec scenarios pass under multi-instance conditions
 - [x] Docker Compose launches and runs both instances successfully
 
+> **Retrospective — acceptance gap (Rule 8):** This step verified partition
+> isolation and Docker Compose startup but did not include an `@acceptance`
+> test that exercises the complete operator workflow (start procedure →
+> send robot commands → observe vitals → trigger alarm → stop procedure).
+> The gap was discovered during manual testing after Phase 2 completion.
+> A retroactive `@acceptance` test for the surgical-procedure module is
+> required in **Phase 5, Step 5.3** when services are refactored to the
+> `medtech::Service` interface.
+
 ---
 
 ## Step 2.9 — Observability Verification ✅ `40819da`

@@ -56,6 +56,7 @@ Scenarios are tagged to enable selective test execution. Tags also communicate w
 | `@benchmark` | Tests performance benchmark harness: metric collection, baseline comparison, regression detection, threshold enforcement | V1.0+ |
 | `@simulation` | Tests simulation fidelity: scenario profiles, cross-signal correlation, temporal realism, seeded reproducibility | V1.0+ |
 | `@foxglove` | Tests Foxglove Bridge plugin pipeline: transformation correctness, adapter plugin WebSocket delivery, storage plugin MCAP output, concurrent operation | V2.0+ |
+| `@acceptance` | Module workflow acceptance: verifies the composed module works end-to-end in Docker Compose by executing the primary user workflow programmatically and asserting an observable outcome. Every phase that delivers a user-facing module must include at least one `@acceptance` test. | V1.0+ |
 
 ---
 
