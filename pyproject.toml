@@ -8,6 +8,7 @@ profile = "black"
 line-length = 88
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 markers = [
     "benchmark: performance benchmark tests (require observability stack)",
     "consistency: DDS consistency contract tests (vision/dds-consistency.md)",
