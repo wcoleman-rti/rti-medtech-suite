@@ -51,7 +51,7 @@ Phase 5: Procedure Orchestration     (depends on: Phases 1–4)
 ── V1.2.0 ──────────────────────────────────────────────────────────────────
 
 Phase 6: Recording & Replay          (depends on: Phases 1–5)
-         + Foxglove Data Model Alignment (Tier 1 field-semantic alignment)
+         + Foxglove Data Model Translatability (Tier 1)
 
 ── V2.0.0 ──────────────────────────────────────────────────────────────────
 

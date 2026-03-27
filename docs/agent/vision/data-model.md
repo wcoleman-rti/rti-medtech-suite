@@ -238,7 +238,7 @@ Data streams that cross a risk class boundary must not operate within the same d
 | `WaveformData` | `Monitoring::WaveformData` | `clinical` | `patient.id`, `source_device_id`, `waveform_kind` | High-rate physiological waveforms. Deadline-enforced (40 ms). |
 | `AlarmMessages` | `Monitoring::AlarmMessage` | `clinical` | `alarm_id` | Per-alarm instance (keyed by alarm ID). Write-on-change. |
 | `DeviceTelemetry` | `Devices::DeviceTelemetry` | `clinical` | `device_id` | Generic device status (pump, ventilator, anesthesia). |
-| `CameraFrame` | `Imaging::CameraFrame` | `operational` | `camera_id` | Endoscope/surgical camera compressed frame data (inline bytes). Deadline-enforced (66 ms). Foxglove `CompressedImage` field-semantically aligned (not wire-compatible due to `@key camera_id`). |
+| `CameraFrame` | `Imaging::CameraFrame` | `operational` | `camera_id` | Endoscope/surgical camera compressed frame data (inline bytes). Deadline-enforced (66 ms). Translatable to Foxglove `CompressedImage` via Transformation plugin. |
 | `CameraConfig` | `Imaging::CameraConfig` | `operational` | `camera_id` | Camera stream configuration state (resolution, encoding, exposure). Write-on-change, TRANSIENT_LOCAL. Late joiners correlate with `CameraFrame` via `camera_id`. |
 | `ProcedureContext` | `Surgery::ProcedureContext` | `operational` | `procedure_id` | Hospital, room, bed, patient, surgeon, procedure type. TRANSIENT_LOCAL. |
 | `RobotFrameTransform` | `Surgery::RobotFrameTransform` | `control` | `robot_id` | *(V1.2)* Kinematic frame hierarchy for 3D visualization. Continuous stream at 100 Hz, synchronized with `RobotState`. Foxglove `FrameTransforms` aligned. |
@@ -633,7 +633,7 @@ Types are organized into subdirectories by functional domain. Each subdirectory 
 ```
 interfaces/idl/
 ├── common/
-│   └── common.idl          # module Common { Time_t, EntityIdentity, constants, aliases }
+│   └── common.idl          # module Common { Timestamp_t, EntityIdentity, constants, aliases }
 ├── surgery/
 │   └── surgery.idl         # module Surgery { RobotCommand, RobotState, SafetyInterlock, OperatorInput, ProcedureContext, ProcedureStatus }
 ├── monitoring/
@@ -741,7 +741,7 @@ void initialize_connext()
     // Step 2 — Register every compiled type referenced by XML <register_type name="..."/>.
     //           Name strings must match the <register_type name="..."/> in the domain XML.
     //           Only top-level topic types require registration — @nested types
-    //           (Time_t, EntityIdentity, CartesianPosition)
+    //           and typedefs (Timestamp_t, EntityIdentity, CartesianPosition)
     //           are embedded by the parent type and do not need separate registration.
     rti::domain::register_type<Surgery::RobotCommand>("Surgery::RobotCommand");
     rti::domain::register_type<Surgery::RobotState>("Surgery::RobotState");
@@ -789,7 +789,7 @@ def initialize_connext():
 
     # Step 2 — Register every compiled type referenced by XML <register_type name="..."/>.
     #           Only top-level topic types require registration — @nested types
-    #           (Time_t, EntityIdentity, CartesianPosition)
+    #           and typedefs (Timestamp_t, EntityIdentity, CartesianPosition)
     #           are embedded by the parent type and do not need separate registration.
     dds.DomainParticipant.register_idl_type(RobotCommand,           "Surgery::RobotCommand")
     dds.DomainParticipant.register_idl_type(RobotState,             "Surgery::RobotState")
@@ -871,39 +871,23 @@ correspond to nested key resolution through the types below.
 |-------|-----------------|-------|
 | `EntityId` | `string<MAX_ID_LENGTH>` | Reusable bounded identifier type for patients, devices, robots, procedures, operators, cameras, alerts |
 
-#### `Common::Time_t`
+#### `Common::Timestamp_t`
 
-Standard timestamp. `@final`. Aligned with
-[`foxglove::Time`](https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/Time.idl)
-(`uint32 sec` + `uint32 nsec`) for field-semantic compatibility with
-Foxglove's `CompressedImage` type (used by `Imaging::CameraFrame`).
+Timestamp alias. `typedef int64 Timestamp_t` — epoch nanoseconds
+(nanoseconds since 1970-01-01 00:00:00 UTC). Provides a single,
+consistent representation for domain-meaningful timestamps across all
+modules.
 
-> **Y2038 limitation:** `uint32 sec` overflows on 2038-01-19 03:14:07 UTC.
-> The previous representation used `int64 seconds` (no practical overflow).
-> This trade-off is accepted because Foxglove alignment is a higher priority
-> than Y2038 safety for this project's simulation-focused deployment. The
-> affected fields are `CameraFrame.timestamp` (Foxglove-aligned, primary
-> motivation), `ProcedureContext.start_time` (wall-clock procedure start),
-> and `AlarmMessage.onset_time` (wall-clock alarm onset). **Migration plan:**
-> when Foxglove migrates `foxglove::Time` to a wider seconds field (e.g.,
-> `int64 sec`), update `Common::Time_t` to match. Because the struct is
-> `@final`, any field-type change is a breaking type evolution requiring
-> coordinated redeployment of all publishers and subscribers — acceptable
-> given the project's containerized deployment model. Monitor the upstream
-> schema at the Foxglove SDK repository.
-
-> **`source_timestamp` convention:** Most top-level types no longer
-> carry an explicit `timestamp` member. Sample publication time is
-> conveyed via `SampleInfo.source_timestamp`, set automatically by
-> the DataWriter. `Common::Time_t` is retained only where a
-> domain-meaningful time distinct from write time is needed
-> (`CameraFrame.timestamp`, `ProcedureContext.start_time`,
+> **`source_timestamp` convention:** Most top-level types do not carry
+> an explicit timestamp member. Sample publication time is conveyed via
+> `SampleInfo.source_timestamp`, set automatically by the DataWriter.
+> `Common::Timestamp_t` is used only where a domain-meaningful time
+> distinct from write time is needed (`ProcedureContext.start_time`,
 > `AlarmMessage.onset_time`).
 
-| Member | Type | Key | Notes |
-|--------|------|-----|-------|
-| `sec` | `uint32` | — | Seconds since epoch (Y2038 — see limitation note above) |
-| `nsec` | `uint32` | — | Sub-second nanoseconds |
+| Definition | Underlying Type | Range |
+|------------|-----------------|-------|
+| `typedef int64 Timestamp_t` | `int64` | ±292 years from epoch (no Y2038 limitation) |
 
 #### `Common::EntityIdentity`
 
@@ -1061,7 +1045,7 @@ Topic: `ProcedureContext` | Domain Tag: `operational` | Pattern:
 | `procedure_type` | `string<Common::MAX_NAME_LENGTH>` | — | Procedure category |
 | `surgeon` | `string<Common::MAX_NAME_LENGTH>` | — | Lead surgeon name |
 | `anesthesiologist` | `string<Common::MAX_NAME_LENGTH>` | — | Anesthesiologist name |
-| `start_time` | `Common::Time_t` | — | Procedure start time |
+| `start_time` | `Common::Timestamp_t` | — | Procedure start time (epoch nanoseconds) |
 
 #### `Surgery::ProcedureStatus`
 
@@ -1157,7 +1141,7 @@ Writers may enable DDS batching for efficient transport.
 | `state` | `AlarmState` | — | Current alarm state (ACTIVE, CLEARED, ACKNOWLEDGED) |
 | `alarm_code` | `string<64>` | — | Machine-readable alarm code |
 | `message` | `string<Common::MAX_DESCRIPTION_LENGTH>` | — | Human-readable alarm description |
-| `onset_time` | `Common::Time_t` | — | When the alarm condition first occurred |
+| `onset_time` | `Common::Timestamp_t` | — | When the alarm condition first occurred (epoch nanoseconds) |
 
 ---
 
@@ -1165,24 +1149,34 @@ Writers may enable DDS batching for efficient transport.
 
 Dependencies: `#include "common/common.idl"`
 
+#### `Imaging::ImageFormat` (Enum)
+
+`@appendable` — Compression format for camera image frames.
+
+| Enumerator | Value | Foxglove `format` string |
+|------------|-------|--------------------------|
+| `JPEG` | 0 | `"jpeg"` |
+| `PNG` | 1 | `"png"` |
+| `H264` | 2 | `"h264"` |
+| `H265` | 3 | `"h265"` |
+
 #### `Imaging::CameraFrame`
 
 Topic: `CameraFrame` | Domain Tag: `operational` | Pattern: `Stream`
 | `@appendable`
 
-Compressed image frame with inline data payload. Field-semantically aligned
-with Foxglove `CompressedImage` (`timestamp`, `frame_id`, `data`, `format`)
-but not wire-compatible due to `@key camera_id` (see XTypes analysis in
-INC-027). If Foxglove interop is needed, a Routing Service transformation
-would bridge between the two types.
+Compressed image frame with inline data payload. Translatable to
+Foxglove `CompressedImage` via the Routing Service Transformation
+plugin: `timestamp` is assembled from `SampleInfo.source_timestamp`,
+`frame_id` is derived from `camera_id` via a configuration lookup,
+and `format` is mapped from the `ImageFormat` enum to its string
+representation (see [Foxglove Schema Alignment](#foxglove-schema-alignment)).
 
 | Member | Type | Key | Notes |
 |--------|------|-----|-------|
 | `camera_id` | `Common::EntityId` | @key | Camera source identifier |
-| `timestamp` | `Common::Time_t` | — | Frame capture time |
-| `frame_id` | `string<Common::MAX_NAME_LENGTH>` | — | Coordinate frame reference (e.g., `"endoscope_left"`, `"overhead_rgb"`). Foxglove-compatible field. |
 | `data` | `sequence<uint8, Common::MAX_FRAME_SIZE>` | — | Inline compressed image bytes |
-| `format` | `string<16>` | — | Compression format: `"jpeg"`, `"png"`, `"h264"`, `"h265"` |
+| `format` | `ImageFormat` | — | Compression format (enum — see `Imaging::ImageFormat` above) |
 
 #### `Imaging::CameraConfig`
 
@@ -1427,19 +1421,24 @@ The security posture and policies must be scoped and documented here before impl
 
 ## Foxglove Schema Alignment
 
-The medtech suite adopts **field-semantic alignment** with selected
+The medtech suite adopts a **translatable, not aligned** strategy with
+selected
 [Foxglove message schemas](https://docs.foxglove.dev/docs/sdk/schemas)
 (OMG IDL variants from the
 [foxglove-sdk](https://github.com/foxglove/foxglove-sdk/tree/main/schemas/omgidl/foxglove))
 to enable visualization of DDS data in
-[Foxglove Studio](https://foxglove.dev/) with minimal adapter code.
+[Foxglove Studio](https://foxglove.dev/).
 
 ### Alignment Strategy
 
-**Field-semantic alignment** means medtech IDL types use field names,
-nesting, and value conventions that match their Foxglove equivalents
-wherever doing so does not compromise the DDS data model's functional
-requirements. Specifically:
+**Translatable, not aligned** means medtech IDL types are designed
+first and foremost for the DDS data model — optimized for wire
+efficiency, strong typing, and DDS semantics. Foxglove compatibility
+is achieved by ensuring every field required by the target Foxglove
+schema is **assemblable** from medtech DDS data (published fields,
+`SampleInfo` metadata, or configuration lookups). Types do not need
+to mirror Foxglove field names, nesting, or value representations.
+Specifically:
 
 - **`@key` fields are never removed or changed** to satisfy Foxglove
   compatibility. DDS instance lifecycle, content filtering, and
@@ -1447,18 +1446,28 @@ requirements. Specifically:
 - **Domain-specific fields** (e.g., `operational_mode`, `error_state`,
   `alarm_code`) that have no Foxglove analog are retained. Foxglove
   ignores fields it does not recognize.
+- **Enums over strings** — where Foxglove uses a string with a small
+  set of known values (e.g., image `format`), medtech types use a
+  strongly-typed enum. The Transformation plugin maps the enum to
+  the expected string value.
+- **SampleInfo over payload timestamps** — Foxglove `timestamp` fields
+  are populated from `SampleInfo.source_timestamp` by the
+  Transformation plugin, not from an explicit timestamp payload field.
+- **Derived fields** — Foxglove fields that are constant per DDS
+  instance (e.g., `frame_id` is constant per `camera_id`) are derived
+  by the Transformation plugin from a configuration lookup rather
+  than carried on every sample.
 - **Nested helper structs** (`Quaternion`, `Pose`, `Vector3`) are
   added to the `Common` module with field names matching their
-  `foxglove::` counterparts. Medtech types embed these helpers where
-  the data semantically matches.
+  `foxglove::` counterparts where the data semantically matches.
 - **Types are NOT wire-compatible** with `foxglove::` types. Foxglove
   types lack `@key` fields, use unbounded `string` and `sequence`,
   carry no DDS extensibility annotations, and live in the `foxglove`
   IDL module. The medtech types remain in their own modules with
   bounded members and full DDS annotations.
 
-The gap between field-aligned medtech types and Foxglove-native types
-is bridged by the **Foxglove Bridge plugin pipeline** (V2) — see
+The gap between medtech types and Foxglove-native types is bridged by
+the **Foxglove Bridge plugin pipeline** (V2) — see
 [Foxglove Bridge Plugins](#foxglove-bridge-plugins) below.
 
 ### Alignment Tiers and Milestones
@@ -1576,22 +1585,23 @@ sample containing all transforms for the kinematic chain at the
 QoS: inherits the `Stream` pattern base with `Deadline20ms` (same as
 `RobotState`) via a new `TopicProfiles::RobotFrameTransform` profile.
 
-#### `Imaging::CameraFrame` (Alignment Strengthened)
+#### `Imaging::CameraFrame` (Translatability Confirmed)
 
-No field changes. The existing field-semantic alignment with
-`foxglove::CompressedImage` is already complete:
+All fields required by `foxglove::CompressedImage` are assemblable
+from `CameraFrame` data and DDS metadata:
 
-| Medtech Field | Foxglove Field | Status |
-|---------------|----------------|--------|
-| `timestamp` (`Common::Time_t`) | `timestamp` (`foxglove::Time`) | Aligned |
-| `frame_id` (`string<128>`) | `frame_id` (`string`) | Aligned |
-| `data` (`sequence<uint8, MAX_FRAME_SIZE>`) | `data` (`sequence<uint8>`) | Aligned (bounded vs unbounded) |
-| `format` (`string<16>`) | `format` (`string`) | Aligned |
-| `camera_id` (`@key EntityId`) | *(no equivalent)* | Medtech-only — stripped by Transformation |
+| Foxglove Field | Source | Transformation |
+|----------------|--------|----------------|
+| `timestamp` (`foxglove::Time`) | `SampleInfo.source_timestamp` | Injected by plugin (sec/nanosec decomposition) |
+| `frame_id` (`string`) | `camera_id` | Derived via configuration lookup (camera_id → frame_id mapping) |
+| `data` (`sequence<uint8>`) | `data` (`sequence<uint8, MAX_FRAME_SIZE>`) | Copied (bounded → unbounded) |
+| `format` (`string`) | `format` (`Imaging::ImageFormat` enum) | Mapped: `JPEG` → `"jpeg"`, `PNG` → `"png"`, `H264` → `"h264"`, `H265` → `"h265"` |
+| *(no equivalent)* | `camera_id` (`@key EntityId`) | Stripped from output |
 
-The Routing Service Transformation plugin maps `CameraFrame` →
-`foxglove::CompressedImage` by copying the four aligned fields and
-dropping `camera_id`.
+The Routing Service Transformation plugin assembles
+`foxglove::CompressedImage` from `CameraFrame` fields and
+`SampleInfo` metadata. No field-level alignment is required in the
+medtech IDL.
 
 ### V2 Alignment Types (Deferred)
 
@@ -1628,7 +1638,7 @@ capability scope is finalized.
 The Foxglove Bridge is a set of three C++ shared-library plugins that
 form a pipeline between the medtech DDS data model and Foxglove Studio.
 All plugin infrastructure is delivered in **V2**; V1.2 delivers only
-the data model field-semantic alignment described above.
+the data model translatability work described above.
 
 The three plugins are:
 

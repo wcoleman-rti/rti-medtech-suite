@@ -154,8 +154,8 @@ Additive within the V1 milestone. No structural changes to V1 modules.
   implementation step will be authored when this milestone is approved for implementation.
 
 #### Foxglove Data Model Alignment
-- **Foxglove schema alignment (Tier 1 — data model only)** — `Surgery::RobotState` updated with Foxglove-aligned fields (`joints` as `sequence<JointState>`, `tool_tip_pose` as `Common::Pose`); new helper structs (`Common::Quaternion`, `Common::Vector3`, `Common::Pose`); new `Surgery::RobotFrameTransform` topic publishing the kinematic frame hierarchy at 100 Hz. See [data-model.md — Foxglove Schema Alignment](data-model.md#foxglove-schema-alignment).
-- **Data model alignment only** — V1.2 prepares the DDS types for future Foxglove integration by adopting field-semantic alignment (matching field names, nesting, and value conventions with Foxglove schema equivalents). No Foxglove IDL compilation, no transformation plugins, no adapter/storage plugins, and no Foxglove Studio connectivity are included in V1.2. The full integration infrastructure is delivered in V2.
+- **Foxglove schema translatability (Tier 1 — data model only)** — `Surgery::RobotState` updated with Foxglove-compatible fields (`joints` as `sequence<JointState>`, `tool_tip_pose` as `Common::Pose`); new helper structs (`Common::Quaternion`, `Common::Vector3`, `Common::Pose`); new `Surgery::RobotFrameTransform` topic publishing the kinematic frame hierarchy at 100 Hz; `Imaging::CameraFrame` streamlined (timestamp and frame_id removed, format changed to enum). See [data-model.md — Foxglove Schema Alignment](data-model.md#foxglove-schema-alignment).
+- **Translatable, not aligned** — V1.2 ensures all DDS types destined for Foxglove visualization are *translatable*: every field required by the target Foxglove schema is assemblable from medtech DDS data, `SampleInfo` metadata, or configuration lookups. Types are DDS-native first (enums over strings, no redundant payload fields). No Foxglove IDL compilation, no transformation plugins, no adapter/storage plugins, and no Foxglove Studio connectivity are included in V1.2. The full integration infrastructure is delivered in V2.
 
 ---
 
@@ -204,7 +204,7 @@ Additive within the V1 milestone. No structural changes to V1 modules.
 - Upgrades V1's read-only `DeviceTelemetry` to a full command/response data path
 
 #### Foxglove Visualization Bridge
-- **Foxglove integration infrastructure** — full Foxglove Studio connectivity delivered in V2, building on the V1.2 data model alignment. Three C++ shared-library plugins form the bridge pipeline:
+- **Foxglove integration infrastructure** — full Foxglove Studio connectivity delivered in V2, building on the V1.2 data model translatability work. Three C++ shared-library plugins form the bridge pipeline:
   1. **Routing Service Transformation plugin** (`libmedtech_foxglove_transf.so`) — implements `rti::routing::transf::DynamicDataTransformation`. One transformation class per target Foxglove type. Converts medtech DDS types to Foxglove-native types by stripping `@key` fields, restructuring nested members, and populating timestamps from `SampleInfo.source_timestamp`. Uses generated C++ types on both sides via `rti::core::xtypes::convert<T>()`.
   2. **Routing Service Adapter plugin** (`libfoxglove_ws_adapter.so`) — implements `rti::routing::adapter::AdapterPlugin` → `Connection` → `DynamicDataStreamWriter`. Output-only adapter: receives transformed Foxglove DynamicData from the Routing Service pipeline and serializes it to a Foxglove Studio live WebSocket connection. The transformation runs before the adapter's `write()` call.
   3. **Recording Service Storage plugin** (`libmedtech_mcap_storage.so`) — implements `rti::recording::storage::StorageWriter` → `DynamicDataStorageStreamWriter`. Custom storage backend that writes transformed Foxglove-native samples to MCAP files. The transformation runs before the storage writer's `store()` call.

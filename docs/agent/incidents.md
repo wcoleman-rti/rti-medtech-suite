@@ -823,79 +823,74 @@ after closure. They form the project's decision log.
 
 ---
 
-## INC-028: Common::Time_t uses uint32 sec — Y2038 limitation accepted for Foxglove alignment
+## INC-028: Common::Time_t replaced with Common::Timestamp_t (typedef int64) — Y2038 eliminated
 
-- **Status:** Closed
+- **Status:** Closed (superseded)
 - **Category:** Design Decision
 - **Date opened:** 2026-03-24
-- **Phase/Step:** Extension — timestamp field removal / Foxglove alignment
+- **Date reopened:** 2026-03-27
+- **Phase/Step:** Extension — Foxglove translatability revision
 - **Documents involved:** `interfaces/idl/common/common.idl`,
   `interfaces/idl/imaging/imaging.idl`, `vision/data-model.md`
-- **Description:** `Common::Time_t` was changed from `{int64 seconds;
-  uint32 nanoseconds}` to `{uint32 sec; uint32 nsec}` to align with
-  Foxglove's `foxglove::Time` IDL definition
-  (https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/Time.idl).
-  This improves field-semantic compatibility between `Imaging::CameraFrame`
-  and Foxglove's `CompressedImage` type, which uses `foxglove::Time` for
-  its timestamp field.
+- **Description:** `Common::Time_t` (`@final` struct, `uint32 sec` +
+  `uint32 nsec`) was originally introduced for field-semantic alignment
+  with Foxglove's `foxglove::Time`. This carried a Y2038 overflow
+  limitation.
 
-  **Trade-off:** `uint32` seconds overflows on 2038-01-19 03:14:07 UTC
-  (Unix epoch Y2038 problem). The previous `int64 seconds` representation
-  had no practical overflow horizon.
+  **Resolution (2026-03-27):** The Foxglove alignment strategy was
+  revised from "field-semantic alignment" to "translatable, not
+  aligned." Since Foxglove timestamps are now assembled from
+  `SampleInfo.source_timestamp` by the Transformation plugin, there
+  is no need for a Foxglove-shaped struct in medtech IDL.
 
-  **Remaining consumers of `Common::Time_t`:**
-  - `Imaging::CameraFrame.timestamp` — Foxglove-aligned, primary
-    motivation for the change.
-  - `Surgery::ProcedureContext.start_time` — wall-clock procedure start;
-    affected by 2038 overflow.
-  - `Monitoring::AlarmMessage.onset_time` — wall-clock alarm onset;
-    affected by 2038 overflow.
+  `Common::Time_t` has been **replaced** with `Common::Timestamp_t`
+  (`typedef int64 Timestamp_t`) — epoch nanoseconds. This eliminates
+  the Y2038 limitation (±292 year range), reduces the type from a
+  2-member struct to a single scalar, and maintains a consistent
+  timestamp representation across modules.
 
-  **Context:** As part of this change, `Common::Time_t timestamp` was
-  also removed as the trailing member from all other top-level IDL
-  types. Those types now rely on DDS `SampleInfo.source_timestamp`
-  (set automatically by the DataWriter at `write()` time) to convey
-  sample publication time. Subscribers access it via
-  `SampleInfo.source_timestamp` (Python) /
-  `sample.info().source_timestamp()` (C++). This reduces wire payload
-  size by 12 bytes per sample and eliminates redundancy with DDS
-  infrastructure metadata.
-- **Migration plan:** When Foxglove updates `foxglove::Time` to use a
-  wider seconds field (e.g., `int64 sec`), update `Common::Time_t` to
-  match. Monitor the upstream schema at:
-  https://github.com/foxglove/foxglove-sdk/blob/main/schemas/omgidl/foxglove/Time.idl
-  Because `Common::Time_t` is `@final`, any field-type change is a
-  breaking type evolution — all publishers and subscribers must be
-  redeployed together. This is acceptable given the project's
-  containerized deployment model.
-- **Resolution:** Design decision promoted into `vision/data-model.md`
-  (`Common::Time_t` section) as a self-contained Y2038 limitation note
-  with full rationale and migration plan. The incident reference has
-  been removed from the design doc — the doc is now the authoritative
-  source for this decision.
-- **Date closed:** 2026-03-24
+  **Consumer migration:**
+  - `Imaging::CameraFrame.timestamp` — **removed entirely**. Frame
+    capture time ≈ write time; use `SampleInfo.source_timestamp`.
+  - `Surgery::ProcedureContext.start_time` — type changed to
+    `Common::Timestamp_t` (epoch nanoseconds).
+  - `Monitoring::AlarmMessage.onset_time` — type changed to
+    `Common::Timestamp_t` (epoch nanoseconds).
+
+  The Foxglove `foxglove::Time` struct is no longer referenced by
+  medtech IDL. The vendored `foxglove/Time.idl` file remains available
+  for the V2 Transformation plugin build.
+- **Resolution:** Superseded by translatability revision. `Time_t`
+  removed; `Timestamp_t` alias introduced. See `vision/data-model.md`
+  (`Common::Timestamp_t` section).
+- **Date closed:** 2026-03-27
 
 ---
 
 ## INC-029: source_timestamp convention — DDS metadata replaces IDL timestamp fields
 
-- **Status:** Closed
+- **Status:** Closed (updated)
 - **Category:** Design Decision
 - **Date opened:** 2026-03-24
+- **Date updated:** 2026-03-27
 - **Phase/Step:** Extension — timestamp field removal / source_timestamp adoption
 - **Documents involved:** `vision/data-model.md`, all IDL files under
   `interfaces/idl/`
 - **Description:** Removed `Common::Time_t timestamp` as the trailing
-  member from all top-level IDL types except `Imaging::CameraFrame`
-  (retained for Foxglove `CompressedImage` field-semantic alignment).
-  Sample publication time is now conveyed via DDS
-  `SampleInfo.source_timestamp`, which is automatically set by the
-  DataWriter at `write()` time and available to subscribers without
-  any payload overhead.
+  member from all top-level IDL types. Sample publication time is now
+  conveyed via DDS `SampleInfo.source_timestamp`, which is
+  automatically set by the DataWriter at `write()` time and available
+  to subscribers without any payload overhead.
 
-  **Retained `Common::Time_t` fields** (domain-meaningful times distinct
-  from write time):
-  - `Imaging::CameraFrame.timestamp` — frame capture time (Foxglove compat)
+  **Update (2026-03-27):** As part of the Foxglove translatability
+  revision, `Imaging::CameraFrame.timestamp` has also been removed.
+  Frame capture time ≈ write time for this project's use case.
+  The Foxglove Transformation plugin populates
+  `foxglove::CompressedImage.timestamp` from
+  `SampleInfo.source_timestamp`.
+
+  **Retained `Common::Timestamp_t` fields** (domain-meaningful times
+  distinct from write time):
   - `Surgery::ProcedureContext.start_time` — wall-clock procedure start
   - `Monitoring::AlarmMessage.onset_time` — wall-clock alarm onset
 
@@ -912,14 +907,10 @@ after closure. They form the project's decision log.
      Hospital domain bridged topics.
   4. Subscribers must access `SampleInfo` alongside data — code paths
      that pass only deserialized data objects will lose timestamp access.
-
-  **Wire savings:** 12 bytes per sample (8-byte `int64` + 4-byte
-  `uint32` under the old `Time_t`; 8 bytes under the new `uint32` +
-  `uint32` Foxglove-aligned `Time_t`).
 - **Resolution:** Applied. All IDL files updated, `data-model.md` type
-  tables updated, `Common::Time_t` definition updated to Foxglove
-  alignment (see INC-028). Build and tests pass.
-- **Date closed:** 2026-03-24
+  tables updated. `Common::Time_t` replaced with `Common::Timestamp_t`
+  (`typedef int64`, epoch nanoseconds) — see INC-028.
+- **Date closed:** 2026-03-27
 
 ---
 

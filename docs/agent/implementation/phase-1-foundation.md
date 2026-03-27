@@ -62,7 +62,7 @@
 ### Work
 
 - Author IDL files under `interfaces/idl/` per the module structure in [vision/data-model.md](../vision/data-model.md):
-  - `common.idl` — `Time_t`, `EntityIdentity`, bounded string typedefs
+  - `common.idl` — `Timestamp_t`, `EntityIdentity`, bounded string typedefs
   - `surgery.idl` — `RobotCommand`, `RobotState`, `SafetyInterlock`, `OperatorInput`, `ProcedureContext`, `ProcedureStatus`
   - `monitoring.idl` — `PatientVitals`, `WaveformData`, `AlarmMessages`
   - `imaging.idl` — `CameraFrame`

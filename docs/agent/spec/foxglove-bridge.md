@@ -57,10 +57,14 @@ All scenarios assume the Foxglove Bridge plugins (`libmedtech_foxglove_transf.so
 ### Scenario: CameraFrame is transformed to foxglove CompressedImage `@integration` `@foxglove`
 
 **Given** the Transformation plugin is loaded in a Routing Service route with `mapping=compressed_image`
-**And** an `Imaging::CameraFrame` sample is published with `format` = `"jpeg"`, `frame_id` = `"endoscope_cam"`, and 1024 bytes of image `data`
+**And** the plugin is configured with a camera-to-frame mapping: `camera_id` = `"endoscope_01"` → `frame_id` = `"endoscope_cam"`
+**And** an `Imaging::CameraFrame` sample is published with `format` = `JPEG` (enum), `camera_id` = `"endoscope_01"`, and 1024 bytes of image `data`
+**And** the sample's `SampleInfo.source_timestamp` = {sec: 1700000000, nanosec: 500000000}
 **When** the transformation processes the sample
-**Then** the output is a `foxglove::CompressedImage` sample with matching `format`, `frame_id`, and `data` (1024 bytes, byte-identical)
-**And** the `timestamp` field is copied directly from the input sample's `timestamp`
+**Then** the output is a `foxglove::CompressedImage` sample with `data` (1024 bytes, byte-identical)
+**And** the `format` field is the string `"jpeg"` (mapped from the `JPEG` enum value)
+**And** the `frame_id` field is `"endoscope_cam"` (derived from the `camera_id` → `frame_id` lookup)
+**And** the `timestamp` field is {sec: 1700000000, nsec: 500000000} (from `SampleInfo.source_timestamp`)
 **And** the `camera_id` `@key` field is not present in the output
 
 ---
@@ -72,7 +76,7 @@ All scenarios assume the Foxglove Bridge plugins (`libmedtech_foxglove_transf.so
 **Given** a transformation class processing any medtech type that contains `@key` fields (`robot_id` on `RobotState`, `camera_id` on `CameraFrame`)
 **When** the transformation produces the output Foxglove type
 **Then** no `@key` field from the input appears in the output type
-**And** all non-key fields required by the Foxglove schema are present and correctly populated
+**And** all fields required by the Foxglove schema are present and correctly populated (from payload fields, `SampleInfo` metadata, or configuration lookups)
 
 ### Scenario: Timestamp is populated from SampleInfo source_timestamp `@integration` `@foxglove`
 

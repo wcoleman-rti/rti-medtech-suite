@@ -315,7 +315,7 @@ The installed layout:
 
 ```
 install/lib/python/site-packages/
-├── common.py               # Common::Time_t, Common::EntityIdentity, etc.
+├── common.py               # Common::Timestamp_t, Common::EntityIdentity, etc.
 ├── surgery.py              # Surgery::RobotCommand, Surgery::RobotState, etc.
 ├── monitoring.py           # Monitoring::PatientVitals, etc.
 ├── imaging.py              # Imaging::CameraFrame
