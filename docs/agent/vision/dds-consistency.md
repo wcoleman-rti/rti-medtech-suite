@@ -1261,8 +1261,10 @@ The threading model is defined in
 
 2. **DDS I/O is allowed on the `run()` thread.** A service may perform
    `write()` or `take()` directly on the thread that invoked `run()`.
-   There is no blanket "no I/O on main thread" rule — that restriction
-   applies only to GUI event loops (see GUI Applications below).
+   There is no blanket "no I/O on main thread" rule. GUI hosts have a
+   nuanced policy: polling reads and `NonBlockingWrite` QoS snippet-configured
+   writes are allowed on the Qt UI thread; other writes and blocking
+   waits are not (see GUI Host Applications below).
 
 3. **C++ services must join all spawned threads in `stop()` / destructor.**
    Any threads or `AsyncWaitSet` instances created by the service must be
@@ -1341,28 +1343,89 @@ govern its lifecycle within the service class pattern (§3):
 
 ### GUI Host Applications
 
-The **sole thread restriction** is for GUI hosts (Procedure Controller,
-Hospital Dashboard, etc.) where a Qt event loop drives the UI.
-DDS I/O must not occur on the Qt event loop thread.
+GUI hosts (Procedure Controller, Hospital Dashboard, etc.) run a Qt event
+loop on the UI thread. The UI thread must remain responsive — operations
+that could block for an unbounded or user-perceptible duration are
+prohibited. DDS operations fall into three categories based on their
+blocking behavior:
+
+| Operation | Qt UI thread | Blocking risk | Condition |
+|-----------|-------------|---------------|----------|
+| `reader.take()` / `reader.read()` (polling) | **Allowed** | Non-blocking — returns immediately with available samples | Cap samples per tick to bound per-frame work |
+| `writer.write()` with `NonBlockingWrite` snippet | **Allowed** | Non-blocking — serializes + inserts into cache; no network send, no queue-full stall | Writer must be configured via `Snippets::NonBlockingWrite` in XML |
+| `writer.write()` without `NonBlockingWrite` | **Prohibited** | Can block up to `max_blocking_time` under reliable/resource-limit pressure | Delegate to worker thread or `GuardCondition` |
+| `WaitSet.wait()` / `take_data_async()` | **Prohibited** | Blocks waiting for data | Use polling or worker thread |
+
+#### Polling Reads on the UI Thread
+
+GUI hosts may call `reader.take()` or `reader.read()` directly from a
+Qt timer callback (e.g., at 30 Hz for display refresh). These calls are
+non-blocking — they return immediately with whatever samples are
+currently available. To keep frame time bounded:
+
+- **C++:** Use a `max_samples` selector to cap samples per tick.
+- **Python:** Slice the returned list if the backlog may be large.
+
+This is the preferred pattern for subscriber-side GUI refresh — simpler
+than `AsyncWaitSet` + signal/slot bridging, and adequate when the
+display only needs data at the rendering rate.
+
+#### Non-Blocking Writes on the UI Thread
+
+GUI hosts may call `writer.write()` on the UI thread **only if** the
+DataWriter is configured with the `Snippets::NonBlockingWrite` QoS
+snippet. This snippet bundles the settings required to eliminate all
+blocking paths from `write()`:
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `publish_mode.kind` | `ASYNCHRONOUS` | Network send happens on a separate Connext thread, not the caller |
+| `reliability.max_blocking_time` | `0` | No waiting budget — immediate return instead of stall |
+| `protocol.rtps_reliable_writer.max_send_window_size` | `LENGTH_UNLIMITED` | Eliminates the send-window-full blocking path |
+| `protocol.rtps_reliable_writer.min_send_window_size` | `LENGTH_UNLIMITED` | Paired with max |
+| Batching | Disabled (not set in snippet) | Batching can force synchronous flush on caller thread |
+
+The writer must also use `KEEP_LAST` history (set by the composing
+Pattern, not by the snippet itself) so that sample replacement absorbs
+backpressure instead of blocking.
+
+> **`rti-chatbot-mcp` note:** RTI's built-in
+> `BuiltinQosSnippetLib::Optimization.ReliabilityProtocol.KeepLast`
+> snippet sets `max_send_window_size = LENGTH_UNLIMITED` and
+> `min_send_window_size = LENGTH_UNLIMITED` with the explicit comment
+> "Do not block because of the send_window." The custom
+> `NonBlockingWrite` snippet extends this by also setting asynchronous
+> publish mode and zero `max_blocking_time`.
+
+**Trade-off:** With `KEEP_LAST` + `NonBlockingWrite`, the writer is
+still RELIABLE (ACK/NACK repair works), but older unACKed samples can
+be overwritten under pressure. This is acceptable for GUI-published
+state (e.g., operator commands, configuration changes) where only the
+latest value matters.
+
+**Writers without `NonBlockingWrite` must not be called from the UI
+thread.** Delegate writes to a worker thread, asyncio task, or
+`GuardCondition` + `AsyncWaitSet` (see §4.1).
+
+#### Architecture Diagram
 
 ```
-┌─────────────────────┐     signals/slots     ┌─────────────────────┐
-│  DDS Thread(s)      │ ──────────────────────►│  UI Thread          │
-│  AsyncWaitSet / rti │                        │  Qt Event Loop      │
-│  .asyncio           │◄────────────────────── │  Widget rendering   │
-│  Reads & writes     │     commands/events    │  User input         │
-└─────────────────────┘                        └─────────────────────┘
+┌─────────────────────────────┐  signals/slots  ┌──────────────────────────┐
+│  DDS Worker Thread(s)       │ ───────────────► │  Qt UI Thread            │
+│  AsyncWaitSet / asyncio     │                  │  Qt Event Loop           │
+│  Writes (non-NonBlocking)   │ ◄─────────────── │  Widget rendering        │
+│  Subscriber dispatch        │  commands/events │  User input              │
+└─────────────────────────────┘                  │  Polling reads (take)    │
+                                                 │  NonBlockingWrite writes │
+                                                 └──────────────────────────┘
 ```
 
-DDS threads own DDS entities. The UI thread owns widgets. Communication
-between them uses thread-safe signals/slots or queues — never direct
-DDS API calls from the UI thread. This is a **Qt constraint**, not a
-DDS constraint — Connext API calls are safe from any application thread.
-
-> **`rti-chatbot-mcp` guidance:** RTI explicitly warns that `write()` can
-> block under certain QoS/resource-limit conditions. Performing writes on
-> the UI thread risks frozen UIs and deadlocks. Polling at the GUI refresh
-> rate is a valid alternative for subscriber-side display updates.
+> **`rti-chatbot-mcp` guidance:** RTI documents `read()`/`take()` as
+> non-blocking operations that return immediately with available samples.
+> `write()` can block under reliable/resource-limit conditions, bounded
+> by `max_blocking_time`. Setting `max_blocking_time = 0` with
+> `KEEP_LAST` + disabled send window + `ASYNCHRONOUS` publish mode
+> eliminates all documented blocking paths for `write()`.
 
 ---
 
@@ -1380,7 +1443,7 @@ validated against `rti-chatbot-mcp` RTI best-practice guidance.
 | AP-10 | **DDS entities in public class APIs** | Leaks middleware abstractions into domain interfaces; couples callers to DDS imports; makes testing harder. | Encapsulate all DDS entities as private members. Public interface uses domain types only (see §3). |
 | AP-3 | **`DynamicData` / `DynamicType` in application code** | Runtime field-name errors (stringly-typed); no compile-time safety; weaker IDE support; higher runtime overhead; fragile refactoring. | IDL-generated types (`rtiddsgen`). DynamicData permitted only in developer tools (`tools/`) and test utilities. |
 | AP-4 | **Hardcoded domain IDs in source code** | Deployment collisions; recompilation for environment changes; test contamination; hidden assumptions. | Domain IDs live exclusively in `Domains.xml` and [data-model.md](data-model.md). Code references domains by name (e.g., "Procedure domain"). |
-| AP-5 | **DDS I/O on the Qt UI event loop** | Frozen UI; jittery UX; deadlocks; priority inversion; unbounded latency from reliable writes or resource-limit pressure. | GUI hosts: dedicated DDS worker threads; UI thread only renders state received via signals/queues (see §5). Non-GUI services: DDS I/O is permitted on any application thread including the `run()` thread. |
+| AP-5 | **Unguarded DDS writes on the Qt UI event loop** | Frozen UI; jittery UX; deadlocks; priority inversion; unbounded latency from reliable writes or resource-limit pressure. | Polling `read()`/`take()` is always safe on the UI thread. `write()` is safe **only** for writers configured with `Snippets::NonBlockingWrite`. All other writes: delegate to worker thread or `GuardCondition` (see §5). Non-GUI services: DDS I/O is permitted on any application thread including the `run()` thread. |
 | AP-6 | **`print()` / `printf` / `std::cout` for logging** | No integration with Connext verbosity categories; blocking console I/O; interleaved unstructured output; dangerous in listener/internal-thread contexts. | RTI Connext Logging API for middleware-level logging. Application-level logging uses the project’s approved logging interface — see [technology.md — Logging Standard](technology.md) for the authoritative logging guidance. No `print()` / `printf` / `std::cout` in production code. |
 | AP-7 | **Hardcoded XML file paths in application code** | Breaks install-tree portability; couples code to file layout; prevents `NDDS_QOS_PROFILES`-based loading. | Use default `QosProvider` which loads from `NDDS_QOS_PROFILES`. See [data-model.md — QoS XML Loading](data-model.md). |
 | AP-8 | **Custom `QosProvider` instances** | Bypasses the shared QoS hierarchy; risks loading partial or inconsistent XML; fragments configuration. | Always use `dds::core::QosProvider::Default()` (C++) or `dds.QosProvider.default` (Python). |
@@ -1502,8 +1565,9 @@ consistency with the existing system:
       for reading — no `DataReaderListener`
 - [ ] Use the correct publication model for each topic (continuous-stream,
       periodic-snapshot, or write-on-change) per [data-model.md](data-model.md)
-- [ ] Keep DDS I/O off the Qt UI event loop (GUI hosts only); services
-      manage their own concurrency per §5
+- [ ] GUI hosts: polling reads allowed; writes only with `NonBlockingWrite`
+      snippet; no blocking waits on Qt UI thread (§5)
+- [ ] Non-GUI services manage their own concurrency per §5
 - [ ] Separate DDS code from business logic (thin DDS boundary pattern) per
       [coding-standards.md — DDS Code Separation](coding-standards.md)
 

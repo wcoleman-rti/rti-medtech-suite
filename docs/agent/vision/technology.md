@@ -74,7 +74,7 @@ Additional Foxglove schemas (`CameraCalibration`, `ImageAnnotations`, `Compresse
 
 - **PySide6** — Qt 6 bindings for Python
 - **QtAsyncio** — used for integrating async DDS reads with the Qt event loop
-- DDS I/O must never occur on the Qt UI event loop thread (see DDS I/O Threading below)
+- DDS polling reads (`take()`/`read()`) are safe on the Qt UI thread; writes require `NonBlockingWrite` QoS snippet (see DDS I/O Threading below)
 
 ### GUI Design Standard
 
@@ -373,10 +373,24 @@ The `requirements.txt` pins exact versions for all runtime and development depen
 
 Connext 7.6.0 DDS API calls (`write()`, `take()`, etc.) are safe from
 **any application thread**. There is no restriction tied to the process
-main thread. The sole thread restriction is for **GUI host applications**
-where a Qt event loop drives the UI — DDS I/O must not occur on the Qt
-event loop thread because `write()` can block under resource-limit
-pressure, risking frozen UIs.
+main thread.
+
+For **GUI host applications** where a Qt event loop drives the UI:
+
+- **Polling reads** (`reader.take()`, `reader.read()`) are **allowed**
+  on the Qt UI thread — they are non-blocking and return immediately
+  with available samples.
+- **Writes** are **allowed** on the Qt UI thread **only** for DataWriters
+  configured with the `Snippets::NonBlockingWrite` QoS snippet, which
+  sets asynchronous publish mode, zero `max_blocking_time`, and
+  unlimited send window to eliminate all blocking paths.
+- **Writes without `NonBlockingWrite`** and **blocking waits**
+  (`WaitSet.wait()`, `take_data_async()`) are **prohibited** on the
+  Qt UI thread.
+
+See [dds-consistency.md §5 — GUI Host Applications](dds-consistency.md)
+for the complete policy, architecture diagram, and per-operation
+allowed/prohibited table.
 
 Services must not assume any properties of the thread that calls `run()`.
 If a service needs periodic publishing or subscriber dispatch, it creates

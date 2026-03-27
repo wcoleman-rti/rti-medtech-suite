@@ -120,7 +120,7 @@ changed.*
 **Given** a module or service `README.md` has an `## Architecture` section
 **When** the threading model description is examined
 **Then** it explicitly identifies how the service manages its internal concurrency
-**And** for GUI hosts, it confirms DDS I/O does not occur on the Qt UI event loop
+**And** for GUI hosts, it confirms writes use `NonBlockingWrite` QoS snippet and no blocking waits occur on the Qt UI thread
 
 ### Scenario: Configuration Reference section provides an environment variables table `@unit`
 
