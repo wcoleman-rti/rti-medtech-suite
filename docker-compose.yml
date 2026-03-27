@@ -206,6 +206,23 @@ services:
       cloud-discovery-service:
         condition: service_healthy
 
+  robot-service-host-or1:
+    image: medtech/app-cpp
+    container_name: robot-service-host-or1
+    command: ["/opt/medtech/bin/robot-service-host"]
+    environment:
+      <<: *medtech-env
+      HOST_ID: "robot-host-or1"
+      ROOM_ID: "OR-1"
+      PROCEDURE_ID: "OR1-001"
+      MEDTECH_APP_NAME: "robot-service-host-or1"
+    volumes: *config-volumes
+    networks:
+      - surgical-net
+    depends_on:
+      cloud-discovery-service:
+        condition: service_healthy
+
   robot-controller-or1:
     image: medtech/app-cpp
     container_name: robot-controller-or1
@@ -314,6 +331,23 @@ services:
       ROOM_ID: "OR-3"
       PROCEDURE_ID: "OR3-001"
       MEDTECH_APP_NAME: "procedure-context-or3"
+    volumes: *config-volumes
+    networks:
+      - surgical-net
+    depends_on:
+      cloud-discovery-service:
+        condition: service_healthy
+
+  robot-service-host-or3:
+    image: medtech/app-cpp
+    container_name: robot-service-host-or3
+    command: ["/opt/medtech/bin/robot-service-host"]
+    environment:
+      <<: *medtech-env
+      HOST_ID: "robot-host-or3"
+      ROOM_ID: "OR-3"
+      PROCEDURE_ID: "OR3-001"
+      MEDTECH_APP_NAME: "robot-service-host-or3"
     volumes: *config-volumes
     networks:
       - surgical-net
