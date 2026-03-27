@@ -1379,15 +1379,12 @@ blocking paths from `write()`:
 
 | Setting | Value | Why |
 |---------|-------|-----|
+| `history.kind` | `KEEP_LAST` | Sample replacement absorbs backpressure instead of blocking; snippet enforces this directly so composing Patterns do not need to provide it |
 | `publish_mode.kind` | `ASYNCHRONOUS` | Network send happens on a separate Connext thread, not the caller |
 | `reliability.max_blocking_time` | `0` | No waiting budget — immediate return instead of stall |
 | `protocol.rtps_reliable_writer.max_send_window_size` | `LENGTH_UNLIMITED` | Eliminates the send-window-full blocking path |
 | `protocol.rtps_reliable_writer.min_send_window_size` | `LENGTH_UNLIMITED` | Paired with max |
 | Batching | Disabled (not set in snippet) | Batching can force synchronous flush on caller thread |
-
-The writer must also use `KEEP_LAST` history (set by the composing
-Pattern, not by the snippet itself) so that sample replacement absorbs
-backpressure instead of blocking.
 
 > **`rti-chatbot-mcp` note:** RTI's built-in
 > `BuiltinQosSnippetLib::Optimization.ReliabilityProtocol.KeepLast`
