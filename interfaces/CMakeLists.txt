@@ -7,7 +7,7 @@ set(CPP_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/cpp")
 set(PY_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/python")
 
 # --- IDL modules to process ---
-set(IDL_MODULES common surgery monitoring imaging devices clinical_alerts hospital)
+set(IDL_MODULES common surgery monitoring imaging devices clinical_alerts hospital orchestration)
 
 # --- C++ code generation ---
 foreach(mod ${IDL_MODULES})
@@ -47,7 +47,10 @@ target_include_directories(medtech_types PUBLIC
     $<BUILD_INTERFACE:${CPP_GEN_DIR}>
     $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(medtech_types PUBLIC RTIConnextDDS::cpp2_api)
+target_link_libraries(medtech_types PUBLIC
+    RTIConnextDDS::cpp2_api
+    RTIConnextDDS::messaging_cpp2_api
+)
 
 install(TARGETS medtech_types
     LIBRARY DESTINATION lib

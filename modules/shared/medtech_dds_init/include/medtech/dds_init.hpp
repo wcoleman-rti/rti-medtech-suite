@@ -17,6 +17,7 @@
 #include "hospital/hospital.hpp"
 #include "imaging/imaging.hpp"
 #include "monitoring/monitoring.hpp"
+#include "orchestration/orchestration.hpp"
 #include "surgery/surgery.hpp"
 
 namespace medtech {
@@ -57,6 +58,10 @@ inline void initialize_connext()
 
         // Hospital module
         rti::domain::register_type<Hospital::ResourceAvailability>("Hospital::ResourceAvailability");
+
+        // Orchestration module
+        rti::domain::register_type<Orchestration::HostCatalog>("Orchestration::HostCatalog");
+        rti::domain::register_type<Orchestration::ServiceStatus>("Orchestration::ServiceStatus");
     });
 }
 

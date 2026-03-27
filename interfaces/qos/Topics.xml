@@ -21,6 +21,15 @@
         <qos_profile name="ResourceAvailability" base_name="Patterns::State"/>
         <qos_profile name="CameraConfig" base_name="Patterns::State"/>
 
+        <!-- Orchestration domain topics -->
+        <qos_profile name="HostCatalog" base_name="Patterns::State">
+            <base_name>
+                <element>Snippets::Liveliness2s</element>
+            </base_name>
+        </qos_profile>
+
+        <qos_profile name="ServiceStatus" base_name="Patterns::State"/>
+
         <!-- Topics with additional tuning (deadline, lifespan, liveliness) -->
         <qos_profile name="OperatorInput" base_name="Patterns::Stream">
             <base_name>
@@ -245,6 +254,16 @@
             <datareader_qos topic_filter="AlarmMessages" base_name="TopicProfiles::GuiAlarmMessages"/>
             <datareader_qos topic_filter="DeviceTelemetry" base_name="TopicProfiles::GuiDeviceTelemetry"/>
             <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::GuiRobotState"/>
+        </qos_profile>
+
+        <!--
+            OrchestrationTopics: topic-filter-bound QoS for Orchestration domain (Domain 15).
+        -->
+        <qos_profile name="OrchestrationTopics">
+            <datawriter_qos topic_filter="HostCatalog" base_name="TopicProfiles::HostCatalog"/>
+            <datareader_qos topic_filter="HostCatalog" base_name="TopicProfiles::HostCatalog"/>
+            <datawriter_qos topic_filter="ServiceStatus" base_name="TopicProfiles::ServiceStatus"/>
+            <datareader_qos topic_filter="ServiceStatus" base_name="TopicProfiles::ServiceStatus"/>
         </qos_profile>
 
     </qos_library>

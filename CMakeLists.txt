@@ -36,7 +36,9 @@ list(APPEND CMAKE_MODULE_PATH
     "${rticonnextdds-cmake-utils_SOURCE_DIR}/cmake/Modules")
 
 # --- Find RTI Connext DDS ---
-find_package(RTIConnextDDS "${CONNEXT_VERSION}" REQUIRED)
+find_package(RTIConnextDDS "${CONNEXT_VERSION}" REQUIRED
+    COMPONENTS messaging_api
+)
 
 # --- Google Test for C++ tests ---
 include(CTest)
@@ -82,6 +84,7 @@ install(FILES
 )
 install(FILES
     interfaces/participants/SurgicalParticipants.xml
+    interfaces/participants/OrchestrationParticipants.xml
     DESTINATION share/participants
 )
 

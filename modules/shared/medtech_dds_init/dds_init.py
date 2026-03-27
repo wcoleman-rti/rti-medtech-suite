@@ -16,6 +16,7 @@ import common  # noqa: F401  — generated; registers Common types
 import devices
 import imaging
 import monitoring
+import orchestration
 import rti.connextdds as dds
 import surgery
 
@@ -75,4 +76,12 @@ def initialize_connext() -> None:
     )
     dds.DomainParticipant.register_idl_type(
         devices.Devices.DeviceTelemetry, "Devices::DeviceTelemetry"
+    )
+
+    # Orchestration module
+    dds.DomainParticipant.register_idl_type(
+        orchestration.Orchestration.HostCatalog, "Orchestration::HostCatalog"
+    )
+    dds.DomainParticipant.register_idl_type(
+        orchestration.Orchestration.ServiceStatus, "Orchestration::ServiceStatus"
     )

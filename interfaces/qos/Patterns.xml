@@ -63,6 +63,15 @@
             </base_name>
         </qos_profile>
 
+        <!--
+            RPC: inherits from the RTI builtin RPC pattern which provides
+            RELIABLE + KEEP_ALL + correlation + optimized transport settings.
+            Used by ServiceHostControl and future RPC interfaces.
+        -->
+        <qos_profile name="RPC"
+                     base_name="BuiltinQosLib::Pattern.RPC">
+        </qos_profile>
+
     </qos_library>
 
 </dds>

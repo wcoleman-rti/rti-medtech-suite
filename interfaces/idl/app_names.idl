@@ -51,4 +51,28 @@ module MedtechEntityNames {
         const string TWIN_SAFETY_INTERLOCK_READER  = "TwinSubscriber::SafetyInterlockReader";
         const string TWIN_ROBOT_COMMAND_READER     = "TwinSubscriber::RobotCommandReader";
     };
+
+    // --- OrchestrationParticipants library ---
+    module OrchestrationParticipants {
+
+        // Participant config names — create_participant_from_config()
+        const string ORCHESTRATION                    = "OrchestrationParticipants::Orchestration";
+        const string PROCEDURE_CONTROLLER_ORCHESTRATION = "OrchestrationParticipants::ProcedureController_Orchestration";
+        const string PROCEDURE_CONTROLLER_HOSPITAL    = "OrchestrationParticipants::ProcedureController_Hospital";
+
+        // Writer names — find_datawriter_by_name() / find_datawriter()
+        const string HOST_CATALOG_WRITER     = "OrchestrationPublisher::HostCatalogWriter";
+        const string SERVICE_STATUS_WRITER   = "OrchestrationPublisher::ServiceStatusWriter";
+
+        // Reader names — find_datareader_by_name() / find_datareader()
+        const string HOST_CATALOG_READER     = "OrchestrationSubscriber::HostCatalogReader";
+        const string SERVICE_STATUS_READER   = "OrchestrationSubscriber::ServiceStatusReader";
+
+        // Controller reader names
+        const string CTRL_HOST_CATALOG_READER    = "ControllerOrchSubscriber::HostCatalogReader";
+        const string CTRL_SERVICE_STATUS_READER  = "ControllerOrchSubscriber::ServiceStatusReader";
+        const string CTRL_PROCEDURE_STATUS_READER  = "ControllerHospSubscriber::ProcedureStatusReader";
+        const string CTRL_PROCEDURE_CONTEXT_READER = "ControllerHospSubscriber::ProcedureContextReader";
+        const string CTRL_PATIENT_VITALS_READER    = "ControllerHospSubscriber::PatientVitalsReader";
+    };
 };

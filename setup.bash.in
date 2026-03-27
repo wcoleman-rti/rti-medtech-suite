@@ -31,7 +31,8 @@ $_DIR/share/qos/Patterns.xml;\
 $_DIR/share/qos/Topics.xml;\
 $_DIR/share/qos/Participants.xml;\
 $_DIR/share/domains/Domains.xml;\
-$_DIR/share/participants/SurgicalParticipants.xml"
+$_DIR/share/participants/SurgicalParticipants.xml;\
+$_DIR/share/participants/OrchestrationParticipants.xml"
 
 # Runtime configuration root
 export MEDTECH_CONFIG_DIR="$_DIR/etc"

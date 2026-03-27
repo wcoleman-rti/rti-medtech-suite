@@ -1483,3 +1483,32 @@ after closure. They form the project's decision log.
   `create_participant_from_config` participants in XML have a
   corresponding application entry point.
 - **Date closed:** 2026-03-27
+
+---
+
+## INC-049: rtiddsgen 4.6.0 C++ RPC codegen variable shadowing
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-27
+- **Phase/Step:** Phase 5 / Step 5.1
+- **Documents involved:** `interfaces/idl/orchestration/orchestration.idl`,
+  `interfaces/CMakeLists.txt`
+- **Description:** When an `@service("DDS")` interface operation uses
+  `request` as a parameter name (e.g., `start_service(in ServiceRequest request)`),
+  rtiddsgen 4.6.0 generates C++ client `send_*` methods that shadow the
+  function parameter with `auto& request = scratchpad_request()`. This
+  causes two compile errors per method: (1) `-Werror=shadow` / hard error
+  on redeclaration, and (2) the `_In` wrapper constructor receives the
+  scratchpad `ServiceHostControl_Call&` instead of the original parameter
+  type. Python codegen is unaffected.
+- **Possible resolutions:**
+  1. Rename the IDL parameter to avoid `request` (e.g., `req`).
+  2. Post-generation `sed` patch to rename the local variable.
+  3. Report upstream to RTI as a codegen defect.
+- **Resolution:** Resolution 1 adopted — renamed IDL parameters from
+  `request` to `req`. Clean fix, no post-gen patching required.
+- **Guideline:** Avoid using `request` as an `@service("DDS")` interface
+  parameter name in IDL. The rtiddsgen C++ template uses `request`
+  internally for the scratchpad variable.
+- **Date closed:** 2026-03-27

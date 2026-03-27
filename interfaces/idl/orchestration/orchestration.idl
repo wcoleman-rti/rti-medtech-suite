@@ -1,0 +1,112 @@
+/*
+ * Orchestration module types — service lifecycle, host catalog, RPC.
+ *
+ * Module: Orchestration
+ * Domain: Orchestration (Domain 15, no domain tags)
+ *
+ * Contains:
+ *   - ServiceState enum (single source of truth for medtech::Service)
+ *   - OperationResultCode enum (RPC reply codes)
+ *   - Pub/sub state types: HostCatalog, ServiceStatus
+ *   - RPC parameter types: ServiceRequest, ConfigureRequest,
+ *     OperationResult, CapabilityReport, HealthReport
+ *   - @service("DDS") interface: ServiceHostControl
+ */
+
+#include "common/common.idl"
+
+module Orchestration {
+
+    // --- Constants ---
+    const long MAX_SERVICE_COUNT = 16;
+    const long MAX_CONFIG_LENGTH = 1024;
+    const long MAX_DIAG_LENGTH = 2048;
+
+    // --- Enums ---
+
+    @appendable
+    enum ServiceState {
+        STOPPED,
+        STARTING,
+        RUNNING,
+        STOPPING,
+        FAILED,
+        UNKNOWN
+    };
+
+    @appendable
+    enum OperationResultCode {
+        OK,
+        INVALID_SERVICE,
+        INVALID_CONFIG,
+        BUSY,
+        ALREADY_RUNNING,
+        NOT_RUNNING,
+        INTERNAL_ERROR
+    };
+
+    // --- Pub/Sub State Types ---
+
+    // Topic: HostCatalog | Pattern: State | Liveliness 2s
+    @appendable
+    struct HostCatalog {
+        @key Common::EntityId host_id;
+        sequence<string<Common::MAX_NAME_LENGTH>, MAX_SERVICE_COUNT> supported_services;
+        int32 capacity;
+        string<Common::MAX_DESCRIPTION_LENGTH> health_summary;
+    };
+
+    // Topic: ServiceStatus | Pattern: State
+    @appendable
+    struct ServiceStatus {
+        @key Common::EntityId host_id;
+        @key Common::EntityId service_id;
+        ServiceState state;
+        Common::Time_t timestamp;
+    };
+
+    // --- RPC Parameter Types ---
+
+    @appendable
+    struct ServiceRequest {
+        Common::EntityId service_id;
+        string<MAX_CONFIG_LENGTH> configuration;
+    };
+
+    @appendable
+    struct ConfigureRequest {
+        Common::EntityId service_id;
+        string<MAX_CONFIG_LENGTH> configuration;
+    };
+
+    @appendable
+    struct OperationResult {
+        OperationResultCode code;
+        string<Common::MAX_DESCRIPTION_LENGTH> message;
+    };
+
+    @appendable
+    struct CapabilityReport {
+        sequence<string<Common::MAX_NAME_LENGTH>, MAX_SERVICE_COUNT> supported_services;
+        int32 capacity;
+    };
+
+    @appendable
+    struct HealthReport {
+        boolean alive;
+        string<Common::MAX_DESCRIPTION_LENGTH> summary;
+        string<MAX_DIAG_LENGTH> diagnostics;
+    };
+
+    // --- RPC Service Interface ---
+
+    @service("DDS")
+    interface ServiceHostControl {
+        OperationResult start_service(in ServiceRequest req);
+        OperationResult stop_service(in ServiceRequest req);
+        OperationResult configure_service(in ConfigureRequest req);
+        CapabilityReport get_capabilities();
+        HealthReport get_health();
+    };
+
+};
