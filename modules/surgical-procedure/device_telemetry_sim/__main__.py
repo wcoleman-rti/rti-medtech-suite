@@ -10,36 +10,35 @@ Environment:
 
 from __future__ import annotations
 
+import asyncio
 import os
 import signal
-import time
 
-from .device_gateway import DeviceGateway
-
-_running = True
-
-
-def _shutdown(signum: int, frame: object) -> None:
-    global _running
-    _running = False
+from .device_telemetry_service import DeviceTelemetryService
 
 
 def main() -> None:
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
-
     room_id = os.environ.get("ROOM_ID", "OR-1")
     procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
 
-    gateway = DeviceGateway(room_id=room_id, procedure_id=procedure_id)
-    gateway.start()
+    seed_env = os.environ.get("MEDTECH_SIM_SEED", "")
+    sim_seed = int(seed_env) if seed_env else None
+    sim_profile = os.environ.get("MEDTECH_SIM_PROFILE", "stable")
+    hb_env = os.environ.get("MEDTECH_HEARTBEAT_INTERVAL", "0")
+    heartbeat_interval = float(hb_env) if hb_env else 0.0
 
-    tick_rate_hz = 1.0  # 1 Hz state checks
-    interval = 1.0 / tick_rate_hz
+    gateway = DeviceTelemetryService(
+        room_id=room_id,
+        procedure_id=procedure_id,
+        sim_seed=sim_seed,
+        sim_profile=sim_profile,
+        heartbeat_interval=heartbeat_interval,
+    )
 
-    while _running:
-        gateway.tick()
-        time.sleep(interval)
+    loop = asyncio.new_event_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, gateway.stop)
+    loop.run_until_complete(gateway.run())
 
 
 if __name__ == "__main__":

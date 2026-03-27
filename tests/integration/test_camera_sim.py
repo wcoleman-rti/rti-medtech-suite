@@ -14,22 +14,22 @@ import time
 import imaging
 import pytest
 import rti.connextdds as dds
-from surgical_procedure.camera_sim.camera_simulator import CameraSimulator
+from surgical_procedure.camera_sim.camera_service import CameraService
 
 CameraFrame = imaging.Imaging.CameraFrame
 
 
 # -----------------------------------------------------------------------
-# Unit tests — CameraSimulator object construction
+# Unit tests — CameraService object construction
 # -----------------------------------------------------------------------
 
 
-class TestCameraSimulatorUnit:
-    """Unit tests for CameraSimulator construction and tick logic."""
+class TestCameraServiceUnit:
+    """Unit tests for CameraService construction and tick logic."""
 
     def test_default_frame_rate(self):
         """Camera simulator defaults to 30 Hz."""
-        sim = CameraSimulator(
+        sim = CameraService(
             room_id="OR-1",
             procedure_id="proc-001",
         )
@@ -38,7 +38,7 @@ class TestCameraSimulatorUnit:
 
     def test_custom_frame_rate(self):
         """Camera simulator accepts custom frame rate."""
-        sim = CameraSimulator(
+        sim = CameraService(
             room_id="OR-1",
             procedure_id="proc-001",
             frame_rate_hz=15,
@@ -48,12 +48,12 @@ class TestCameraSimulatorUnit:
 
     def test_tick_returns_camera_frame(self):
         """tick() returns a CameraFrame with correct fields."""
-        sim = CameraSimulator(
+        sim = CameraService(
             room_id="OR-1",
             procedure_id="proc-001",
             camera_id="cam-1",
         )
-        sim.start()
+        sim._start()
         frame = sim.tick()
 
         assert frame.camera_id == "cam-1"
@@ -66,12 +66,12 @@ class TestCameraSimulatorUnit:
 
     def test_tick_increments_sequence(self):
         """Successive tick() calls produce incrementing frame IDs."""
-        sim = CameraSimulator(
+        sim = CameraService(
             room_id="OR-1",
             procedure_id="proc-001",
             camera_id="cam-1",
         )
-        sim.start()
+        sim._start()
 
         f1 = sim.tick()
         f2 = sim.tick()
@@ -91,19 +91,19 @@ class TestCameraSimulatorUnit:
 
 @pytest.mark.integration
 @pytest.mark.streaming
-class TestCameraSimulatorIntegration:
-    """Integration tests for CameraSimulator DDS publishing."""
+class TestCameraServiceIntegration:
+    """Integration tests for CameraService DDS publishing."""
 
     @pytest.fixture
     def camera(self):
-        """Create a CameraSimulator and start it."""
-        sim = CameraSimulator(
+        """Create a CameraService and start it."""
+        sim = CameraService(
             room_id="OR-1",
             procedure_id="proc-001",
             camera_id="cam-int-1",
             frame_rate_hz=30,
         )
-        sim.start()
+        sim._start()
         yield sim
         sim.participant.close()
 

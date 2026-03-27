@@ -88,12 +88,12 @@ class OperatorConsoleService(Service):
             self._participant.find_datawriter(names.SAFETY_INTERLOCK_WRITER)
         )
 
-    def start(self) -> None:
+    def _start(self) -> None:
         """Enable participant and begin DDS discovery."""
         self._participant.enable()
         self._t0 = time.monotonic()
         log.notice(
-            f"OperatorConsole enabled: operator={self._operator_id}, "
+            f"OperatorConsoleService enabled: operator={self._operator_id}, "
             f"robot={self._robot_id}, rate={self._input_rate_hz} Hz"
         )
 
@@ -160,14 +160,14 @@ class OperatorConsoleService(Service):
             except dds.AlreadyClosedError:
                 pass
             self._participant = None
-        log.informational("OperatorConsole: stopped")
+        log.informational("OperatorConsoleService: stopped")
 
     # --- medtech.Service interface ---
 
     async def run(self) -> None:
         self._svc_state = ServiceState.STARTING
         self._stop_event = asyncio.Event()
-        self.start()
+        self._start()
 
         # Allow discovery, then publish initial state
         await asyncio.sleep(2)
@@ -194,7 +194,7 @@ class OperatorConsoleService(Service):
 
     @property
     def name(self) -> str:
-        return "OperatorConsole"
+        return "OperatorConsoleService"
 
     @property
     def state(self) -> ServiceState:

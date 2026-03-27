@@ -105,33 +105,33 @@ class TestClassEncapsulation:
     """Scenario: Application classes encapsulate DDS entities as private
     members."""
 
-    def test_procedure_context_publisher_no_dds_in_public_api(self):
-        """ProcedureContextPublisher exposes no DDS entity types in its
-        public interface. Public methods: __init__, start, publish_context,
-        publish_status, procedure_id."""
-        from surgical_procedure.procedure_context import ProcedureContextPublisher
+    def test_procedure_context_service_no_dds_in_public_api(self):
+        """ProcedureContextService exposes no DDS entity types in its
+        public interface."""
+        from surgical_procedure.procedure_context_service import ProcedureContextService
 
         # Verify that the class has no 'context_writer' or 'status_writer'
         # public properties (D-7 fix)
         assert not hasattr(
-            ProcedureContextPublisher, "context_writer"
-        ), "ProcedureContextPublisher should not expose context_writer"
+            ProcedureContextService, "context_writer"
+        ), "ProcedureContextService should not expose context_writer"
         assert not hasattr(
-            ProcedureContextPublisher, "status_writer"
-        ), "ProcedureContextPublisher should not expose status_writer"
+            ProcedureContextService, "status_writer"
+        ), "ProcedureContextService should not expose status_writer"
 
-    def test_procedure_context_publisher_has_start(self):
-        """ProcedureContextPublisher.start() replaces run() (D-8 fix)."""
-        from surgical_procedure.procedure_context import ProcedureContextPublisher
+    def test_procedure_context_service_implements_service(self):
+        """ProcedureContextService implements medtech.Service (Phase 5)."""
+        from surgical_procedure.procedure_context_service import ProcedureContextService
 
         assert hasattr(
-            ProcedureContextPublisher, "start"
-        ), "ProcedureContextPublisher should have a start() method"
-        # run() should no longer exist
-        assert not hasattr(ProcedureContextPublisher, "run"), (
-            "ProcedureContextPublisher should not have a run() method "
-            "(renamed to start())"
-        )
+            ProcedureContextService, "_start"
+        ), "ProcedureContextService should have a _start() method"
+        assert hasattr(
+            ProcedureContextService, "run"
+        ), "ProcedureContextService should have a run() method (Service interface)"
+        assert hasattr(
+            ProcedureContextService, "stop"
+        ), "ProcedureContextService should have a stop() method (Service interface)"
 
 
 class TestDestructorShutdownSequence:
@@ -145,7 +145,7 @@ class TestDestructorShutdownSequence:
             / "modules"
             / "surgical-procedure"
             / "robot_controller"
-            / "robot_controller_app.cpp"
+            / "robot_controller_service.cpp"
         )
         content = cpp_path.read_text()
 
@@ -168,12 +168,12 @@ class TestDestructorShutdownSequence:
             / "modules"
             / "surgical-procedure"
             / "robot_controller"
-            / "robot_controller_app.cpp"
+            / "robot_controller_service.cpp"
         )
         content = cpp_path.read_text()
 
         # Extract destructor body by counting braces
-        dtor_start = content.find("~RobotControllerApp()")
+        dtor_start = content.find("~RobotControllerService()")
         assert dtor_start != -1, "Destructor not found"
         brace_start = content.find("{", dtor_start)
         depth = 0

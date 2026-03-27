@@ -4,58 +4,44 @@ Usage:
     python -m surgical_procedure.vitals_sim
 
 Environment:
-    ROOM_ID          Procedure room identifier (default: OR-1)
-    PROCEDURE_ID     Procedure identifier (default: proc-001)
+    ROOM_ID            Procedure room identifier (default: OR-1)
+    PROCEDURE_ID       Procedure identifier (default: proc-001)
+    MEDTECH_SIM_SEED   RNG seed for reproducible simulation (optional)
+    MEDTECH_SIM_PROFILE  Simulation profile name (default: stable)
 """
 
 from __future__ import annotations
 
+import asyncio
 import os
 import signal
-import time
 
-from .bedside_monitor import BedsideMonitor
-
-_running = True
-
-
-def _shutdown(signum: int, frame: object) -> None:
-    global _running
-    _running = False
+from .bedside_monitor_service import BedsideMonitorService
 
 
 def main() -> None:
+    room_id = os.environ.get("ROOM_ID", "OR-1")
+    procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
+    seed_str = os.environ.get("MEDTECH_SIM_SEED", "")
+    sim_seed = int(seed_str) if seed_str else None
+    sim_profile = os.environ.get("MEDTECH_SIM_PROFILE", "stable")
+
+    monitor = BedsideMonitorService(
+        room_id=room_id,
+        procedure_id=procedure_id,
+        sim_seed=sim_seed,
+        sim_profile=sim_profile,
+    )
+
+    loop = asyncio.new_event_loop()
+
+    def _shutdown(signum: int, frame: object) -> None:
+        monitor.stop()
+
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
 
-    room_id = os.environ.get("ROOM_ID", "OR-1")
-    procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
-
-    monitor = BedsideMonitor(room_id=room_id, procedure_id=procedure_id)
-    monitor.start()
-
-    vitals_interval = 1.0  # 1 Hz
-    waveform_interval = 0.02  # 50 Hz
-
-    next_vitals = time.monotonic()
-    next_waveform = time.monotonic()
-
-    while _running:
-        now = time.monotonic()
-
-        if now >= next_waveform:
-            monitor.tick_waveform()
-            next_waveform += waveform_interval
-
-        if now >= next_vitals:
-            monitor.tick_vitals()
-            next_vitals += vitals_interval
-
-        # Sleep until the next event
-        next_event = min(next_vitals, next_waveform)
-        sleep_time = next_event - time.monotonic()
-        if sleep_time > 0:
-            time.sleep(sleep_time)
+    loop.run_until_complete(monitor.run())
 
 
 if __name__ == "__main__":

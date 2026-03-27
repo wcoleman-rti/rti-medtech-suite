@@ -101,22 +101,22 @@ docker compose up -d
 
 ```text
 modules/surgical-procedure/
-├── procedure_context.py        Procedure context & status publisher
+├── procedure_context_service.py        Procedure context & status publisher
 ├── robot_controller/            C++ robot controller (100 Hz state loop)
 │   ├── robot_controller.hpp    Pure logic state machine
 │   ├── robot_controller.cpp    State machine implementation
-│   └── robot_controller_app.cpp  DDS application entry point
+│   └── robot_controller_service.cpp + main.cpp  DDS application entry point
 ├── operator_sim/               Operator console simulator
-│   └── operator_console.py     OperatorInput + RobotCommand + SafetyInterlock
+│   └── operator_console_service.py     OperatorInput + RobotCommand + SafetyInterlock
 ├── vitals_sim/                 Bedside monitor simulator
-│   ├── bedside_monitor.py      PatientVitals + WaveformData + AlarmMessages
+│   ├── bedside_monitor_service.py      PatientVitals + WaveformData + AlarmMessages
 │   ├── _signal.py              Signal model (convergence, noise, correlation)
 │   ├── _profiles.py            Scenario profiles (stable, hemorrhage_onset)
 │   └── _alarm.py               Alarm evaluation (threshold + hysteresis)
 ├── camera_sim/                 Camera frame simulator
-│   └── camera_simulator.py     CameraFrame publisher (30 Hz default)
+│   └── camera_service.py          CameraFrame publisher (30 Hz default)
 ├── device_telemetry_sim/       Device gateway simulator
-│   ├── device_gateway.py       DeviceTelemetry write-on-change publisher
+│   ├── device_telemetry_service.py       DeviceTelemetry write-on-change publisher
 │   └── _device_model.py        Device profiles + state model
 └── digital_twin/               PySide6 digital twin display
     ├── digital_twin_display.py Main window with async DDS readers
@@ -267,7 +267,7 @@ python -m pytest tests/integration/test_robot_controller.py \
                  tests/integration/test_vitals_sim.py \
                  tests/integration/test_camera_sim.py \
                  tests/integration/test_device_telemetry.py \
-                 tests/integration/test_procedure_context.py \
+                 tests/integration/test_procedure_context_service.py \
                  tests/integration/test_exclusive_ownership.py \
                  tests/integration/test_partition_isolation.py \
                  tests/gui/test_digital_twin.py \

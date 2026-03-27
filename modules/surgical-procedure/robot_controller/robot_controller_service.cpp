@@ -1,28 +1,9 @@
-// robot_controller_app.cpp — Robot controller DDS application entry point.
-//
-// Creates a ControlRobot participant from XML config, wraps all DDS
-// entities in a RobotControllerApp class for RAII lifecycle, and runs
-// a 100 Hz publish loop on a dedicated timer thread alongside an
-// AsyncWaitSet for subscriber input processing.
-//
-// Canonical architecture pattern per vision/dds-consistency.md §3:
-//   - All DDS entities are private members
-//   - start() enables participant, starts AWS, spawns timer
-//   - wait_for_shutdown() blocks until running_ is false
-//   - Destructor follows canonical shutdown sequence
-//   - Member declaration order ensures correct destruction
-//
-// Environment variables:
-//   ROBOT_ID         — Robot numeric ID (default: "001"), prefixed to "robot-001"
-//   ROOM_ID          — Room identifier (e.g., "OR-3")
-//   PROCEDURE_ID     — Procedure identifier (e.g., "proc-001")
-//   MEDTECH_APP_NAME — Monitoring Library 2.0 application name
-//   NDDS_QOS_PROFILES — QoS XML files (set by setup.bash)
+// robot_controller_service.cpp — RobotControllerService implementation.
+
+#include "robot_controller_service.hpp"
 
 #include <atomic>
 #include <chrono>
-#include <csignal>
-#include <cstdlib>
 #include <shared_mutex>
 #include <string>
 #include <thread>
@@ -34,54 +15,42 @@
 #include <rti/sub/findImpl.hpp>
 
 #include "medtech/dds_init.hpp"
-#include "medtech/logging.hpp"
-#include "medtech/service.hpp"
 #include "robot_controller.hpp"
 
 #include <app_names/app_names.hpp>
 
 namespace names = MedtechEntityNames::SurgicalParticipants;
 
+namespace medtech::surgical {
+
 namespace {
 
-std::string env_or(const char* name, const char* fallback)
-{
-    const char* val = std::getenv(name);
-    return (val != nullptr) ? std::string(val) : std::string(fallback);
-}
-
 // ---------------------------------------------------------------------------
-// RobotControllerApp — canonical C++ service class per dds-consistency.md §3.
+// RobotControllerService — canonical C++ service per dds-consistency.md §3.
 //
 // Owns all DDS entities privately. Member declaration order ensures
 // reverse destruction: timer_thread_ → sub_aws_ → conditions → readers →
 // writer → participant_ → running_ → log_ → controller_.
 // ---------------------------------------------------------------------------
-class RobotControllerApp : public medtech::Service {
+class RobotControllerService : public medtech::Service {
 public:
-    RobotControllerApp(const std::string& robot_id,
-                       const std::string& room_id,
-                       const std::string& procedure_id,
-                       medtech::ModuleLogger& log,
-                       dds::domain::DomainParticipant participant =
-                           dds::domain::DomainParticipant(nullptr))
+    RobotControllerService(const std::string& robot_id,
+                           const std::string& room_id,
+                           const std::string& procedure_id,
+                           medtech::ModuleLogger& log)
         : controller_("robot-" + robot_id), log_(log),
           svc_state_(Orchestration::ServiceState::STOPPED)
     {
         const std::string partition =
             "room/" + room_id + "/procedure/" + procedure_id;
 
-        if (participant == dds::core::null) {
-            medtech::initialize_connext();
-            auto provider = dds::core::QosProvider::Default();
-            participant_ = provider.extensions().create_participant_from_config(
-                std::string(names::CONTROL_ROBOT));
-            auto dp_qos = participant_.qos();
-            dp_qos << dds::core::policy::Partition(partition);
-            participant_.qos(dp_qos);
-        } else {
-            participant_ = participant;
-        }
+        medtech::initialize_connext();
+        auto provider = dds::core::QosProvider::Default();
+        participant_ = provider.extensions().create_participant_from_config(
+            std::string(names::CONTROL_ROBOT));
+        auto dp_qos = participant_.qos();
+        dp_qos << dds::core::policy::Partition(partition);
+        participant_.qos(dp_qos);
 
         log_.notice("Participant created: " + std::string(names::CONTROL_ROBOT));
 
@@ -159,7 +128,7 @@ public:
         sub_aws_.attach_condition(input_rc_);
     }
 
-    ~RobotControllerApp()
+    ~RobotControllerService() override
     {
         // 1. Signal threads to stop
         running_.store(false, std::memory_order_release);
@@ -173,6 +142,36 @@ public:
         //    sub_aws_ → conditions → readers → writer → participant_
     }
 
+    void run() override
+    {
+        svc_state_.store(Orchestration::ServiceState::STARTING,
+                         std::memory_order_release);
+        start();
+        svc_state_.store(Orchestration::ServiceState::RUNNING,
+                         std::memory_order_release);
+        wait_for_shutdown();
+        svc_state_.store(Orchestration::ServiceState::STOPPING,
+                         std::memory_order_release);
+        svc_state_.store(Orchestration::ServiceState::STOPPED,
+                         std::memory_order_release);
+    }
+
+    void stop() override
+    {
+        running_.store(false, std::memory_order_release);
+    }
+
+    std::string_view name() const override
+    {
+        return "RobotControllerService";
+    }
+
+    Orchestration::ServiceState state() const override
+    {
+        return svc_state_.load(std::memory_order_acquire);
+    }
+
+private:
     void start()
     {
         participant_.enable();
@@ -210,97 +209,37 @@ public:
         log_.notice("Shutting down robot controller");
     }
 
-    // --- medtech::Service interface ---
-
-    void run() override
-    {
-        svc_state_.store(Orchestration::ServiceState::STARTING,
-                         std::memory_order_release);
-        start();
-        svc_state_.store(Orchestration::ServiceState::RUNNING,
-                         std::memory_order_release);
-        wait_for_shutdown();
-        svc_state_.store(Orchestration::ServiceState::STOPPING,
-                         std::memory_order_release);
-        svc_state_.store(Orchestration::ServiceState::STOPPED,
-                         std::memory_order_release);
-    }
-
-    void stop() override
-    {
-        running_.store(false, std::memory_order_release);
-    }
-
-    std::string_view name() const override
-    {
-        return "RobotControllerApp";
-    }
-
-    Orchestration::ServiceState state() const override
-    {
-        return svc_state_.load(std::memory_order_acquire);
-    }
-
-private:
     // Members declared in construction order; destroyed in reverse.
-    // Pure logic — no DDS
-    medtech::surgical::RobotController controller_;
+    RobotController controller_;
     medtech::ModuleLogger& log_;
     std::atomic<bool> running_{true};
     std::atomic<Orchestration::ServiceState> svc_state_{
         Orchestration::ServiceState::STOPPED};
 
-    // DDS entities (destroyed after AsyncWaitSet)
     dds::domain::DomainParticipant participant_{nullptr};
     dds::pub::DataWriter<Surgery::RobotState> state_writer_{nullptr};
     dds::sub::DataReader<Surgery::SafetyInterlock> interlock_reader_{nullptr};
     dds::sub::DataReader<Surgery::RobotCommand> command_reader_{nullptr};
     dds::sub::DataReader<Surgery::OperatorInput> input_reader_{nullptr};
 
-    // Conditions (destroyed before readers)
     dds::sub::cond::ReadCondition interlock_rc_{nullptr};
     dds::sub::cond::ReadCondition command_rc_{nullptr};
     dds::sub::cond::ReadCondition input_rc_{nullptr};
 
-    // AsyncWaitSet (destroyed first — declared last among DDS members)
     rti::core::cond::AsyncWaitSet sub_aws_;
-
-    // Worker thread (joined in destructor before aws_.stop())
     std::thread timer_thread_;
 };
 
-// File-level pointer for signal handler → app shutdown integration
-RobotControllerApp* g_app_ptr = nullptr;
-
-void signal_handler(int /*sig*/)
-{
-    if (g_app_ptr != nullptr) {
-        g_app_ptr->stop();
-    }
-}
-
 }  // anonymous namespace
 
-int main()
+std::unique_ptr<medtech::Service> make_robot_controller_service(
+    const std::string& robot_id,
+    const std::string& room_id,
+    const std::string& procedure_id,
+    medtech::ModuleLogger& log)
 {
-    std::signal(SIGINT, signal_handler);
-    std::signal(SIGTERM, signal_handler);
-
-    auto log = medtech::init_logging(medtech::ModuleName::SurgicalProcedure);
-
-    try {
-        const std::string robot_id = env_or("ROBOT_ID", "001");
-        const std::string room_id = env_or("ROOM_ID", "OR-1");
-        const std::string procedure_id = env_or("PROCEDURE_ID", "proc-001");
-
-        RobotControllerApp app(robot_id, room_id, procedure_id, log);
-        g_app_ptr = &app;
-        app.run();
-        g_app_ptr = nullptr;
-        return 0;
-
-    } catch (const std::exception& ex) {
-        log.error(std::string("Fatal: ") + ex.what());
-        return 1;
-    }
+    return std::make_unique<RobotControllerService>(
+        robot_id, room_id, procedure_id, log);
 }
+
+}  // namespace medtech::surgical

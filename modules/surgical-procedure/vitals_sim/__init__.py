@@ -3,11 +3,11 @@
 from ._alarm import AlarmEvaluator
 from ._profiles import PROFILES, ScenarioProfile
 from ._signal import SignalModel
-from .bedside_monitor import BedsideMonitor
+from .bedside_monitor_service import BedsideMonitorService
 
 __all__ = [
     "AlarmEvaluator",
-    "BedsideMonitor",
+    "BedsideMonitorService",
     "PROFILES",
     "ScenarioProfile",
     "SignalModel",

@@ -29,7 +29,7 @@ import rti.connextdds as dds
 from surgical_procedure.vitals_sim._alarm import AlarmEvaluator
 from surgical_procedure.vitals_sim._profiles import PROFILES, baroreceptor_reflex
 from surgical_procedure.vitals_sim._signal import SignalModel
-from surgical_procedure.vitals_sim.bedside_monitor import BedsideMonitor
+from surgical_procedure.vitals_sim.bedside_monitor_service import BedsideMonitorService
 
 PatientVitals = monitoring.Monitoring.PatientVitals
 WaveformData = monitoring.Monitoring.WaveformData
@@ -398,21 +398,21 @@ class TestSimulationModel:
 DOCKER_TOLERANCE = 10 if os.environ.get("MEDTECH_DOCKER") else 1
 
 
-class TestBedsideMonitorIntegration:
-    """Integration tests for the BedsideMonitor DDS publishing."""
+class TestBedsideMonitorServiceIntegration:
+    """Integration tests for the BedsideMonitorService DDS publishing."""
 
     @pytest.fixture
     def monitor(self, monkeypatch):
-        """Create a BedsideMonitor with a stable profile and fixed seed."""
+        """Create a BedsideMonitorService with a stable profile and fixed seed."""
         monkeypatch.setenv("MEDTECH_SIM_SEED", "42")
         monkeypatch.setenv("MEDTECH_SIM_PROFILE", "stable")
-        mon = BedsideMonitor(
+        mon = BedsideMonitorService(
             room_id="OR-1",
             procedure_id="proc-001",
             patient_id="p1",
             device_id="bedside-001",
         )
-        mon.start()
+        mon._start()
         yield mon
         mon.participant.close()
 

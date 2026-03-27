@@ -1,5 +1,5 @@
 """camera_sim — Surgical camera simulator."""
 
-from .camera_simulator import CameraSimulator
+from .camera_service import CameraService
 
-__all__ = ["CameraSimulator"]
+__all__ = ["CameraService"]

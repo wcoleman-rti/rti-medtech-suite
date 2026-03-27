@@ -10,35 +10,23 @@ Environment:
 
 from __future__ import annotations
 
+import asyncio
 import os
 import signal
-import time
 
-from .camera_simulator import CameraSimulator
-
-_running = True
-
-
-def _shutdown(signum: int, frame: object) -> None:
-    global _running
-    _running = False
+from .camera_service import CameraService
 
 
 def main() -> None:
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
-
     room_id = os.environ.get("ROOM_ID", "OR-1")
     procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
 
-    sim = CameraSimulator(room_id=room_id, procedure_id=procedure_id)
-    sim.start()
+    sim = CameraService(room_id=room_id, procedure_id=procedure_id)
 
-    interval = 1.0 / sim.frame_rate_hz
-
-    while _running:
-        sim.tick()
-        time.sleep(interval)
+    loop = asyncio.new_event_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, sim.stop)
+    loop.run_until_complete(sim.run())
 
 
 if __name__ == "__main__":

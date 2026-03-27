@@ -10,46 +10,23 @@ Environment:
 
 from __future__ import annotations
 
+import asyncio
 import os
 import signal
-import time
 
-from .operator_console import OperatorConsole
-
-_running = True
-
-
-def _shutdown(signum: int, frame: object) -> None:
-    global _running
-    _running = False
+from .operator_console_service import OperatorConsoleService
 
 
 def main() -> None:
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
-
     room_id = os.environ.get("ROOM_ID", "OR-1")
     procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
 
-    console = OperatorConsole(room_id=room_id, procedure_id=procedure_id)
-    console.start()
+    console = OperatorConsoleService(room_id=room_id, procedure_id=procedure_id)
 
-    # Allow discovery before sending the initial command
-    time.sleep(2)
-
-    # Publish initial SafetyInterlock (inactive) so robot knows it's safe
-    console.set_interlock(active=False)
-
-    # Send RobotCommand to transition robot IDLE → OPERATIONAL
-    console.send_command()
-
-    interval = 1.0 / console.input_rate_hz
-
-    while _running:
-        console.tick()
-        time.sleep(interval)
-
-    console.close()
+    loop = asyncio.new_event_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, console.stop)
+    loop.run_until_complete(console.run())
 
 
 if __name__ == "__main__":

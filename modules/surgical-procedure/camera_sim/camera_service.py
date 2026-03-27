@@ -85,11 +85,11 @@ class CameraService(Service):
 
         self._frame_writer = dds.DataWriter(frame_any)
 
-    def start(self) -> None:
+    def _start(self) -> None:
         """Enable participant and begin DDS discovery."""
         self._participant.enable()
         log.notice(
-            f"CameraSimulator enabled: camera={self._camera_id}, "
+            f"CameraService enabled: camera={self._camera_id}, "
             f"rate={self._frame_rate_hz} Hz"
         )
 
@@ -133,7 +133,7 @@ class CameraService(Service):
     async def run(self) -> None:
         self._state = ServiceState.STARTING
         self._stop_event = asyncio.Event()
-        self.start()
+        self._start()
         self._state = ServiceState.RUNNING
 
         interval = 1.0 / self._frame_rate_hz
@@ -153,7 +153,7 @@ class CameraService(Service):
 
     @property
     def name(self) -> str:
-        return "CameraSimulator"
+        return "CameraService"
 
     @property
     def state(self) -> ServiceState:

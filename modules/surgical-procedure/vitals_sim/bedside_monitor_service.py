@@ -115,12 +115,12 @@ class BedsideMonitorService(Service):
         self._sim_start: float | None = None
         self._last_event_idx = -1
 
-    def start(self) -> None:
+    def _start(self) -> None:
         """Enable participant and begin DDS discovery."""
         self._participant.enable()
         self._sim_start = time.monotonic()
         log.notice(
-            f"BedsideMonitor enabled: patient={self._patient_id}, "
+            f"BedsideMonitorService enabled: patient={self._patient_id}, "
             f"profile={self._profile.name}"
         )
 
@@ -226,7 +226,7 @@ class BedsideMonitorService(Service):
     async def run(self) -> None:
         self._state = ServiceState.STARTING
         self._stop_event = asyncio.Event()
-        self.start()
+        self._start()
         self._state = ServiceState.RUNNING
 
         vitals_interval = 1.0
@@ -258,7 +258,7 @@ class BedsideMonitorService(Service):
 
     @property
     def name(self) -> str:
-        return "BedsideMonitor"
+        return "BedsideMonitorService"
 
     @property
     def state(self) -> ServiceState:

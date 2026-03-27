@@ -1,5 +1,5 @@
 """device_telemetry_sim — Device telemetry simulation (infusion pump, anesthesia machine)."""
 
-from .device_gateway import DeviceGateway
+from .device_telemetry_service import DeviceTelemetryService
 
-__all__ = ["DeviceGateway"]
+__all__ = ["DeviceTelemetryService"]

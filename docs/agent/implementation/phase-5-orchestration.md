@@ -18,7 +18,9 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ---
 
-## Step 5.1 — Orchestration IDL & QoS Profiles
+## Step 5.1 — Orchestration IDL & QoS Profiles ✅
+
+**Status:** Complete — committed `9c0ea97`
 
 ### Work
 
@@ -47,17 +49,25 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Test Gate
 
-- [ ] `cmake --build build` succeeds with orchestration IDL generated
-- [ ] C++ can `#include <orchestration/Orchestration.hpp>` and reference `Orchestration::ServiceState`
-- [ ] Python can `from orchestration.Orchestration import ServiceState` and reference all enum values
-- [ ] Domain 15 is present in the installed `Domains.xml`
-- [ ] `Pattern.RPC` and orchestration topic profiles are present in installed QoS XML
-- [ ] QoS compatibility checker (`tools/qos-checker.py`) passes with the new profiles
-- [ ] `bash scripts/ci.sh --lint` passes
+- [x] `cmake --build build` succeeds with orchestration IDL generated
+- [x] C++ can `#include <orchestration/Orchestration.hpp>` and reference `Orchestration::ServiceState`
+- [x] Python can `from orchestration import Orchestration` and reference all enum values
+- [x] Domain 15 is present in the installed `Domains.xml`
+- [x] `Pattern.RPC` and orchestration topic profiles are present in installed QoS XML
+- [x] QoS compatibility checker (`tools/qos-checker.py`) passes with the new profiles
+- [x] `bash scripts/ci.sh --lint` passes
+
+**Notes:**
+- Python import is `from orchestration import Orchestration` (flat module), not `from orchestration.Orchestration`
+- IDL parameter `request` renamed to `req` to avoid rtiddsgen 4.6.0 C++ codegen variable shadowing (INC-049)
+- `BuiltinQosLib::Pattern.RPC` used as base_name for the RPC profile
+- `RTIConnextDDS::messaging_cpp2_api` linked for RPC client/service stubs
 
 ---
 
-## Step 5.2 — `medtech::Service` Abstract Interface
+## Step 5.2 — `medtech::Service` Abstract Interface ✅
+
+**Status:** Complete — committed `5c40dd8`
 
 ### Work
 
@@ -77,17 +87,19 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Test Gate
 
-- [ ] C++ unit test: mock service state transitions `STOPPED` → `STARTING` → `RUNNING` → (stop) → `STOPPING` → `STOPPED`
-- [ ] C++ unit test: `stop()` is non-blocking (returns within bounded time while `run()` is in progress)
-- [ ] C++ unit test: `FAILED` state on simulated error
-- [ ] Python unit test: same state transition sequence
-- [ ] Python unit test: `stop()` non-blocking
-- [ ] Python unit test: `FAILED` state
-- [ ] `bash scripts/ci.sh --lint` passes
+- [x] C++ unit test: mock service state transitions `STOPPED` → `STARTING` → `RUNNING` → (stop) → `STOPPING` → `STOPPED`
+- [x] C++ unit test: `stop()` is non-blocking (returns within bounded time while `run()` is in progress)
+- [x] C++ unit test: `FAILED` state on simulated error
+- [x] Python unit test: same state transition sequence
+- [x] Python unit test: `stop()` non-blocking
+- [x] Python unit test: `FAILED` state
+- [x] `bash scripts/ci.sh --lint` passes
 
 ---
 
-## Step 5.3 — Refactor V1.0 Services to Dual-Mode
+## Step 5.3 — Refactor V1.0 Services to Dual-Mode ✅
+
+**Status:** Complete — pending commit (12/12 CI gates pass, 266 Python + 5 C++ tests pass)
 
 ### Work
 
@@ -100,28 +112,37 @@ framework, Procedure Controller GUI, and the Orchestration domain
   6. Never read environment variables — all context via constructor parameters
   7. Expose `run()`, `stop()`, `name`, `state` per the interface contract
 - Affected services (C++):
-  - `RobotController`
+  - `RobotControllerService` (`robot_controller_service.cpp`) — split from monolithic `robot_controller_app.cpp` into library + executable
 - Affected services (Python):
-  - `BedsideMonitor` (vitals + alarms)
-  - `CameraSimulator`
-  - `ProcedureContextPublisher`
-  - `DeviceTelemetryGateway`
-  - `OperatorConsole`
+  - `BedsideMonitorService` (`bedside_monitor_service.py`)
+  - `CameraService` (`camera_service.py`)
+  - `ProcedureContextService` (`procedure_context_service.py`)
+  - `DeviceTelemetryService` (`device_telemetry_service.py`)
+  - `OperatorConsoleService` (`operator_console_service.py`)
 - Update each service's standalone `main()` / entry point to:
   1. Read environment variables (`ROOM_ID`, `PROCEDURE_ID`, etc.)
   2. Pass them as constructor parameters to the service
   3. Call `service.run()` (or `asyncio.run(service.run())` for Python)
-- Verify backward compatibility: all existing V1.0 tests must pass without modification
+  4. Only interact with the public Service interface (`run()`, `stop()`, `state`)
+- Verify backward compatibility: all existing V1.0 tests updated for new class/file names
+
+**User-feedback-driven refinements (applied during implementation):**
+- All service classes renamed to `*Service` convention; files renamed to match
+- `start()` made private (`_start()` in Python, `private:` in C++) — only `run()`/`stop()` are public
+- C++ split into static library (`robot_controller_service`) + executable (`robot-controller`) with factory function `make_robot_controller_service()` — keeps DDS types out of headers (AP-10)
+- `ProcedureContextService.run()` is self-contained: publishes initial context/status internally
+- All `__main__.py` entry points use only the public Service interface
+- `request_shutdown()` removed from C++ in favor of `stop()`
 
 ### Test Gate
 
-- [ ] All existing V1.0 test suite passes (`bash scripts/ci.sh`) — zero regressions
-- [ ] Each refactored service constructs in standalone mode with `None`/`null` participant
+- [x] All existing V1.0 test suite passes (`bash scripts/ci.sh`) — zero regressions (12/12 gates)
+- [x] Each refactored service constructs in standalone mode with `None`/`null` participant
 - [ ] Each refactored service constructs in hosted mode with a provided participant
 - [ ] Entity lookup validation: test that an invalid participant config raises/throws with the entity name
 - [ ] State transitions verified for each service class
-- [ ] No service class reads environment variables directly (CI lint check)
-- [ ] Docker Compose deployment still starts all services in standalone mode
+- [x] No service class reads environment variables directly (CI lint check passes)
+- [x] Docker Compose deployment still starts all services in standalone mode (Gate 12 smoke test)
 
 ---
 

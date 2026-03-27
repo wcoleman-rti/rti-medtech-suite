@@ -193,7 +193,7 @@ services:
   procedure-context-or1:
     image: medtech/app-python
     container_name: procedure-context-or1
-    command: ["python", "-m", "surgical_procedure.procedure_context"]
+    command: ["python", "-m", "surgical_procedure.procedure_context_service"]
     environment:
       <<: *medtech-env
       ROOM_ID: "OR-1"
@@ -308,7 +308,7 @@ services:
   procedure-context-or3:
     image: medtech/app-python
     container_name: procedure-context-or3
-    command: ["python", "-m", "surgical_procedure.procedure_context"]
+    command: ["python", "-m", "surgical_procedure.procedure_context_service"]
     environment:
       <<: *medtech-env
       ROOM_ID: "OR-3"

@@ -138,7 +138,7 @@ class DeviceTelemetryService(Service):
         self._last_fault_idx = -1
         self._publish_count = 0
 
-    def start(self) -> None:
+    def _start(self) -> None:
         """Enable participant and begin DDS discovery.
 
         Publishes the initial state for all devices so late joiners
@@ -147,7 +147,7 @@ class DeviceTelemetryService(Service):
         self._participant.enable()
         self._sim_start = time.monotonic()
         log.notice(
-            f"DeviceGateway enabled: room={self._room_id}, "
+            f"DeviceTelemetryService enabled: room={self._room_id}, "
             f"devices={list(self._devices.keys())}, "
             f"profile={self._profile.name}"
         )
@@ -227,7 +227,7 @@ class DeviceTelemetryService(Service):
     async def run(self) -> None:
         self._svc_state = ServiceState.STARTING
         self._stop_event = asyncio.Event()
-        self.start()
+        self._start()
         self._svc_state = ServiceState.RUNNING
 
         interval = 1.0  # 1 Hz
@@ -243,7 +243,7 @@ class DeviceTelemetryService(Service):
 
     @property
     def name(self) -> str:
-        return "DeviceGateway"
+        return "DeviceTelemetryService"
 
     @property
     def state(self) -> ServiceState:

@@ -88,13 +88,13 @@ class ProcedureContextService(Service):
         self._last_context: ProcedureContext | None = None
         self._last_phase: ProcedurePhase | None = None
 
-    def start(self) -> None:
+    def _start(self) -> None:
         """Enable the participant to initiate DDS discovery.
 
         Call after construction, once all setup is complete.
         """
         self._participant.enable()
-        log.notice(f"ProcedureContextPublisher enabled: procedure={self._procedure_id}")
+        log.notice(f"ProcedureContextService enabled: procedure={self._procedure_id}")
 
     def publish_context(
         self,
@@ -154,7 +154,7 @@ class ProcedureContextService(Service):
     async def run(self) -> None:
         self._state_val = ServiceState.STARTING
         self._stop_event = asyncio.Event()
-        self.start()
+        self._start()
         self.publish_context(room=self._room_id)
         self.publish_status(ProcedurePhase.PRE_OP, message="Initializing")
         self._state_val = ServiceState.RUNNING
@@ -166,7 +166,7 @@ class ProcedureContextService(Service):
 
     @property
     def name(self) -> str:
-        return "ProcedureContextPublisher"
+        return "ProcedureContextService"
 
     @property
     def state(self) -> ServiceState:

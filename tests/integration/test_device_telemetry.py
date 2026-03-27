@@ -24,8 +24,8 @@ from surgical_procedure.device_telemetry_sim._device_model import (
     DeviceSpec,
     DeviceStateModel,
 )
-from surgical_procedure.device_telemetry_sim.device_gateway import (
-    DeviceGateway,
+from surgical_procedure.device_telemetry_sim.device_telemetry_service import (
+    DeviceTelemetryService,
     _samples_equal,
 )
 
@@ -165,7 +165,7 @@ class TestSamplesEqual:
 
 
 # -----------------------------------------------------------------------
-# Integration tests — DeviceGateway
+# Integration tests — DeviceTelemetryService
 # -----------------------------------------------------------------------
 
 
@@ -177,9 +177,11 @@ class TestDeviceTelemetryPublished:
         publishes initial DeviceTelemetry."""
         _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
-        gw = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
+        gw = DeviceTelemetryService(
+            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+        )
         try:
-            gw.start()
+            gw._start()
             time.sleep(0.5)
 
             # Should have published initial state for both devices (pump + anesthesia)
@@ -199,9 +201,11 @@ class TestDeviceTelemetryPublished:
         status fields."""
         _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
-        gw = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
+        gw = DeviceTelemetryService(
+            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+        )
         try:
-            gw.start()
+            gw._start()
             time.sleep(0.5)
 
             # Tick to advance state
@@ -222,9 +226,11 @@ class TestDeviceTelemetryPublished:
         gateway."""
         _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
-        gw = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
+        gw = DeviceTelemetryService(
+            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+        )
         try:
-            gw.start()
+            gw._start()
 
             # Create a subscriber
             p = participant_factory(
@@ -263,9 +269,11 @@ class TestWriteOnChange:
             MEDTECH_HEARTBEAT_INTERVAL="0",
         )
 
-        gw = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
+        gw = DeviceTelemetryService(
+            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+        )
         try:
-            gw.start()
+            gw._start()
 
             # Run 60 ticks (simulating 30 seconds at 2 Hz tick rate)
             # With stable profile and fixed seed, battery noise is rounded
@@ -293,9 +301,11 @@ class TestWriteOnChange:
             MEDTECH_SIM_PROFILE="stable",
         )
 
-        gw = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
+        gw = DeviceTelemetryService(
+            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+        )
         try:
-            gw.start()
+            gw._start()
 
             # Manually inject a fault to force a state change
             pump = gw.devices["pump-001"]
@@ -334,9 +344,11 @@ class TestWriteOnChange:
             MEDTECH_HEARTBEAT_INTERVAL="0",
         )
 
-        gw = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
+        gw = DeviceTelemetryService(
+            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+        )
         try:
-            gw.start()
+            gw._start()
             initial_count = gw.publish_count  # initial publishes for all devices
 
             # Simulate 60 ticks (standing for 30 s at 2 Hz)
@@ -359,7 +371,7 @@ class TestExclusiveOwnershipFailover:
 
     Full exclusive ownership failover for DeviceTelemetry is tested in
     test_exclusive_ownership.py (common-behaviors.md — Exclusive Ownership).
-    These tests verify that the DeviceGateway's writer has the QoS
+    These tests verify that the DeviceTelemetryService's writer has the QoS
     properties required for failover to work and that liveliness is
     correctly configured for writer health detection.
     """
@@ -369,9 +381,11 @@ class TestExclusiveOwnershipFailover:
         enabling writer health detection for write-on-change topics."""
         _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
-        gw = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
+        gw = DeviceTelemetryService(
+            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+        )
         try:
-            gw.start()
+            gw._start()
             qos = gw.writer.qos
             assert qos.liveliness.kind == dds.LivelinessKind.AUTOMATIC
             assert qos.liveliness.lease_duration.sec == 2
@@ -384,9 +398,11 @@ class TestExclusiveOwnershipFailover:
         exclusive ownership failover."""
         _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
-        gw = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
+        gw = DeviceTelemetryService(
+            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+        )
         try:
-            gw.start()
+            gw._start()
             qos = gw.writer.qos
             assert qos.reliability.kind == dds.ReliabilityKind.RELIABLE
             assert qos.durability.kind == dds.DurabilityKind.TRANSIENT_LOCAL
@@ -518,11 +534,15 @@ class TestSeededReproducibility:
         """Two gateways with the same seed produce the same tick results."""
         _env_override(monkeypatch, MEDTECH_SIM_SEED="99", MEDTECH_SIM_PROFILE="stable")
 
-        gw1 = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
-        gw2 = DeviceGateway(room_id="OR-1", procedure_id="proc-001")
+        gw1 = DeviceTelemetryService(
+            room_id="OR-1", procedure_id="proc-001", sim_seed=99, sim_profile="stable"
+        )
+        gw2 = DeviceTelemetryService(
+            room_id="OR-1", procedure_id="proc-001", sim_seed=99, sim_profile="stable"
+        )
         try:
-            gw1.start()
-            gw2.start()
+            gw1._start()
+            gw2._start()
 
             samples1 = []
             samples2 = []
