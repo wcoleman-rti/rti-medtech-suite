@@ -84,7 +84,7 @@ A version may only be cut when **all** of the following are true:
 
 ### V2.0.0 — Security & Hospital Integration Gateways
 
-**Implementation phase:** 5 (Security), plus new gateway modules
+**Implementation phases:** 7 (Security), plus new gateway modules (Phases 8–13)
 
 **Theme:** Harden the data bus with Connext Security Plugins and introduce simulated external hospital system integrations. Demonstrates the open pub/sub model for hospital IT interoperability.
 
@@ -122,4 +122,4 @@ A version may only be cut when **all** of the following are true:
 - A Major version boundary requires all spec scenarios from the new milestone to be authored and reviewed **before** implementation begins (per the Approval Rule in `/docs/agent/README.md`).
 - A Minor version boundary requires new scenario(s) to be added to the appropriate spec file and the Summary of Concrete Requirements to be updated before implementation begins.
 - Integration gateway modules follow the same doc cascade as core modules: vision → spec → implementation phase file.
-- Security (V2.0.0) has pre-existing placeholder documents in `vision/security.md`, `spec/security.md`, and `implementation/phase-6-security.md`. These must be fully populated and operator-approved before V2 implementation begins.
+- Security (V2.0.0) has pre-existing placeholder documents in `vision/security.md`, `spec/security.md`, and `implementation/phase-7-security.md`. These must be fully populated and operator-approved before V2 implementation begins.

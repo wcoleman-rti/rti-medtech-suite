@@ -163,7 +163,7 @@ Additive within the V1 milestone. No structural changes to V1 modules.
 
 **Theme:** Harden the data bus with Connext Security Plugins and introduce simulated external hospital system integrations, demonstrating the open pub/sub model for hospital IT interoperability.
 
-#### Security (Phase 6)
+#### Security (Phase 7)
 - Connext Security Plugins with per-participant identity (leaf certificates issued from a central CA)
 - Domain-level governance documents per functional domain (`Governance_Procedure.xml`, `Governance_Hospital.xml`)
 - Topic-level protection: encryption for `clinical`-tag data, encrypt + sign for `control`-tag data, signing for `operational` data

@@ -239,9 +239,9 @@ All scenarios assume the participant operates within a room partition (e.g., `ro
 
 ### Scenario: Digital twin does not block on DDS reads `@integration` `@gui`
 
-**Given** a digital twin display using QtAsyncio for DDS data reception
-**When** multiple `control`-tag topics publish concurrently at high rates
-**Then** the Qt main thread is never blocked by DDS reads
+**Given** a digital twin display receiving data from multiple `control`-tag topics at high rates
+**When** the display is running
+**Then** DDS reads use polling (`take()`/`read()`) on the UI thread or worker-thread dispatch — the mechanism is not prescribed, but the UI thread must never block on DDS operations
 **And** frame rendering remains smooth at the target frame rate
 
 ---

@@ -1,4 +1,4 @@
-# Phase 6: Security
+# Phase 7: Security
 
 **Goal:** Enable RTI Connext Security Plugins across all domains, establish governance and permissions infrastructure, and verify all security spec scenarios from `spec/security.md`.
 

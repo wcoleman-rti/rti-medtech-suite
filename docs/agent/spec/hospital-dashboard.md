@@ -15,7 +15,7 @@ The dashboard subscribes to the Hospital domain. All data arrives via Routing Se
 | Vitals HR critical color threshold | HR > 120 bpm (red) |
 | Robot state liveliness lease (disconnect detection) | 2 s |
 | Procedure list update | Automatic on new `ProcedureStatus` sample — no manual refresh required |
-| UI thread protection | DDS reads never occur on Qt main thread; widget updates dispatched via signals or QtAsyncio |
+| UI thread protection | Polling reads (`take()`/`read()`) allowed on Qt UI thread; writes allowed only with `NonBlockingWrite` snippet; blocking waits prohibited; widget updates via signals, QtAsyncio, or polling timer |
 | Dashboard initialization — participants matched and initial state displayed | ≤ 15 s from process start on `hospital-net` |
 | Dashboard restart re-integration | ≤ 15 s from restart to displaying current state for all active procedures |
 | Routing Service unavailability | Dashboard continues displaying last known values; stale indicator shown; no crash |
@@ -160,7 +160,9 @@ The dashboard subscribes to the Hospital domain. All data arrives via Routing Se
 **Given** the dashboard is running with active data subscriptions
 **When** a burst of data arrives simultaneously (vitals + alerts + robot state)
 **Then** the UI remains responsive (no freeze or stutter)
-**And** widget updates occur on the Qt main thread via signals/slots or QtAsyncio
+**And** DDS reads use polling (`take()`/`read()`) on the UI thread, worker-thread dispatch, or QtAsyncio
+**And** DDS writes on the UI thread use only DataWriters configured with the `NonBlockingWrite` QoS snippet
+**And** no blocking waits (`WaitSet.wait()`, `take_data_async()`) occur on the UI thread
 
 ### Scenario: Content-filtered topics reduce unnecessary processing `@integration` `@filtering`
 

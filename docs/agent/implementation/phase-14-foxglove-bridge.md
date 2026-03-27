@@ -1,8 +1,8 @@
-# Phase 13: Foxglove Visualization Bridge
+# Phase 14: Foxglove Visualization Bridge
 
 **Goal:** Deliver the full Foxglove Studio integration pipeline — Transformation plugin, WebSocket Adapter plugin, MCAP Storage plugin — and verify all `@foxglove` spec scenarios from `spec/foxglove-bridge.md`.
 
-**Depends on:** Phase 5 (Recording & Replay + Foxglove Data Model Alignment — provides the Foxglove-aligned medtech IDL types that the transformation plugin consumes)
+**Depends on:** Phase 6 (Recording & Replay + Foxglove Data Model Alignment — provides the Foxglove-aligned medtech IDL types that the transformation plugin consumes)
 **Blocks:** Nothing (terminal V2 phase — can run in parallel with Phases 6–12)
 
 ---
@@ -176,7 +176,7 @@
 
 ## Step 13.9 — Performance Baseline Recording
 
-**Work:** Record the Phase 13 performance baseline covering the Foxglove Bridge pipeline.
+**Work:** Record the Phase 14 performance baseline covering the Foxglove Bridge pipeline.
 
 1. Run the performance benchmark harness with Foxglove Bridge services active
 2. Measure transformation latency overhead (time added by the transformation pipeline per sample)
