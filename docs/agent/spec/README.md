@@ -56,6 +56,8 @@ Scenarios are tagged to enable selective test execution. Tags also communicate w
 | `@benchmark` | Tests performance benchmark harness: metric collection, baseline comparison, regression detection, threshold enforcement | V1.0+ |
 | `@simulation` | Tests simulation fidelity: scenario profiles, cross-signal correlation, temporal realism, seeded reproducibility | V1.0+ |
 | `@foxglove` | Tests Foxglove Bridge plugin pipeline: transformation correctness, adapter plugin WebSocket delivery, storage plugin MCAP output, concurrent operation | V2.0+ |
+| `@multi-arm` | Tests dynamic multi-arm orchestration: `RobotArmAssignment` lifecycle, table positioning, multi-arm coordination, Procedure Controller `control`-tag subscription, digital twin multi-arm rendering | V1.2+ |
+| `@teleop` | Tests teleoperation / remote operator: exclusive ownership on `OperatorInput`, ownership strength tiering via Routing Service, safe-hold mode, ControlAuthority state machine, AUTOMATIC liveliness + DEADLINE failover, control-tag RS bridge | V2.1+ |
 | `@acceptance` | Module workflow acceptance: verifies the composed module works end-to-end in Docker Compose by executing the primary user workflow programmatically and asserting an observable outcome. Every phase that delivers a user-facing module must include at least one `@acceptance` test. | V1.0+ |
 
 ---
@@ -72,5 +74,7 @@ Scenarios are tagged to enable selective test execution. Tags also communicate w
 | [security.md](security.md) | Security | V2.0 | Authentication, access control, topic encryption/signing, CRL, PSK, origin authentication, governance enforcement |
 | [performance-baseline.md](performance-baseline.md) | Performance Baseline | V1.0 | Benchmark harness, metric collection, baseline recording, regression detection, threshold enforcement |
 | [foxglove-bridge.md](foxglove-bridge.md) | Foxglove Visualization Bridge | V2.0 | Transformation correctness, adapter plugin (WebSocket), storage plugin (MCAP), concurrent live + offline operation |
+| [multi-arm-orchestration.md](multi-arm-orchestration.md) | Dynamic Multi-Arm Orchestration | V1.2 | `RobotArmAssignment` lifecycle, table positioning, multi-arm coordination, Procedure Controller `control`-tag expansion, digital twin multi-arm rendering |
+| [teleoperation.md](teleoperation.md) | Teleoperation / Remote Operator | V2.1 | Exclusive ownership, ownership strength tiering via RS, safe-hold mode, ControlAuthority state machine, AUTOMATIC liveliness + DEADLINE failover, control-tag RS bridge |
 
 *When V1.1 and V2 implementation begins, new spec files will be added for Recording/Replay and each integration gateway module. V3 will add specs for instrument tracking, imaging, inter-OR communication, ClinicalAlerts HA, and the Cloud Command Center. Each new file must follow the conventions above and will require operator approval before scenarios are authored (per the Approval Rule in [docs/agent/README.md](../README.md)).*

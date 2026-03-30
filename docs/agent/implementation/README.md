@@ -25,7 +25,8 @@ Phases are grouped by release milestone. All phases within a milestone must be c
 
 > **Implementation order:** Execute phases in **milestone order**, which now
 > matches phase numbering: V1.0 phases (1–5) → V1.1 phase (6) →
-> V2.0 phases (7–14) → V3.0 phases (15–19).
+> V1.2 phase (20) → V2.0 phases (7–14) → V2.1 phase (21) →
+> V3.0 phases (15–19).
 
 ```
 ── V1.0.0 ──────────────────────────────────────────────────────────────────
@@ -54,6 +55,13 @@ Phase 1: Foundation
 Phase 6: Recording & Replay          (depends on: Phases 1–5)
          + Foxglove Data Model Translatability (Tier 1)
 
+── V1.2.0 ──────────────────────────────────────────────────────────────────
+
+Phase 20: Dynamic Multi-Arm           (depends on: Phases 1–5)
+          Orchestration
+
+    (Phase 20 can proceed in parallel with Phase 6)
+
 ── V2.0.0 ──────────────────────────────────────────────────────────────────
 
 Phase 7: Security                    (depends on: Phases 1–5)
@@ -67,6 +75,11 @@ Phase 14: Foxglove Bridge            (depends on: Phase 6)
 
     (Phases 8–13 can proceed in parallel after Phase 7)
     (Phase 14 can proceed in parallel with Phases 7–13)
+
+── V2.1.0 ──────────────────────────────────────────────────────────────────
+
+Phase 21: Teleoperation /             (depends on: Phases 1–5, Phase 7)
+          Remote Operator
 
 ── V3.0.0 ──────────────────────────────────────────────────────────────────
 
@@ -132,6 +145,14 @@ After all V1.0.0 phases (1–5, plus 3–4) are complete, a **final regression g
 
 > **Prerequisite:** Phase 6 requires `spec/recording-replay.md` to be authored and operator-approved before implementation begins. The spec file does not yet exist.
 
+### V1.2.0 Phases (planned)
+
+| Phase | Depends On | Key Deliverables |
+|-------|------------|------------------|
+| Phase 20: Dynamic Multi-Arm Orchestration *(file not yet authored)* | Phases 1–5 | `RobotArmAssignment` topic (IDL, QoS), `ArmAssignmentState`/`TablePosition` enums, multi-arm table positioning, Procedure Controller `control`-tag participant expansion, digital twin multi-arm rendering, `@multi-arm` test coverage |
+
+> **Prerequisite:** Phase 20 requires [spec/multi-arm-orchestration.md](../spec/multi-arm-orchestration.md) to be operator-approved before implementation begins.
+
 ### V2.0.0 Phases (planned)
 
 | Phase | Depends On | Key Deliverables |
@@ -144,6 +165,14 @@ After all V1.0.0 phases (1–5, plus 3–4) are complete, a **final regression g
 | Phase 12: Alarm Management Gateway *(file not yet authored)* | Phase 7 | Alert routing sink, decoupled subscriber pattern |
 | Phase 13: Device Gateway (bidirectional) *(file not yet authored)* | Phase 7 | Pump/anesthesia command/control, exclusive ownership failover |
 | [phase-14-foxglove-bridge.md](phase-14-foxglove-bridge.md) | Phase 6 | Foxglove IDL compilation, Transformation plugin, WebSocket Adapter plugin, MCAP Storage plugin, Routing Service Foxglove routes, Recording Service MCAP config, `@foxglove` test coverage |
+
+### V2.1.0 Phases (planned)
+
+| Phase | Depends On | Key Deliverables |
+|-------|------------|------------------|
+| Phase 21: Teleoperation / Remote Operator *(file not yet authored)* | Phases 1–5, Phase 7 (Security) | `EXCLUSIVE_OWNERSHIP_QOS` on `OperatorInput`, ownership strength tiering via RS, safe-hold mode, ControlAuthority state machine, AUTOMATIC liveliness + DEADLINE failover, Routing Service control-tag bridge, `@teleop` test coverage |
+
+> **Prerequisite:** Phase 21 requires V2.0 (Security, Phase 7) to be complete and [spec/teleoperation.md](../spec/teleoperation.md) to be operator-approved before implementation begins.
 
 ### V3.0.0 Phases (planned)
 
