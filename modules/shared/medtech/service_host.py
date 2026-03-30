@@ -287,10 +287,13 @@ class ServiceHost(Service):
             await self._rpc_impl.stop_all()
             rpc_task.cancel()
             try:
-                await rpc_task
-            except asyncio.CancelledError:
+                await asyncio.wait_for(asyncio.shield(rpc_task), timeout=2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
                 pass
-            rpc_service.close()
+            try:
+                rpc_service.close()
+            except Exception:
+                pass
 
             self._state_val = ServiceState.STOPPED
 

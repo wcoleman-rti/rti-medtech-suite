@@ -23,8 +23,18 @@ def main() -> None:
     host = make_clinical_service_host(host_id, room_id, procedure_id)
 
     loop = asyncio.new_event_loop()
+    _shutdown_count = 0
+
+    def _on_signal() -> None:
+        nonlocal _shutdown_count
+        _shutdown_count += 1
+        if _shutdown_count == 1:
+            host.stop()
+        else:
+            os._exit(1)
+
     for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, host.stop)
+        loop.add_signal_handler(sig, _on_signal)
     loop.run_until_complete(host.run())
 
 

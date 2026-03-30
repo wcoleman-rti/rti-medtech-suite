@@ -53,7 +53,6 @@ def qapp():
 def orch_participant():
     """Test participant on the Orchestration domain for publishing test data."""
     qos = dds.DomainParticipantQos()
-    qos.partition.name = [f"room/{ROOM_ID}"]
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     p.enable()

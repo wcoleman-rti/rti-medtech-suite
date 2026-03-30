@@ -126,10 +126,6 @@ class ProcedureController(QMainWindow):
         self._orch_participant = provider.create_participant_from_config(
             orch_names.PROCEDURE_CONTROLLER_ORCHESTRATION
         )
-        partition = f"room/{room_id}"
-        qos = self._orch_participant.qos
-        qos.partition.name = [partition]
-        self._orch_participant.qos = qos
         self._orch_participant.enable()
 
         self._catalog_reader = dds.DataReader(
@@ -149,7 +145,7 @@ class ProcedureController(QMainWindow):
                 f"Reader not found: {orch_names.CTRL_SERVICE_STATUS_READER}"
             )
 
-        log.notice(f"Orchestration participant created, partition={partition}")
+        log.notice("Orchestration participant created")
 
         # -- Hospital domain participant (read-only) --
         self._hosp_participant = provider.create_participant_from_config(
