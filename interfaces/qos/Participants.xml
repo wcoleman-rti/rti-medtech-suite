@@ -70,7 +70,7 @@
                     <autoenable_created_entities>false</autoenable_created_entities>
                 </entity_factory>
                 <logging>
-                    <verbosity>WARNING</verbosity>
+                    <verbosity>ERROR</verbosity>
                     <category>ALL</category>
                     <print_format>VERBOSE_TIMESTAMPED</print_format>
                 </logging>

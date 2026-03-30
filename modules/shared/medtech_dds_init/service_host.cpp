@@ -10,6 +10,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -101,9 +102,31 @@ public:
         }
 
         try {
-            ServiceSlot slot;
-            slot.service = factory_it->second(svc_id);
+            // Phase 1: Create the service on a temporary worker thread.
+            // The RPC handler runs on an AsyncWaitSet thread; service
+            // constructors may create their own AsyncWaitSet, which
+            // deadlocks if nested at the same AWSet level.
+            auto& factory_fn = factory_it->second;
+            std::unique_ptr<Service> new_service;
+            std::string create_error;
+            {
+                std::thread creator([&]() {
+                    try {
+                        new_service = factory_fn(svc_id);
+                    } catch (const std::exception& ex) {
+                        create_error = ex.what();
+                    }
+                });
+                creator.join();
+            }
 
+            if (!create_error.empty()) {
+                throw std::runtime_error(create_error);
+            }
+
+            // Phase 2: Start run() on a dedicated thread.
+            ServiceSlot slot;
+            slot.service = std::move(new_service);
             auto* svc_ptr = slot.service.get();
             slot.thread = std::thread([svc_ptr, this]() {
                 try {
@@ -121,7 +144,9 @@ public:
             log_.notice("start_service: OK (service_id=" + svc_id + ")");
         } catch (const std::exception& ex) {
             result.code = Orchestration::OperationResultCode::INTERNAL_ERROR;
-            result.message = std::string("Failed to start service: ") + ex.what();
+            std::string msg = std::string("Failed to start service: ") + ex.what();
+            if (msg.size() > 500) msg.resize(500);
+            result.message = msg;
             log_.error("start_service: INTERNAL_ERROR — "
                 + std::string(ex.what()));
         }
@@ -147,10 +172,21 @@ public:
         }
 
         slot_it->second.service->stop();
-        if (slot_it->second.thread.joinable()) {
-            slot_it->second.thread.join();
+
+        // Join the service's run thread and destroy the service off the
+        // RPC handler's AsyncWaitSet thread (avoids level-nesting deadlock).
+        // Keep the slot so the status polling loop can detect the STOPPED
+        // transition and publish ServiceStatus. start_service clears
+        // stale STOPPED/FAILED slots before creating a new service.
+        {
+            auto& slot_ref = slot_it->second;
+            std::thread joiner([&slot_ref]() {
+                if (slot_ref.thread.joinable()) {
+                    slot_ref.thread.join();
+                }
+            });
+            joiner.join();
         }
-        slots_.erase(slot_it);
 
         result.code = Orchestration::OperationResultCode::OK;
         result.message = "Service stopped";

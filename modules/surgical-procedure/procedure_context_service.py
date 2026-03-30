@@ -164,6 +164,10 @@ class ProcedureContextService(Service):
         self._state_val = ServiceState.STOPPING
         self._state_val = ServiceState.STOPPED
 
+    def stop(self) -> None:
+        if self._stop_event is not None:
+            self._stop_event.set()
+
     @property
     def name(self) -> str:
         return "ProcedureContextService"

@@ -8,7 +8,7 @@
 module Common {
 
     // --- Constants ---
-    const long MAX_ID_LENGTH = 16;
+    const long MAX_ID_LENGTH = 64;
     const long MAX_NAME_LENGTH = 128;
     const long MAX_DESCRIPTION_LENGTH = 512;
     const long MAX_WAVEFORM_SAMPLES = 64;

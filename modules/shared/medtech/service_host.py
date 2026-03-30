@@ -19,6 +19,7 @@ import time
 from typing import Callable
 
 import app_names
+import common
 import rti.connextdds as dds
 import rti.rpc
 from medtech.service import Service, ServiceState
@@ -26,6 +27,7 @@ from medtech_dds_init.dds_init import initialize_connext
 from orchestration import Orchestration
 
 orch_names = app_names.MedtechEntityNames.OrchestrationParticipants
+Time_t = common.Common.Time_t
 
 # ---------------------------------------------------------------------------
 # ServiceFactory — creates a medtech.Service.
@@ -114,7 +116,9 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
             return result
 
         slot.service.stop()
-        del self._slots[svc_id]
+        # Keep slot so the status polling loop can detect the STOPPED
+        # transition and publish ServiceStatus.  start_service clears
+        # stale STOPPED/FAILED slots before creating a new service.
 
         result.code = Orchestration.OperationResultCode.OK
         result.message = "Service stopped"
@@ -225,12 +229,14 @@ class ServiceHost(Service):
         self._log.info("Orchestration participant created")
 
         # -- Look up pub/sub entities --
-        self._catalog_writer = dds.DynamicData.DataWriter(
-            self._participant.find_datawriter(orch_names.HOST_CATALOG_WRITER)
-        )
-        self._status_writer = dds.DynamicData.DataWriter(
-            self._participant.find_datawriter(orch_names.SERVICE_STATUS_WRITER)
-        )
+        catalog_any = self._participant.find_datawriter(orch_names.HOST_CATALOG_WRITER)
+        status_any = self._participant.find_datawriter(orch_names.SERVICE_STATUS_WRITER)
+        if catalog_any is None:
+            raise RuntimeError(f"Writer not found: {orch_names.HOST_CATALOG_WRITER}")
+        if status_any is None:
+            raise RuntimeError(f"Writer not found: {orch_names.SERVICE_STATUS_WRITER}")
+        self._catalog_writer = dds.DataWriter(catalog_any)
+        self._status_writer = dds.DataWriter(status_any)
         self._log.info("Orchestration DataWriters found")
 
         # -- Create the RPC implementation --
@@ -321,7 +327,7 @@ class ServiceHost(Service):
             host_id=self._host_id,
             service_id=service_id,
             state=svc_state,
-            timestamp={"sec": sec, "nsec": nsec},
+            timestamp=Time_t(sec=sec & 0xFFFFFFFF, nsec=nsec),
         )
         self._status_writer.write(status)
         self._log.info("Published ServiceStatus: %d for %s", int(svc_state), service_id)

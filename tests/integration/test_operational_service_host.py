@@ -1,15 +1,14 @@
-"""Integration tests: Robot Service Host (Step 5.4).
+"""Integration tests: Operational Service Host (Step 5.5).
 
-Spec: procedure-orchestration.md — Service Host Framework
+Spec: procedure-orchestration.md — Service Host Framework (Python)
 Tags: @integration @orchestration
 
-Tests that the Robot Service Host:
+Tests that the Operational Service Host:
 - Publishes HostCatalog on startup (TRANSIENT_LOCAL)
-- Responds to ServiceHostControl RPC at the correct service_name
-- Starts/stops the RobotControllerService via RPC
+- Responds to ServiceHostControl RPC
+- Starts/stops CameraService and ProcedureContextService via RPC
 - Publishes ServiceStatus transitions (write-on-change)
 - Returns ALREADY_RUNNING / NOT_RUNNING on duplicate/invalid ops
-- Maintains Orchestration / Procedure domain isolation
 """
 
 import os
@@ -25,8 +24,7 @@ from rti.rpc import Requester
 pytestmark = [pytest.mark.integration, pytest.mark.orchestration]
 
 ORCHESTRATION_DOMAIN_ID = 15
-PROCEDURE_DOMAIN_ID = 10
-HOST_ID = "robot-host-test"
+HOST_ID = "operational-host-test"
 ROOM_ID = "OR-1"
 
 
@@ -36,43 +34,27 @@ ROOM_ID = "OR-1"
 
 
 @pytest.fixture(scope="module")
-def robot_service_host():
-    """Start the robot-service-host binary as a subprocess and yield it.
-
-    Waits for the process to be alive, then tears it down after the module.
-    """
-    bin_path = os.path.join(
-        os.environ.get("MEDTECH_INSTALL", "install"), "bin", "robot-service-host"
-    )
-    if not os.path.isfile(bin_path):
-        # Fall back to build directory
-        bin_path = os.path.join(
-            "build",
-            "modules",
-            "surgical-procedure",
-            "robot_service_host",
-            "robot-service-host",
-        )
+def operational_service_host():
+    """Start the operational-service-host as a subprocess."""
     env = os.environ.copy()
     env["HOST_ID"] = HOST_ID
     env["ROOM_ID"] = ROOM_ID
     env["PROCEDURE_ID"] = "proc-test"
 
     proc = subprocess.Popen(
-        [bin_path],
+        ["python", "-m", "surgical_procedure.operational_service_host"],
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    # Give it time to start
-    time.sleep(3)
+    time.sleep(4)
     assert (
         proc.poll() is None
-    ), f"robot-service-host exited immediately with code {proc.returncode}"
+    ), f"operational-service-host exited immediately with code {proc.returncode}"
     yield proc
     proc.send_signal(signal.SIGTERM)
     try:
-        proc.wait(timeout=5)
+        proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
@@ -197,115 +179,74 @@ def _make_stop_call(service_id: str) -> object:
 # ---------------------------------------------------------------------------
 
 
-class TestHostCatalog:
+class TestOperationalHostCatalog:
     """Verify HostCatalog publication on startup."""
 
-    def test_host_catalog_published(self, robot_service_host, catalog_reader):
-        """Robot Service Host publishes HostCatalog with correct host_id
-        and supported services."""
+    def test_host_catalog_published(self, operational_service_host, catalog_reader):
+        """Operational Service Host publishes HostCatalog with services."""
         samples = _wait_for_data(catalog_reader, timeout_sec=15)
         assert len(samples) >= 1, "No HostCatalog samples received"
         matching = [s for s in samples if s.data.host_id == HOST_ID]
         assert matching, f"No HostCatalog for {HOST_ID}"
         catalog = matching[0].data
-        assert "RobotControllerService" in catalog.supported_services
-        assert catalog.capacity >= 1
-
-    def test_host_catalog_transient_local(self, robot_service_host, orch_participant):
-        """A late-joining reader receives HostCatalog via TRANSIENT_LOCAL."""
-        # Reuse existing topic (already created by catalog_reader fixture)
-        topic = dds.Topic.find(orch_participant, "HostCatalog")
-        sub = dds.Subscriber(orch_participant)
-        rqos = dds.DataReaderQos()
-        rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
-        rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
-        rqos.history.kind = dds.HistoryKind.KEEP_LAST
-        rqos.history.depth = 1
-        late_reader = dds.DataReader(sub, topic, rqos)
-        try:
-            samples = _wait_for_data(late_reader, timeout_sec=10)
-            assert len(samples) >= 1, "Late-joining reader did not receive HostCatalog"
-            matching = [s for s in samples if s.data.host_id == HOST_ID]
-            assert (
-                matching
-            ), f"Late-joining reader did not receive HostCatalog for {HOST_ID}"
-            assert matching[0].data.host_id == HOST_ID
-        finally:
-            late_reader.close()
+        assert "CameraService" in catalog.supported_services
+        assert "ProcedureContextService" in catalog.supported_services
+        assert catalog.capacity == 2
 
 
-class TestServiceStatus:
+class TestOperationalServiceStatus:
     """Verify ServiceStatus publication."""
 
-    def test_initial_status_stopped(self, robot_service_host, status_reader):
-        """Robot Service Host publishes initial ServiceStatus with STOPPED."""
-        samples = _wait_for_data(status_reader, timeout_sec=15)
-        assert len(samples) >= 1, "No ServiceStatus samples received"
-        matching = [s for s in samples if s.data.host_id == HOST_ID]
-        assert matching, f"No ServiceStatus for {HOST_ID}"
-        status = matching[0].data
-        assert status.state == Orchestration.ServiceState.STOPPED
+    def test_initial_status_stopped(self, operational_service_host, status_reader):
+        """Operational Service Host publishes initial ServiceStatus STOPPED."""
+        deadline = time.time() + 15
+        svc_ids: set[str] = set()
+        while time.time() < deadline:
+            samples = status_reader.read()
+            for s in samples:
+                if s.info.valid and s.data.host_id == HOST_ID:
+                    svc_ids.add(s.data.service_id)
+                    assert s.data.state == Orchestration.ServiceState.STOPPED
+            if len(svc_ids) >= 2:
+                break
+            time.sleep(0.2)
+        assert "CameraService" in svc_ids
+        assert "ProcedureContextService" in svc_ids
 
 
-class TestRpcServiceControl:
+class TestOperationalRpcControl:
     """Verify ServiceHostControl RPC operations."""
 
-    def test_rpc_discovery(self, robot_service_host, rpc_requester):
+    def test_rpc_discovery(self, operational_service_host, rpc_requester):
         """RPC requester discovers the ServiceHostControl replier."""
         found = _wait_for_replier(rpc_requester, timeout_sec=15)
-        assert found, f"RPC requester did not discover ServiceHostControl/{HOST_ID}"
+        assert found, f"Requester did not discover ServiceHostControl/{HOST_ID}"
 
-    def test_get_capabilities(self, robot_service_host, rpc_requester):
-        """get_capabilities returns supported services."""
+    def test_get_capabilities(self, operational_service_host, rpc_requester):
+        """get_capabilities returns both operational services."""
         _wait_for_replier(rpc_requester, timeout_sec=10)
         call = Orchestration.ServiceHostControl.call_type()
-        # get_capabilities takes no parameters — use the In struct directly
-        # The union discriminator selects get_capabilities when set
         call.get_capabilities = Orchestration.ServiceHostControl.call_type.in_structs[
             -385927898
         ][1]()
         reply = _send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for get_capabilities"
         result = reply.get_capabilities.result.return_
-        assert "RobotControllerService" in result.supported_services
-        assert result.capacity >= 1
+        assert "CameraService" in result.supported_services
+        assert "ProcedureContextService" in result.supported_services
+        assert result.capacity == 2
 
-    def test_get_health(self, robot_service_host, rpc_requester):
-        """get_health returns alive=True."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = Orchestration.ServiceHostControl.call_type()
-        call.get_health = Orchestration.ServiceHostControl.call_type.in_structs[
-            -1076937166
-        ][1]()
-        reply = _send_rpc(rpc_requester, call)
-        assert reply is not None, "No reply received for get_health"
-        result = reply.get_health.result.return_
-        assert result.alive
-
-    def test_stop_non_running_returns_not_running(
-        self, robot_service_host, rpc_requester
+    def test_start_camera_service(
+        self, operational_service_host, rpc_requester, status_reader
     ):
-        """stop_service on a non-running service returns NOT_RUNNING."""
+        """start_service starts CameraService."""
         _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_stop_call("RobotControllerService")
+        call = _make_start_call("CameraService")
         reply = _send_rpc(rpc_requester, call)
-        assert reply is not None, "No reply received for stop_service"
-        result = reply.stop_service.result.return_
-        assert result.code == Orchestration.OperationResultCode.NOT_RUNNING
-
-    def test_start_service_ok(self, robot_service_host, rpc_requester, status_reader):
-        """start_service creates and starts the RobotControllerService."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_start_call("RobotControllerService")
-        reply = _send_rpc(rpc_requester, call)
-        assert reply is not None, "No reply received for start_service"
-        assert (
-            reply.discriminator != 0
-        ), f"RPC returned remote exception (remoteEx={reply.remoteEx})"
+        assert reply is not None
         result = reply.start_service.result.return_
         assert result.code == Orchestration.OperationResultCode.OK
 
-        # Wait for RUNNING state to be published via ServiceStatus
         deadline = time.time() + 15
         found_running = False
         while time.time() < deadline:
@@ -314,6 +255,7 @@ class TestRpcServiceControl:
                 if (
                     s.info.valid
                     and s.data.host_id == HOST_ID
+                    and s.data.service_id == "CameraService"
                     and s.data.state == Orchestration.ServiceState.RUNNING
                 ):
                     found_running = True
@@ -321,30 +263,57 @@ class TestRpcServiceControl:
             if found_running:
                 break
             time.sleep(0.2)
-        assert found_running, "ServiceStatus never reached RUNNING"
+        assert found_running, "CameraService never reached RUNNING"
 
-    def test_start_already_running_returns_already_running(
-        self, robot_service_host, rpc_requester
+    def test_start_procedure_context(
+        self, operational_service_host, rpc_requester, status_reader
     ):
-        """start_service on an already-running service returns ALREADY_RUNNING."""
-        # Service was started by the previous test (module-scoped host)
+        """start_service starts ProcedureContextService."""
         _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_start_call("RobotControllerService")
+        call = _make_start_call("ProcedureContextService")
         reply = _send_rpc(rpc_requester, call)
-        assert reply is not None, "No reply received for start_service"
+        assert reply is not None
+        result = reply.start_service.result.return_
+        assert result.code == Orchestration.OperationResultCode.OK
+
+        deadline = time.time() + 15
+        found_running = False
+        while time.time() < deadline:
+            samples = status_reader.take()
+            for s in samples:
+                if (
+                    s.info.valid
+                    and s.data.host_id == HOST_ID
+                    and s.data.service_id == "ProcedureContextService"
+                    and s.data.state == Orchestration.ServiceState.RUNNING
+                ):
+                    found_running = True
+                    break
+            if found_running:
+                break
+            time.sleep(0.2)
+        assert found_running, "ProcedureContextService never reached RUNNING"
+
+    def test_start_already_running(self, operational_service_host, rpc_requester):
+        """start_service on already-running service returns ALREADY_RUNNING."""
+        _wait_for_replier(rpc_requester, timeout_sec=10)
+        call = _make_start_call("CameraService")
+        reply = _send_rpc(rpc_requester, call)
+        assert reply is not None
         result = reply.start_service.result.return_
         assert result.code == Orchestration.OperationResultCode.ALREADY_RUNNING
 
-    def test_stop_service_ok(self, robot_service_host, rpc_requester, status_reader):
-        """stop_service stops the running service and publishes STOPPED."""
+    def test_stop_camera_service(
+        self, operational_service_host, rpc_requester, status_reader
+    ):
+        """stop_service stops CameraService."""
         _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_stop_call("RobotControllerService")
+        call = _make_stop_call("CameraService")
         reply = _send_rpc(rpc_requester, call)
-        assert reply is not None, "No reply received for stop_service"
+        assert reply is not None
         result = reply.stop_service.result.return_
         assert result.code == Orchestration.OperationResultCode.OK
 
-        # Verify STOPPED state published
         deadline = time.time() + 10
         found_stopped = False
         while time.time() < deadline:
@@ -353,6 +322,7 @@ class TestRpcServiceControl:
                 if (
                     s.info.valid
                     and s.data.host_id == HOST_ID
+                    and s.data.service_id == "CameraService"
                     and s.data.state == Orchestration.ServiceState.STOPPED
                 ):
                     found_stopped = True
@@ -360,41 +330,42 @@ class TestRpcServiceControl:
             if found_stopped:
                 break
             time.sleep(0.2)
-        assert found_stopped, "ServiceStatus never reached STOPPED after stop"
+        assert found_stopped, "CameraService never reached STOPPED"
 
+    def test_stop_non_running(self, operational_service_host, rpc_requester):
+        """stop_service on non-running service returns NOT_RUNNING."""
+        _wait_for_replier(rpc_requester, timeout_sec=10)
+        call = _make_stop_call("CameraService")
+        reply = _send_rpc(rpc_requester, call)
+        assert reply is not None
+        result = reply.stop_service.result.return_
+        assert result.code == Orchestration.OperationResultCode.NOT_RUNNING
 
-class TestDomainIsolation:
-    """Verify Orchestration domain is isolated from Procedure domain."""
+    def test_stop_procedure_context(
+        self, operational_service_host, rpc_requester, status_reader
+    ):
+        """stop_service stops ProcedureContextService."""
+        _wait_for_replier(rpc_requester, timeout_sec=10)
+        call = _make_stop_call("ProcedureContextService")
+        reply = _send_rpc(rpc_requester, call)
+        assert reply is not None
+        result = reply.stop_service.result.return_
+        assert result.code == Orchestration.OperationResultCode.OK
 
-    def test_orchestration_isolated_from_procedure(self, robot_service_host):
-        """A Procedure domain participant does not discover Orchestration
-        entities."""
-        proc_qos = dds.DomainParticipant.default_participant_qos
-        proc_qos.partition.name = [f"room/{ROOM_ID}/procedure/proc-test"]
-        proc_participant = dds.DomainParticipant(PROCEDURE_DOMAIN_ID, proc_qos)
-        proc_participant.enable()
-
-        try:
-            # Create a reader on the Procedure domain for HostCatalog topic
-            # — this topic should not exist on domain 10
-            topic = dds.Topic(
-                proc_participant,
-                "HostCatalog",
-                Orchestration.HostCatalog,
-            )
-            sub = dds.Subscriber(proc_participant)
-            rqos = dds.DataReaderQos()
-            rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
-            rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
-            reader = dds.DataReader(sub, topic, rqos)
-
-            # Wait briefly — should get nothing
-            time.sleep(3)
-            samples = reader.read()
-            valid = [s for s in samples if s.info.valid]
-            assert (
-                len(valid) == 0
-            ), "Procedure domain received HostCatalog — isolation broken"
-            reader.close()
-        finally:
-            proc_participant.close()
+        deadline = time.time() + 10
+        found_stopped = False
+        while time.time() < deadline:
+            samples = status_reader.take()
+            for s in samples:
+                if (
+                    s.info.valid
+                    and s.data.host_id == HOST_ID
+                    and s.data.service_id == "ProcedureContextService"
+                    and s.data.state == Orchestration.ServiceState.STOPPED
+                ):
+                    found_stopped = True
+                    break
+            if found_stopped:
+                break
+            time.sleep(0.2)
+        assert found_stopped, "ProcedureContextService never reached STOPPED"
