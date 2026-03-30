@@ -316,12 +316,13 @@ with DDS-enforced control authority arbitration.
 - Application-level authority management (`LOCAL_ACTIVE`,
   `REMOTE_ACTIVE`, `FAILOVER_PENDING`, `RECLAIM_PENDING`,
   `NO_OPERATOR`) layered on top of DDS ownership arbitration
-- `MANUAL_BY_TOPIC` liveliness for operator control topics, ensuring
-  failure detection covers both process death and control-loop stalls
+- `AUTOMATIC` liveliness on dedicated `control`-tag participant +
+  `DEADLINE` on `OperatorInput` for layered failure detection
+  (process death via liveliness, control-loop stall via deadline)
 
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|
-| Remote operator control path | Exclusive ownership, ownership strength, MANUAL_BY_TOPIC liveliness, Routing Service QoS transformation |
+| Remote operator control path | Exclusive ownership, ownership strength, AUTOMATIC liveliness + DEADLINE failover, Routing Service QoS transformation |
 | Routing Service control-tag bridge | Reverse data path (Hospital/Cloud → Procedure), separate domain_route per risk class |
 | Failover automation | DDS ownership + liveliness for automatic primary/backup switching |
 

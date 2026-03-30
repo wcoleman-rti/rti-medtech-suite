@@ -2017,8 +2017,12 @@ is uncertain or in transition. It ensures no robot motion occurs
 without confirmed, synchronized operator control.
 
 **Entry triggers:**
-- Active operator's `MANUAL_BY_TOPIC` liveliness expires (primary)
-- Active operator's `DEADLINE` is missed (secondary / corroborating)
+- Active operator's `AUTOMATIC` liveliness expires on the dedicated
+  `control`-tag participant (primary — detects process crash,
+  participant death, or connectivity loss)
+- Active operator's `DEADLINE` is missed on `OperatorInput`
+  (corroborating — detects control-loop stalls even if the
+  participant middleware threads are still running)
 - Explicit handoff command (planned authority transfer)
 
 **Robot behavior in safe-hold:**
@@ -2062,12 +2066,41 @@ without confirmed, synchronized operator control.
 
 ### Liveliness for Teleoperation
 
-RTI recommends `MANUAL_BY_TOPIC` liveliness (rather than `AUTOMATIC`)
-for operator control topics in a failover design. `AUTOMATIC`
-liveliness may keep a writer appearing alive even if the control loop
-is hung (middleware threads still running). `MANUAL_BY_TOPIC` requires
-the control loop itself to assert liveliness each cycle, ensuring
-failure detection covers both process death and control-loop stalls.
+Control topics use `AUTOMATIC` liveliness on the dedicated `control`-tag
+DomainParticipant, combined with `DEADLINE` on continuous-stream topics
+(`OperatorInput`), for ownership failover detection.
+
+**Why `AUTOMATIC` (not `MANUAL_BY_TOPIC`):** Because control topics are
+isolated on a dedicated `control`-tag participant, `AUTOMATIC` liveliness
+on that participant accurately represents "the control-plane process is
+alive and reachable." If the process crashes, the participant disappears,
+or connectivity is lost, `AUTOMATIC` liveliness expires for all writers
+on that participant simultaneously, triggering ownership transfer.
+
+`MANUAL_BY_TOPIC` would require each writer to explicitly assert
+liveliness at a required frequency. This conflicts with the event-driven
+write-on-change publication model used by `RobotCommand` and
+`SafetyInterlock` — there may be long periods with no writes, and
+forcing periodic assertion adds application complexity with no benefit
+for topics that are already covered by participant-level health.
+
+**Failure mode coverage:**
+
+| Failure Mode | Detection Mechanism |
+|---|---|
+| Process crash / participant death | `AUTOMATIC` liveliness expiration → ownership transfer |
+| Network / connectivity loss | `AUTOMATIC` liveliness expiration → ownership transfer |
+| Control-loop stall (process alive, middleware running) | `DEADLINE` miss on `OperatorInput` (4 ms) |
+| Write-on-change topic stall (process alive, middleware running) | **Residual gap** — mitigated by `OperatorInput` deadline as canary signal (see below) |
+
+**Residual gap:** If the process is alive and Connext middleware threads
+continue running, `AUTOMATIC` liveliness will remain asserted even if
+application logic producing `RobotCommand` or `SafetyInterlock` is hung.
+This gap is narrow and mitigated by the fact that `OperatorInput` is the
+upstream signal in the control path — if `OperatorInput` stops (caught
+by `DEADLINE`), the system already knows the control path is broken. The
+`OperatorInput` deadline serves as the canary signal for overall
+control-path health.
 
 ### Hospital Domain Tag Re-Evaluation
 

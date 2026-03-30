@@ -106,7 +106,7 @@ A version may only be cut when **all** of the following are true:
 
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|
-| Remote operator control path | Exclusive ownership, ownership strength, MANUAL_BY_TOPIC liveliness, Routing Service QoS transformation |
+| Remote operator control path | Exclusive ownership, ownership strength, AUTOMATIC liveliness + DEADLINE failover, Routing Service QoS transformation |
 | Routing Service control-tag bridge | Reverse data path (Hospital/Cloud → Procedure), separate domain_route per risk class |
 | Failover automation | DDS ownership + liveliness for automatic primary/backup switching |
 | Safe-hold mode | Application-level supervisory state machine layered on DDS ownership arbitration |
