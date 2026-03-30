@@ -94,11 +94,22 @@ public:
                     + svc_id + ")");
                 return result;
             }
-            // Clear stale slot (STOPPED or FAILED)
-            if (slot_it->second.thread.joinable()) {
-                slot_it->second.thread.join();
+            // Clear stale slot (STOPPED or FAILED).
+            // Destroy on a worker thread: the service destructor may
+            // call AsyncWaitSet::stop(), which deadlocks if called
+            // from the RPC server's AsyncWaitSet thread (same level).
+            {
+                ServiceSlot stale = std::move(slot_it->second);
+                slots_.erase(slot_it);
+                std::thread cleanup([s = std::move(stale)]() mutable {
+                    if (s.thread.joinable()) {
+                        s.thread.join();
+                    }
+                    // ~ServiceSlot destroys the service here,
+                    // off the RPC AsyncWaitSet thread.
+                });
+                cleanup.join();
             }
-            slots_.erase(slot_it);
         }
 
         try {
