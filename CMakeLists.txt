@@ -117,3 +117,8 @@ install(DIRECTORY modules/shared/medtech_logging/include/
 install(DIRECTORY modules/surgical-procedure/
     DESTINATION lib/python/site-packages/surgical_procedure
     FILES_MATCHING PATTERN "*.py")
+
+# --- Install hospital-dashboard Python module ---
+install(DIRECTORY modules/hospital-dashboard/
+    DESTINATION lib/python/site-packages/hospital_dashboard
+    FILES_MATCHING PATTERN "*.py")

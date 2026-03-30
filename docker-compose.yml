@@ -354,6 +354,22 @@ services:
       cloud-discovery-service:
         condition: service_healthy
 
+  procedure-controller-or1:
+    image: medtech/app-python
+    container_name: procedure-controller-or1
+    command: ["python", "-m", "hospital_dashboard.procedure_controller"]
+    environment:
+      <<: *medtech-env
+      ROOM_ID: "OR-1"
+      QT_QPA_PLATFORM: offscreen
+      MEDTECH_APP_NAME: "procedure-controller-or1"
+    volumes: *config-volumes
+    networks:
+      - surgical-net
+    depends_on:
+      cloud-discovery-service:
+        condition: service_healthy
+
   # ── OR-3 Instance ───────────────────────────────────────────────
 
   procedure-context-or3:
