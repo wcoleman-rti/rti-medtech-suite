@@ -50,11 +50,20 @@ class TestContainerBuildIntegrity:
         """robot-controller starts without GLIBCXX/GLIBC errors."""
         # robot-controller is a long-lived process; start it, let it
         # initialize briefly, then check output for ABI errors.
+        # Use a named container so we can reliably stop + remove it.
+        container_name = "medtech-test-glibcxx-check"
+        # Remove any leftover container from a previous failed run.
+        subprocess.run(
+            ["docker", "rm", "-f", container_name],
+            capture_output=True,
+            timeout=10,
+        )
         proc = subprocess.Popen(
             [
                 "docker",
                 "run",
-                "--rm",
+                "--name",
+                container_name,
                 "-e",
                 "MEDTECH_APP_NAME=test-robot",
                 "medtech/app-cpp",
@@ -67,6 +76,19 @@ class TestContainerBuildIntegrity:
         try:
             stdout, stderr = proc.communicate(timeout=5)
         except subprocess.TimeoutExpired:
+            # Stop the container (sends SIGTERM to PID 1 inside), then
+            # remove it.  This prevents orphaned containers accumulating
+            # after each test run.
+            subprocess.run(
+                ["docker", "stop", "-t", "3", container_name],
+                capture_output=True,
+                timeout=10,
+            )
+            subprocess.run(
+                ["docker", "rm", "-f", container_name],
+                capture_output=True,
+                timeout=10,
+            )
             proc.kill()
             stdout, stderr = proc.communicate()
         combined = stdout + stderr
