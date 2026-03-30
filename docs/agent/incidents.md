@@ -1630,3 +1630,57 @@ after closure. They form the project's decision log.
   own host on a shared domain. Always filter by the key field
   (`host_id`, `service_id`) before asserting.
 - **Date closed:** 2026-03-28
+
+---
+
+## INC-054: RTI Connext Logging API is not printf-style
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-30
+- **Phase/Step:** Phase 5 / Step 5.6
+- **Documents involved:** `modules/hospital-dashboard/procedure_controller/procedure_controller.py`
+- **Description:** The `ModuleLogger` returned by `medtech_logging.init_logging()`
+  wraps the RTI Connext Logging API. Its methods (`notice()`, `informational()`,
+  `error()`, etc.) take a single string argument — not printf-style `(fmt, *args)`.
+  Using `log.informational("msg: %s", value)` raises
+  `TypeError: ModuleLogger.informational() takes 2 positional arguments but 3 were given`.
+  The correct usage is `log.informational(f"msg: {value}")`.
+- **Resolution:** All logging calls in the Procedure Controller use f-strings.
+- **Guideline:** Always use f-strings with the medtech logging API:
+  `log.informational(f"message: {val}")`, never `log.informational("message: %s", val)`.
+- **Date closed:** 2026-03-30
+
+---
+
+## INC-055: rti.rpc.Service lifecycle: close_on_cancel and thread cleanup
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-30
+- **Phase/Step:** Phase 5 / Step 5.6
+- **Documents involved:** `tests/integration/test_procedure_controller.py`
+- **Description:** When running `rti.rpc.Service.run()` on a background
+  thread (via `asyncio.new_event_loop().run_until_complete()`), the
+  service's `run()` blocks indefinitely and cannot be interrupted by
+  `svc.close()` — calling `close()` while the service is running raises
+  `PreconditionNotMetError: Cannot close a running service. Cancel the
+  run() task first.` The correct pattern is: (1) hold a reference to the
+  `asyncio.current_task()` inside the runner coroutine, (2) cancel that
+  task using `loop.call_soon_threadsafe(task.cancel)`, (3) catch
+  `CancelledError` in the runner, (4) then call `svc.close()` (which may
+  raise `AlreadyClosedError` if `close_on_cancel=True` was used — wrap
+  in try/except). This pattern makes in-process mock RPC services for
+  tests feasible, though test hangs can still occur if the cleanup
+  sequence is wrong. For Step 5.6, the RPC tests were simplified to
+  unit-level call construction tests; full end-to-end RPC delivery is
+  deferred to Step 5.7.
+- **Resolution:** RPC tests in Step 5.6 verify call construction and
+  requester creation without starting a mock RPC service. End-to-end
+  RPC tests will use real Service Host subprocesses (Step 5.7) where
+  process-level signal handling provides clean shutdown.
+- **Guideline:** Do not attempt to run `rti.rpc.Service` on a background
+  thread in unit/integration tests. Instead, test RPC call construction
+  and requester creation separately. For full RPC validation, use
+  subprocess-based tests with real Service Host binaries.
+- **Date closed:** 2026-03-30

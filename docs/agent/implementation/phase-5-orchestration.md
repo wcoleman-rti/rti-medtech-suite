@@ -207,7 +207,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ---
 
-## Step 5.6 — Procedure Controller GUI
+## Step 5.6 — Procedure Controller GUI ✅ `4d811d5`
 
 ### Work
 
@@ -226,15 +226,15 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Test Gate
 
-- [ ] Procedure Controller discovers available Service Hosts (HostCatalog received)
-- [ ] Procedure Controller displays service states (ServiceStatus rendered)
-- [ ] `start_service` RPC issued from GUI results in service starting on target host
-- [ ] `stop_service` RPC issued from GUI results in service stopping
-- [ ] Controller is read-only on Hospital domain (no DataWriters created)
-- [ ] Controller restart reconstructs state from TRANSIENT_LOCAL (within 15 s)
-- [ ] Controller does not join Procedure domain
-- [ ] GUI remains responsive during concurrent data arrival
-- [ ] `bash scripts/ci.sh` passes
+- [x] Procedure Controller discovers available Service Hosts (HostCatalog received)
+- [x] Procedure Controller displays service states (ServiceStatus rendered)
+- [x] `start_service` RPC issued from GUI results in service starting on target host
+- [x] `stop_service` RPC issued from GUI results in service stopping
+- [x] Controller is read-only on Hospital domain (no DataWriters created)
+- [x] Controller restart reconstructs state from TRANSIENT_LOCAL (within 15 s)
+- [x] Controller does not join Procedure domain
+- [x] GUI remains responsive during concurrent data arrival
+- [x] `bash scripts/ci.sh` passes
 
 ---
 
