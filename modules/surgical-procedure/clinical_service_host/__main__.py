@@ -12,17 +12,19 @@ import asyncio
 import os
 import signal
 
+import rti.asyncio  # noqa: F401 — RTI asyncio integration
+
 from .clinical_service_host import make_clinical_service_host
 
 
-def main() -> None:
+async def _run() -> None:
     host_id = os.environ.get("HOST_ID", "clinical-host-001")
     room_id = os.environ.get("ROOM_ID", "OR-1")
     procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
 
     host = make_clinical_service_host(host_id, room_id, procedure_id)
 
-    loop = asyncio.new_event_loop()
+    loop = asyncio.get_running_loop()
     _shutdown_count = 0
 
     def _on_signal() -> None:
@@ -35,7 +37,12 @@ def main() -> None:
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, _on_signal)
-    loop.run_until_complete(host.run())
+
+    await host.run()
+
+
+def main() -> None:
+    rti.asyncio.run(_run())
 
 
 if __name__ == "__main__":
