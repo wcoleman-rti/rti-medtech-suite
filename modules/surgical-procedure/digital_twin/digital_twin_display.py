@@ -220,10 +220,19 @@ class DigitalTwinDisplay(QMainWindow):
         log.informational("DigitalTwinDisplay: async DDS receive tasks started")
 
     def stop(self) -> None:
-        """Cancel all async tasks and close the participant."""
+        """Signal async tasks to stop and schedule async cleanup."""
         self._running = False
+        asyncio.ensure_future(self._async_cleanup())
+
+    async def _async_cleanup(self) -> None:
+        """Cancel tasks, await their unwinding, then close the participant."""
         for task in self._tasks:
             task.cancel()
+        for task in self._tasks:
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
         self._tasks.clear()
         if self._participant is not None:
             try:
