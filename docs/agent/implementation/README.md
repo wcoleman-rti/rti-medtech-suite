@@ -149,7 +149,7 @@ After all V1.0.0 phases (1–5, plus 3–4) are complete, a **final regression g
 
 | Phase | Depends On | Key Deliverables |
 |-------|------------|------------------|
-| Phase 20: Dynamic Multi-Arm Orchestration *(file not yet authored)* | Phases 1–5 | `RobotArmAssignment` topic (IDL, QoS), `ArmAssignmentState`/`TablePosition` enums, multi-arm table positioning, Procedure Controller `control`-tag participant expansion, digital twin multi-arm rendering, `@multi-arm` test coverage |
+| [phase-20-multi-arm.md](phase-20-multi-arm.md) | Phases 1–5 | `RobotArmAssignment` topic (IDL, QoS), `ArmAssignmentState`/`TablePosition` enums, multi-arm table positioning, Procedure Controller `control`-tag participant expansion, digital twin multi-arm rendering, `@multi-arm` test coverage |
 
 > **Prerequisite:** Phase 20 requires [spec/multi-arm-orchestration.md](../spec/multi-arm-orchestration.md) to be operator-approved before implementation begins.
 
@@ -170,7 +170,7 @@ After all V1.0.0 phases (1–5, plus 3–4) are complete, a **final regression g
 
 | Phase | Depends On | Key Deliverables |
 |-------|------------|------------------|
-| Phase 21: Teleoperation / Remote Operator *(file not yet authored)* | Phases 1–5, Phase 7 (Security) | `EXCLUSIVE_OWNERSHIP_QOS` on `OperatorInput`, ownership strength tiering via RS, safe-hold mode, ControlAuthority state machine, AUTOMATIC liveliness + DEADLINE failover, Routing Service control-tag bridge, `@teleop` test coverage |
+| [phase-21-teleoperation.md](phase-21-teleoperation.md) | Phases 1–5, Phase 7 (Security) | `EXCLUSIVE_OWNERSHIP_QOS` on `OperatorInput`, ownership strength tiering via RS, safe-hold mode, ControlAuthority state machine, AUTOMATIC liveliness + DEADLINE failover, Routing Service control-tag bridge, `@teleop` test coverage |
 
 > **Prerequisite:** Phase 21 requires V2.0 (Security, Phase 7) to be complete and [spec/teleoperation.md](../spec/teleoperation.md) to be operator-approved before implementation begins.
 
