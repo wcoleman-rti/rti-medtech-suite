@@ -1512,3 +1512,121 @@ after closure. They form the project's decision log.
   parameter name in IDL. The rtiddsgen C++ template uses `request`
   internally for the scratchpad variable.
 - **Date closed:** 2026-03-27
+
+---
+
+## INC-050: C++ RPC handler AWSet thread deadlock on factory/stop
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-28
+- **Phase/Step:** Phase 5 / Step 5.4–5.5
+- **Documents involved:** `modules/shared/medtech_dds_init/service_host.cpp`
+- **Description:** The `dds::rpc::Server` dispatches RPC handler methods
+  on an `AsyncWaitSet` (AWSet) thread at nesting level 1. When
+  `start_service()` calls a factory that constructs an `AsyncWaitSet`
+  (e.g., `RobotControllerService`), the nested AWSet creation triggers:
+  `"dead lock risk: cannot enter WSCT of level 1 from WSCT of level 1"`.
+  Similarly, `stop_service()` joining the service thread and destroying
+  the service (which calls `sub_aws_.stop()`) deadlocks on the same
+  nesting constraint. The error manifests as a `remoteEx` (discriminator=0)
+  reply with code `UNKNOWN_EXCEPTION` (value=5).
+- **Possible resolutions:**
+  1. Delegate factory creation and stop/join to a worker `std::thread`
+     so the AWSet thread is never nested.
+  2. Defer service construction to `run()` rather than the constructor.
+  3. Use `std::async` with `std::launch::async` for the factory call.
+- **Resolution:** Resolution 1 adopted — both `start_service` and
+  `stop_service` delegate blocking work to a temporary `std::thread`
+  and join it before returning the result. This keeps the RPC handler
+  non-blocking with respect to AWSet nesting.
+- **Guideline:** Never create/destroy `AsyncWaitSet` instances from
+  within an RPC handler. All DDS entity lifecycle work in RPC handlers
+  must be delegated to a non-AWSet thread.
+- **Date closed:** 2026-03-28
+
+---
+
+## INC-051: Test participant transport QoS must match AvoidIPFragmentation
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-28
+- **Phase/Step:** Phase 5 / Step 5.5
+- **Documents involved:** `tests/integration/test_*_service_host.py`,
+  `interfaces/qos/Participants.xml`
+- **Description:** Test participants created via bare
+  `dds.DomainParticipant(domain_id)` use the default UDPv4
+  `message_size_max=65507`. All XML-configured participants inherit
+  `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation`, which
+  sets `message_size_max=1400`. This mismatch causes DDS to log
+  `INVALID CONFIGURATION | the message_size_max, 1400 ... does not
+  match the message_size_max, 65507` and silently drop RTPS packets
+  larger than the smaller value. The result is intermittent discovery
+  or data loss — tests pass sometimes but fail when the RPC reply or
+  HostCatalog exceeds 1400 bytes.
+  Additionally, the RTI Connext Python API does NOT expose
+  `transport_builtin.udpv4.message_size_max` as a direct attribute
+  (raises `AttributeError`). The correct API is the Property QoS:
+  `qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"`.
+- **Resolution:** All test `orch_participant` fixtures now set
+  `message_size_max=1400` via the Property QoS API.
+- **Guideline:** Any test participant on a domain shared with
+  XML-configured participants must match the transport QoS. For the
+  Orchestration domain (15), set
+  `qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"`.
+- **Date closed:** 2026-03-28
+
+---
+
+## INC-052: RPC reply union discriminator=0 is remoteEx, not method result
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-28
+- **Phase/Step:** Phase 5 / Step 5.4
+- **Documents involved:** `tests/integration/test_robot_service_host.py`,
+  generated `orchestration.hpp` / Python `orchestration.py`
+- **Description:** The RTI RPC `ServiceHostControl_Return` union uses
+  `discriminator=0` for the `remoteEx` (remote exception) branch, not
+  for any method result. When the server throws an unhandled exception,
+  the reply has `discriminator=0, value=5` (UNKNOWN_EXCEPTION). If the
+  test accesses `.start_service` on this reply, it raises
+  `ValueError: Union field not selected by current discriminator (0)`.
+  This is easy to confuse with "the RPC succeeded with OperationResultCode::OK"
+  since `OK=0` in the IDL enum.
+- **Resolution:** Robot test adds
+  `assert reply.discriminator != 0, f"RPC returned remote exception"`.
+  The root cause (INC-050) was also fixed so remoteEx no longer occurs.
+- **Guideline:** Always check `reply.discriminator != 0` (or equivalently,
+  check that the expected method branch is selected) before accessing
+  RPC reply fields. Discriminator 0 = `remoteEx` in RTI RPC unions.
+- **Date closed:** 2026-03-28
+
+---
+
+## INC-053: TRANSIENT_LOCAL HostCatalog stale cross-host reads
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-28
+- **Phase/Step:** Phase 5 / Step 5.5
+- **Documents involved:** `tests/integration/test_*_service_host.py`
+- **Description:** When multiple service hosts share Domain 15
+  (Orchestration), a test reader subscribing to `HostCatalog`
+  (TRANSIENT_LOCAL, KEEP_LAST depth=1, keyed by `host_id`) may
+  receive samples from a different host — particularly samples left
+  over from a previous test module's subprocess that hasn't fully
+  shut down. The test assumed `samples[0].data.host_id == HOST_ID`
+  but received a stale sample from `clinical-host-test` while
+  running the operational test suite. The same issue applies to
+  `ServiceStatus` reads.
+- **Resolution:** All test assertions now filter samples by `host_id`
+  before checking values. HostCatalog tests use
+  `matching = [s for s in samples if s.data.host_id == HOST_ID]`.
+  ServiceStatus tests poll with a `host_id` filter rather than
+  assuming `min_count` valid samples are all from the target host.
+- **Guideline:** Never assume `samples[0]` belongs to the test's
+  own host on a shared domain. Always filter by the key field
+  (`host_id`, `service_id`) before asserting.
+- **Date closed:** 2026-03-28

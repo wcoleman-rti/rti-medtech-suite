@@ -99,7 +99,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ## Step 5.3 — Refactor V1.0 Services to Dual-Mode ✅
 
-**Status:** Complete — pending commit (12/12 CI gates pass, 266 Python + 5 C++ tests pass)
+**Status:** Complete — committed `60c585e`
 
 ### Work
 
@@ -148,6 +148,8 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ## Step 5.4 — Service Host Framework (C++)
 
+**Status:** Complete — committed `df7bb1f`
+
 ### Work
 
 - Author the Robot Service Host (`modules/surgical-procedure/src/robot_service_host.cpp`):
@@ -165,20 +167,22 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Test Gate
 
-- [ ] Robot Service Host starts and publishes `HostCatalog` on the Orchestration domain
-- [ ] `ServiceHostControl` RPC is addressable at `ServiceHostControl/<host_id>`
-- [ ] `start_service` RPC creates and starts `RobotController` in hosted mode
-- [ ] `ServiceStatus` transitions (`STOPPED` → `STARTING` → `RUNNING`) are published
-- [ ] `stop_service` RPC stops the service; `ServiceStatus` transitions to `STOPPED`
-- [ ] `ALREADY_RUNNING` returned on duplicate start
-- [ ] `NOT_RUNNING` returned on stopping a non-running service
+- [x] Robot Service Host starts and publishes `HostCatalog` on the Orchestration domain
+- [x] `ServiceHostControl` RPC is addressable at `ServiceHostControl/<host_id>`
+- [x] `start_service` RPC creates and starts `RobotController` in hosted mode
+- [x] `ServiceStatus` transitions (`STOPPED` → `STARTING` → `RUNNING`) are published
+- [x] `stop_service` RPC stops the service; `ServiceStatus` transitions to `STOPPED`
+- [x] `ALREADY_RUNNING` returned on duplicate start
+- [x] `NOT_RUNNING` returned on stopping a non-running service
 - [ ] Liveliness lost detected when Service Host process is killed (within 2 s)
-- [ ] Orchestration domain is isolated from Procedure domain (no cross-domain discovery)
-- [ ] `bash scripts/ci.sh` passes
+- [x] Orchestration domain is isolated from Procedure domain (no cross-domain discovery)
+- [x] `bash scripts/ci.sh` passes
 
 ---
 
 ## Step 5.5 — Service Host Framework (Python)
+
+**Status:** Complete — committed `1be1dc1`
 
 ### Work
 
@@ -193,13 +197,13 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Test Gate
 
-- [ ] Clinical Service Host publishes `HostCatalog` and responds to RPC
-- [ ] `start_service` creates and gathers Python service coroutines
-- [ ] `ServiceStatus` reflects hosted service state transitions
-- [ ] `stop_service` cancels service coroutines; state transitions to `STOPPED`
-- [ ] Operational Service Host same test coverage
+- [x] Clinical Service Host publishes `HostCatalog` and responds to RPC
+- [x] `start_service` creates and gathers Python service coroutines
+- [x] `ServiceStatus` reflects hosted service state transitions
+- [x] `stop_service` cancels service coroutines; state transitions to `STOPPED`
+- [x] Operational Service Host same test coverage
 - [ ] Partition isolation: `room/OR-1` host not discoverable by `room/OR-3` controller
-- [ ] `bash scripts/ci.sh` passes
+- [x] `bash scripts/ci.sh` passes
 
 ---
 
