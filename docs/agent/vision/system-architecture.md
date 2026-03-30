@@ -78,7 +78,7 @@ In practice, not every process needs all three tags:
 | Procedure context + status publisher (standalone) | 1 (+1 Observability) | Procedure `operational` |
 | Device telemetry gateway (standalone) | 1 (+1 Observability) | Procedure `clinical` |
 | Digital twin display | 1 (+1 Observability) | Procedure `control` |
-| **Procedure Controller** | 1 Orchestration + 1 Hospital (+1 Observability) | Orchestration domain + Hospital domain |
+| **Procedure Controller** | 1 Orchestration + 1 Procedure `control` + 1 Hospital (+1 Observability) | Orchestration domain + Procedure `control` *(V1.2 — `RobotArmAssignment` subscription)* + Hospital domain |
 | **Routing Service** (Procedure → Hospital bridge) | **4** (+1 Observability) | `control` + `clinical` + `operational` (3 on Procedure domain) + 1 on Hospital domain (no tag) |
 
 Application logging uses the **RTI Connext Logging API** (`rti::config::Logger` / `rti.connextdds.Logger`), with log messages forwarded to Collector Service via Monitoring Library 2.0. See [technology.md — Logging Standard](technology.md) for details.
@@ -560,6 +560,83 @@ It bridges:
 - Hospital → Cloud: facility status, aggregated clinical alerts, resource utilization, operational KPIs
 
 WAN transport uses the RTI Real-Time WAN Transport (`UDPv4_WAN`) for NAT/firewall traversal, Cloud Discovery Service for cross-site discovery, and Connext Security Plugins for authentication and encryption. The WAN Routing Service follows the same architectural principles as the intra-hospital bridge — only explicitly configured topics cross the boundary, and no hospital application publishes directly to the Cloud domain.
+
+### Teleoperation Routing Service (V2.1)
+
+V2.1 teleoperation introduces a **reverse data path** from the Hospital
+and Cloud domains into the Procedure domain for remote operator control.
+This is a fundamentally different data flow from the existing Procedure →
+Hospital observational bridge and requires dedicated routing
+infrastructure.
+
+#### Ownership Strength Lowering
+
+The surgeon console application publishes `OperatorInput` with a fixed
+ownership strength (200) regardless of its deployment location. When the
+console is deployed at the hospital or cloud level, its `OperatorInput`
+samples reach the Procedure domain via Routing Service. The Routing
+Service output DataWriter is configured with a **lower ownership
+strength** than the console's native strength:
+
+| Route | Input (source domain) | Output Ownership Strength | Notes |
+|-------|----------------------|---------------------------|-------|
+| Local console (no RS) | Procedure `control` (direct) | 200 (native) | No routing — direct write |
+| Hospital → Procedure | Hospital domain | 100 | RS output writer QoS override |
+| Cloud → Procedure | Cloud domain | 50 | WAN RS output writer QoS override |
+
+This pattern ensures that when a local console is present and alive, its
+higher-strength samples always win. If the local console loses
+liveliness, the Routing Service-bridged samples from the hospital or
+cloud console automatically become the active source on the robot-side
+reader — standard DDS exclusive ownership behavior.
+
+#### Separate Control-Tag Domain Route
+
+The reverse teleoperation route uses a **separate `domain_route`** from
+the existing observational bridge. It creates dedicated
+DomainParticipants with the `control` domain tag on the Procedure domain
+side. This enforces the same risk-class isolation in the routing
+infrastructure that exists between direct Procedure domain participants.
+
+The control-tag route is architecturally independent:
+- Separate participants (different domain tags)
+- Separate sessions (different QoS and topic sets)
+- Separate failure domains (a fault in the observational bridge does not
+  affect the control-tag route, and vice versa)
+
+#### Hospital Domain Tag Re-Evaluation
+
+The reverse data path makes Hospital-domain participants **actors** (they
+originate control data) rather than observers. Per the escalation trigger
+in § Hospital Domain, this requires re-evaluating the Hospital domain for
+domain-tag isolation. The V2.1 design must determine whether a `control`
+tag is needed on the Hospital domain for the remote operator's outbound
+data path.
+
+### Safe-Hold Mode (V2.1)
+
+Safe-hold is the robot operating mode entered when control authority is
+uncertain or in transition. It is the bridge between DDS-level ownership
+arbitration and application-level safety requirements.
+
+See [data-model.md — V2.1 Forward Design Notes](data-model.md) for the
+full behavioral specification including entry triggers, robot behavior,
+exit conditions, emergency safe-stop, and reclaim behavior.
+
+**Key architectural implications:**
+
+- Safe-hold is **per-procedure, not per-arm.** When the active operator
+  loses authority, all arms in the procedure enter safe-hold
+  simultaneously. This is consistent with procedure-wide exclusive
+  ownership — split authority (some arms holding, others accepting new
+  commands) is a safety hazard.
+- `RobotState` continues publishing during safe-hold (`operational_mode
+  = PAUSED`). The robot is not silent — it actively reports its held
+  state. This is critical for the returning or backup operator to assess
+  the situation.
+- `SafetyInterlock` is published with `interlock_active = true` only in
+  the emergency safe-stop case (no operator available). Safe-hold itself
+  is not an interlock — it is a recoverable transitional state.
 
 ---
 

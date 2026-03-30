@@ -217,6 +217,116 @@ Additive within the V1 milestone. No structural changes to V1.0 modules.
 
 ---
 
+### V1.2.0 — Dynamic Multi-Arm Orchestration
+
+**Theme:** Extend the procedure orchestration model to support dynamic
+spawning, spatial assignment, and positioning of multiple robot arm
+services around a surgical table, with full lifecycle visibility from
+the Procedure Controller and digital twin display.
+
+#### Robot Arm Assignment & Positioning
+- **`RobotArmAssignment` topic** — new write-on-change state topic on the
+  Procedure domain (`control` tag, Class C / Class III) tracking each
+  arm's table position and assignment lifecycle
+- **`ArmAssignmentState` lifecycle:** `IDLE → ASSIGNED → POSITIONING →
+  OPERATIONAL` with `dispose()` on arm departure
+- **`TablePosition` enum** — standard positions around the surgical table
+  (HEAD, FOOT, LEFT, RIGHT, and diagonal positions), defined relative to
+  patient orientation
+- **`MAX_ARM_COUNT` constant** — Surgery module bound (8) for the
+  maximum number of arms per table. Independent of
+  `Orchestration::MAX_SERVICE_COUNT`, which remains an abstract
+  infrastructure bound.
+
+#### Orchestration Flow
+1. Procedure Controller issues `start_service` RPC to a Robot Service
+   Host on the Orchestration domain — includes desired table position in
+   the service configuration
+2. Service Host spawns the arm service and publishes
+   `ServiceStatus(state = RUNNING)` on the Orchestration domain
+3. Arm service writes `RobotArmAssignment(status = ASSIGNED)` on the
+   Procedure domain (`control` tag) — remote subscribers begin tracking
+   the instance
+4. Arm transitions to `POSITIONING` — publishes updated assignment as it
+   moves to the requested table position
+5. Arm reaches position — publishes `RobotArmAssignment(status =
+   OPERATIONAL)` — Procedure Controller considers the arm procedure-ready
+6. Procedure Controller (subscribing to `RobotArmAssignment`) waits for
+   all requested arms to reach `OPERATIONAL` before enabling procedure
+   control
+7. On arm shutdown/removal, the arm service calls `dispose()` on its
+   `RobotArmAssignment` instance, notifying subscribers
+   (`NOT_ALIVE_DISPOSED`)
+
+#### Digital Twin Enhancement
+- Digital twin display subscribes to `RobotArmAssignment` (already a
+  `control`-tag subscriber for `RobotState`)
+- Renders all arms around the table at their assigned positions with
+  color-coded lifecycle status indicators
+- Clickable per-arm overlay showing capabilities and assignment state
+
+#### Procedure Controller Enhancement
+- Adds a Procedure domain `control`-tag DomainParticipant for
+  subscribing to `RobotArmAssignment` (in addition to existing
+  Orchestration and Hospital domain participants)
+- Table layout UI showing arm positions, status, and readiness
+- Procedure start gated on all requested arms reaching `OPERATIONAL`
+
+| Module / Capability | Connext Features Demonstrated |
+|---------------------|-------------------------------|
+| `RobotArmAssignment` topic | Write-on-change state with `dispose()` for instance removal, TRANSIENT_LOCAL for late-joining controllers |
+| Multi-arm lifecycle | Keyed instances per `robot_id`, liveliness-based arm health detection |
+| Table position assignment | Spatial assignment as DDS state data, correlated with `RobotState` via shared `robot_id` key |
+| Procedure Controller expansion | Multi-domain participant model: Orchestration + Procedure `control` + Hospital |
+
+---
+
+### V2.1.0 — Teleoperation / Remote Operator
+
+**Theme:** Extend operator control to hospital and cloud levels with
+automatic failover, enabling remote surgical assistance and supervision
+with DDS-enforced control authority arbitration.
+
+#### Remote Operator Control Path
+- **Procedure-wide exclusive ownership** — `EXCLUSIVE_OWNERSHIP_QOS` on
+  `OperatorInput` ensures exactly one operator source controls all arms
+  in a procedure. Per-arm or per-component override is prohibited as a
+  safety hazard.
+- **Static console, Routing Service tiering** — the surgeon console
+  application uses a fixed ownership strength regardless of deployment
+  location. Routing Service lowers the strength on the output DataWriter
+  when bridging from hospital or cloud layers, creating the priority
+  tier without dynamic console configuration.
+- **Reverse `control`-tag Routing Service route** — introduces a
+  Hospital/Cloud → Procedure data path for remote operator input.
+  Uses a **separate `domain_route`** with dedicated `control`-tag
+  participants, architecturally isolated from the existing observational
+  bridge. Triggers the Hospital domain tag re-evaluation per the
+  escalation trigger in `system-architecture.md`.
+
+#### Safe-Hold Mode
+- Robot operating mode during control authority transitions: controlled
+  deceleration, position hold, incoming commands buffered until authority
+  is confirmed
+- Emergency safe-stop if all operator sources lose liveliness
+- Full behavioral specification in
+  [data-model.md — V2.1 Forward Design Notes](data-model.md)
+
+#### Supervisory State Machine
+- Application-level authority management (`LOCAL_ACTIVE`,
+  `REMOTE_ACTIVE`, `FAILOVER_PENDING`, `RECLAIM_PENDING`,
+  `NO_OPERATOR`) layered on top of DDS ownership arbitration
+- `MANUAL_BY_TOPIC` liveliness for operator control topics, ensuring
+  failure detection covers both process death and control-loop stalls
+
+| Module / Capability | Connext Features Demonstrated |
+|---------------------|-------------------------------|
+| Remote operator control path | Exclusive ownership, ownership strength, MANUAL_BY_TOPIC liveliness, Routing Service QoS transformation |
+| Routing Service control-tag bridge | Reverse data path (Hospital/Cloud → Procedure), separate domain_route per risk class |
+| Failover automation | DDS ownership + liveliness for automatic primary/backup switching |
+
+---
+
 ### V3.0.0 — Advanced Scenarios & Multi-Facility
 
 **Theme:** Extend to larger-scale and more complex hospital scenarios — cross-facility bridging, scope expansion, and advanced specialized workflows — without architectural changes to the core system.

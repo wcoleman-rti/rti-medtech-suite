@@ -68,6 +68,20 @@ A version may only be cut when **all** of the following are true:
 
 ---
 
+### V1.2.0 — Dynamic Multi-Arm Orchestration
+
+**Theme:** Extend the procedure orchestration model to support dynamic spawning, spatial assignment, and positioning of multiple robot arm services around a surgical table.
+
+| Module / Capability | Connext Features Demonstrated |
+|---------------------|-------------------------------|
+| `RobotArmAssignment` topic | Write-on-change state with `dispose()` for instance removal, TRANSIENT_LOCAL for late-joining controllers |
+| Multi-arm lifecycle | Keyed instances per `robot_id`, liveliness-based arm health detection |
+| Table position assignment | Spatial assignment as DDS state data, correlated with `RobotState` via shared `robot_id` key |
+| Procedure Controller expansion | Multi-domain participant model: Orchestration + Procedure `control` + Hospital |
+| Digital twin enhancement | Table layout visualization with per-arm status indicators |
+
+---
+
 ### V2.0.0 — Security & Hospital Integration Gateways
 
 **Implementation phases:** 7 (Security), plus new gateway modules (Phases 8–13)
@@ -83,6 +97,19 @@ A version may only be cut when **all** of the following are true:
 | OR Scheduling Gateway | Inbound: drives partition assignment and procedure context from scheduled data |
 | Hospital Alarm Management Gateway | Read-only subscriber to `ClinicalAlert` and `AlarmMessages`; routes to staff |
 | Device Integration Gateway (bidirectional) | Infusion pump / anesthesia machine command/control; exclusive ownership primary/backup |
+
+---
+
+### V2.1.0 — Teleoperation / Remote Operator
+
+**Theme:** Extend operator control to hospital and cloud levels with automatic failover, demonstrating DDS-enforced control authority arbitration via exclusive ownership and Routing Service QoS transformation.
+
+| Module / Capability | Connext Features Demonstrated |
+|---------------------|-------------------------------|
+| Remote operator control path | Exclusive ownership, ownership strength, MANUAL_BY_TOPIC liveliness, Routing Service QoS transformation |
+| Routing Service control-tag bridge | Reverse data path (Hospital/Cloud → Procedure), separate domain_route per risk class |
+| Failover automation | DDS ownership + liveliness for automatic primary/backup switching |
+| Safe-hold mode | Application-level supervisory state machine layered on DDS ownership arbitration |
 
 ---
 
