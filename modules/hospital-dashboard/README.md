@@ -12,7 +12,7 @@ a pure consumer and orchestrator. It creates two DomainParticipants:
 
 | Participant | Domain | Role |
 |-------------|--------|------|
-| Orchestration | 15 (no domain tags) | Subscribe to HostCatalog + ServiceStatus; issue RPC commands |
+| Orchestration | 15 (no domain tags) | Subscribe to ServiceCatalog + ServiceStatus; issue RPC commands |
 | Hospital | Hospital domain | Read-only subscriber for scheduling context |
 
 ### Connext Features Used
@@ -45,7 +45,7 @@ python -m hospital_dashboard.procedure_controller
 
 The GUI window shows two tables (Service Hosts, Service States) and four
 action buttons (Start, Stop, Capabilities, Health). Service Hosts appear
-automatically as they publish HostCatalog samples on the Orchestration
+automatically as they publish ServiceCatalog samples on the Orchestration
 domain.
 
 ## Architecture
@@ -67,7 +67,7 @@ modules/hospital-dashboard/
 
 | Entity | Topic / Service | Type | QoS |
 |--------|-----------------|------|-----|
-| DataReader | `HostCatalog` | `Orchestration::HostCatalog` | RELIABLE / TRANSIENT_LOCAL |
+| DataReader | `ServiceCatalog` | `Orchestration::ServiceCatalog` | RELIABLE / TRANSIENT_LOCAL |
 | DataReader | `ServiceStatus` | `Orchestration::ServiceStatus` | RELIABLE / TRANSIENT_LOCAL |
 | RPC Requester | `ServiceHostControl/<host_id>` | Request/Reply | Created on-demand per host |
 
@@ -131,7 +131,7 @@ Key test scenarios (from `test_procedure_controller.py`):
 
 | Test | Verifies |
 |------|----------|
-| `test_host_catalog_discovery` | HostCatalog samples populate the hosts table |
+| `test_host_catalog_discovery` | ServiceCatalog samples populate the hosts table |
 | `test_service_status_tracking` | ServiceStatus samples populate the services table |
 | `test_hospital_domain_read_only` | Hospital participant has zero DataWriters |
 | `test_start_service_rpc_call` | Start button produces correct RPC request |

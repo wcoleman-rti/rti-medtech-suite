@@ -58,7 +58,7 @@ internally:
 The function is **idempotent** — safe to call multiple times per process.
 C++ uses `std::call_once`; Python uses a module-level guard flag.
 
-**C++ — implementation (`modules/shared/medtech_dds_init/include/medtech/dds_init.hpp`):**
+**C++ — implementation (`modules/shared/include/medtech/dds_init.hpp`):**
 
 ```cpp
 #include <rti/config/Compliance.hpp>
@@ -157,11 +157,12 @@ class BedsideMonitor(Service):
         # ...
 ```
 
-> **Structural note:** The Python `dds_init.py` currently resides in
-> `modules/surgical-procedure/`. It should be relocated to a shared
-> location aligned with the C++ structure (e.g.,
-> `modules/shared/medtech_dds_init/`) so that all Python modules import
-> from one common package. This relocation is an implementation task.
+> **Structural note:** The Python DDS initialization module lives in
+> `modules/shared/medtech/dds.py` under the unified `medtech` namespace
+> package. All Python modules import via
+> `from medtech.dds import initialize_connext`. See
+> [coding-standards.md — Shared Package Structure](coding-standards.md)
+> for the full `medtech` namespace layout.
 
 See [data-model.md — Pre-Participant Initialization](data-model.md) for
 the full type registration list, the authoritative XTypes bit value,
@@ -832,9 +833,9 @@ built on the shared `ServiceHost` framework:
 - **Python**: `medtech.service_host` module
 
 The framework provides the orchestration infrastructure (RPC endpoint,
-`HostCatalog` publisher, `ServiceStatus` publisher, lifecycle management)
-and is parameterized only by a `ServiceFactoryMap`. Concrete hosts are
-thin wrappers that register factories and delegate to `make_service_host`.
+`ServiceCatalog` publisher, `ServiceStatus` publisher, lifecycle management)
+and is parameterized only by a `ServiceRegistryMap`. Concrete hosts are
+thin wrappers that register service entries and delegate to `make_service_host`.
 
 **Rules for new Service Hosts and Services:**
 
@@ -853,15 +854,15 @@ thin wrappers that register factories and delegate to `make_service_host`.
 
 3. **Concrete hosts are header-only / trivial**: A concrete host (e.g.,
    `make_robot_service_host`) should be an `inline` factory function that
-   populates a `ServiceFactoryMap` and calls `make_service_host<N>()`.
+   populates a `ServiceRegistryMap` and calls `make_service_host<N>()`.
    No subclassing or additional state.
 
 4. **Capacity is compile-time (C++)**: `make_service_host<N>()` enforces
    the factory count at compile time via `static_assert` and at runtime
    via a bounds check. The capacity appears in `CapabilityReport`.
 
-5. **`Common::EntityId` as service key**: The factory map, slot map,
-   `ServiceRequest`, `HostCatalog`, and `ServiceStatus` all use
+5. **`Common::EntityId` as service key**: The registry map, slot map,
+   `ServiceRequest`, `ServiceCatalog`, and `ServiceStatus` all use
    `Common::EntityId` (IDL `string<MAX_ID_LENGTH>`) as the service
    identifier. `ServiceRequest` additionally carries a sequence of
    `ServiceProperty` name-value pairs for runtime configuration.

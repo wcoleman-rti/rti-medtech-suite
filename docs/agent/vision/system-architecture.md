@@ -221,7 +221,7 @@ A Service Host transitions from `unassigned` to `room/OR-n` when the Procedure C
 The Orchestration domain uses a **hybrid RPC + pub/sub** model:
 
 - **DDS RPC** (`ServiceHostControl` interface, `Pattern.RPC` QoS) — directed, transactional commands from Procedure Controller to a specific Service Host. Each Service Host exposes a uniquely-named RPC service instance (`ServiceHostControl/<host_id>`).
-- **Pub/sub** (`HostCatalog` and `ServiceStatus` topics, `Pattern.Status` QoS) — asynchronous state distribution. Service Hosts publish host capabilities and per-service lifecycle state. TRANSIENT_LOCAL durability enables state reconstruction by late-joining or restarting controllers.
+- **Pub/sub** (`ServiceCatalog` and `ServiceStatus` topics, `Pattern.Status` QoS) — asynchronous state distribution. Service Hosts publish per-service capabilities and lifecycle state. TRANSIENT_LOCAL durability enables state reconstruction by late-joining or restarting controllers.
 
 See [data-model.md — Domain 15](data-model.md) for topic definitions and RPC interface specification.
 

@@ -145,10 +145,10 @@ A shared Qt stylesheet (`resources/styles/medtech.qss`) defines the common theme
 
 #### Shared GUI Bootstrap
 
-All PySide6 applications share a common initialization sequence: load the `.qss` stylesheet, register bundled fonts via `QFontDatabase`, and place the RTI logo in the header bar. To avoid duplicating this boilerplate, a shared Python utility module (`medtech_gui`) is installed to `lib/python/site-packages/`. It exposes a single entry point:
+All PySide6 applications share a common initialization sequence: load the `.qss` stylesheet, register bundled fonts via `QFontDatabase`, and place the RTI logo in the header bar. To avoid duplicating this boilerplate, a shared Python subpackage (`medtech.gui`) is installed to `lib/python/site-packages/medtech/gui/`. It exposes a single entry point:
 
 ```python
-from medtech_gui import init_theme
+from medtech.gui import init_theme
 
 app = QApplication(sys.argv)
 init_theme(app)  # loads medtech.qss, registers fonts, returns header widget

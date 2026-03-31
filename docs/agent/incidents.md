@@ -1607,6 +1607,9 @@ after closure. They form the project's decision log.
 
 ## INC-053: TRANSIENT_LOCAL HostCatalog stale cross-host reads
 
+> **Note:** The `HostCatalog` topic was renamed to `ServiceCatalog` (INC-062).
+> Historical references in this incident reflect the original name.
+
 - **Status:** Closed
 - **Category:** Discovery
 - **Date opened:** 2026-03-28
@@ -1878,4 +1881,88 @@ after closure. They form the project's decision log.
     (existing tag isolation is sufficient).
   - Tests on domain 0 or unique domains: safe for parallel execution.
   - If a new domain is shared across files, create a new xdist group.
+- **Date closed:** 2026-03-31
+
+---
+
+## INC-062: HostCatalog → ServiceCatalog rename and ServiceRegistration introduction
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Phase 5 / Evolution (post-completion)
+- **Documents involved:**
+  `interfaces/idl/orchestration/orchestration.idl`,
+  `interfaces/idl/app_names.idl`,
+  `interfaces/domains/Domains.xml`,
+  `interfaces/qos/Topics.xml`,
+  `interfaces/participants/OrchestrationParticipants.xml`,
+  `modules/shared/medtech_dds_init/include/medtech/service_host.hpp`,
+  `modules/shared/medtech_dds_init/service_host.cpp`,
+  `modules/shared/medtech_dds_init/include/medtech/dds_init.hpp`,
+  `modules/shared/medtech/service_host.py`,
+  `modules/shared/medtech_dds_init/dds_init.py`,
+  `modules/surgical-procedure/robot_service_host/robot_service_host.hpp`,
+  `modules/surgical-procedure/clinical_service_host/clinical_service_host.py`,
+  `modules/surgical-procedure/operational_service_host/operational_service_host.py`,
+  `modules/surgical-procedure/operator_service_host/operator_service_host.py`,
+  `modules/hospital-dashboard/procedure_controller/procedure_controller.py`,
+  `tests/integration/test_robot_service_host.py`,
+  `tests/integration/test_clinical_service_host.py`,
+  `tests/integration/test_operational_service_host.py`,
+  `tests/integration/test_procedure_controller.py`,
+  all `docs/agent/` planning docs,
+  both module READMEs
+- **Description:** The single-per-host `HostCatalog` topic was replaced
+  by a dual-keyed `ServiceCatalog` topic (`host_id` + `service_id`).
+  Each Service Host now writes N DDS instances — one per registered
+  service — instead of a single monolithic catalog.  This enables:
+  (1) per-service `PropertyDescriptor` advertisement (name, current
+  value, default, description, required) so the Procedure Controller
+  can render configuration forms at discovery time without an RPC
+  round-trip; (2) finer-grained liveliness — the controller can detect
+  which services are offered without parsing a list.
+
+  Structural changes:
+  - **IDL:** `HostCatalog` removed; `ServiceCatalog` added with dual
+    key.  `PropertyDescriptor` (`@appendable @nested`) added.
+    `CapabilityReport.supported_services` removed (now redundant —
+    discovered via `ServiceCatalog`).  `CapabilityReport` slimmed to
+    just `capacity`.
+  - **C++/Python framework:** `ServiceFactoryMap` replaced by
+    `ServiceRegistryMap`, keyed by `EntityId` to `ServiceRegistration`.
+    `ServiceRegistration` bundles factory + `display_name` +
+    `vector<PropertyDescriptor>`.  `publish_host_catalog()` replaced by
+    `publish_service_catalog()` (writes N instances).
+    `get_capabilities()` returns only `capacity`.
+  - **Concrete hosts:** All four hosts (robot, clinical, operational,
+    operator) provide `ServiceRegistration` with `display_name` and
+    empty `properties` (V1.0).
+  - **Procedure Controller:** Internal state changed from
+    `_hosts: dict[str, HostCatalog]` to
+    `_catalogs: dict[tuple[str, str], ServiceCatalog]`.  Added
+    `_known_host_ids()` and `_services_by_host()` helpers.  Host tile
+    builder aggregates health from individual entries.
+  - **Tests:** All four integration test suites updated to create
+    `ServiceCatalog` topics, assert per-service instances, and remove
+    `supported_services` assertions.
+  - **XML configs:** Type registrations, topic names, writer/reader
+    names, QoS profiles, and entity name constants all renamed.
+  - **Planning docs:** All 8 `docs/agent/` files updated.
+  - **Module READMEs:** Both updated.
+
+  All 306 Python tests + 5 C++ tests + 12 CI gates pass.
+- **Resolution:** Complete rename applied across ~30 files.
+  RTI Connext `rti-chatbot-mcp` was consulted and validated the
+  design: `PropertyDescriptor` should be `@appendable` (not `@final`)
+  for future extensibility; `current_value` and `default_value` should
+  be separate fields.  User explicitly declined `schema_version` /
+  `config_version` fields.
+- **Guideline:** When renaming a DDS topic/type, the full propagation
+  chain is: IDL → codegen (automatic) → XML configs (Domains, QoS,
+  Participants) → entity name constants (`app_names.idl`) →
+  type registrations (`dds_init.hpp`/`dds_init.py`) → framework code →
+  concrete hosts → subscribers (Procedure Controller) → tests →
+  planning docs → module READMEs.  Missing any layer causes a build
+  or runtime failure.  Start from the IDL and work outward.
 - **Date closed:** 2026-03-31

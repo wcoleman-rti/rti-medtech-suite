@@ -81,14 +81,14 @@
         <!--
             Domain 15 — Orchestration
             Infrastructure lifecycle control-plane. No domain tags.
-            Pub/sub: HostCatalog, ServiceStatus
+            Pub/sub: ServiceCatalog, ServiceStatus
             RPC: ServiceHostControl (generated topics managed by RPC layer)
         -->
         <domain name="Orchestration" domain_id="15">
-            <register_type name="Orchestration::HostCatalog"     type_ref="Orchestration::HostCatalog"/>
+            <register_type name="Orchestration::ServiceCatalog"   type_ref="Orchestration::ServiceCatalog"/>
             <register_type name="Orchestration::ServiceStatus"   type_ref="Orchestration::ServiceStatus"/>
 
-            <topic name="HostCatalog"    register_type_ref="Orchestration::HostCatalog"/>
+            <topic name="ServiceCatalog"  register_type_ref="Orchestration::ServiceCatalog"/>
             <topic name="ServiceStatus"  register_type_ref="Orchestration::ServiceStatus"/>
         </domain>
 

@@ -2,7 +2,8 @@
 //
 // Contains ServiceHostControlImpl (the RPC handler) and ServiceHost
 // (the medtech::Service wrapper).  These are fully generic — each
-// concrete host (robot, clinical, operational) only provides factories.
+// concrete host (robot, clinical, operational) only provides a
+// ServiceRegistryMap with factories and catalog metadata.
 //
 // Mirrors modules/shared/medtech/service_host.py for the Python side.
 
@@ -50,7 +51,7 @@ using ServiceSlotMap = std::unordered_map<Common::EntityId, ServiceSlot>;
 // ServiceHostControlImpl — generic RPC service implementation.
 //
 // Implements the IDL-generated Orchestration::ServiceHostControl interface.
-// Manages zero or more services keyed by Common::EntityId via a factory map.
+// Manages zero or more services keyed by Common::EntityId via a registry.
 // Dispatched by the RPC framework on the server thread pool.
 // ---------------------------------------------------------------------------
 class ServiceHostControlImpl : public Orchestration::ServiceHostControl {
@@ -58,11 +59,11 @@ public:
     ServiceHostControlImpl(
         const std::string& host_id,
         int32_t capacity,
-        ServiceFactoryMap factories,
+        ServiceRegistryMap registry,
         ModuleLogger& log)
         : host_id_(host_id),
           capacity_(capacity),
-          factories_(std::move(factories)),
+          registry_(std::move(registry)),
           log_(log)
     {
     }
@@ -74,8 +75,8 @@ public:
         Orchestration::OperationResult result;
         const Common::EntityId svc_id(req.service_id);
 
-        auto factory_it = factories_.find(svc_id);
-        if (factory_it == factories_.end()) {
+        auto reg_it = registry_.find(svc_id);
+        if (reg_it == registry_.end()) {
             result.code = Orchestration::OperationResultCode::INVALID_SERVICE;
             result.message = "Unknown service: " + svc_id;
             log_.notice("start_service rejected: INVALID_SERVICE ("
@@ -117,13 +118,13 @@ public:
             // The RPC handler runs on an AsyncWaitSet thread; service
             // constructors may create their own AsyncWaitSet, which
             // deadlocks if nested at the same AWSet level.
-            auto& factory_fn = factory_it->second;
+            auto& factory_fn = reg_it->second.factory;
             std::unique_ptr<Service> new_service;
             std::string create_error;
             {
                 std::thread creator([&]() {
                     try {
-                        new_service = factory_fn(svc_id);
+                        new_service = factory_fn(req);
                     } catch (const std::exception& ex) {
                         create_error = ex.what();
                     }
@@ -165,11 +166,11 @@ public:
     }
 
     Orchestration::OperationResult stop_service(
-        const Orchestration::ServiceRequest& req) override
+        const Common::EntityId& service_id) override
     {
         std::lock_guard<std::mutex> lock(mu_);
         Orchestration::OperationResult result;
-        const Common::EntityId svc_id(req.service_id);
+        const Common::EntityId svc_id(service_id);
 
         auto slot_it = slots_.find(svc_id);
         if (slot_it == slots_.end()
@@ -205,13 +206,13 @@ public:
         return result;
     }
 
-    Orchestration::OperationResult configure_service(
-        const Orchestration::ConfigureRequest& req) override
+    Orchestration::OperationResult update_service(
+        const Orchestration::ServiceRequest& req) override
     {
         Orchestration::OperationResult result;
         result.code = Orchestration::OperationResultCode::OK;
         result.message = "Configuration accepted (no-op in V1.0)";
-        log_.notice("configure_service: OK (service_id="
+        log_.notice("update_service: OK (service_id="
             + std::string(req.service_id) + ")");
         return result;
     }
@@ -219,12 +220,8 @@ public:
     Orchestration::CapabilityReport get_capabilities() override
     {
         Orchestration::CapabilityReport report;
-        for (const auto& [name, _] : factories_) {
-            report.supported_services.push_back(name);
-        }
         report.capacity = capacity_;
-        log_.notice("get_capabilities: reported "
-            + std::to_string(factories_.size()) + " service(s), capacity="
+        log_.notice("get_capabilities: capacity="
             + std::to_string(capacity_));
         return report;
     }
@@ -262,15 +259,21 @@ public:
         return states;
     }
 
-    /// Return factory-registered service IDs (for initial status publish).
+    /// Return registry-registered service IDs (for initial status publish).
     std::vector<Common::EntityId> registered_service_ids() const
     {
         std::vector<Common::EntityId> ids;
-        ids.reserve(factories_.size());
-        for (const auto& [name, _] : factories_) {
+        ids.reserve(registry_.size());
+        for (const auto& [name, _] : registry_) {
             ids.push_back(name);
         }
         return ids;
+    }
+
+    /// Read-only access to the registry for catalog publishing.
+    const ServiceRegistryMap& registry() const
+    {
+        return registry_;
     }
 
     /// Stop all running services (called during host shutdown).
@@ -291,7 +294,7 @@ public:
 private:
     std::string host_id_;
     int32_t capacity_;
-    ServiceFactoryMap factories_;
+    ServiceRegistryMap registry_;
     ModuleLogger& log_;
 
     mutable std::mutex mu_;
@@ -303,8 +306,8 @@ private:
 // ServiceHost — generic medtech::Service that wraps the orchestration layer.
 //
 // Creates an Orchestration domain participant, registers the RPC service,
-// publishes HostCatalog and ServiceStatus, and blocks in run().
-// Configured via ServiceFactoryMap — the only variation point between
+// publishes ServiceCatalog and ServiceStatus, and blocks in run().
+// Configured via ServiceRegistryMap — the only variation point between
 // robot, clinical, and operational service hosts.
 // ---------------------------------------------------------------------------
 class ServiceHost : public Service {
@@ -313,7 +316,7 @@ public:
         const std::string& host_id,
         const std::string& host_name,
         int32_t capacity,
-        ServiceFactoryMap factories,
+        ServiceRegistryMap registry,
         ModuleLogger& log)
         : host_id_(host_id),
           host_name_(host_name),
@@ -333,9 +336,9 @@ public:
         // -- Look up pub/sub entities --
         catalog_writer_ =
             rti::pub::find_datawriter_by_name<
-                dds::pub::DataWriter<Orchestration::HostCatalog>>(
+                dds::pub::DataWriter<Orchestration::ServiceCatalog>>(
                 orch_participant_,
-                std::string(orch_names::HOST_CATALOG_WRITER));
+                std::string(orch_names::SERVICE_CATALOG_WRITER));
 
         status_writer_ =
             rti::pub::find_datawriter_by_name<
@@ -354,7 +357,7 @@ public:
         // -- Create the RPC implementation --
         rpc_impl_ = std::make_shared<ServiceHostControlImpl>(
             host_id,
-            capacity, std::move(factories), log);
+            capacity, std::move(registry), log);
     }
 
     void run() override
@@ -380,8 +383,8 @@ public:
 
         log_.notice("RPC service registered: ServiceHostControl/" + host_id_);
 
-        // -- Publish initial HostCatalog --
-        publish_host_catalog();
+        // -- Publish initial ServiceCatalog (one instance per service) --
+        publish_service_catalog();
 
         // -- Publish initial ServiceStatus (STOPPED) for each service --
         for (const auto& svc_id : rpc_impl_->registered_service_ids()) {
@@ -441,17 +444,21 @@ public:
     }
 
 private:
-    void publish_host_catalog()
+    void publish_service_catalog()
     {
-        Orchestration::HostCatalog catalog;
-        catalog.host_id = host_id_;
-        for (const auto& svc_id : rpc_impl_->registered_service_ids()) {
-            catalog.supported_services.push_back(svc_id);
+        for (const auto& [svc_id, reg] : rpc_impl_->registry()) {
+            Orchestration::ServiceCatalog catalog;
+            catalog.host_id = host_id_;
+            catalog.service_id = svc_id;
+            catalog.display_name = reg.display_name;
+            for (const auto& pd : reg.properties) {
+                catalog.properties.push_back(pd);
+            }
+            catalog.health_summary = "OK";
+            catalog_writer_.write(catalog);
+            log_.notice("Published ServiceCatalog for "
+                + host_id_ + "/" + svc_id);
         }
-        catalog.capacity = capacity_;
-        catalog.health_summary = "OK";
-        catalog_writer_.write(catalog);
-        log_.notice("Published HostCatalog for host " + host_id_);
     }
 
     void publish_service_status(
@@ -493,7 +500,7 @@ private:
 
     // Orchestration domain
     dds::domain::DomainParticipant orch_participant_{nullptr};
-    dds::pub::DataWriter<Orchestration::HostCatalog> catalog_writer_{nullptr};
+    dds::pub::DataWriter<Orchestration::ServiceCatalog> catalog_writer_{nullptr};
     dds::pub::DataWriter<Orchestration::ServiceStatus> status_writer_{nullptr};
 
     // RPC
@@ -511,12 +518,12 @@ std::unique_ptr<Service> make_service_host_impl(
     const std::string& host_id,
     const std::string& host_name,
     int32_t capacity,
-    ServiceFactoryMap factories,
+    ServiceRegistryMap registry,
     ModuleLogger& log)
 {
     return std::make_unique<ServiceHost>(
         host_id, host_name,
-        capacity, std::move(factories), log);
+        capacity, std::move(registry), log);
 }
 
 }  // namespace medtech

@@ -1,14 +1,19 @@
 """Clinical Service Host — manages BedsideMonitor and DeviceTelemetry.
 
-Registers two service factories and delegates to the generic
+Registers two services and delegates to the generic
 ``medtech.service_host.make_service_host()``.  This module is the
 Python equivalent of the C++ robot_service_host.hpp pattern:
-a thin factory wrapper, no subclassing.
+a thin registry wrapper, no subclassing.
 """
 
 from __future__ import annotations
 
-from medtech.service_host import ServiceFactoryMap, ServiceHost, make_service_host
+from medtech.service_host import (
+    ServiceHost,
+    ServiceRegistration,
+    ServiceRegistryMap,
+    make_service_host,
+)
 from surgical_procedure.device_telemetry_sim import DeviceTelemetryService
 from surgical_procedure.vitals_sim import BedsideMonitorService
 
@@ -24,14 +29,22 @@ def make_clinical_service_host(
       - BedsideMonitorService
       - DeviceTelemetryService
     """
-    factories: ServiceFactoryMap = {
-        "BedsideMonitorService": lambda svc_id: BedsideMonitorService(
-            room_id=room_id,
-            procedure_id=procedure_id,
+    registry: ServiceRegistryMap = {
+        "BedsideMonitorService": ServiceRegistration(
+            factory=lambda req: BedsideMonitorService(
+                room_id=room_id,
+                procedure_id=procedure_id,
+            ),
+            display_name="Bedside Monitor",
+            properties=[],
         ),
-        "DeviceTelemetryService": lambda svc_id: DeviceTelemetryService(
-            room_id=room_id,
-            procedure_id=procedure_id,
+        "DeviceTelemetryService": ServiceRegistration(
+            factory=lambda req: DeviceTelemetryService(
+                room_id=room_id,
+                procedure_id=procedure_id,
+            ),
+            display_name="Device Telemetry",
+            properties=[],
         ),
     }
-    return make_service_host(host_id, "ClinicalServiceHost", 2, factories)
+    return make_service_host(host_id, "ClinicalServiceHost", 2, registry)

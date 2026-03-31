@@ -178,8 +178,8 @@ These conventions apply to:
 
 - `modules/surgical-procedure/digital_twin/_robot_widget.py`
 - `modules/hospital-dashboard/procedure_controller/procedure_controller.py`
-- `modules/shared/medtech_gui/_theme.py`
-- `modules/shared/medtech_gui/_widgets.py`
+- `modules/shared/medtech/gui/_theme.py`
+- `modules/shared/medtech/gui/_widgets.py`
 - `resources/styles/medtech.qss`
 - `resources/styles/medtech-dark.qss`
 - All future GUI modules

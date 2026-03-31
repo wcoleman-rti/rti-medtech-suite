@@ -1,7 +1,7 @@
 // robot_service_host.hpp — Robot Service Host factory (header-only).
 //
-// Registers the RobotControllerService factory and delegates to the
-// generic medtech::ServiceHost via make_service_host<1>().
+// Registers the RobotControllerService and delegates to the generic
+// medtech::ServiceHost via make_service_host<1>().
 // All orchestration infrastructure lives in the shared service_host
 // library — this file is the only robot-specific code.
 
@@ -28,15 +28,19 @@ inline std::unique_ptr<medtech::Service> make_robot_service_host(
     const std::string& procedure_id,
     medtech::ModuleLogger& log)
 {
-    medtech::ServiceFactoryMap factories;
-    factories["RobotControllerService"] =
-        [room_id, procedure_id, &log](const Common::EntityId& service_id) {
+    medtech::ServiceRegistryMap registry;
+    registry["RobotControllerService"] = medtech::ServiceRegistration{
+        .factory = [room_id, procedure_id, &log](
+            const Orchestration::ServiceRequest& req) {
             return make_robot_controller_service(
-                service_id, room_id, procedure_id, log);
-        };
+                req.service_id, room_id, procedure_id, log);
+        },
+        .display_name = "Robot Controller",
+        .properties = {},
+    };
 
     return medtech::make_service_host<1>(
-        host_id, "RobotServiceHost", std::move(factories), log);
+        host_id, "RobotServiceHost", std::move(registry), log);
 }
 
 }  // namespace medtech::surgical

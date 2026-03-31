@@ -4,7 +4,7 @@ Spec: procedure-orchestration.md — Service Host Framework
 Tags: @integration @orchestration
 
 Tests that the Robot Service Host:
-- Publishes HostCatalog on startup (TRANSIENT_LOCAL)
+- Publishes ServiceCatalog on startup (TRANSIENT_LOCAL)
 - Responds to ServiceHostControl RPC at the correct service_name
 - Starts/stops the RobotControllerService via RPC
 - Publishes ServiceStatus transitions (write-on-change)
@@ -43,7 +43,7 @@ ROOM_ID = "OR-1"
 def robot_service_host():
     """Start the robot-service-host binary as a subprocess and yield it.
 
-    Waits for the process to publish HostCatalog, then tears it down
+    Waits for the process to publish ServiceCatalog, then tears it down
     after the module.
     """
     bin_path = os.path.join(
@@ -69,12 +69,12 @@ def robot_service_host():
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    # Wait for HostCatalog publication instead of fixed sleep
+    # Wait for ServiceCatalog publication instead of fixed sleep
     qos = dds.DomainParticipantQos()
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
     probe_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     probe_dp.enable()
-    topic = dds.Topic(probe_dp, "HostCatalog", Orchestration.HostCatalog)
+    topic = dds.Topic(probe_dp, "ServiceCatalog", Orchestration.ServiceCatalog)
     rqos = dds.DataReaderQos()
     rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
     rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
@@ -95,7 +95,7 @@ def robot_service_host():
     assert (
         proc.poll() is None
     ), f"robot-service-host exited immediately with code {proc.returncode}"
-    assert ready, "robot-service-host did not publish HostCatalog within 10 s"
+    assert ready, "robot-service-host did not publish ServiceCatalog within 10 s"
     yield proc
     proc.send_signal(signal.SIGTERM)
     try:
@@ -122,8 +122,8 @@ def orch_participant():
 
 @pytest.fixture(scope="module")
 def catalog_reader(orch_participant):
-    """DataReader for HostCatalog on the Orchestration domain."""
-    topic = dds.Topic(orch_participant, "HostCatalog", Orchestration.HostCatalog)
+    """DataReader for ServiceCatalog on the Orchestration domain."""
+    topic = dds.Topic(orch_participant, "ServiceCatalog", Orchestration.ServiceCatalog)
     sub = dds.Subscriber(orch_participant)
     rqos = dds.DataReaderQos()
     rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
@@ -220,7 +220,7 @@ def _make_start_call(service_id: str) -> object:
     """Build RPC call for start_service."""
     call = _CallType()
     _in = _CallType.in_structs[-522153841][1]()
-    _in.req = Orchestration.ServiceRequest(service_id=service_id, configuration="")
+    _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=[])
     call.start_service = _in
     return call
 
@@ -229,7 +229,7 @@ def _make_stop_call(service_id: str) -> object:
     """Build RPC call for stop_service."""
     call = _CallType()
     _in = _CallType.in_structs[123337698][1]()
-    _in.req = Orchestration.ServiceRequest(service_id=service_id, configuration="")
+    _in.service_id = service_id
     call.stop_service = _in
     return call
 
@@ -239,24 +239,30 @@ def _make_stop_call(service_id: str) -> object:
 # ---------------------------------------------------------------------------
 
 
-class TestHostCatalog:
-    """Verify HostCatalog publication on startup."""
+class TestServiceCatalog:
+    """Verify ServiceCatalog publication on startup."""
 
-    def test_host_catalog_published(self, robot_service_host, catalog_reader):
-        """Robot Service Host publishes HostCatalog with correct host_id
-        and supported services."""
+    def test_service_catalog_published(self, robot_service_host, catalog_reader):
+        """Robot Service Host publishes ServiceCatalog with correct host_id
+        and service_id."""
         samples = _wait_for_data(catalog_reader, timeout_sec=15)
-        assert len(samples) >= 1, "No HostCatalog samples received"
-        matching = [s for s in samples if s.data.host_id == HOST_ID]
-        assert matching, f"No HostCatalog for {HOST_ID}"
+        assert len(samples) >= 1, "No ServiceCatalog samples received"
+        matching = [
+            s
+            for s in samples
+            if s.data.host_id == HOST_ID
+            and s.data.service_id == "RobotControllerService"
+        ]
+        assert matching, f"No ServiceCatalog for {HOST_ID}/RobotControllerService"
         catalog = matching[0].data
-        assert "RobotControllerService" in catalog.supported_services
-        assert catalog.capacity >= 1
+        assert catalog.display_name == "Robot Controller"
 
-    def test_host_catalog_transient_local(self, robot_service_host, orch_participant):
-        """A late-joining reader receives HostCatalog via TRANSIENT_LOCAL."""
+    def test_service_catalog_transient_local(
+        self, robot_service_host, orch_participant
+    ):
+        """A late-joining reader receives ServiceCatalog via TRANSIENT_LOCAL."""
         # Reuse existing topic (already created by catalog_reader fixture)
-        topic = dds.Topic.find(orch_participant, "HostCatalog")
+        topic = dds.Topic.find(orch_participant, "ServiceCatalog")
         sub = dds.Subscriber(orch_participant)
         rqos = dds.DataReaderQos()
         rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
@@ -266,11 +272,13 @@ class TestHostCatalog:
         late_reader = dds.DataReader(sub, topic, rqos)
         try:
             samples = _wait_for_data(late_reader, timeout_sec=10)
-            assert len(samples) >= 1, "Late-joining reader did not receive HostCatalog"
+            assert (
+                len(samples) >= 1
+            ), "Late-joining reader did not receive ServiceCatalog"
             matching = [s for s in samples if s.data.host_id == HOST_ID]
             assert (
                 matching
-            ), f"Late-joining reader did not receive HostCatalog for {HOST_ID}"
+            ), f"Late-joining reader did not receive ServiceCatalog for {HOST_ID}"
             assert matching[0].data.host_id == HOST_ID
         finally:
             late_reader.close()
@@ -309,7 +317,6 @@ class TestRpcServiceControl:
         reply = _send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for get_capabilities"
         result = reply.get_capabilities.result.return_
-        assert "RobotControllerService" in result.supported_services
         assert result.capacity >= 1
 
     def test_get_health(self, robot_service_host, rpc_requester):
@@ -417,12 +424,12 @@ class TestDomainIsolation:
         proc_participant.enable()
 
         try:
-            # Create a reader on the Procedure domain for HostCatalog topic
+            # Create a reader on the Procedure domain for ServiceCatalog topic
             # — this topic should not exist on domain 10
             topic = dds.Topic(
                 proc_participant,
-                "HostCatalog",
-                Orchestration.HostCatalog,
+                "ServiceCatalog",
+                Orchestration.ServiceCatalog,
             )
             sub = dds.Subscriber(proc_participant)
             rqos = dds.DataReaderQos()
@@ -436,7 +443,7 @@ class TestDomainIsolation:
             valid = [s for s in samples if s.info.valid]
             assert (
                 len(valid) == 0
-            ), "Procedure domain received HostCatalog — isolation broken"
+            ), "Procedure domain received ServiceCatalog — isolation broken"
             reader.close()
         finally:
             proc_participant.close()

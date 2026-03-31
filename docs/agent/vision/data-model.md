@@ -304,7 +304,7 @@ Infrastructure lifecycle management layer for procedure service orchestration. T
 
 | Topic | Registered Type | Key Fields | Publication Model | Notes |
 |-------|----------------|------------|-------------------|-------|
-| `HostCatalog` | `Orchestration::HostCatalog` | `host_id` | State (write-on-change, TRANSIENT_LOCAL, RELIABLE, KEEP_LAST 1) | Service Host capability advertisement. Published by each Service Host. Liveliness-monitored for host failure detection. |
+| `ServiceCatalog` | `Orchestration::ServiceCatalog` | `host_id`, `service_id` | State (write-on-change, TRANSIENT_LOCAL, RELIABLE, KEEP_LAST 1) | Per-service capability and configuration advertisement. One DDS instance per (host, service) pair. Published by each Service Host. Liveliness-monitored for host failure detection. |
 | `ServiceStatus` | `Orchestration::ServiceStatus` | `host_id`, `service_id` | State (write-on-change, TRANSIENT_LOCAL, RELIABLE, KEEP_LAST 1) | Per-service lifecycle state. Published by Service Hosts (polled from each hosted service's `state` property). Late-joining controllers reconstruct full state. |
 
 #### RPC Service Interface
@@ -320,7 +320,7 @@ Infrastructure lifecycle management layer for procedure service orchestration. T
 | `start_service` | `ServiceRequest` (service_id, properties) | `OperationResult` (code, message) | Start a service on the target host |
 | `stop_service` | `Common::EntityId` (service_id) | `OperationResult` | Gracefully stop a running service |
 | `update_service` | `ServiceRequest` (service_id, properties) | `OperationResult` | Update service configuration |
-| `get_capabilities` | (no params) | `CapabilityReport` (supported services, capacity) | Query host capabilities |
+| `get_capabilities` | (no params) | `CapabilityReport` (capacity) | Query host capabilities |
 | `get_health` | (no params) | `HealthReport` (alive, summary, diagnostics) | Query host health |
 
 #### IDL Module
@@ -329,7 +329,7 @@ New IDL directory: `interfaces/idl/orchestration/`
 
 Types defined in `module Orchestration`:
 
-- **Pub/sub state types:** `HostCatalog`, `ServiceStatus`
+- **Pub/sub state types:** `ServiceCatalog`, `ServiceStatus`
 - **RPC interface:** `ServiceHostControl` — `@service("DDS")` interface
 - **RPC parameter types:** `ServiceProperty` (`@final @nested` name-value pair), `ServiceRequest` (service_id + sequence of `ServiceProperty`), `OperationResult`, `CapabilityReport`, `HealthReport`
 - **Enums:**

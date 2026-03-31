@@ -4,7 +4,7 @@ Spec: procedure-orchestration.md — Procedure Controller
 Tags: @integration @orchestration @gui
 
 Tests that the Procedure Controller:
-- Discovers available Service Hosts (HostCatalog received)
+- Discovers available Service Hosts (ServiceCatalog received)
 - Displays service states (ServiceStatus rendered)
 - Issues start_service RPC resulting in service starting on target host
 - Issues stop_service RPC resulting in service stopping
@@ -67,8 +67,8 @@ def orch_participant():
 
 @pytest.fixture(scope="module")
 def catalog_writer(orch_participant):
-    """DataWriter for HostCatalog on the Orchestration domain."""
-    topic = dds.Topic(orch_participant, "HostCatalog", Orchestration.HostCatalog)
+    """DataWriter for ServiceCatalog on the Orchestration domain."""
+    topic = dds.Topic(orch_participant, "ServiceCatalog", Orchestration.ServiceCatalog)
     pub = dds.Publisher(orch_participant)
     wqos = dds.DataWriterQos()
     wqos.reliability.kind = dds.ReliabilityKind.RELIABLE
@@ -97,10 +97,12 @@ def status_writer(orch_participant):
 
 @pytest.fixture(scope="module")
 def catalog_reader(orch_participant):
-    """DataReader for HostCatalog — used by the Procedure Controller."""
-    topic = dds.Topic.find(orch_participant, "HostCatalog")
+    """DataReader for ServiceCatalog — used by the Procedure Controller."""
+    topic = dds.Topic.find(orch_participant, "ServiceCatalog")
     if topic is None:
-        topic = dds.Topic(orch_participant, "HostCatalog", Orchestration.HostCatalog)
+        topic = dds.Topic(
+            orch_participant, "ServiceCatalog", Orchestration.ServiceCatalog
+        )
     sub = dds.Subscriber(orch_participant)
     rqos = dds.DataReaderQos()
     rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
@@ -140,14 +142,16 @@ def _process_events(qapp, duration_ms=500):
 
 
 def _publish_catalog(writer, host_id, services, capacity=2):
-    """Publish a HostCatalog sample."""
-    catalog = Orchestration.HostCatalog(
-        host_id=host_id,
-        supported_services=services,
-        capacity=capacity,
-        health_summary="OK",
-    )
-    writer.write(catalog)
+    """Publish ServiceCatalog samples (one per service)."""
+    for svc_id in services:
+        catalog = Orchestration.ServiceCatalog(
+            host_id=host_id,
+            service_id=svc_id,
+            display_name=svc_id,
+            properties=[],
+            health_summary="OK",
+        )
+        writer.write(catalog)
 
 
 def _publish_status(writer, host_id, service_id, state):
@@ -167,9 +171,9 @@ def _publish_status(writer, host_id, service_id, state):
 
 
 # ---------------------------------------------------------------------------
-# Test: Discovers available Service Hosts (HostCatalog received)
+# Test: Discovers available Service Hosts (ServiceCatalog received)
 # ---------------------------------------------------------------------------
-class TestHostCatalogDiscovery:
+class TestServiceCatalogDiscovery:
     """Verify Procedure Controller discovers Service Hosts."""
 
     def test_discovers_host(
@@ -181,7 +185,7 @@ class TestHostCatalogDiscovery:
         catalog_reader,
         status_reader,
     ):
-        """Controller receives HostCatalog and populates hosts dict."""
+        """Controller receives ServiceCatalog and populates catalogs dict."""
         from hospital_dashboard.procedure_controller import ProcedureController
 
         controller = ProcedureController(
@@ -206,7 +210,7 @@ class TestHostCatalogDiscovery:
                     break
 
             assert HOST_ID in controller.hosts
-            assert "SvcA" in controller.hosts[HOST_ID].supported_services
+            assert (HOST_ID, "SvcA") in controller.catalogs
         finally:
             controller.close_dds()
 
@@ -308,7 +312,7 @@ class TestHospitalReadOnly:
                 topic = dds.Topic(
                     checker,
                     "ProcedureStatus",
-                    Orchestration.HostCatalog,  # type doesn't matter for discovery
+                    Orchestration.ServiceCatalog,  # type doesn't matter for discovery
                 )
                 sub = dds.Subscriber(checker)
                 rqos = dds.DataReaderQos()
@@ -387,10 +391,10 @@ class TestTransientLocalReconstruction:
         # Use programmatic readers since we need fresh ones
         sub = dds.Subscriber(orch_participant)
 
-        cat_topic = dds.Topic.find(orch_participant, "HostCatalog")
+        cat_topic = dds.Topic.find(orch_participant, "ServiceCatalog")
         if cat_topic is None:
             cat_topic = dds.Topic(
-                orch_participant, "HostCatalog", Orchestration.HostCatalog
+                orch_participant, "ServiceCatalog", Orchestration.ServiceCatalog
             )
         rqos = dds.DataReaderQos()
         rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
@@ -425,7 +429,7 @@ class TestTransientLocalReconstruction:
                 if found_host and found_status:
                     break
 
-            assert found_host, "Controller did not receive HostCatalog within 15 s"
+            assert found_host, "Controller did not receive ServiceCatalog within 15 s"
             assert found_status, "Controller did not receive ServiceStatus within 15 s"
         finally:
             controller.close_dds()

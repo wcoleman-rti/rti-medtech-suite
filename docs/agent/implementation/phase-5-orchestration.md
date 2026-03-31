@@ -27,7 +27,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - Author `interfaces/idl/orchestration/Orchestration.idl` in `module Orchestration`:
   - `ServiceState` enum: `STOPPED`, `STARTING`, `RUNNING`, `STOPPING`, `FAILED`, `UNKNOWN`
   - `OperationResultCode` enum: `OK`, `INVALID_SERVICE`, `INVALID_CONFIG`, `BUSY`, `ALREADY_RUNNING`, `NOT_RUNNING`, `INTERNAL_ERROR`
-  - `HostCatalog` struct (keyed on `host_id`): host ID, supported service types, capacity, health summary
+  - `ServiceCatalog` struct (keyed on `host_id` + `service_id`): host ID, service ID, display name, property descriptors, health summary
   - `ServiceStatus` struct (keyed on `host_id` + `service_id`): host ID, service ID, `ServiceState`, timestamp
   - `ServiceProperty` `@final @nested` struct: name, value (bounded strings)
   - `ServiceRequest` struct: service_id, sequence of `ServiceProperty` name-value pairs
@@ -39,9 +39,9 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - Add Domain 15 definition to `interfaces/domains/Domains.xml` with no domain tag
 - Author `Pattern.RPC` QoS profile in `interfaces/qos/Patterns.xml`: RELIABLE, KEEP_ALL, appropriate history depth
 - Author `Pattern.Status` QoS profile (if not already covered by existing `Patterns::State`): TRANSIENT_LOCAL, RELIABLE, KEEP_LAST 1, liveliness 2 s
-- Author topic-specific profiles for `HostCatalog` and `ServiceStatus` in `interfaces/qos/TopicProfiles.xml` inheriting from the appropriate pattern
+- Author topic-specific profiles for `ServiceCatalog` and `ServiceStatus` in `interfaces/qos/TopicProfiles.xml` inheriting from the appropriate pattern
 - Add orchestration participant profiles to `interfaces/participants/Participants.xml`:
-  - `Participant::Orchestration` — Domain 15, no domain tag, with contained entities for `HostCatalog` writer/reader, `ServiceStatus` writer/reader, and `ServiceHostControl` RPC endpoints
+  - `Participant::Orchestration` — Domain 15, no domain tag, with contained entities for `ServiceCatalog` writer/reader, `ServiceStatus` writer/reader, and `ServiceHostControl` RPC endpoints
   - `Participant::ProcedureController_Orchestration` — controller's Orchestration domain participant (RPC client + status subscriber)
   - `Participant::ProcedureController_Hospital` — controller's Hospital domain participant (read-only subscriber)
 - Add orchestration entity name constants to `interfaces/idl/app_names/app_names.idl` per the naming convention in [dds-consistency.md §1 Step 2](../vision/dds-consistency.md)
@@ -156,7 +156,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
   - Creates an Orchestration domain participant from `Participant::Orchestration` XML config
   - Creates a Procedure domain `control`-tag participant for the hosted `RobotController`
   - Registers `ServiceHostControl/<host_id>` RPC service on the Orchestration domain
-  - Publishes `HostCatalog` (TRANSIENT_LOCAL, liveliness 2 s)
+  - Publishes `ServiceCatalog` (TRANSIENT_LOCAL, liveliness 2 s)
   - Polls `RobotController::state()` and publishes `ServiceStatus` (write-on-change)
   - Implements `start_service`: constructs `RobotController` in hosted mode, spawns `run()` on a dedicated thread
   - Implements `stop_service`: calls `stop()`, joins thread
@@ -168,7 +168,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Test Gate
 
-- [x] Robot Service Host starts and publishes `HostCatalog` on the Orchestration domain
+- [x] Robot Service Host starts and publishes `ServiceCatalog` on the Orchestration domain
 - [x] `ServiceHostControl` RPC is addressable at `ServiceHostControl/<host_id>`
 - [x] `start_service` RPC creates and starts `RobotController` in hosted mode
 - [x] `ServiceStatus` transitions (`STOPPED` → `STARTING` → `RUNNING`) are published
@@ -189,7 +189,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 - Author the Clinical Service Host (`modules/surgical-procedure/clinical_service_host.py`):
   - Manages Python services: `BedsideMonitor`, `DeviceTelemetryGateway`
-  - Same orchestration pattern as C++ host: RPC, HostCatalog, ServiceStatus
+  - Same orchestration pattern as C++ host: RPC, ServiceCatalog, ServiceStatus
   - Uses `asyncio.gather()` for hosted service coroutines
 - Author the Operational Service Host (`modules/surgical-procedure/operational_service_host.py`):
   - Manages: `CameraSimulator`, `ProcedureContextPublisher`
@@ -201,7 +201,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Test Gate
 
-- [x] Clinical Service Host publishes `HostCatalog` and responds to RPC
+- [x] Clinical Service Host publishes `ServiceCatalog` and responds to RPC
 - [x] `start_service` creates and gathers Python service coroutines
 - [x] `ServiceStatus` reflects hosted service state transitions
 - [x] `stop_service` cancels service coroutines; state transitions to `STOPPED`
@@ -218,7 +218,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - Author the Procedure Controller PySide6 application (`modules/hospital-dashboard/procedure_controller.py` or a new module directory):
   - Creates one participant on the Orchestration domain (`Participant::ProcedureController_Orchestration`)
   - Creates one participant on the Hospital domain (`Participant::ProcedureController_Hospital`, read-only)
-  - Subscribes to `HostCatalog` and `ServiceStatus` on the Orchestration domain
+  - Subscribes to `ServiceCatalog` and `ServiceStatus` on the Orchestration domain
   - Displays available Service Hosts and their service states
   - Provides UI controls to: select a host, start a service, stop a service, view capabilities/health
   - Issues RPC commands via `ServiceHostControl` client stubs
@@ -230,7 +230,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Test Gate
 
-- [x] Procedure Controller discovers available Service Hosts (HostCatalog received)
+- [x] Procedure Controller discovers available Service Hosts (ServiceCatalog received)
 - [x] Procedure Controller displays service states (ServiceStatus rendered)
 - [x] `start_service` RPC issued from GUI results in service starting on target host
 - [x] `stop_service` RPC issued from GUI results in service stopping

@@ -1,5 +1,5 @@
 /*
- * Orchestration module types — service lifecycle, host catalog, RPC.
+ * Orchestration module types — service lifecycle, service catalog, RPC.
  *
  * Module: Orchestration
  * Domain: Orchestration (Domain 15, no domain tags)
@@ -7,8 +7,8 @@
  * Contains:
  *   - ServiceState enum (single source of truth for medtech::Service)
  *   - OperationResultCode enum (RPC reply codes)
- *   - Pub/sub state types: HostCatalog, ServiceStatus
- *   - RPC parameter types: ServiceRequest, ConfigureRequest,
+ *   - Pub/sub state types: ServiceCatalog, ServiceStatus
+ *   - RPC parameter types: ServiceProperty, ServiceRequest,
  *     OperationResult, CapabilityReport, HealthReport
  *   - @service("DDS") interface: ServiceHostControl
  */
@@ -21,6 +21,7 @@ module Orchestration {
     const long MAX_SERVICE_COUNT = 16;
     const long MAX_CONFIG_LENGTH = 1024;
     const long MAX_DIAG_LENGTH = 2048;
+    const long MAX_PROPERTY_COUNT = 32;
 
     // --- Enums ---
 
@@ -47,13 +48,34 @@ module Orchestration {
 
     // --- Pub/Sub State Types ---
 
-    // Topic: HostCatalog | Pattern: State | Liveliness 2s
+    // Property descriptor for service configuration advertisement.
+    // Embedded in ServiceCatalog so the Procedure Controller can
+    // render a configuration form at discovery time without an RPC
+    // round-trip.  @appendable allows future additions (type hints,
+    // units, allowed values, etc.) without breaking compatibility.
+    @appendable @nested
+    struct PropertyDescriptor {
+        string<Common::MAX_NAME_LENGTH> name;
+        string<MAX_CONFIG_LENGTH> current_value;
+        @optional string<MAX_CONFIG_LENGTH> default_value;
+        string<Common::MAX_DESCRIPTION_LENGTH> description;
+        boolean required;
+    };
+
+    // Topic: ServiceCatalog | Pattern: State | Liveliness 2s
+    // Dual-keyed: one DDS instance per (host, service) pair.
+    // A Service Host writes N instances on startup — one per
+    // registered service.  TRANSIENT_LOCAL + KEEP_LAST 1 gives
+    // late-joining controllers the full picture immediately.
+    // After update_service RPC, the host re-publishes with
+    // updated property values.
     @appendable
-    struct HostCatalog {
+    struct ServiceCatalog {
         @key Common::EntityId host_id;
-        sequence<string<Common::MAX_NAME_LENGTH>, MAX_SERVICE_COUNT> supported_services;
-        int32 capacity;
-        string<Common::MAX_DESCRIPTION_LENGTH> health_summary;
+        @key Common::EntityId service_id;
+        string<Common::MAX_NAME_LENGTH> display_name;
+        sequence<PropertyDescriptor, MAX_PROPERTY_COUNT> properties;
+        @optional string<Common::MAX_DESCRIPTION_LENGTH> health_summary;
     };
 
     // Topic: ServiceStatus | Pattern: State
@@ -67,16 +89,16 @@ module Orchestration {
 
     // --- RPC Parameter Types ---
 
-    @appendable
-    struct ServiceRequest {
-        Common::EntityId service_id;
-        string<MAX_CONFIG_LENGTH> configuration;
+    @final @nested
+    struct ServiceProperty {
+        string<Common::MAX_NAME_LENGTH> name;
+        string<MAX_CONFIG_LENGTH> value;
     };
 
     @appendable
-    struct ConfigureRequest {
+    struct ServiceRequest {
         Common::EntityId service_id;
-        string<MAX_CONFIG_LENGTH> configuration;
+        sequence<ServiceProperty, MAX_PROPERTY_COUNT> properties;
     };
 
     @appendable
@@ -87,7 +109,6 @@ module Orchestration {
 
     @appendable
     struct CapabilityReport {
-        sequence<string<Common::MAX_NAME_LENGTH>, MAX_SERVICE_COUNT> supported_services;
         int32 capacity;
     };
 
@@ -103,8 +124,8 @@ module Orchestration {
     @service("DDS")
     interface ServiceHostControl {
         OperationResult start_service(in ServiceRequest req);
-        OperationResult stop_service(in ServiceRequest req);
-        OperationResult configure_service(in ConfigureRequest req);
+        OperationResult stop_service(in Common::EntityId service_id);
+        OperationResult update_service(in ServiceRequest req);
         CapabilityReport get_capabilities();
         HealthReport get_health();
     };

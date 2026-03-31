@@ -19,7 +19,7 @@
 
         <!--
             Orchestration — Service Host participant on the Orchestration domain.
-            Publishes: HostCatalog, ServiceStatus
+            Publishes: ServiceCatalog, ServiceStatus
             Subscribes: (none via pub/sub — RPC handled by generated entities)
             RPC: ServiceHostControl service endpoint
         -->
@@ -29,9 +29,9 @@
 
             <publisher name="OrchestrationPublisher">
 
-                <data_writer name="HostCatalogWriter"
-                             topic_ref="HostCatalog">
-                    <datawriter_qos base_name="TopicProfiles::HostCatalog"/>
+                <data_writer name="ServiceCatalogWriter"
+                             topic_ref="ServiceCatalog">
+                    <datawriter_qos base_name="TopicProfiles::ServiceCatalog"/>
                 </data_writer>
 
                 <data_writer name="ServiceStatusWriter"
@@ -42,9 +42,9 @@
 
             <subscriber name="OrchestrationSubscriber">
 
-                <data_reader name="HostCatalogReader"
-                             topic_ref="HostCatalog">
-                    <datareader_qos base_name="TopicProfiles::HostCatalog"/>
+                <data_reader name="ServiceCatalogReader"
+                             topic_ref="ServiceCatalog">
+                    <datareader_qos base_name="TopicProfiles::ServiceCatalog"/>
                 </data_reader>
 
                 <data_reader name="ServiceStatusReader"
@@ -56,7 +56,7 @@
 
         <!--
             ProcedureController_Orchestration — Controller's Orchestration domain
-            participant. Subscribes to HostCatalog and ServiceStatus.
+            participant. Subscribes to ServiceCatalog and ServiceStatus.
             RPC: ServiceHostControl client endpoint.
         -->
         <domain_participant name="ProcedureController_Orchestration"
@@ -65,9 +65,9 @@
 
             <subscriber name="ControllerOrchSubscriber">
 
-                <data_reader name="HostCatalogReader"
-                             topic_ref="HostCatalog">
-                    <datareader_qos base_name="TopicProfiles::HostCatalog"/>
+                <data_reader name="ServiceCatalogReader"
+                             topic_ref="ServiceCatalog">
+                    <datareader_qos base_name="TopicProfiles::ServiceCatalog"/>
                 </data_reader>
 
                 <data_reader name="ServiceStatusReader"

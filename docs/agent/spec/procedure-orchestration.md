@@ -23,7 +23,7 @@ to an OR use the `unassigned` partition.
 | `stop()` behavior | Non-blocking, thread-safe; `run()` returns promptly after `stop()` |
 | Dual-mode standalone signal | `None` (Python) / `dds::core::null` (C++) |
 | Dual-mode hosted signal | Valid `DomainParticipant` passed to constructor |
-| `HostCatalog` durability | TRANSIENT_LOCAL (late-joining controllers receive current state) |
+| `ServiceCatalog` durability | TRANSIENT_LOCAL (late-joining controllers receive current state) |
 | `ServiceStatus` durability | TRANSIENT_LOCAL (late-joining controllers receive current state) |
 | `ServiceHostControl` RPC QoS | `Pattern.RPC` (RELIABLE, KEEP_ALL) |
 | Orchestration domain ID | 15 |
@@ -127,12 +127,12 @@ is added or changed.*
 
 ## Service Host Framework
 
-### Scenario: Service Host publishes HostCatalog on startup `@integration` `@orchestration`
+### Scenario: Service Host publishes ServiceCatalog on startup `@integration` `@orchestration`
 
 **Given** a Service Host is started and assigned to partition `room/OR-1`
-**When** the Service Host's Orchestration domain participant becomes active
-**Then** the Service Host publishes a `HostCatalog` sample with its `host_id`, supported service types, and capacity
-**And** the sample is TRANSIENT_LOCAL and available to late-joining controllers
+**When** the Service Host’s Orchestration domain participant becomes active
+**Then** the Service Host publishes a `ServiceCatalog` sample for each registered service, with `host_id`, `service_id`, `display_name`, and configurable property descriptors
+**And** the samples are TRANSIENT_LOCAL and available to late-joining controllers
 
 ### Scenario: Service Host publishes ServiceStatus for each hosted service `@integration` `@orchestration`
 
@@ -196,8 +196,8 @@ is added or changed.*
 
 ### Scenario: Service Host failure is detected via liveliness `@integration` `@orchestration`
 
-**Given** a Service Host is publishing `HostCatalog` with automatic liveliness (2 s lease)
-**And** the Procedure Controller is subscribed to `HostCatalog`
+**Given** a Service Host is publishing `ServiceCatalog` with automatic liveliness (2 s lease)
+**And** the Procedure Controller is subscribed to `ServiceCatalog`
 **When** the Service Host process is killed
 **Then** the Procedure Controller detects liveliness lost within the 2 s lease period
 **And** all `ServiceStatus` entries from that host are considered stale
@@ -208,15 +208,15 @@ is added or changed.*
 
 ### Scenario: Procedure Controller discovers available Service Hosts `@integration` `@orchestration`
 
-**Given** the Procedure Controller is subscribed to `HostCatalog` on the Orchestration domain
+**Given** the Procedure Controller is subscribed to `ServiceCatalog` on the Orchestration domain
 **When** Service Hosts publish their catalog entries
 **Then** the Procedure Controller displays the available hosts and their capabilities
 
 ### Scenario: Procedure Controller reconstructs state on restart `@integration` `@orchestration` `@durability`
 
-**Given** Service Hosts have been publishing `HostCatalog` and `ServiceStatus` with TRANSIENT_LOCAL durability
+**Given** Service Hosts have been publishing `ServiceCatalog` and `ServiceStatus` with TRANSIENT_LOCAL durability
 **When** the Procedure Controller restarts and joins the Orchestration domain
-**Then** the controller immediately receives the most recent `HostCatalog` sample for each host
+**Then** the controller immediately receives the most recent `ServiceCatalog` sample for each (host, service) pair
 **And** the most recent `ServiceStatus` sample for each (host, service) pair
 **And** reconstructs the full orchestration state without re-querying each host via RPC
 
@@ -283,7 +283,7 @@ is added or changed.*
 
 **Given** Service Host A is on the Orchestration domain with partition `room/OR-1`
 **And** Service Host B is on the Orchestration domain with partition `room/OR-3`
-**When** both publish `HostCatalog` and `ServiceStatus`
+**When** both publish `ServiceCatalog` and `ServiceStatus`
 **Then** a Procedure Controller with partition `room/OR-1` receives data only from Service Host A
 **And** a Procedure Controller with partition `room/OR-3` receives data only from Service Host B
 
@@ -329,7 +329,7 @@ is added or changed.*
 **Given** a Procedure Controller and one or more Service Hosts are started on `hospital-net`
 **When** all processes are running
 **Then** all Orchestration domain DomainParticipant endpoints have matched within 15 s
-**And** `HostCatalog` and `ServiceStatus` TRANSIENT_LOCAL state has been delivered to the Procedure Controller within the same 15 s window
+**And** `ServiceCatalog` and `ServiceStatus` TRANSIENT_LOCAL state has been delivered to the Procedure Controller within the same 15 s window
 
 ### Scenario: Procedure Controller restart re-integrates within time budget `@integration` `@orchestration` `@performance`
 

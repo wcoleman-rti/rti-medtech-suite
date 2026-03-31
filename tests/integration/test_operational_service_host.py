@@ -4,7 +4,7 @@ Spec: procedure-orchestration.md — Service Host Framework (Python)
 Tags: @integration @orchestration
 
 Tests that the Operational Service Host:
-- Publishes HostCatalog on startup (TRANSIENT_LOCAL)
+- Publishes ServiceCatalog on startup (TRANSIENT_LOCAL)
 - Responds to ServiceHostControl RPC
 - Starts/stops CameraService and ProcedureContextService via RPC
 - Publishes ServiceStatus transitions (write-on-change)
@@ -51,12 +51,12 @@ def operational_service_host():
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    # Wait for HostCatalog publication instead of fixed sleep
+    # Wait for ServiceCatalog publication instead of fixed sleep
     qos = dds.DomainParticipantQos()
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
     probe_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     probe_dp.enable()
-    topic = dds.Topic(probe_dp, "HostCatalog", Orchestration.HostCatalog)
+    topic = dds.Topic(probe_dp, "ServiceCatalog", Orchestration.ServiceCatalog)
     rqos = dds.DataReaderQos()
     rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
     rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
@@ -77,7 +77,7 @@ def operational_service_host():
     assert (
         proc.poll() is None
     ), f"operational-service-host exited immediately with code {proc.returncode}"
-    assert ready, "operational-service-host did not publish HostCatalog within 10 s"
+    assert ready, "operational-service-host did not publish ServiceCatalog within 10 s"
     yield proc
     proc.send_signal(signal.SIGTERM)
     try:
@@ -104,8 +104,8 @@ def orch_participant():
 
 @pytest.fixture(scope="module")
 def catalog_reader(orch_participant):
-    """DataReader for HostCatalog on the Orchestration domain."""
-    topic = dds.Topic(orch_participant, "HostCatalog", Orchestration.HostCatalog)
+    """DataReader for ServiceCatalog on the Orchestration domain."""
+    topic = dds.Topic(orch_participant, "ServiceCatalog", Orchestration.ServiceCatalog)
     sub = dds.Subscriber(orch_participant)
     rqos = dds.DataReaderQos()
     rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
@@ -187,7 +187,7 @@ def _make_start_call(service_id: str) -> object:
     """Build RPC call for start_service."""
     call = _CallType()
     _in = _CallType.in_structs[-522153841][1]()
-    _in.req = Orchestration.ServiceRequest(service_id=service_id, configuration="")
+    _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=[])
     call.start_service = _in
     return call
 
@@ -196,7 +196,7 @@ def _make_stop_call(service_id: str) -> object:
     """Build RPC call for stop_service."""
     call = _CallType()
     _in = _CallType.in_structs[123337698][1]()
-    _in.req = Orchestration.ServiceRequest(service_id=service_id, configuration="")
+    _in.service_id = service_id
     call.stop_service = _in
     return call
 
@@ -206,19 +206,18 @@ def _make_stop_call(service_id: str) -> object:
 # ---------------------------------------------------------------------------
 
 
-class TestOperationalHostCatalog:
-    """Verify HostCatalog publication on startup."""
+class TestOperationalServiceCatalog:
+    """Verify ServiceCatalog publication on startup."""
 
-    def test_host_catalog_published(self, operational_service_host, catalog_reader):
-        """Operational Service Host publishes HostCatalog with services."""
-        samples = _wait_for_data(catalog_reader, timeout_sec=15)
-        assert len(samples) >= 1, "No HostCatalog samples received"
+    def test_service_catalog_published(self, operational_service_host, catalog_reader):
+        """Operational Service Host publishes ServiceCatalog for each service."""
+        samples = _wait_for_data(catalog_reader, timeout_sec=15, min_count=2)
+        assert len(samples) >= 2, "Expected at least 2 ServiceCatalog samples"
         matching = [s for s in samples if s.data.host_id == HOST_ID]
-        assert matching, f"No HostCatalog for {HOST_ID}"
-        catalog = matching[0].data
-        assert "CameraService" in catalog.supported_services
-        assert "ProcedureContextService" in catalog.supported_services
-        assert catalog.capacity == 2
+        assert len(matching) >= 2, f"No ServiceCatalog for {HOST_ID}"
+        service_ids = {s.data.service_id for s in matching}
+        assert "CameraService" in service_ids
+        assert "ProcedureContextService" in service_ids
 
 
 class TestOperationalServiceStatus:
@@ -259,8 +258,6 @@ class TestOperationalRpcControl:
         reply = _send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for get_capabilities"
         result = reply.get_capabilities.result.return_
-        assert "CameraService" in result.supported_services
-        assert "ProcedureContextService" in result.supported_services
         assert result.capacity == 2
 
     def test_start_camera_service(

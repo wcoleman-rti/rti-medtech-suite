@@ -114,13 +114,13 @@ The full release version policy — including version increment rules, release c
 - Surgeon-facing PySide6 GUI application for driving the procedure lifecycle: select patient, procedure type, equipment configuration, start procedure, monitor, stop
 - Subscribes to Hospital domain for scheduling context and patient information (read-only, via Routing Service bridge)
 - Issues service lifecycle commands via DDS RPC (`ServiceHostControl` interface) to targeted Service Hosts on the Orchestration domain
-- Subscribes to `HostCatalog` and `ServiceStatus` topics on the Orchestration domain for real-time visibility of host availability and service state
+- Subscribes to `ServiceCatalog` and `ServiceStatus` topics on the Orchestration domain for real-time visibility of host availability and service state
 - Reconstructs full orchestration state on restart via TRANSIENT_LOCAL status topics
 
 #### Service Host Framework
 - Distributed process that hosts and manages DDS services locally on behalf of the Procedure Controller
 - Exposes a `ServiceHostControl` RPC service (uniquely named per host instance) for receiving start/stop/configure commands
-- Polls hosted services' `state` property and publishes `HostCatalog` (capabilities, health) and `ServiceStatus` (per-service lifecycle state) on the Orchestration domain
+- Polls hosted services’ `state` property and publishes `ServiceCatalog` (per-service capabilities, configuration descriptors, health) and `ServiceStatus` (per-service lifecycle state) on the Orchestration domain
 - Reconciliation loop: on startup or controller reconnection, compares desired state from RPC commands against actual local service state and converges
 - Specialized subtypes: Robot Service Host (C++, manages robot controller), Clinical Service Host (Python, manages vitals/alarms/telemetry), Operational Service Host (Python, manages camera/context)
 
@@ -135,7 +135,7 @@ The full release version policy — including version increment rules, release c
 | Procedure Controller (PySide6 GUI) | DDS RPC client (Modern C++ and Python), multi-domain participant (Hospital + Orchestration), QtAsyncio integration |
 | Service Host framework | DDS RPC service, dual-mode service lifecycle, per-host unique service naming |
 | Orchestration domain | Dedicated domain for infrastructure control-plane, `Pattern.Status` for state topics, `Pattern.RPC` for command channel |
-| `HostCatalog` + `ServiceStatus` topics | TRANSIENT_LOCAL state reconstruction, write-on-change, liveliness-based host failure detection |
+| `ServiceCatalog` + `ServiceStatus` topics | TRANSIENT_LOCAL state reconstruction, write-on-change, liveliness-based host failure detection |
 | `ServiceHostControl` RPC interface | IDL `@service` interface, typed request/reply, generated client/service stubs for C++ and Python |
 | `medtech::Service` interface | Consistent service contract across C++ and Python, pollable `ServiceState` for lifecycle reporting |
 

@@ -338,7 +338,77 @@ Separated by blank lines, sorted alphabetically within each group:
 1. `from __future__ import annotations`
 2. Standard library (`import asyncio`, `from pathlib import Path`)
 3. Third-party (`import rti.connext as dds`, `from PySide6.QtWidgets import ...`)
-4. Project (`from medtech_gui import init_theme`)
+4. Project (`from medtech.gui import init_theme`)
+
+### Shared Package Structure (`medtech` Namespace)
+
+All project-authored shared Python code lives under a single `medtech`
+top-level package, mirroring the C++ `medtech::` root namespace. This
+eliminates multiple unrelated top-level packages and gives all shared
+imports a consistent prefix.
+
+| Submodule | Source location | Import path | Purpose |
+|-----------|----------------|-------------|--------|
+| `medtech` (root) | `modules/shared/medtech/__init__.py` | `from medtech import Service` | Re-exports `Service`, `ServiceState` |
+| `medtech.service` | `modules/shared/medtech/service.py` | `from medtech.service import Service` | Service ABC |
+| `medtech.service_host` | `modules/shared/medtech/service_host.py` | `from medtech.service_host import ServiceHost` | Generic Service Host |
+| `medtech.dds` | `modules/shared/medtech/dds.py` | `from medtech.dds import initialize_connext` | Pre-participant DDS init |
+| `medtech.log` | `modules/shared/medtech/log.py` | `from medtech.log import init_logging` | RTI Connext Logging wrapper |
+| `medtech.gui` | `modules/shared/medtech/gui/` | `from medtech.gui import init_theme` | PySide6 theme + widgets |
+
+**C++ alignment:** All shared C++ headers already live under
+`include/medtech/` and use the `medtech::` namespace. The Python
+structure mirrors this: `medtech.dds` ↔ `medtech/dds_init.hpp`,
+`medtech.log` ↔ `medtech/logging.hpp`, etc.
+
+**Directory layout:**
+
+```text
+modules/shared/
+├── medtech/                     # Single Python namespace package
+│   ├── __init__.py              # Re-exports Service, ServiceState
+│   ├── service.py               # medtech.service
+│   ├── service_host.py          # medtech.service_host
+│   ├── dds.py                   # medtech.dds (was medtech_dds_init)
+│   ├── log.py                   # medtech.log (was medtech_logging)
+│   └── gui/                     # medtech.gui subpackage (was medtech_gui)
+│       ├── __init__.py
+│       ├── _theme.py
+│       └── _widgets.py
+├── include/                     # Unified C++ include tree
+│   └── medtech/
+│       ├── dds_init.hpp
+│       ├── logging.hpp
+│       ├── service.hpp
+│       └── service_host.hpp
+└── src/                         # C++ implementation
+    ├── CMakeLists.txt
+    └── service_host.cpp
+```
+
+**Install layout** (under `install/lib/python/site-packages/`):
+
+```text
+medtech/
+├── __init__.py
+├── service.py
+├── service_host.py
+├── dds.py
+├── log.py
+└── gui/
+    ├── __init__.py
+    ├── _theme.py
+    └── _widgets.py
+```
+
+**Naming rationale:**
+
+- `medtech.dds` instead of `medtech.dds_init` — shorter; the module
+  contains only `initialize_connext()` today but may grow to include
+  shared DDS utilities.
+- `medtech.log` instead of `medtech.logging` — avoids shadowing the
+  Python standard library `logging` module.
+- `medtech.gui` instead of `medtech_gui` — consistent namespace.
 
 ### Docstrings
 

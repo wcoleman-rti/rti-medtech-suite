@@ -80,7 +80,7 @@ def initialize_connext() -> None:
 
     # Orchestration module
     dds.DomainParticipant.register_idl_type(
-        orchestration.Orchestration.HostCatalog, "Orchestration::HostCatalog"
+        orchestration.Orchestration.ServiceCatalog, "Orchestration::ServiceCatalog"
     )
     dds.DomainParticipant.register_idl_type(
         orchestration.Orchestration.ServiceStatus, "Orchestration::ServiceStatus"

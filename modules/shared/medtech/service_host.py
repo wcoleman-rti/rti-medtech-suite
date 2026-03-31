@@ -2,7 +2,7 @@
 
 Provides the reusable ServiceHost class that all concrete service hosts
 (robot, clinical, operational) share.  A concrete host only needs to
-provide a factory map and call ``make_service_host()``.
+provide a service registry and call ``make_service_host()``.
 
 C++ and Python service host implementations mirror each other:
   C++ — medtech::make_service_host<N>()  (service_host.hpp / .cpp)
@@ -14,6 +14,7 @@ Key types are keyed by service_id (str, matching Common::EntityId).
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import time
 from typing import Callable
@@ -32,22 +33,33 @@ Time_t = common.Common.Time_t
 # ---------------------------------------------------------------------------
 # ServiceFactory — creates a medtech.Service.
 #
-# Zero-arg: all context (room_id, procedure_id, device IDs, logger, …)
-# is captured in the closure at registration time.  The framework has
-# no opinion on what parameters each service needs.
+# Accepts the full Orchestration.ServiceRequest so the host can pass
+# both the service_id and any configuration properties to each service
+# it creates.  All other context (room_id, procedure_id, device IDs,
+# logger, …) is captured in the closure at registration time.
 # ---------------------------------------------------------------------------
-ServiceFactory = Callable[[str], Service]
-"""Callable(service_id: str) -> Service"""
+ServiceFactory = Callable[[Orchestration.ServiceRequest], Service]
+"""Callable(req: Orchestration.ServiceRequest) -> Service"""
 
-ServiceFactoryMap = dict[str, ServiceFactory]
-"""Factory map keyed by service_id (Common::EntityId)."""
+
+@dataclasses.dataclass
+class ServiceRegistration:
+    """Bundles a factory with its catalog metadata."""
+
+    factory: ServiceFactory
+    display_name: str
+    properties: list  # list[Orchestration.PropertyDescriptor]
+
+
+ServiceRegistryMap = dict[str, ServiceRegistration]
+"""Registry map keyed by service_id (Common::EntityId)."""
 
 
 # ---------------------------------------------------------------------------
 # ServiceHostControlImpl — RPC handler (Python ABC implementation).
 # ---------------------------------------------------------------------------
 class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
-    """Generic RPC implementation dispatching to a factory map.
+    """Generic RPC implementation dispatching to a service registry.
 
     Each method is called by the rti.rpc.Service dispatch loop on a
     background asyncio task.  Mirrors the C++ ServiceHostControlImpl.
@@ -57,11 +69,11 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
         self,
         host_id: str,
         capacity: int,
-        factories: ServiceFactoryMap,
+        registry: ServiceRegistryMap,
     ) -> None:
         self._host_id = host_id
         self._capacity = capacity
-        self._factories = factories
+        self._registry = registry
         self._slots: dict[str, _ServiceSlot] = {}
         self._log = logging.getLogger(f"medtech.service_host.{host_id}")
 
@@ -71,7 +83,7 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
         svc_id: str = req.service_id
         result = Orchestration.OperationResult()
 
-        if svc_id not in self._factories:
+        if svc_id not in self._registry:
             result.code = Orchestration.OperationResultCode.INVALID_SERVICE
             result.message = f"Unknown service: {svc_id}"
             self._log.info("start_service rejected: INVALID_SERVICE (%s)", svc_id)
@@ -89,7 +101,7 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
             del self._slots[svc_id]
 
         try:
-            service = self._factories[svc_id](svc_id)
+            service = self._registry[svc_id].factory(req)
             task = asyncio.ensure_future(service.run())
             self._slots[svc_id] = _ServiceSlot(service=service, task=task)
 
@@ -102,10 +114,8 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
             result.message = "Failed to start service"
         return result
 
-    def stop_service(
-        self, req: Orchestration.ServiceRequest
-    ) -> Orchestration.OperationResult:
-        svc_id: str = req.service_id
+    def stop_service(self, service_id: str) -> Orchestration.OperationResult:
+        svc_id: str = service_id
         result = Orchestration.OperationResult()
 
         slot = self._slots.get(svc_id)
@@ -125,22 +135,20 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
         self._log.info("stop_service: OK (service_id=%s)", svc_id)
         return result
 
-    def configure_service(
-        self, req: Orchestration.ConfigureRequest
+    def update_service(
+        self, req: Orchestration.ServiceRequest
     ) -> Orchestration.OperationResult:
         result = Orchestration.OperationResult()
         result.code = Orchestration.OperationResultCode.OK
         result.message = "Configuration accepted (no-op in V1.0)"
-        self._log.info("configure_service: OK (service_id=%s)", req.service_id)
+        self._log.info("update_service: OK (service_id=%s)", req.service_id)
         return result
 
     def get_capabilities(self) -> Orchestration.CapabilityReport:
         report = Orchestration.CapabilityReport()
-        report.supported_services = list(self._factories.keys())
         report.capacity = self._capacity
         self._log.info(
-            "get_capabilities: reported %d service(s), capacity=%d",
-            len(self._factories),
+            "get_capabilities: capacity=%d",
             self._capacity,
         )
         return report
@@ -163,8 +171,13 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
         return {sid: slot.service.state for sid, slot in self._slots.items()}
 
     def registered_service_ids(self) -> list[str]:
-        """Return factory-registered service IDs."""
-        return list(self._factories.keys())
+        """Return registry-registered service IDs."""
+        return list(self._registry.keys())
+
+    @property
+    def registry(self) -> ServiceRegistryMap:
+        """Read-only access to the registry for catalog publishing."""
+        return self._registry
 
     async def stop_all(self) -> None:
         """Stop all running services."""
@@ -193,8 +206,8 @@ class ServiceHost(Service):
     """Generic orchestration host managing services via RPC.
 
     Creates an Orchestration domain participant, registers the RPC service,
-    publishes HostCatalog and ServiceStatus, and blocks in run().
-    Configured via ServiceFactoryMap — the only variation point between
+    publishes ServiceCatalog and ServiceStatus, and blocks in run().
+    Configured via ServiceRegistryMap — the only variation point between
     robot, clinical, and operational service hosts.
     """
 
@@ -203,18 +216,17 @@ class ServiceHost(Service):
         host_id: str,
         host_name: str,
         capacity: int,
-        factories: ServiceFactoryMap,
+        registry: ServiceRegistryMap,
     ) -> None:
-        if len(factories) > capacity:
+        if len(registry) > capacity:
             raise ValueError(
                 f"ServiceHost(capacity={capacity}): registered "
-                f"{len(factories)} factories — exceeds capacity"
+                f"{len(registry)} services — exceeds capacity"
             )
 
         self._host_id = host_id
         self._host_name = host_name
         self._capacity = capacity
-        self._factories = factories
         self._state_val = ServiceState.STOPPED
         self._stop_event: asyncio.Event | None = None
         self._log = logging.getLogger(f"medtech.service_host.{host_id}")
@@ -229,10 +241,12 @@ class ServiceHost(Service):
         self._log.info("Orchestration participant created")
 
         # -- Look up pub/sub entities --
-        catalog_any = self._participant.find_datawriter(orch_names.HOST_CATALOG_WRITER)
+        catalog_any = self._participant.find_datawriter(
+            orch_names.SERVICE_CATALOG_WRITER
+        )
         status_any = self._participant.find_datawriter(orch_names.SERVICE_STATUS_WRITER)
         if catalog_any is None:
-            raise RuntimeError(f"Writer not found: {orch_names.HOST_CATALOG_WRITER}")
+            raise RuntimeError(f"Writer not found: {orch_names.SERVICE_CATALOG_WRITER}")
         if status_any is None:
             raise RuntimeError(f"Writer not found: {orch_names.SERVICE_STATUS_WRITER}")
         self._catalog_writer = dds.DataWriter(catalog_any)
@@ -240,7 +254,7 @@ class ServiceHost(Service):
         self._log.info("Orchestration DataWriters found")
 
         # -- Create the RPC implementation --
-        self._rpc_impl = _ServiceHostControlImpl(host_id, capacity, factories)
+        self._rpc_impl = _ServiceHostControlImpl(host_id, capacity, registry)
 
     async def run(self) -> None:
         self._state_val = ServiceState.STARTING
@@ -257,8 +271,8 @@ class ServiceHost(Service):
         )
         self._log.info("RPC service registered: ServiceHostControl/%s", self._host_id)
 
-        # -- Publish initial HostCatalog --
-        self._publish_host_catalog()
+        # -- Publish initial ServiceCatalog (one instance per service) --
+        self._publish_service_catalog()
 
         # -- Publish initial ServiceStatus (STOPPED) for each service --
         for svc_id in self._rpc_impl.registered_service_ids():
@@ -311,15 +325,17 @@ class ServiceHost(Service):
 
     # -- Private helpers --
 
-    def _publish_host_catalog(self) -> None:
-        catalog = Orchestration.HostCatalog(
-            host_id=self._host_id,
-            supported_services=list(self._factories.keys()),
-            capacity=self._capacity,
-            health_summary="OK",
-        )
-        self._catalog_writer.write(catalog)
-        self._log.info("Published HostCatalog for host %s", self._host_id)
+    def _publish_service_catalog(self) -> None:
+        for svc_id, reg in self._rpc_impl.registry.items():
+            catalog = Orchestration.ServiceCatalog(
+                host_id=self._host_id,
+                service_id=svc_id,
+                display_name=reg.display_name,
+                properties=list(reg.properties),
+                health_summary="OK",
+            )
+            self._catalog_writer.write(catalog)
+            self._log.info("Published ServiceCatalog for %s/%s", self._host_id, svc_id)
 
     def _publish_service_status(self, service_id: str, svc_state: ServiceState) -> None:
         now = time.time()
@@ -340,19 +356,23 @@ def make_service_host(
     host_id: str,
     host_name: str,
     capacity: int,
-    factories: ServiceFactoryMap,
+    registry: ServiceRegistryMap,
 ) -> ServiceHost:
-    """Create a ServiceHost with the given factories and capacity.
+    """Create a ServiceHost with the given registry and capacity.
 
     Usage::
 
-        factories = {
-            "RobotControllerService": lambda: make_robot(room, proc, log),
+        registry = {
+            "RobotControllerService": ServiceRegistration(
+                factory=lambda req: make_robot(req, room, proc, log),
+                display_name="Robot Controller",
+                properties=[],
+            ),
         }
         host = make_service_host(
             "robot-host-or1",
-            "RobotServiceHost", 1, factories
+            "RobotServiceHost", 1, registry
         )
         await host.run()
     """
-    return ServiceHost(host_id, host_name, capacity, factories)
+    return ServiceHost(host_id, host_name, capacity, registry)

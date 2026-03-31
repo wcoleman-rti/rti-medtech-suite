@@ -42,12 +42,12 @@ reception.
 | Connext Feature | How It Is Used |
 |-----------------|----------------|
 | DDS topics | `RobotState`, `OperatorInput`, `RobotCommand`, `SafetyInterlock`, `PatientVitals`, `WaveformData`, `AlarmMessages`, `DeviceTelemetry`, `ProcedureContext`, `ProcedureStatus`, `CameraFrame`, `CameraConfig` |
-| Orchestration topics | `HostCatalog`, `ServiceStatus` |
+| Orchestration topics | `ServiceCatalog`, `ServiceStatus` |
 | DDS RPC | `ServiceHostControl/<host_id>` — start, stop, configure, capabilities, health |
 | QoS profiles | `TopicProfiles::*` per topic — State, Stream, Command patterns loaded from `NDDS_QOS_PROFILES` XML |
 | Domain tags | `control`, `clinical`, `operational` — each tag uses a separate `DomainParticipant` |
 | Partitions | `room/<ROOM_ID>/procedure/<PROCEDURE_ID>` — set programmatically at participant startup |
-| TRANSIENT_LOCAL durability | State-pattern topics for late-joiner support; `HostCatalog` and `ServiceStatus` for controller restart reconstruction |
+| TRANSIENT_LOCAL durability | State-pattern topics for late-joiner support; `ServiceCatalog` and `ServiceStatus` for controller restart reconstruction |
 | Exclusive ownership | `DeviceTelemetry` supports primary/backup failover via ownership strength |
 | Time-based filter | Digital twin applies 100 ms minimum separation on high-rate readers (`RobotState`, `OperatorInput`) for 60 Hz rendering |
 | Cloud Discovery Service | All participants discover peers through CDS (`NDDS_DISCOVERY_PEERS`) |
@@ -247,7 +247,7 @@ Orchestration domain, no domain tags. Created by each Service Host.
 
 | Entity | Topic | QoS Profile | Notes |
 |--------|-------|-------------|-------|
-| DataWriter | `HostCatalog` | `OrchestrationProfiles::HostCatalog` | TRANSIENT_LOCAL, liveliness 2 s |
+| DataWriter | `ServiceCatalog` | `OrchestrationProfiles::ServiceCatalog` | TRANSIENT_LOCAL, liveliness 2 s |
 | DataWriter | `ServiceStatus` | `OrchestrationProfiles::ServiceStatus` | TRANSIENT_LOCAL, write-on-change |
 | RPC Service | `ServiceHostControl/<host_id>` | `Pattern.RPC` | RELIABLE, KEEP_ALL |
 

@@ -109,7 +109,7 @@ Orchestration domain scenarios use partition `room/<room_id>`.
 
 ### Scenario: Procedure Controller requests arm startup with table position `@integration` `@multi-arm` `@orchestration`
 
-**Given** the Procedure Controller has discovered a Robot Service Host via `HostCatalog`
+**Given** the Procedure Controller has discovered a Robot Service Host via `ServiceCatalog`
 **When** the controller sends a `start_service` RPC request to the Robot Service Host
 **Then** the request includes the desired `table_position` in the service configuration parameters
 **And** the Service Host spawns the arm service with the requested position

@@ -60,7 +60,7 @@ inline void initialize_connext()
         rti::domain::register_type<Hospital::ResourceAvailability>("Hospital::ResourceAvailability");
 
         // Orchestration module
-        rti::domain::register_type<Orchestration::HostCatalog>("Orchestration::HostCatalog");
+        rti::domain::register_type<Orchestration::ServiceCatalog>("Orchestration::ServiceCatalog");
         rti::domain::register_type<Orchestration::ServiceStatus>("Orchestration::ServiceStatus");
     });
 }

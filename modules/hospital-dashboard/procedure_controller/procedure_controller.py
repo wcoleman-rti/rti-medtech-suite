@@ -1,6 +1,6 @@
 """Procedure Controller — PySide6 GUI for orchestrating surgical services.
 
-Subscribes to HostCatalog and ServiceStatus on the Orchestration domain
+Subscribes to ServiceCatalog and ServiceStatus on the Orchestration domain
 (Domain 15) via async DDS reads (``rti.asyncio`` / ``take_data_async``).
 Issues RPC commands to Service Hosts via ServiceHostControl client stubs
 on a worker thread. Reads scheduling context from the Hospital domain
@@ -79,7 +79,7 @@ class ProcedureController(QMainWindow):
     """PySide6 main window for orchestrating surgical services.
 
     Creates two DomainParticipants:
-      - Orchestration domain: HostCatalog + ServiceStatus subscribers,
+      - Orchestration domain: ServiceCatalog + ServiceStatus subscribers,
         ServiceHostControl RPC client
       - Hospital domain: read-only subscriber for scheduling context
 
@@ -113,7 +113,7 @@ class ProcedureController(QMainWindow):
         self._tasks: list[asyncio.Task] = []
 
         # State tracking
-        self._hosts: dict[str, Orchestration.HostCatalog] = {}
+        self._catalogs: dict[tuple[str, str], Orchestration.ServiceCatalog] = {}
         self._service_states: dict[tuple[str, str], Orchestration.ServiceStatus] = {}
         self._pub_handle_to_host: dict[dds.InstanceHandle, str] = {}
 
@@ -149,7 +149,9 @@ class ProcedureController(QMainWindow):
         self._orch_participant.enable()
 
         self._catalog_reader = dds.DataReader(
-            self._orch_participant.find_datareader(orch_names.CTRL_HOST_CATALOG_READER)
+            self._orch_participant.find_datareader(
+                orch_names.CTRL_SERVICE_CATALOG_READER
+            )
         )
         self._status_reader = dds.DataReader(
             self._orch_participant.find_datareader(
@@ -158,7 +160,7 @@ class ProcedureController(QMainWindow):
         )
         if self._catalog_reader is None:
             raise RuntimeError(
-                f"Reader not found: {orch_names.CTRL_HOST_CATALOG_READER}"
+                f"Reader not found: {orch_names.CTRL_SERVICE_CATALOG_READER}"
             )
         if self._status_reader is None:
             raise RuntimeError(
@@ -419,9 +421,9 @@ class ProcedureController(QMainWindow):
                 "ACTIVE",
             )
             if is_running:
-                btn_cfg = QPushButton("\u2699  Configure")
+                btn_cfg = QPushButton("\u2699  Update")
                 btn_cfg.setObjectName("infoTile")
-                btn_cfg.clicked.connect(self._on_configure_selected)
+                btn_cfg.clicked.connect(self._on_update_selected)
                 self._overlay_layout.addWidget(btn_cfg)
             else:
                 btn_start = QPushButton("\u25B6  Start")
@@ -466,7 +468,7 @@ class ProcedureController(QMainWindow):
     # ------------------------------------------------------------------ #
 
     def _build_host_tile(
-        self, host_id: str, catalog: Orchestration.HostCatalog
+        self, host_id: str, services: dict[str, Orchestration.ServiceCatalog]
     ) -> QFrame:
         """Build a fixed-size tappable tile for a service host."""
         tile = QFrame()
@@ -482,17 +484,17 @@ class ProcedureController(QMainWindow):
         name_lbl.setWordWrap(True)
         tile_layout.addWidget(name_lbl)
 
-        cap_lbl = QLabel(f"Capacity: {catalog.capacity}")
-        cap_lbl.setObjectName("cardMeta")
-        tile_layout.addWidget(cap_lbl)
-
-        svc_count = len(catalog.supported_services)
+        svc_count = len(services)
         count_lbl = QLabel(f"{svc_count} service{'s' if svc_count != 1 else ''}")
         count_lbl.setObjectName("cardMeta")
         tile_layout.addWidget(count_lbl)
 
-        if catalog.health_summary:
-            health_lbl = QLabel(catalog.health_summary)
+        # Aggregate health from individual ServiceCatalog entries
+        summaries = [
+            cat.health_summary for cat in services.values() if cat.health_summary
+        ]
+        if summaries:
+            health_lbl = QLabel("; ".join(summaries))
             health_lbl.setObjectName("cardDescription")
             health_lbl.setWordWrap(True)
             tile_layout.addWidget(health_lbl)
@@ -554,15 +556,16 @@ class ProcedureController(QMainWindow):
 
     def _rebuild_host_view(self) -> None:
         """Rebuild the Host View tile grid from current state."""
-        if not self._hosts:
+        host_services = self._services_by_host()
+        if not host_services:
             self._host_page.setCurrentIndex(0)
             return
         self._host_page.setCurrentIndex(1)
 
         _clear_flow(self._host_flow)
 
-        for host_id, catalog in sorted(self._hosts.items()):
-            tile = self._build_host_tile(host_id, catalog)
+        for host_id in sorted(host_services):
+            tile = self._build_host_tile(host_id, host_services[host_id])
             self._host_flow.addWidget(tile)
 
         self._update_tile_highlights()
@@ -586,7 +589,7 @@ class ProcedureController(QMainWindow):
         """Update the summary KPI stat cards."""
         host_val = self._stat_hosts.findChild(QLabel, "statValue")
         if host_val is not None:
-            host_val.setText(str(len(self._hosts)))
+            host_val.setText(str(len(self._services_by_host())))
 
         running = sum(
             1
@@ -610,8 +613,8 @@ class ProcedureController(QMainWindow):
     # Async DDS receive loops                                              #
     # ------------------------------------------------------------------ #
 
-    async def _receive_host_catalog(self) -> None:
-        """Consume HostCatalog samples asynchronously.
+    async def _receive_service_catalog(self) -> None:
+        """Consume ServiceCatalog samples asynchronously.
 
         Uses ``take_async()`` (not ``take_data_async()``) so we can
         capture the publication handle from SampleInfo for each writer.
@@ -623,7 +626,7 @@ class ProcedureController(QMainWindow):
                 self._pub_handle_to_host[sample.info.publication_handle] = (
                     sample.data.host_id
                 )
-                self._update_host(sample.data)
+                self._update_catalog(sample.data)
 
     async def _receive_service_status(self) -> None:
         """Consume ServiceStatus samples asynchronously."""
@@ -631,7 +634,7 @@ class ProcedureController(QMainWindow):
             self._update_service_status(data)
 
     async def _monitor_liveliness(self) -> None:
-        """Monitor HostCatalog writer liveliness via StatusCondition.
+        """Monitor ServiceCatalog writer liveliness via StatusCondition.
 
         Uses ``wait_async`` (not ``dispatch_async``) so that the
         liveliness-change processing runs inline on the asyncio/Qt
@@ -667,27 +670,44 @@ class ProcedureController(QMainWindow):
                     if host_id is not None:
                         self._remove_host(host_id)
                     # Fallback: if no writers remain, purge all hosts
-                    if st.alive_count == 0 and self._hosts:
-                        for hid in list(self._hosts):
+                    if st.alive_count == 0 and self._catalogs:
+                        for hid in list(self._known_host_ids()):
                             self._remove_host(hid)
                         self._pub_handle_to_host.clear()
         finally:
             waitset -= status_cond
 
-    def _update_host(self, catalog: Orchestration.HostCatalog) -> None:
-        """Process a HostCatalog sample and update the UI."""
-        host_id = catalog.host_id
-        self._hosts[host_id] = catalog
+    def _known_host_ids(self) -> set[str]:
+        """Derive unique host IDs from the catalog keys."""
+        return {host_id for host_id, _ in self._catalogs}
+
+    def _services_by_host(self) -> dict[str, dict[str, Orchestration.ServiceCatalog]]:
+        """Group catalog entries by host_id."""
+        result: dict[str, dict[str, Orchestration.ServiceCatalog]] = {}
+        for (host_id, svc_id), cat in self._catalogs.items():
+            result.setdefault(host_id, {})[svc_id] = cat
+        return result
+
+    def _update_catalog(self, catalog: Orchestration.ServiceCatalog) -> None:
+        """Process a ServiceCatalog sample and update the UI."""
+        key = (catalog.host_id, catalog.service_id)
+        self._catalogs[key] = catalog
         self._rebuild_host_view()
         self._refresh_stat_cards()
         if self._conn_dot is not None:
             self._conn_dot.set_connected(True)
-        self._status_bar.showMessage(f"Discovered {len(self._hosts)} host(s)", 3000)
-        log.informational(f"HostCatalog received: host_id={host_id}")
+        host_count = len(self._known_host_ids())
+        self._status_bar.showMessage(f"Discovered {host_count} host(s)", 3000)
+        log.informational(
+            f"ServiceCatalog received: host_id={catalog.host_id}, "
+            f"service_id={catalog.service_id}"
+        )
 
     def _remove_host(self, host_id: str) -> None:
         """Remove a host and its services after liveliness loss."""
-        self._hosts.pop(host_id, None)
+        dead_catalog_keys = [k for k in self._catalogs if k[0] == host_id]
+        for k in dead_catalog_keys:
+            del self._catalogs[k]
         dead_keys = [k for k in self._service_states if k[0] == host_id]
         for k in dead_keys:
             del self._service_states[k]
@@ -737,7 +757,7 @@ class ProcedureController(QMainWindow):
         self._running = True
         loop = asyncio.get_event_loop()
         self._tasks = [
-            loop.create_task(self._receive_host_catalog()),
+            loop.create_task(self._receive_service_catalog()),
             loop.create_task(self._receive_service_status()),
             loop.create_task(self._monitor_liveliness()),
             loop.create_task(self._ui_consistency_sweep()),
@@ -769,7 +789,7 @@ class ProcedureController(QMainWindow):
                     self._pub_handle_to_host[sample.info.publication_handle] = (
                         sample.data.host_id
                     )
-                    self._update_host(sample.data)
+                    self._update_catalog(sample.data)
         except dds.AlreadyClosedError:
             pass
         try:
@@ -863,11 +883,11 @@ class ProcedureController(QMainWindow):
             host_id, svc_id = self._selected_svc_key
             self._on_stop(host_id, svc_id)
 
-    def _on_configure_selected(self) -> None:
-        """Configure the selected service."""
+    def _on_update_selected(self) -> None:
+        """Update the selected service."""
         if self._selected_svc_key:
             host_id, svc_id = self._selected_svc_key
-            self._on_configure(host_id, svc_id)
+            self._on_update(host_id, svc_id)
 
     def _on_capabilities_selected(self) -> None:
         """Query capabilities of the selected host."""
@@ -882,9 +902,8 @@ class ProcedureController(QMainWindow):
     def _on_start_all(self) -> None:
         """Start all discovered services across all hosts."""
         calls = []
-        for host_id, catalog in self._hosts.items():
-            for svc_name in catalog.supported_services:
-                calls.append((host_id, _make_start_call(svc_name), "start_service"))
+        for host_id, svc_id in self._catalogs:
+            calls.append((host_id, _make_start_call(svc_id), "start_service"))
         if calls:
             self._status_bar.showMessage(f"Starting {len(calls)} service(s)\u2026")
             asyncio.get_event_loop().create_task(self._do_rpc_batch(calls))
@@ -892,9 +911,8 @@ class ProcedureController(QMainWindow):
     def _on_stop_all(self) -> None:
         """Stop all discovered services across all hosts."""
         calls = []
-        for host_id, catalog in self._hosts.items():
-            for svc_name in catalog.supported_services:
-                calls.append((host_id, _make_stop_call(svc_name), "stop_service"))
+        for host_id, svc_id in self._catalogs:
+            calls.append((host_id, _make_stop_call(svc_id), "stop_service"))
         if calls:
             self._status_bar.showMessage(f"Stopping {len(calls)} service(s)\u2026")
             asyncio.get_event_loop().create_task(self._do_rpc_batch(calls))
@@ -915,12 +933,12 @@ class ProcedureController(QMainWindow):
             self._do_rpc(host_id, call, "stop_service")
         )
 
-    def _on_configure(self, host_id: str, service_id: str) -> None:
-        """Handle Configure action for a specific service."""
-        call = _make_configure_call(service_id)
-        self._status_bar.showMessage(f"Configuring {service_id} on {host_id}\u2026")
+    def _on_update(self, host_id: str, service_id: str) -> None:
+        """Handle Update action for a specific service."""
+        call = _make_update_call(service_id)
+        self._status_bar.showMessage(f"Updating {service_id} on {host_id}\u2026")
         asyncio.get_event_loop().create_task(
-            self._do_rpc(host_id, call, "configure_service")
+            self._do_rpc(host_id, call, "update_service")
         )
 
     def _on_capabilities(self, host_id: str) -> None:
@@ -973,7 +991,6 @@ class ProcedureController(QMainWindow):
                     "Capabilities",
                     None,
                     [
-                        ("Services", ", ".join(result.supported_services)),
                         ("Capacity", str(result.capacity)),
                     ],
                 )
@@ -1088,9 +1105,14 @@ class ProcedureController(QMainWindow):
     # ------------------------------------------------------------------ #
 
     @property
-    def hosts(self) -> dict[str, Orchestration.HostCatalog]:
-        """Currently discovered hosts."""
-        return dict(self._hosts)
+    def catalogs(self) -> dict[tuple[str, str], Orchestration.ServiceCatalog]:
+        """Currently discovered service catalogs."""
+        return dict(self._catalogs)
+
+    @property
+    def hosts(self) -> set[str]:
+        """Currently discovered host IDs."""
+        return self._known_host_ids()
 
     @property
     def service_states(
@@ -1283,7 +1305,7 @@ def _make_start_call(service_id: str) -> object:
     """Build RPC call for start_service."""
     call = _CallType()
     _in = _CallType.in_structs[-522153841][1]()
-    _in.req = Orchestration.ServiceRequest(service_id=service_id, configuration="")
+    _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=[])
     call.start_service = _in
     return call
 
@@ -1292,7 +1314,7 @@ def _make_stop_call(service_id: str) -> object:
     """Build RPC call for stop_service."""
     call = _CallType()
     _in = _CallType.in_structs[123337698][1]()
-    _in.req = Orchestration.ServiceRequest(service_id=service_id, configuration="")
+    _in.service_id = service_id
     call.stop_service = _in
     return call
 
@@ -1311,14 +1333,14 @@ def _make_get_health_call() -> object:
     return call
 
 
-def _make_configure_call(service_id: str, configuration: str = "") -> object:
-    """Build RPC call for configure_service."""
+def _make_update_call(service_id: str, properties: list | None = None) -> object:
+    """Build RPC call for update_service."""
     call = _CallType()
-    _in = _CallType.in_structs[-1680089419][1]()
-    _in.req = Orchestration.ConfigureRequest(
-        service_id=service_id, configuration=configuration
+    _in = _CallType.in_structs[312505061][1]()
+    _in.req = Orchestration.ServiceRequest(
+        service_id=service_id, properties=properties or []
     )
-    call.configure_service = _in
+    call.update_service = _in
     return call
 
 
@@ -1331,10 +1353,10 @@ def _extract_rpc_result(reply: object, op_name: str) -> str:
             return f"{result.code} \u2014 {result.message}"
         elif op_name == "stop_service":
             return f"{result.code} \u2014 {result.message}"
-        elif op_name == "configure_service":
+        elif op_name == "update_service":
             return f"{result.code} \u2014 {result.message}"
         elif op_name == "get_capabilities":
-            return f"services={result.supported_services}, capacity={result.capacity}"
+            return f"capacity={result.capacity}"
         elif op_name == "get_health":
             return f"alive={result.alive}, summary={result.summary}"
         return str(result)
