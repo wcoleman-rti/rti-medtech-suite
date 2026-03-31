@@ -24,7 +24,7 @@
         <!-- Orchestration domain topics -->
         <qos_profile name="ServiceCatalog" base_name="Patterns::State">
             <base_name>
-                <element>Snippets::Liveliness2s</element>
+                <element>Snippets::LivelinessStandard</element>
             </base_name>
         </qos_profile>
 
@@ -33,38 +33,38 @@
         <!-- Topics with additional tuning (deadline, lifespan, liveliness) -->
         <qos_profile name="OperatorInput" base_name="Patterns::Stream">
             <base_name>
-                <element>Snippets::Deadline4ms</element>
-                <element>Snippets::Lifespan20ms</element>
+                <element>Snippets::DeadlineOperatorInput</element>
+                <element>Snippets::LifespanOperatorInput</element>
             </base_name>
         </qos_profile>
 
         <qos_profile name="RobotState" base_name="Patterns::State">
             <base_name>
-                <element>Snippets::Deadline20ms</element>
+                <element>Snippets::DeadlineRobotState</element>
             </base_name>
         </qos_profile>
 
         <qos_profile name="SafetyInterlock" base_name="Patterns::State">
             <base_name>
-                <element>Snippets::Liveliness500ms</element>
+                <element>Snippets::LivelinessSafety</element>
             </base_name>
         </qos_profile>
 
         <qos_profile name="PatientVitals" base_name="Patterns::State">
             <base_name>
-                <element>Snippets::Deadline2s</element>
+                <element>Snippets::DeadlinePatientVitals</element>
             </base_name>
         </qos_profile>
 
         <qos_profile name="WaveformData" base_name="Patterns::Stream">
             <base_name>
-                <element>Snippets::Deadline40ms</element>
+                <element>Snippets::DeadlineWaveform</element>
             </base_name>
         </qos_profile>
 
         <qos_profile name="CameraFrame" base_name="Patterns::Stream">
             <base_name>
-                <element>Snippets::Deadline66ms</element>
+                <element>Snippets::DeadlineCameraFrame</element>
             </base_name>
         </qos_profile>
 
@@ -126,13 +126,13 @@
         <!-- GuiOperatorInput: display reader at 60 Hz.
              The base OperatorInput profile has a 4 ms deadline (for the
              robot controller). The GUI reader does not need that strict
-             deadline. GuiDeadline100ms relaxes the reader deadline to 100 ms
+             deadline. GuiReaderDeadline relaxes the reader deadline to 100 ms
              so the TBF (16 ms) satisfies the DDS constraint:
              time_based_filter <= deadline. -->
         <qos_profile name="GuiOperatorInput" base_name="TopicProfiles::OperatorInput">
             <base_name>
                 <element>Snippets::GuiSubsample</element>
-                <element>Snippets::GuiDeadline100ms</element>
+                <element>Snippets::GuiReaderDeadline</element>
             </base_name>
         </qos_profile>
 

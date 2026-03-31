@@ -14,6 +14,20 @@ x-medtech-env: &medtech-env
   MEDTECH_TRANSPORT_PROFILE: "Docker"
   NDDS_DISCOVERY_PEERS: "rtps@udpv4://cloud-discovery-service:7400"
   PYTHONPATH: "/opt/medtech/lib/python/site-packages"
+  # QoS timing overrides for Docker (non-real-time scheduling).
+  # Relaxes deadlines that Docker's OS scheduler cannot guarantee.
+  # Both _SEC and _NS must be set as a pair — see Snippets.xml
+  # <configuration_variables> for real-time defaults.
+  DEADLINE_OPERATOR_INPUT_SEC: "0"
+  DEADLINE_OPERATOR_INPUT_NS: "100000000"    # 100 ms (RT: 4 ms)
+  DEADLINE_ROBOT_STATE_SEC: "0"
+  DEADLINE_ROBOT_STATE_NS: "100000000"       # 100 ms (RT: 20 ms)
+  DEADLINE_WAVEFORM_SEC: "0"
+  DEADLINE_WAVEFORM_NS: "200000000"          # 200 ms (RT: 40 ms)
+  DEADLINE_CAMERA_FRAME_SEC: "0"
+  DEADLINE_CAMERA_FRAME_NS: "200000000"      # 200 ms (RT: 66 ms)
+  LIFESPAN_OPERATOR_INPUT_SEC: "0"
+  LIFESPAN_OPERATOR_INPUT_NS: "100000000"    # 100 ms (RT: 20 ms)
 
 x-qos-volumes: &qos-volumes
   - ./interfaces/qos:/opt/medtech/share/qos:ro

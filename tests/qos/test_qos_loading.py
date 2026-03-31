@@ -102,7 +102,7 @@ class TestPatterns:
 
 class TestTopicFilters:
     def test_patient_vitals_writer(self, provider):
-        """PatientVitals: State base + Deadline2s override."""
+        """PatientVitals: State base + DeadlinePatientVitals override."""
         qos = provider.set_topic_datawriter_qos(
             "Topics::ProcedureTopics", "PatientVitals"
         )
@@ -118,7 +118,7 @@ class TestTopicFilters:
         assert qos.deadline.period.sec == 2
 
     def test_operator_input_writer(self, provider):
-        """OperatorInput: BestEffort + KeepLast1 (writer) + Deadline4ms + Lifespan20ms."""
+        """OperatorInput: BestEffort + KeepLast1 (writer) + DeadlineOperatorInput + LifespanOperatorInput."""
         qos = provider.set_topic_datawriter_qos(
             "Topics::ProcedureTopics", "OperatorInput"
         )
@@ -134,13 +134,13 @@ class TestTopicFilters:
         assert qos.durability.kind == dds.DurabilityKind.VOLATILE
 
     def test_robot_state_writer(self, provider):
-        """RobotState: State base + Deadline20ms."""
+        """RobotState: State base + DeadlineRobotState."""
         qos = provider.set_topic_datawriter_qos("Topics::ProcedureTopics", "RobotState")
         assert qos.reliability.kind == dds.ReliabilityKind.RELIABLE
         assert qos.deadline.period.nanosec == 20000000
 
     def test_camera_frame_writer(self, provider):
-        """CameraFrame: Stream + Deadline66ms."""
+        """CameraFrame: Stream + DeadlineCameraFrame."""
         qos = provider.set_topic_datawriter_qos(
             "Topics::ProcedureTopics", "CameraFrame"
         )
@@ -148,7 +148,7 @@ class TestTopicFilters:
         assert qos.deadline.period.nanosec == 66000000
 
     def test_waveform_data_writer(self, provider):
-        """WaveformData: Stream + Deadline40ms."""
+        """WaveformData: Stream + DeadlineWaveform."""
         qos = provider.set_topic_datawriter_qos(
             "Topics::ProcedureTopics", "WaveformData"
         )

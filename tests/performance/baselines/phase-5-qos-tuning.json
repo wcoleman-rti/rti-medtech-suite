@@ -1,0 +1,51 @@
+{
+  "version": "1.0",
+  "phase": "phase-5-qos-tuning",
+  "timestamp": "2026-03-31T20:29:20.403394+00:00",
+  "git_commit": "359fa9f",
+  "environment": {
+    "connext_version": "7.6.0",
+    "docker_compose_profile": "observability",
+    "surgical_instances": 2,
+    "measurement_duration_s": 60,
+    "warmup_s": 15
+  },
+  "metrics": {
+    "R1": {
+      "value": 24.0,
+      "unit": "count"
+    },
+    "R2": {
+      "value": 56.0,
+      "unit": "count"
+    },
+    "R3": {
+      "value": 146829312.0,
+      "unit": "bytes"
+    },
+    "R4": {
+      "value": 3859623936.0,
+      "unit": "bytes"
+    },
+    "R5": {
+      "value": 55.0,
+      "unit": "count"
+    },
+    "T1": {
+      "value": 195.53447923857266,
+      "unit": "samples/s"
+    },
+    "T4": {
+      "value": 1.9999590714418778,
+      "unit": "samples/s"
+    },
+    "T5": {
+      "value": 0.0,
+      "unit": "samples"
+    },
+    "T6": {
+      "value": 0.0,
+      "unit": "count"
+    }
+  }
+}

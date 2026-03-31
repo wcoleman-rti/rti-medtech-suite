@@ -27,8 +27,8 @@ All scenarios assume the Procedure domain `control` tag and partition
 | Cloud→Procedure RS output strength | 50 (set on Routing Service output DataWriter QoS) |
 | Console strength configuration | Static — console uses the same strength regardless of deployment location |
 | Liveliness kind (control-tag participant) | `AUTOMATIC` — on the dedicated `control`-tag DomainParticipant |
-| Liveliness lease duration (control-tag participant) | 2 s (existing `Liveliness2s` snippet) |
-| `OperatorInput` DEADLINE period | 4 ms (existing `Deadline4ms` snippet) |
+| Liveliness lease duration (control-tag participant) | 2 s (existing `LivelinessStandard` snippet) |
+| `OperatorInput` DEADLINE period | 4 ms (existing `DeadlineOperatorInput` snippet) |
 | Safe-hold deceleration profile | Controlled deceleration to zero velocity (kinematic safe-stop, not snap-stop) |
 | Safe-hold `RobotState.operational_mode` | `PAUSED` |
 | Safe-hold `RobotState` publication rate | 100 Hz (unchanged from normal operation) |

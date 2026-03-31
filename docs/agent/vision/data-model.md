@@ -233,7 +233,7 @@ Data streams that cross a risk class boundary must not operate within the same d
 |-------|----------------|------------|------------|-------|
 | `RobotCommand` | `Surgery::RobotCommand` | `control` | `robot_id`, `command_id` | Operator → robot. Volatile, reliable. |
 | `RobotState` | `Surgery::RobotState` | `control` | `robot_id` | Robot → operator/dashboard. TRANSIENT_LOCAL. Deadline-enforced (20 ms). |
-| `SafetyInterlock` | `Surgery::SafetyInterlock` | `control` | `robot_id` | Safety system state. Write-on-change; writer health detected via `Liveliness500ms` (500 ms lease). |
+| `SafetyInterlock` | `Surgery::SafetyInterlock` | `control` | `robot_id` | Safety system state. Write-on-change; writer health detected via `LivelinessSafety` (500 ms lease). |
 | `OperatorInput` | `Surgery::OperatorInput` | `control` | `operator_id`, `robot_id` | High-rate control input (joystick/haptic). Best-effort streaming. |
 | `PatientVitals` | `Monitoring::PatientVitals` | `clinical` | `patient.id` | Periodic snapshot of current vital signs. Deadline-enforced (2 s). |
 | `WaveformData` | `Monitoring::WaveformData` | `clinical` | `patient.id`, `source_device_id`, `waveform_kind` | High-rate physiological waveforms. Deadline-enforced (40 ms). |
@@ -425,16 +425,16 @@ Isolated, composable, no inheritance. Each enables/disables a single concern.
 |---------|-----------|--------------|
 | `Volatile` | DW + DR | Sets VOLATILE durability |
 | `ExclusiveOwnership` | DW + DR | Sets EXCLUSIVE_OWNERSHIP |
-| `Liveliness2s` | DW + DR | Automatic liveliness, 2-second lease |
-| `Deadline4ms` | DW + DR | Deadline period = 4 ms. Writer: detects publish stall. Reader: detects stream interruption. See *Deadline QoS* below. |
-| `Deadline20ms` | DW + DR | Deadline period = 20 ms. Stream interruption detection for 100 Hz topics (2× nominal). |
-| `Deadline40ms` | DW + DR | Deadline period = 40 ms. Stream interruption detection for 50 Hz topics (2× nominal). |
-| `Deadline66ms` | DW + DR | Deadline period = 66 ms. Stream interruption detection for 30 Hz topics (2× nominal). |
-| `Deadline2s` | DW + DR | Deadline period = 2 s. Periodic-snapshot interruption detection for 1 Hz topics (2× nominal). |
-| `Lifespan20ms` | DW only | Lifespan duration = 20 ms. Samples older than 20 ms are discarded before delivery. |
-| `Liveliness500ms` | DW + DR | Automatic liveliness, 500 ms lease. Tight writer-health detection for safety-critical write-on-change topics. |
+| `LivelinessStandard` | DW + DR | Automatic liveliness (RT default: 2 s lease). Value set via `LIVELINESS_STANDARD_{SEC,NS}`. |
+| `DeadlineOperatorInput` | DW + DR | Deadline period (RT default: 4 ms). Writer: detects publish stall. Reader: detects stream interruption. Value set via `DEADLINE_OPERATOR_INPUT_{SEC,NS}` env vars; see `<configuration_variables>` in `Snippets.xml`. |
+| `DeadlineRobotState` | DW + DR | Deadline period (RT default: 20 ms). Stream interruption detection for 100 Hz topics (2× nominal). Value set via `DEADLINE_ROBOT_STATE_{SEC,NS}`. |
+| `DeadlineWaveform` | DW + DR | Deadline period (RT default: 40 ms). Stream interruption detection for 50 Hz topics (2× nominal). Value set via `DEADLINE_WAVEFORM_{SEC,NS}`. |
+| `DeadlineCameraFrame` | DW + DR | Deadline period (RT default: 66 ms). Stream interruption detection for 30 Hz topics (2× nominal). Value set via `DEADLINE_CAMERA_FRAME_{SEC,NS}`. |
+| `DeadlinePatientVitals` | DW + DR | Deadline period (RT default: 2 s). Periodic-snapshot interruption detection for 1 Hz topics (2× nominal). Value set via `DEADLINE_PATIENT_VITALS_{SEC,NS}`. |
+| `LifespanOperatorInput` | DW only | Lifespan duration (RT default: 20 ms). Samples older than the configured duration are discarded before delivery. Value set via `LIFESPAN_OPERATOR_INPUT_{SEC,NS}`. |
+| `LivelinessSafety` | DW + DR | Automatic liveliness (RT default: 500 ms lease). Tight writer-health detection for safety-critical write-on-change topics. Value set via `LIVELINESS_SAFETY_{SEC,NS}`. |
 | `GuiSubsample` | DR only | TIME_BASED_FILTER minimum_separation for GUI refresh rate |
-| `GuiDeadline100ms` | DR only | Deadline period = 100 ms (reader only). Relaxes strict writer-side deadlines for GUI display readers where the TBF-controlled rendering rate doesn't need sub-millisecond stream-interruption detection. Satisfies DDS constraint: TBF (16 ms) ≤ deadline (100 ms). |
+| `GuiReaderDeadline` | DR only | Deadline period (RT default: 100 ms, reader only). Relaxes strict writer-side deadlines for GUI display readers where the TBF-controlled rendering rate doesn't need sub-millisecond stream-interruption detection. Satisfies DDS constraint: TBF (16 ms) ≤ deadline. Value set via `GUI_READER_DEADLINE_{SEC,NS}`. |
 | `NonBlockingWrite` | DW only | Guarantees `write()` never blocks the calling thread. Enables writes on the Qt UI event loop. Sets: `history.kind = KEEP_LAST`, `publish_mode.kind = ASYNCHRONOUS`, `reliability.max_blocking_time = 0`, `protocol.rtps_reliable_writer.max_send_window_size = LENGTH_UNLIMITED`, `protocol.rtps_reliable_writer.min_send_window_size = LENGTH_UNLIMITED`. The snippet itself enforces `KEEP_LAST` history so that sample replacement absorbs backpressure instead of blocking — composing Patterns do not need to provide it. Batching must be disabled. See [dds-consistency.md §5 — GUI Host Applications](dds-consistency.md) for the threading policy this snippet enables. |
 
 ### Data Pattern Base Profiles (`Patterns.xml`)
@@ -443,7 +443,7 @@ Generic profiles that inherit from semantically appropriate `BuiltinQosLib` prof
 
 | Pattern Profile | Base | Additional Composition | Use Case |
 |----------------|------|------------------------|----------|
-| `State` | `BuiltinQosLib::Generic.KeepLastReliable.TransientLocal` | `Snippets::Liveliness2s` | Latest-state data: vitals, device status, robot state, procedure context, alarms. Base provides Reliable + KeepLast1 + TransientLocal + ReliabilityProtocol.KeepLast optimization. |
+| `State` | `BuiltinQosLib::Generic.KeepLastReliable.TransientLocal` | `Snippets::LivelinessStandard` | Latest-state data: vitals, device status, robot state, procedure context, alarms. Base provides Reliable + KeepLast1 + TransientLocal + ReliabilityProtocol.KeepLast optimization. |
 | `Command` | `BuiltinQosLib::Generic.KeepLastReliable` | *(none)* | Commands where only the most recent matters, stale commands must not reach late joiners. Base provides Reliable + KeepLast1 + ReliabilityProtocol.KeepLast optimization. Volatile durability is the Connext default — no explicit override needed. |
 | `Stream` | `BuiltinQosLib::Generic.BestEffort` | Override writer history depth to 1 (no repair cache needed for best-effort), reader history depth to 4. | High-rate streaming: waveforms, camera frames, operator input. Base provides BestEffort + KeepLast (depth 100 by default, overridden here). |
 | `GuiState` | `Patterns::State` | `Snippets::GuiSubsample` | Downsampled state for GUI readers (~100–200 ms minimum separation) |
@@ -462,12 +462,12 @@ Deadline is applied to every topic that publishes at a **fixed rate** — contin
 
 | Topic | Publication Model | Nominal Rate | Deadline Period | Snippet |
 |-------|-------------------|-------------|----------------|--------|
-| `OperatorInput` | Continuous Stream | 500 Hz (2 ms) | 4 ms | `Deadline4ms` |
-| `RobotState` | Continuous Stream | 100 Hz (10 ms) | 20 ms | `Deadline20ms` |
-| `RobotFrameTransform` | Continuous Stream | 100 Hz (10 ms) | 20 ms | `Deadline20ms` |
-| `WaveformData` | Continuous Stream | 50 Hz (20 ms) | 40 ms | `Deadline40ms` |
-| `CameraFrame` | Continuous Stream | 30 Hz (~33 ms) | 66 ms | `Deadline66ms` |
-| `PatientVitals` | Periodic Snapshot | 1 Hz (1000 ms) | 2 s | `Deadline2s` |
+| `OperatorInput` | Continuous Stream | 500 Hz (2 ms) | 4 ms | `DeadlineOperatorInput` |
+| `RobotState` | Continuous Stream | 100 Hz (10 ms) | 20 ms | `DeadlineRobotState` |
+| `RobotFrameTransform` | Continuous Stream | 100 Hz (10 ms) | 20 ms | `DeadlineRobotState` |
+| `WaveformData` | Continuous Stream | 50 Hz (20 ms) | 40 ms | `DeadlineWaveform` |
+| `CameraFrame` | Continuous Stream | 30 Hz (~33 ms) | 66 ms | `DeadlineCameraFrame` |
+| `PatientVitals` | Periodic Snapshot | 1 Hz (1000 ms) | 2 s | `DeadlinePatientVitals` |
 
 Setting Deadline on **both** writer and reader enables diagnosability: writer-missed + reader-missed → publisher-side fault; writer-OK + reader-missed → transport/network issue.
 
@@ -475,9 +475,9 @@ Setting Deadline on **both** writer and reader enables diagnosability: writer-mi
 
 ### Liveliness QoS for Write-on-Change Topics
 
-Write-on-change topics rely on DDS liveliness QoS — not Deadline — to detect writer health, because sample absence is the normal steady state. The general `Liveliness2s` snippet (2-second automatic lease, composed into the `State` pattern) covers most write-on-change topics.
+Write-on-change topics rely on DDS liveliness QoS — not Deadline — to detect writer health, because sample absence is the normal steady state. The general `LivelinessStandard` snippet (2-second automatic lease, composed into the `State` pattern) covers most write-on-change topics.
 
-**`SafetyInterlock` exception:** The safety interlock is a write-on-change topic on the `control` tag (Class C / Class III). Although its data pattern is event-driven, the consequence of an undetected writer failure is a robot operating without safety oversight. A tighter liveliness lease (500 ms via `Liveliness500ms`) provides faster detection of safety-system failure than the general 2-second lease — the robot controller can transition to a safe-stopped state within 500 ms of losing the safety writer, rather than waiting 2 seconds.
+**`SafetyInterlock` exception:** The safety interlock is a write-on-change topic on the `control` tag (Class C / Class III). Although its data pattern is event-driven, the consequence of an undetected writer failure is a robot operating without safety oversight. A tighter liveliness lease (500 ms via `LivelinessSafety`) provides faster detection of safety-system failure than the general 2-second lease — the robot controller can transition to a safe-stopped state within 500 ms of losing the safety writer, rather than waiting 2 seconds.
 
 ### Topic Profiles and Topic-Bound Profiles (`Topics.xml`)
 
@@ -508,45 +508,45 @@ Example structure:
     <!-- Topics with additional tuning (deadline, lifespan, liveliness) -->
     <qos_profile name="OperatorInput" base_name="Patterns::Stream">
         <base_name>
-            <element>Snippets::Deadline4ms</element>
-            <element>Snippets::Lifespan20ms</element>
+            <element>Snippets::DeadlineOperatorInput</element>
+            <element>Snippets::LifespanOperatorInput</element>
         </base_name>
     </qos_profile>
 
     <qos_profile name="RobotState" base_name="Patterns::State">
         <base_name>
-            <element>Snippets::Deadline20ms</element>
+            <element>Snippets::DeadlineRobotState</element>
         </base_name>
     </qos_profile>
 
     <qos_profile name="SafetyInterlock" base_name="Patterns::State">
         <base_name>
-            <element>Snippets::Liveliness500ms</element>
+            <element>Snippets::LivelinessSafety</element>
         </base_name>
     </qos_profile>
 
     <qos_profile name="PatientVitals" base_name="Patterns::State">
         <base_name>
-            <element>Snippets::Deadline2s</element>
+            <element>Snippets::DeadlinePatientVitals</element>
         </base_name>
     </qos_profile>
 
     <qos_profile name="WaveformData" base_name="Patterns::Stream">
         <base_name>
-            <element>Snippets::Deadline40ms</element>
+            <element>Snippets::DeadlineWaveform</element>
         </base_name>
     </qos_profile>
 
     <qos_profile name="CameraFrame" base_name="Patterns::Stream">
         <base_name>
-            <element>Snippets::Deadline66ms</element>
+            <element>Snippets::DeadlineCameraFrame</element>
         </base_name>
     </qos_profile>
 
     <!-- V1.1: RobotFrameTransform — same deadline as RobotState -->
     <qos_profile name="RobotFrameTransform" base_name="Patterns::Stream">
         <base_name>
-            <element>Snippets::Deadline20ms</element>
+            <element>Snippets::DeadlineRobotState</element>
         </base_name>
     </qos_profile>
 
@@ -1652,7 +1652,7 @@ sample containing all transforms for the kinematic chain at the
 | `robot_id` | `Common::EntityId` | @key | Robot instance identifier — correlates with `RobotState` |
 | `transforms` | `sequence<FrameTransformEntry, Common::MAX_JOINT_COUNT>` | — | Ordered kinematic chain: base → link1 → … → tool_tip |
 
-QoS: inherits the `Stream` pattern base with `Deadline20ms` (same as
+QoS: inherits the `Stream` pattern base with `DeadlineRobotState` (same as
 `RobotState`) via a new `TopicProfiles::RobotFrameTransform` profile.
 
 #### `Imaging::CameraFrame` (Translatability Confirmed)

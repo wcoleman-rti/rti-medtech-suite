@@ -36,6 +36,13 @@ WARMUP_S = 15
 MEASUREMENT_S = 60
 COOLDOWN_S = 5
 
+# T6 PromQL for per-reader deadline-miss breakdown (joins guid → topic/name)
+T6_DIAGNOSE_PROMQL = (
+    "dds_data_reader_deadline_missed_total"
+    " * on(guid) group_left(topic_name, name)"
+    " dds_data_reader_presence"
+)
+
 
 # ── Prometheus Query Interface ───────────────────────────────────────
 
@@ -144,6 +151,31 @@ def save_baseline(data: dict, phase: str) -> Path:
         json.dump(data, f, indent=2)
         f.write("\n")
     return path
+
+
+def diagnose_t6() -> list[dict]:
+    """Query per-reader deadline-miss breakdown via PromQL guid join.
+
+    Returns list of {topic, reader, count} sorted by count descending.
+    """
+    result = _prometheus_get("/api/v1/query", {"query": T6_DIAGNOSE_PROMQL})
+    if result.get("status") != "success":
+        return []
+
+    entries = []
+    for r in result.get("data", {}).get("result", []):
+        metric = r.get("metric", {})
+        val = r.get("value", [None, None])
+        count = float(val[1]) if val[1] is not None else 0
+        if count > 0:
+            entries.append(
+                {
+                    "topic": metric.get("topic_name", "unknown"),
+                    "reader": metric.get("name", "unknown"),
+                    "count": int(count),
+                }
+            )
+    return sorted(entries, key=lambda e: e["count"], reverse=True)
 
 
 # ── Comparison Logic ─────────────────────────────────────────────────
@@ -285,6 +317,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Path to a specific baseline JSON to compare against.",
     )
+    parser.add_argument(
+        "--diagnose-t6",
+        action="store_true",
+        help="Print per-reader deadline-miss breakdown when T6 > 0.",
+    )
     return parser.parse_args(argv)
 
 
@@ -375,6 +412,25 @@ def run(argv: list[str] | None = None) -> int:
         sys.stdout.write(f" — {verdict}\n")
 
     sys.stdout.write("\n")
+
+    # T6 diagnosis: print per-reader breakdown if T6 failed or --diagnose-t6
+    t6_value = collected.get("T6", 0)
+    t6_failed = any(
+        e["metric_id"] == "T6" and e["verdict"] == "FAIL" for e in comparison
+    )
+    if t6_failed or (args.diagnose_t6 and t6_value > 0):
+        sys.stdout.write("T6 Deadline-Miss Breakdown (per reader):\n")
+        breakdown = diagnose_t6()
+        if breakdown:
+            for entry in breakdown:
+                sys.stdout.write(
+                    f"  {entry['topic']:25s} {entry['reader']:50s} "
+                    f"{entry['count']:>10,d}\n"
+                )
+        else:
+            sys.stdout.write("  (no per-reader data available)\n")
+        sys.stdout.write("\n")
+
     if has_fail:
         sys.stdout.write(
             "RESULT: FAIL — one or more metrics exceed regression thresholds\n"

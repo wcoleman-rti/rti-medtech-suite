@@ -3,6 +3,60 @@
      xsi:noNamespaceSchemaLocation="https://community.rti.com/schema/7.6.0/rti_dds_profiles.xsd">
 
     <!--
+        Configuration variables — environment-driven QoS timing overrides.
+        These define real-time defaults.  Environment variables of the same
+        name, when set, take precedence (e.g. via docker-compose.yml).
+
+        Every timing parameter has a _SEC / _NS pair applied to the
+        <sec> and <nanosec> XML fields respectively.  When overriding
+        in the environment, both must be set — behavior is undefined
+        if only one is provided.
+
+        Naming convention:
+            DEADLINE_<TOPIC>_{SEC,NS}
+            LIVELINESS_<ROLE>_{SEC,NS}
+            LIFESPAN_<TOPIC>_{SEC,NS}
+            GUI_READER_DEADLINE_{SEC,NS}
+    -->
+    <configuration_variables>
+        <!-- Deadline: OperatorInput — 4 ms -->
+        <element><name>DEADLINE_OPERATOR_INPUT_SEC</name><value>0</value></element>
+        <element><name>DEADLINE_OPERATOR_INPUT_NS</name><value>4000000</value></element>
+
+        <!-- Deadline: RobotState — 20 ms -->
+        <element><name>DEADLINE_ROBOT_STATE_SEC</name><value>0</value></element>
+        <element><name>DEADLINE_ROBOT_STATE_NS</name><value>20000000</value></element>
+
+        <!-- Deadline: WaveformData — 40 ms -->
+        <element><name>DEADLINE_WAVEFORM_SEC</name><value>0</value></element>
+        <element><name>DEADLINE_WAVEFORM_NS</name><value>40000000</value></element>
+
+        <!-- Deadline: CameraFrame — 66 ms -->
+        <element><name>DEADLINE_CAMERA_FRAME_SEC</name><value>0</value></element>
+        <element><name>DEADLINE_CAMERA_FRAME_NS</name><value>66000000</value></element>
+
+        <!-- Deadline: PatientVitals — 2 s -->
+        <element><name>DEADLINE_PATIENT_VITALS_SEC</name><value>2</value></element>
+        <element><name>DEADLINE_PATIENT_VITALS_NS</name><value>0</value></element>
+
+        <!-- Deadline: GUI readers — 100 ms -->
+        <element><name>GUI_READER_DEADLINE_SEC</name><value>0</value></element>
+        <element><name>GUI_READER_DEADLINE_NS</name><value>100000000</value></element>
+
+        <!-- Liveliness: standard (state pattern) — 2 s -->
+        <element><name>LIVELINESS_STANDARD_SEC</name><value>2</value></element>
+        <element><name>LIVELINESS_STANDARD_NS</name><value>0</value></element>
+
+        <!-- Liveliness: safety (SafetyInterlock) — 500 ms -->
+        <element><name>LIVELINESS_SAFETY_SEC</name><value>0</value></element>
+        <element><name>LIVELINESS_SAFETY_NS</name><value>500000000</value></element>
+
+        <!-- Lifespan: OperatorInput — 20 ms -->
+        <element><name>LIFESPAN_OPERATOR_INPUT_SEC</name><value>0</value></element>
+        <element><name>LIFESPAN_OPERATOR_INPUT_NS</name><value>20000000</value></element>
+    </configuration_variables>
+
+    <!--
         Isolated, composable QoS policy chunks — no inheritance.
         Only custom snippets are defined here. Builtin equivalents from
         BuiltinQosSnippetLib are used directly by Patterns and TopicProfiles:
@@ -44,13 +98,13 @@
         </qos_profile>
 
         <!-- Liveliness -->
-        <qos_profile name="Liveliness2s">
+        <qos_profile name="LivelinessStandard">
             <datawriter_qos>
                 <liveliness>
                     <kind>AUTOMATIC_LIVELINESS_QOS</kind>
                     <lease_duration>
-                        <sec>2</sec>
-                        <nanosec>0</nanosec>
+                        <sec>$(LIVELINESS_STANDARD_SEC)</sec>
+                        <nanosec>$(LIVELINESS_STANDARD_NS)</nanosec>
                     </lease_duration>
                 </liveliness>
             </datawriter_qos>
@@ -58,20 +112,20 @@
                 <liveliness>
                     <kind>AUTOMATIC_LIVELINESS_QOS</kind>
                     <lease_duration>
-                        <sec>2</sec>
-                        <nanosec>0</nanosec>
+                        <sec>$(LIVELINESS_STANDARD_SEC)</sec>
+                        <nanosec>$(LIVELINESS_STANDARD_NS)</nanosec>
                     </lease_duration>
                 </liveliness>
             </datareader_qos>
         </qos_profile>
 
-        <qos_profile name="Liveliness500ms">
+        <qos_profile name="LivelinessSafety">
             <datawriter_qos>
                 <liveliness>
                     <kind>AUTOMATIC_LIVELINESS_QOS</kind>
                     <lease_duration>
-                        <sec>0</sec>
-                        <nanosec>500000000</nanosec>
+                        <sec>$(LIVELINESS_SAFETY_SEC)</sec>
+                        <nanosec>$(LIVELINESS_SAFETY_NS)</nanosec>
                     </lease_duration>
                 </liveliness>
             </datawriter_qos>
@@ -79,116 +133,121 @@
                 <liveliness>
                     <kind>AUTOMATIC_LIVELINESS_QOS</kind>
                     <lease_duration>
-                        <sec>0</sec>
-                        <nanosec>500000000</nanosec>
+                        <sec>$(LIVELINESS_SAFETY_SEC)</sec>
+                        <nanosec>$(LIVELINESS_SAFETY_NS)</nanosec>
                     </lease_duration>
                 </liveliness>
             </datareader_qos>
         </qos_profile>
 
-        <!-- Deadline -->
-        <qos_profile name="Deadline4ms">
+        <!-- Deadline
+             Values are parameterized via Connext XML variable expansion
+             $(VAR) so deployment environments can override them.
+             Real-time defaults are defined in <configuration_variables>
+             above.  Docker overrides are set in docker-compose.yml
+             x-medtech-env. -->
+        <qos_profile name="DeadlineOperatorInput">
             <datawriter_qos>
                 <deadline>
                     <period>
-                        <sec>0</sec>
-                        <nanosec>4000000</nanosec>
+                        <sec>$(DEADLINE_OPERATOR_INPUT_SEC)</sec>
+                        <nanosec>$(DEADLINE_OPERATOR_INPUT_NS)</nanosec>
                     </period>
                 </deadline>
             </datawriter_qos>
             <datareader_qos>
                 <deadline>
                     <period>
-                        <sec>0</sec>
-                        <nanosec>4000000</nanosec>
+                        <sec>$(DEADLINE_OPERATOR_INPUT_SEC)</sec>
+                        <nanosec>$(DEADLINE_OPERATOR_INPUT_NS)</nanosec>
                     </period>
                 </deadline>
             </datareader_qos>
         </qos_profile>
 
-        <qos_profile name="Deadline20ms">
+        <qos_profile name="DeadlineRobotState">
             <datawriter_qos>
                 <deadline>
                     <period>
-                        <sec>0</sec>
-                        <nanosec>20000000</nanosec>
+                        <sec>$(DEADLINE_ROBOT_STATE_SEC)</sec>
+                        <nanosec>$(DEADLINE_ROBOT_STATE_NS)</nanosec>
                     </period>
                 </deadline>
             </datawriter_qos>
             <datareader_qos>
                 <deadline>
                     <period>
-                        <sec>0</sec>
-                        <nanosec>20000000</nanosec>
+                        <sec>$(DEADLINE_ROBOT_STATE_SEC)</sec>
+                        <nanosec>$(DEADLINE_ROBOT_STATE_NS)</nanosec>
                     </period>
                 </deadline>
             </datareader_qos>
         </qos_profile>
 
-        <qos_profile name="Deadline40ms">
+        <qos_profile name="DeadlineWaveform">
             <datawriter_qos>
                 <deadline>
                     <period>
-                        <sec>0</sec>
-                        <nanosec>40000000</nanosec>
+                        <sec>$(DEADLINE_WAVEFORM_SEC)</sec>
+                        <nanosec>$(DEADLINE_WAVEFORM_NS)</nanosec>
                     </period>
                 </deadline>
             </datawriter_qos>
             <datareader_qos>
                 <deadline>
                     <period>
-                        <sec>0</sec>
-                        <nanosec>40000000</nanosec>
+                        <sec>$(DEADLINE_WAVEFORM_SEC)</sec>
+                        <nanosec>$(DEADLINE_WAVEFORM_NS)</nanosec>
                     </period>
                 </deadline>
             </datareader_qos>
         </qos_profile>
 
-        <qos_profile name="Deadline66ms">
+        <qos_profile name="DeadlineCameraFrame">
             <datawriter_qos>
                 <deadline>
                     <period>
-                        <sec>0</sec>
-                        <nanosec>66000000</nanosec>
+                        <sec>$(DEADLINE_CAMERA_FRAME_SEC)</sec>
+                        <nanosec>$(DEADLINE_CAMERA_FRAME_NS)</nanosec>
                     </period>
                 </deadline>
             </datawriter_qos>
             <datareader_qos>
                 <deadline>
                     <period>
-                        <sec>0</sec>
-                        <nanosec>66000000</nanosec>
+                        <sec>$(DEADLINE_CAMERA_FRAME_SEC)</sec>
+                        <nanosec>$(DEADLINE_CAMERA_FRAME_NS)</nanosec>
                     </period>
                 </deadline>
             </datareader_qos>
         </qos_profile>
 
-        <qos_profile name="Deadline2s">
+        <qos_profile name="DeadlinePatientVitals">
             <datawriter_qos>
                 <deadline>
                     <period>
-                        <sec>2</sec>
-                        <nanosec>0</nanosec>
+                        <sec>$(DEADLINE_PATIENT_VITALS_SEC)</sec>
+                        <nanosec>$(DEADLINE_PATIENT_VITALS_NS)</nanosec>
                     </period>
                 </deadline>
             </datawriter_qos>
             <datareader_qos>
                 <deadline>
                     <period>
-                        <sec>2</sec>
-                        <nanosec>0</nanosec>
+                        <sec>$(DEADLINE_PATIENT_VITALS_SEC)</sec>
+                        <nanosec>$(DEADLINE_PATIENT_VITALS_NS)</nanosec>
                     </period>
                 </deadline>
             </datareader_qos>
         </qos_profile>
 
         <!-- Lifespan -->
-        <qos_profile name="Lifespan20ms">
+        <qos_profile name="LifespanOperatorInput">
             <datawriter_qos>
                 <lifespan>
                     <duration>
-                        <sec>0</sec>
-                        <nanosec>20000000</nanosec>
+                        <sec>$(LIFESPAN_OPERATOR_INPUT_SEC)</sec>
+                        <nanosec>$(LIFESPAN_OPERATOR_INPUT_NS)</nanosec>
                     </duration>
                 </lifespan>
             </datawriter_qos>
@@ -213,12 +272,12 @@
              sufficient for display-level "stream gone" detection and satisfies
              the DDS constraint: time_based_filter (16 ms) <= deadline (100 ms).
              Reader-only — writer keeps its original deadline. -->
-        <qos_profile name="GuiDeadline100ms">
+        <qos_profile name="GuiReaderDeadline">
             <datareader_qos>
                 <deadline>
                     <period>
-                        <sec>0</sec>
-                        <nanosec>100000000</nanosec>
+                        <sec>$(GUI_READER_DEADLINE_SEC)</sec>
+                        <nanosec>$(GUI_READER_DEADLINE_NS)</nanosec>
                     </period>
                 </deadline>
             </datareader_qos>

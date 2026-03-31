@@ -137,7 +137,7 @@ echo ""
 source .venv/bin/activate 2>/dev/null || true
 
 benchmark_rc=0
-python tests/performance/benchmark.py "${BENCHMARK_ARGS[@]}" || benchmark_rc=$?
+python tests/performance/benchmark.py --diagnose-t6 "${BENCHMARK_ARGS[@]}" || benchmark_rc=$?
 
 echo ""
 

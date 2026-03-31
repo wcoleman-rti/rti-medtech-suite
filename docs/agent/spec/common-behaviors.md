@@ -17,7 +17,7 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 | `PatientVitals` deadline (DDS Deadline QoS) | 2 s — enforced on both writer and reader; detects periodic-snapshot interruption per instance |
 | `OperatorInput` lifespan (DDS Lifespan QoS) | 20 ms — samples older than 20 ms discarded before delivery |
 | General liveliness lease duration | 2 s |
-| `SafetyInterlock` liveliness lease duration | 500 ms — tighter lease for safety-critical write-on-change topic (via `Liveliness500ms` snippet) |
+| `SafetyInterlock` liveliness lease duration | 500 ms — tighter lease for safety-critical write-on-change topic (via `LivelinessSafety` snippet) |
 | Domain tag isolation | All three tag pairs (`control`/`clinical`, `control`/`operational`, `clinical`/`operational`) are mutually isolated; no cross-tag discovery or data exchange |
 | Cross-domain data flow | Procedure domain data reaches Hospital domain only via Routing Service; no direct cross-domain discovery |
 | Monitoring Library 2.0 | Enabled on every DomainParticipant via XML — no code-level opt-in |

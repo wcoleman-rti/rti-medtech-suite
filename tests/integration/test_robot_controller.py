@@ -177,7 +177,7 @@ class TestOperatorInputQoS:
     ):
         """Stale operator input (expired lifespan) is not applied.
 
-        Spec: Given OperatorInput with Lifespan20ms snippet (lifespan = 20 ms)
+        Spec: Given OperatorInput with LifespanOperatorInput snippet (lifespan = 20 ms)
               When the robot controller reads a sample older than 20 ms
               Then the sample is discarded by DDS before delivery.
 

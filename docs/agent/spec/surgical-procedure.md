@@ -20,7 +20,7 @@ All scenarios assume the participant operates within a room partition (e.g., `ro
 | `RobotFrameTransform` publication rate | 100 Hz (one sample every 10 ms) — V1.1 |
 | `RobotFrameTransform` deadline (DDS Deadline QoS) | 20 ms — enforced on both writer and reader (V1.1) |
 | `SafetyInterlock` response — robot reaches safe-stopped state | ≤ 40 ms after receiving interlock sample |
-| `SafetyInterlock` liveliness lease | 500 ms — writer health detection via `Liveliness500ms` snippet |
+| `SafetyInterlock` liveliness lease | 500 ms — writer health detection via `LivelinessSafety` snippet |
 | `PatientVitals` publication rate | 1 Hz |
 | `PatientVitals` deadline | 2 s |
 | `WaveformData` sample rate (ECG) | 500 Sa/s; published in 10-sample blocks at 50 Hz |
@@ -47,7 +47,7 @@ All scenarios assume the participant operates within a room partition (e.g., `ro
 
 ### Scenario: Operator input reaches robot controller within deadline `@integration` `@streaming`
 
-**Given** an operator console publishing `OperatorInput` on the Procedure domain (`control` tag) with the `TopicProfiles::OperatorInput` QoS profile (Stream pattern + Deadline4ms + Lifespan20ms)
+**Given** an operator console publishing `OperatorInput` on the Procedure domain (`control` tag) with the `TopicProfiles::OperatorInput` QoS profile (Stream pattern + DeadlineOperatorInput + LifespanOperatorInput)
 **And** a robot controller subscribing to `OperatorInput` on the Procedure domain (`control` tag) in the same partition with the same `TopicProfiles::OperatorInput` QoS profile
 **When** the operator publishes a control input sample
 **Then** the robot controller receives the sample within 4 ms of publication
@@ -70,7 +70,7 @@ All scenarios assume the participant operates within a room partition (e.g., `ro
 
 ### Scenario: Stale operator input is not applied `@integration` `@command`
 
-**Given** an operator console publishing `OperatorInput` with `Lifespan20ms` snippet (lifespan = 20 ms)
+**Given** an operator console publishing `OperatorInput` with `LifespanOperatorInput` snippet (lifespan = 20 ms)
 **When** the robot controller reads a sample older than 20 ms
 **Then** the sample is discarded by DDS before delivery and is not applied to the robot control loop
 

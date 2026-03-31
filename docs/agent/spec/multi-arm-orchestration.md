@@ -27,7 +27,7 @@ Orchestration domain scenarios use partition `room/<room_id>`.
 | Arm departure notification | `dispose()` on `RobotArmAssignment` instance → subscribers see `NOT_ALIVE_DISPOSED` |
 | Procedure start gate | All requested arms must reach `OPERATIONAL` before procedure control is enabled |
 | Procedure Controller multi-domain model | Orchestration + Procedure `control` + Hospital |
-| Liveliness for `RobotArmAssignment` | 2 s (inherited from `Patterns::State` via `Liveliness2s` snippet) |
+| Liveliness for `RobotArmAssignment` | 2 s (inherited from `Patterns::State` via `LivelinessStandard` snippet) |
 | Arm instance correlation | `robot_id` — shared key across `RobotArmAssignment`, `RobotState`, `RobotCommand`, `OperatorInput` |
 | Digital twin rendering | Subscribes to `RobotArmAssignment` on `control` tag; renders arm positions and lifecycle status |
 | Orchestration-to-assignment coordination latency | ≤ 5 s from `ServiceStatus(RUNNING)` on Orchestration domain to first `RobotArmAssignment` sample on Procedure domain |

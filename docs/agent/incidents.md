@@ -966,7 +966,7 @@ after closure. They form the project's decision log.
 - **Phase/Step:** Phase 2 / Step 2.2
 - **Documents involved:** `tests/integration/test_robot_controller.py`, `tests/conftest.py`
 - **Description:** The `wait_for_data()` helper polls with 50 ms sleep intervals using
-  `reader.read()`. OperatorInput has a 20 ms lifespan (Lifespan20ms snippet). By the time
+  `reader.read()`. OperatorInput has a 20 ms lifespan (LifespanOperatorInput snippet). By the time
   the helper reads the sample, it has already expired and been purged from the reader
   queue. Tests for short-lifespan topics must use a tighter polling loop (2 ms) with
   `reader.take()` to read samples before they expire.
@@ -1158,7 +1158,7 @@ after closure. They form the project's decision log.
 - **Documents involved:** `interfaces/qos/Snippets.xml`, `interfaces/qos/Topics.xml`, `spec/surgical-procedure.md`
 - **Description:** The `Snippets::GuiSubsample` QoS snippet was set to
   `time_based_filter.minimum_separation = 100 ms`. The `TopicProfiles::RobotState`
-  profile uses `Snippets::Deadline20ms` (deadline = 20 ms). The DDS QoS
+  profile uses `Snippets::DeadlineRobotState` (deadline = 20 ms). The DDS QoS
   consistency rule requires `time_based_filter.minimum_separation <= deadline.period`.
   With TBF = 100 ms > deadline = 20 ms, creating a DataReader from the
   `ControlDigitalTwin` participant (which uses `TopicProfiles::GuiRobotState`)
@@ -1290,7 +1290,7 @@ after closure. They form the project's decision log.
   3. **Single profile for all environments** — no path to enable
      multicast for bare-metal / production without editing XML.
   Additionally, the inline `<datareader_qos>` deadline override in
-  `GuiOperatorInput` was moved to a `GuiDeadline100ms` snippet for
+  `GuiOperatorInput` was moved to a `GuiReaderDeadline` snippet for
   consistency with the snippet composition model.
 - **Resolution:**
   1. Removed `is_default_qos="true"` from the transport profile.
@@ -1307,7 +1307,7 @@ after closure. They form the project's decision log.
      (now contains only the `Factory` library).
   4. Renamed all 6 participant references from
      `Participants::SimulationTransport` → `Participants::Transport`.
-  5. Added `Snippets::GuiDeadline100ms` (reader-only, 100 ms deadline)
+  5. Added `Snippets::GuiReaderDeadline` (reader-only, 100 ms deadline)
      and replaced the inline override in `GuiOperatorInput`.
   6. Updated `setup.bash.in`, `build/setup.bash`, `docker-compose.yml`,
      `CMakeLists.txt`, and CTest environment.

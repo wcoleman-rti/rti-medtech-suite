@@ -35,7 +35,7 @@ def _make_exclusive_writer_qos(strength: int) -> dds.DataWriterQos:
     """Create DataWriterQos with exclusive ownership and given strength.
 
     Uses AUTOMATIC liveliness with a 2 s lease to match the application
-    QoS profile (Snippets::Liveliness2s).
+    QoS profile (Snippets::LivelinessStandard).
     """
     qos = dds.DataWriterQos()
     qos.ownership.kind = dds.OwnershipKind.EXCLUSIVE
@@ -50,7 +50,7 @@ def _make_exclusive_reader_qos() -> dds.DataReaderQos:
     """Create DataReaderQos with exclusive ownership.
 
     Uses AUTOMATIC liveliness with a 2 s lease to match the application
-    QoS profile (Snippets::Liveliness2s).
+    QoS profile (Snippets::LivelinessStandard).
     """
     qos = dds.DataReaderQos()
     qos.ownership.kind = dds.OwnershipKind.EXCLUSIVE

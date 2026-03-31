@@ -7,12 +7,12 @@
         <!--
             State: latest-state data (vitals, device status, robot state, alarms).
             Base provides Reliable + KeepLast1 + TransientLocal + ReliabilityProtocol.KeepLast.
-            Liveliness2s composed for writer-health detection on write-on-change topics.
+            LivelinessStandard composed for writer-health detection on write-on-change topics.
         -->
         <qos_profile name="State">
             <base_name>
                 <element>BuiltinQosLib::Generic.KeepLastReliable.TransientLocal</element>
-                <element>Snippets::Liveliness2s</element>
+                <element>Snippets::LivelinessStandard</element>
             </base_name>
         </qos_profile>
 

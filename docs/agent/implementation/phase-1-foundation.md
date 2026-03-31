@@ -91,7 +91,7 @@
 ### Work
 
 - Author the four QoS XML files under `interfaces/qos/` per the structure in [vision/data-model.md](../vision/data-model.md):
-  - `Snippets.xml` — custom QoS policy snippets for policies with no builtin equivalent (Volatile, ExclusiveOwnership, Liveliness2s, Liveliness500ms, Deadline*, Lifespan20ms, GuiSubsample). Policies with builtin equivalents (Reliable, BestEffort, TransientLocal, KeepLast1, KeepAll) use `BuiltinQosSnippetLib::` directly.
+  - `Snippets.xml` — custom QoS policy snippets for policies with no builtin equivalent (Volatile, ExclusiveOwnership, LivelinessStandard, LivelinessSafety, Deadline*, LifespanOperatorInput, GuiSubsample). Policies with builtin equivalents (Reliable, BestEffort, TransientLocal, KeepLast1, KeepAll) use `BuiltinQosSnippetLib::` directly.
   - `Patterns.xml` — data-pattern base profiles (State, Command, Stream, GuiState, GuiStream) inheriting from semantically appropriate `BuiltinQosLib` profiles (`Generic.KeepLastReliable.TransientLocal`, `Generic.KeepLastReliable`, `Generic.BestEffort`)
   - `Topics.xml` — two libraries: `TopicProfiles` (per-topic profiles as single source of truth for topic-specific tuning) and `Topics` (domain-scoped topic-filter bindings referencing `TopicProfiles::` profiles with no nested content)
   - `Participants.xml` — `Transport` library (deployment-specific transport snippets selected via `$(MEDTECH_TRANSPORT_PROFILE)` with `<configuration_variables>` default of `Default`), `Factory` library (process-level `participant_factory_qos`), and `Participants` library (`Transport` profile composing AvoidIPFragmentation + selected transport snippet). Docker sets `MEDTECH_TRANSPORT_PROFILE=Docker`; bare-metal uses the XML default.

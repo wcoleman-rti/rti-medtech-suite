@@ -57,7 +57,7 @@ the Procedure Controller and digital twin display.
 
 - Add `TopicProfiles::RobotArmAssignment` to `interfaces/qos/Topics.xml`:
   - Inherits from `Patterns::State` (RELIABLE, TRANSIENT_LOCAL, KEEP_LAST 1,
-    `Liveliness2s`)
+    `LivelinessStandard`)
   - No additional topic-specific tuning needed (write-on-change, standard
     liveliness)
 - Add topic-filter binding in the `Topics` library of `Topics.xml`:
