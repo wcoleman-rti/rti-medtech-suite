@@ -1684,3 +1684,75 @@ after closure. They form the project's decision log.
   and requester creation separately. For full RPC validation, use
   subprocess-based tests with real Service Host binaries.
 - **Date closed:** 2026-03-30
+
+---
+
+## INC-056: dispatch_async handler runs on DDS thread — segfault on Qt widget access
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-30
+- **Phase/Step:** GUI Evolution — Procedure Controller
+- **Documents involved:** `procedure_controller.py`,
+  `docs/agent/vision/dds-consistency.md`,
+  `docs/agent/vision/ui-design-system.md`
+- **Description:** `WaitSet.dispatch_async()` with `set_handler()`
+  invokes the handler callback on a DDS internal notification thread,
+  not the asyncio/Qt event loop thread. When the handler performed Qt
+  widget operations (rebuilding tile views, updating status bar,
+  deleting widgets via `_remove_host()`), Qt emitted
+  `"Cannot set parent, new parent is in a different thread"` errors
+  followed by a segmentation fault. The root cause is that Qt widgets
+  have thread affinity — they can only be modified from their owning
+  thread (the main/UI thread).
+- **Possible resolutions:**
+  1. Use `wait_async()` instead of `dispatch_async()`. After
+     `await wait_async()` returns, execution resumes on the asyncio
+     event loop thread, making inline Qt widget operations safe.
+  2. Use `dispatch_async()` + handler but bridge to the Qt thread via
+     `QMetaObject.invokeMethod` or an `asyncio.Queue`.
+- **Resolution:** Resolution 1 adopted. Replaced `dispatch_async()` +
+  `set_handler()` with `await waitset.wait_async(timeout)` followed by
+  inline status processing. The `dds.TimeoutError` exception on timeout
+  is caught and the loop continues.
+- **Guideline:** In Python GUI applications using QtAsyncio, **always
+  use `wait_async()`** for status condition monitoring, not
+  `dispatch_async()`. The `wait_async` pattern keeps all processing on
+  the event-loop/Qt thread. Document this in the UI design system.
+- **Date closed:** 2026-03-30
+
+---
+
+## INC-057: rti.rpc.Requester has native async API — ThreadPoolExecutor unnecessary
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-30
+- **Phase/Step:** GUI Evolution — Procedure Controller
+- **Documents involved:** `procedure_controller.py`,
+  `docs/agent/vision/dds-consistency.md`
+- **Description:** The Procedure Controller originally wrapped
+  `rti.rpc.Requester` calls in a `ThreadPoolExecutor` because
+  `receive_replies()` is blocking. However, RTI Connext 7.6.0 Python
+  API provides native async methods:
+  - `await requester.wait_for_service_async(timeout)` — async service
+    discovery
+  - `requester.send_request(call)` — non-blocking write (safe on
+    event loop thread)
+  - `await requester.wait_for_replies_async(timeout, related_request_id)`
+    — async reply wait
+  - `requester.take_replies(related_request_id)` — non-blocking drain
+  Using these eliminates the need for `ThreadPoolExecutor` and
+  `run_in_executor()` entirely. Source: `rti-chatbot-mcp` confirmed
+  `send_request()` is a DDS write operation (not a blocking wait),
+  and `receive_replies()` is documented as a convenience combining
+  `wait_for_replies()` + `take_replies()`.
+- **Resolution:** Removed `ThreadPoolExecutor`. Both `_do_rpc()` and
+  `_do_rpc_display()` now use the native async Requester flow directly
+  on the asyncio event loop.
+- **Guideline:** For Python asyncio/QtAsyncio applications, prefer the
+  native async `Requester` API over wrapping blocking calls in an
+  executor. The pattern is:
+  `await wait_for_service_async()` → `send_request()` →
+  `await wait_for_replies_async()` → `take_replies()`.
+- **Date closed:** 2026-03-30

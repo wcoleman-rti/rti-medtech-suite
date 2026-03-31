@@ -29,6 +29,7 @@ def main() -> None:
     display.show()
 
     QtAsyncio.run(display.start(), handle_sigint=True)
+    display.close_dds()
 
 
 if __name__ == "__main__":

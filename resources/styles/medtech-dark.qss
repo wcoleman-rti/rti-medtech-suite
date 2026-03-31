@@ -1,14 +1,14 @@
-/* Medtech Suite — Shared Qt Stylesheet
- * RTI brand color palette and typography for all GUI applications.
- * Loaded by medtech_gui.init_theme() at startup.
+/* Medtech Suite — Dark Theme Variant
+ * Same RTI brand color palette and typography, dark surface colors.
+ * Loaded by medtech_gui.ThemeManager when dark mode is active.
  */
 
 /* === Global defaults === */
 QWidget {
     font-family: "Montserrat", sans-serif;
     font-size: 14px;
-    color: #2D2D2D;
-    background-color: #F7F8FA;
+    color: #E0E2E6;
+    background-color: #1A1D23;
 }
 
 /* === Header bar === */
@@ -29,12 +29,12 @@ QFrame#headerBar QLabel {
 
 /* === Sidebar === */
 QFrame#sidebar {
-    background-color: #004C97;
+    background-color: #0D1117;
     min-width: 220px;
 }
 
 QFrame#sidebar QPushButton {
-    color: #FFFFFF;
+    color: #E0E2E6;
     background-color: transparent;
     border: none;
     border-radius: 6px;
@@ -47,6 +47,7 @@ QFrame#sidebar QPushButton {
 
 QFrame#sidebar QPushButton:hover {
     background-color: #00B5E2;
+    color: #FFFFFF;
 }
 
 QFrame#sidebar QPushButton:pressed {
@@ -55,8 +56,8 @@ QFrame#sidebar QPushButton:pressed {
 
 /* === Status bar === */
 QStatusBar {
-    background-color: #3A3D42;
-    color: #FFFFFF;
+    background-color: #0D1117;
+    color: #E0E2E6;
     font-size: 12px;
     min-height: 28px;
     padding: 2px 12px;
@@ -85,7 +86,7 @@ QPushButton:pressed {
 }
 
 QPushButton:disabled {
-    background-color: #BBBCBC;
+    background-color: #3A3D42;
     color: #63666A;
 }
 
@@ -121,7 +122,7 @@ QPushButton#actionTile:pressed {
 }
 
 QPushButton#actionTile:disabled {
-    background-color: #BBBCBC;
+    background-color: #3A3D42;
     color: #63666A;
 }
 
@@ -169,21 +170,22 @@ QPushButton#infoTile:pressed {
 
 /* === Table views === */
 QTableView, QTableWidget {
-    gridline-color: #E0E2E6;
+    gridline-color: #2D3139;
     selection-background-color: #004C97;
     selection-color: #FFFFFF;
-    alternate-background-color: #F0F2F5;
-    background-color: #FFFFFF;
-    border: 1px solid #E0E2E6;
+    alternate-background-color: #21252B;
+    background-color: #1A1D23;
+    border: 1px solid #2D3139;
     border-radius: 8px;
     font-size: 13px;
+    color: #E0E2E6;
     outline: none;
 }
 
 QTableView::item, QTableWidget::item {
     padding: 8px 12px;
     min-height: 36px;
-    border-bottom: 1px solid #F0F2F5;
+    border-bottom: 1px solid #2D3139;
 }
 
 QTableView::item:selected, QTableWidget::item:selected {
@@ -213,22 +215,23 @@ QHeaderView::section:last {
 
 /* === Panels === */
 QGroupBox {
-    background-color: #FFFFFF;
-    border: 1px solid #E0E2E6;
+    background-color: #21252B;
+    border: 1px solid #2D3139;
     border-radius: 10px;
     margin-top: 20px;
     padding: 16px 12px 12px 12px;
     font-family: "Roboto Condensed", sans-serif;
     font-size: 15px;
     font-weight: bold;
+    color: #E0E2E6;
 }
 
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
     padding: 4px 12px;
-    color: #004C97;
-    background-color: #FFFFFF;
+    color: #00B5E2;
+    background-color: #21252B;
     border-radius: 4px;
 }
 
@@ -258,7 +261,7 @@ QLabel#statusInfo {
 }
 
 QLabel#statusDisconnected {
-    color: #BBBCBC;
+    color: #63666A;
     font-weight: bold;
     font-size: 14px;
 }
@@ -267,9 +270,9 @@ QLabel#statusDisconnected {
 QPlainTextEdit, QTextEdit#logOutput {
     font-family: "Roboto Mono", monospace;
     font-size: 12px;
-    background-color: #1A1A2E;
+    background-color: #0D1117;
     color: #D4D4D4;
-    border: 1px solid #2A2A3E;
+    border: 1px solid #2D3139;
     border-radius: 8px;
     padding: 8px;
     selection-background-color: #004C97;
@@ -277,7 +280,7 @@ QPlainTextEdit, QTextEdit#logOutput {
 
 /* === Dividers === */
 QFrame#divider {
-    background-color: #E0E2E6;
+    background-color: #2D3139;
     max-height: 1px;
 }
 
@@ -289,7 +292,7 @@ QScrollBar:vertical {
 }
 
 QScrollBar::handle:vertical {
-    background-color: #BBBCBC;
+    background-color: #3A3D42;
     border-radius: 4px;
     min-height: 24px;
 }
@@ -309,7 +312,7 @@ QScrollBar:horizontal {
 }
 
 QScrollBar::handle:horizontal {
-    background-color: #BBBCBC;
+    background-color: #3A3D42;
     border-radius: 4px;
     min-width: 24px;
 }
@@ -324,27 +327,27 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
 
 /* === Content wrapper === */
 QWidget#contentArea {
-    background-color: #F7F8FA;
+    background-color: #1A1D23;
 }
 
 /* === Card-style info panels === */
 QFrame#cardPanel {
-    background-color: #FFFFFF;
-    border: 1px solid #E0E2E6;
+    background-color: #21252B;
+    border: 1px solid #2D3139;
     border-radius: 10px;
     padding: 16px;
 }
 
-/* === Table row hover feedback (#5) === */
+/* === Table row hover feedback === */
 QTableView::item:hover, QTableWidget::item:hover {
-    background-color: #E8F0FE;
+    background-color: #2A3040;
     cursor: pointer;
 }
 
-/* === Stat card tiles (#2) === */
+/* === Stat card tiles === */
 QFrame#statCard {
-    background-color: #FFFFFF;
-    border: 1px solid #E0E2E6;
+    background-color: #21252B;
+    border: 1px solid #2D3139;
     border-radius: 12px;
     padding: 16px;
     min-width: 120px;
@@ -355,14 +358,14 @@ QFrame#statCard QLabel#statValue {
     font-family: "Roboto Condensed", sans-serif;
     font-size: 28px;
     font-weight: bold;
-    color: #004C97;
+    color: #00B5E2;
     background-color: transparent;
 }
 
 QFrame#statCard QLabel#statLabel {
     font-family: "Montserrat", sans-serif;
     font-size: 12px;
-    color: #63666A;
+    color: #BBBCBC;
     background-color: transparent;
 }
 
@@ -371,9 +374,9 @@ QFrame#statCard QLabel#statIcon {
     background-color: transparent;
 }
 
-/* === Empty-state placeholder (#7) === */
+/* === Empty-state placeholder === */
 QLabel#emptyState {
-    color: #BBBCBC;
+    color: #63666A;
     font-family: "Roboto Condensed", sans-serif;
     font-size: 15px;
     font-weight: bold;
@@ -381,15 +384,15 @@ QLabel#emptyState {
     background-color: transparent;
 }
 
-/* === Section header with icon (#6) === */
+/* === Section header with icon === */
 QLabel#sectionIcon {
     font-size: 18px;
-    color: #004C97;
+    color: #00B5E2;
     background-color: transparent;
     padding-right: 4px;
 }
 
-/* === Connection indicator (#4) === */
+/* === Connection indicator === */
 QLabel#connDot {
     background-color: transparent;
     min-width: 14px;
@@ -417,9 +420,9 @@ QPushButton#themeToggle:hover {
 
 /* === Tooltips === */
 QToolTip {
-    background-color: #3A3D42;
-    color: #FFFFFF;
-    border: none;
+    background-color: #21252B;
+    color: #E0E2E6;
+    border: 1px solid #2D3139;
     border-radius: 4px;
     padding: 6px 10px;
     font-size: 12px;
@@ -427,28 +430,28 @@ QToolTip {
 
 /* === Host card === */
 QFrame#hostCard {
-    background-color: #FFFFFF;
-    border: 1px solid #E0E2E6;
+    background-color: #21252B;
+    border: 1px solid #2D3139;
     border-radius: 12px;
     min-height: 64px;
 }
 
 QFrame#hostCard:hover {
-    border-color: #004C97;
-    background-color: #F0F4FA;
+    border-color: #00B5E2;
+    background-color: #2A3040;
 }
 
 /* === Service card === */
 QFrame#serviceCard {
-    background-color: #FAFBFC;
-    border: 1px solid #E0E2E6;
+    background-color: #1A1D23;
+    border: 1px solid #2D3139;
     border-radius: 10px;
     min-height: 52px;
 }
 
 QFrame#serviceCard:hover {
     border-color: #00B5E2;
-    background-color: #E8F0FE;
+    background-color: #2A3040;
 }
 
 /* === Card text styles === */
@@ -456,30 +459,30 @@ QLabel#cardTitle {
     font-family: "Roboto Condensed", sans-serif;
     font-size: 16px;
     font-weight: bold;
-    color: #004C97;
+    color: #00B5E2;
     background-color: transparent;
 }
 
 QLabel#cardMeta {
     font-family: "Montserrat", sans-serif;
     font-size: 12px;
-    color: #63666A;
+    color: #BBBCBC;
     background-color: transparent;
 }
 
 QLabel#cardDescription {
     font-family: "Montserrat", sans-serif;
     font-size: 13px;
-    color: #63666A;
+    color: #BBBCBC;
     background-color: transparent;
 }
 
 /* === View toggle buttons === */
 QPushButton#viewToggle {
     background-color: transparent;
-    border: 1px solid #E0E2E6;
+    border: 1px solid #2D3139;
     border-radius: 8px;
-    color: #63666A;
+    color: #BBBCBC;
     padding: 8px 20px;
     font-family: "Roboto Condensed", sans-serif;
     font-size: 14px;
@@ -488,14 +491,14 @@ QPushButton#viewToggle {
 }
 
 QPushButton#viewToggle:hover {
-    background-color: #F0F4FA;
-    border-color: #004C97;
-    color: #004C97;
+    background-color: #2A3040;
+    border-color: #00B5E2;
+    color: #00B5E2;
 }
 
 QPushButton#viewToggleActive {
-    background-color: #004C97;
-    border: 1px solid #004C97;
+    background-color: #00B5E2;
+    border: 1px solid #00B5E2;
     border-radius: 8px;
     color: #FFFFFF;
     padding: 8px 20px;
@@ -506,24 +509,24 @@ QPushButton#viewToggleActive {
 }
 
 QPushButton#viewToggleActive:hover {
-    background-color: #00B5E2;
-    border-color: #00B5E2;
+    background-color: #0090B5;
+    border-color: #0090B5;
 }
 
 /* === Selected tile highlight === */
 QFrame#hostCard[selected="true"] {
-    border: 2px solid #004C97;
-    background-color: #E8F0FE;
+    border: 2px solid #00B5E2;
+    background-color: #2A3040;
 }
 
 QFrame#serviceCard[selected="true"] {
     border: 2px solid #00B5E2;
-    background-color: #E8F0FE;
+    background-color: #2A3040;
 }
 
 /* === Action overlay === */
 QFrame#actionOverlay {
-    background-color: rgba(255, 255, 255, 230);
+    background-color: rgba(33, 37, 43, 230);
     border: none;
     border-radius: 24px;
     min-height: 52px;
@@ -531,24 +534,24 @@ QFrame#actionOverlay {
 
 /* === Result card overlay === */
 QFrame#resultCard {
-    background-color: rgba(255, 255, 255, 245);
-    border: 1px solid #E0E2E6;
+    background-color: rgba(33, 37, 43, 240);
+    border: 1px solid #2D3139;
     border-radius: 16px;
 }
 
 QPushButton#resultClose {
     background-color: transparent;
     border: none;
-    color: #63666A;
+    color: #BBBCBC;
     font-size: 18px;
     font-weight: bold;
 }
 
 QPushButton#resultClose:hover {
-    color: #004C97;
+    color: #FFFFFF;
 }
 
 /* === Clickable stat card cursor hint === */
 QFrame#statCard:hover {
-    border-color: #004C97;
+    border-color: #00B5E2;
 }

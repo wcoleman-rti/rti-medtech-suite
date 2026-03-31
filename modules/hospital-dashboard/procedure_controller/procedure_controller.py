@@ -1,14 +1,25 @@
 """Procedure Controller — PySide6 GUI for orchestrating surgical services.
 
 Subscribes to HostCatalog and ServiceStatus on the Orchestration domain
-(Domain 15) via polling reads on a QTimer. Issues RPC commands to Service
-Hosts via ServiceHostControl client stubs on a worker thread. Reads
-scheduling context from the Hospital domain (read-only).
+(Domain 15) via async DDS reads (``rti.asyncio`` / ``take_data_async``).
+Issues RPC commands to Service Hosts via ServiceHostControl client stubs
+on a worker thread. Reads scheduling context from the Hospital domain
+(read-only).
 
 Threading model:
-  - DDS polling reads on the Qt UI thread (QTimer, 10 Hz)
-  - RPC calls on a dedicated worker thread (threading.Thread)
+  - DDS reads via async coroutines on the QtAsyncio event loop
+  - RPC calls via native async Requester API (no thread pool)
   - No DDS writes on the UI thread (Procedure Controller has no writers)
+  - Liveliness monitored via StatusCondition + WaitSet (event-driven)
+  - Periodic UI consistency sweep rebuilds views from cached state (2 Hz)
+
+Touch-friendly UI:
+  - No tables — hosts and services rendered as large tappable cards
+  - Two views: Host View (drill into host → services → actions) and
+    Service View (flat list of services across all hosts)
+  - Stat cards in the header bar are tappable to switch views
+  - Refresh button for user-initiated data drain
+  - All touch targets are at least 48×48 px (WCAG 2.5.8)
 
 Follows the canonical application architecture in vision/dds-consistency.md §5.
 Uses generated entity name constants from app_names.idl.
@@ -16,40 +27,52 @@ Uses generated entity name constants from app_names.idl.
 
 from __future__ import annotations
 
-import threading
+import asyncio
 from typing import Optional
 
 import app_names
 import rti.connextdds as dds
 import rti.rpc
 from medtech_dds_init.dds_init import initialize_connext
-from medtech_gui import init_theme
+from medtech_gui import (
+    ConnectionDot,
+    create_empty_state,
+    create_stat_card,
+    create_status_chip,
+    init_theme,
+)
 from medtech_logging import ModuleName, init_logging
 from orchestration import Orchestration
-from PySide6.QtCore import QTimer, Signal
+from PySide6.QtCore import QPoint, QRect, QSize, Qt
 from PySide6.QtWidgets import (
     QApplication,
-    QGroupBox,
+    QFrame,
     QHBoxLayout,
-    QHeaderView,
+    QLabel,
+    QLayout,
     QMainWindow,
     QPushButton,
+    QScrollArea,
+    QStackedWidget,
     QStatusBar,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QWidgetItem,
 )
 
 orch_names = app_names.MedtechEntityNames.OrchestrationParticipants
 
 log = init_logging(ModuleName.HOSPITAL_DASHBOARD)
 
-# Polling interval for DDS reads (milliseconds)
-_POLL_INTERVAL_MS = 100  # 10 Hz
-
 # RPC timeout
 _RPC_TIMEOUT = dds.Duration(seconds=10)
+
+# UI consistency sweep interval (seconds)
+_UI_SWEEP_INTERVAL = 0.5
+
+# View mode constants
+_HOST_VIEW = 0
+_SERVICE_VIEW = 1
 
 
 class ProcedureController(QMainWindow):
@@ -60,8 +83,9 @@ class ProcedureController(QMainWindow):
         ServiceHostControl RPC client
       - Hospital domain: read-only subscriber for scheduling context
 
-    DDS polling reads run on the Qt UI thread via QTimer (non-blocking).
-    RPC calls run on worker threads to avoid blocking the UI.
+    DDS data reception runs as async coroutines (QtAsyncio / rti.asyncio)
+    so the Qt main thread is never blocked by DDS reads. The UI updates
+    only when new data arrives (event-driven).
 
     Parameters
     ----------
@@ -72,9 +96,6 @@ class ProcedureController(QMainWindow):
         in tests. When both are supplied, no DomainParticipants are
         created internally.
     """
-
-    # Qt signal to deliver RPC results from worker thread to UI thread
-    _rpc_result_signal = Signal(str, str)
 
     def __init__(
         self,
@@ -88,10 +109,17 @@ class ProcedureController(QMainWindow):
         self._orch_participant: Optional[dds.DomainParticipant] = None
         self._hosp_participant: Optional[dds.DomainParticipant] = None
         self._requesters: dict[str, rti.rpc.Requester] = {}
+        self._running = False
+        self._tasks: list[asyncio.Task] = []
 
         # State tracking
         self._hosts: dict[str, Orchestration.HostCatalog] = {}
         self._service_states: dict[tuple[str, str], Orchestration.ServiceStatus] = {}
+        self._pub_handle_to_host: dict[dds.InstanceHandle, str] = {}
+
+        # Single-selection tracking (only one item selected at a time)
+        self._selected_host_id: Optional[str] = None
+        self._selected_svc_key: Optional[tuple[str, str]] = None
 
         # ---- DDS setup ----
         injected = catalog_reader is not None and status_reader is not None
@@ -104,14 +132,6 @@ class ProcedureController(QMainWindow):
         # ---- Qt UI ----
         self.setWindowTitle("Medtech Suite — Procedure Controller")
         self._setup_ui()
-
-        # ---- RPC result signal ----
-        self._rpc_result_signal.connect(self._on_rpc_result)
-
-        # ---- Polling timer ----
-        self._poll_timer = QTimer(self)
-        self._poll_timer.timeout.connect(self._poll_dds)
-        self._poll_timer.start(_POLL_INTERVAL_MS)
 
     # ------------------------------------------------------------------ #
     # DDS initialization                                                   #
@@ -168,135 +188,597 @@ class ProcedureController(QMainWindow):
     def _setup_ui(self) -> None:
         central = QWidget()
         self.setCentralWidget(central)
-        layout = QVBoxLayout(central)
-        layout.setSpacing(0)
-        layout.setContentsMargins(0, 0, 0, 0)
+        root_layout = QVBoxLayout(central)
+        root_layout.setSpacing(0)
+        root_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Shared GUI header (RTI logo + theme)
+        # Shared GUI header (RTI logo + theme + connection dot)
         app = QApplication.instance()
         if app is not None:
             header = init_theme(app)
-            layout.addWidget(header)
+            root_layout.addWidget(header)
+            self._conn_dot = header.findChild(ConnectionDot)
+        else:
+            self._conn_dot = None
 
-        # Content area
-        content = QWidget()
+        # Content area — click background to deselect
+        content = _ClickableWidget(on_click=self._deselect_all)
+        content.setObjectName("contentArea")
         content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(12, 8, 12, 8)
+        content_layout.setContentsMargins(20, 16, 20, 16)
+        content_layout.setSpacing(16)
 
-        # -- Hosts table --
-        host_group = QGroupBox("Service Hosts")
-        host_layout = QVBoxLayout(host_group)
-        self._host_table = QTableWidget(0, 4)
-        self._host_table.setHorizontalHeaderLabels(
-            ["Host ID", "Host Type", "Capacity", "Services"]
+        # -- Stat cards row (tappable to switch views) --
+        stats_layout = QHBoxLayout()
+        stats_layout.setSpacing(12)
+        self._stat_hosts = create_stat_card("0", "Hosts Online", "\u2302", "#004C97")
+        self._stat_hosts.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._stat_hosts.setToolTip("Tap to switch to Host View")
+        self._stat_hosts.mousePressEvent = lambda _: self._switch_view(_HOST_VIEW)
+
+        self._stat_services = create_stat_card(
+            "0", "Services Running", "\u2699", "#A4D65E"
         )
-        self._host_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        self._stat_services.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._stat_services.setToolTip("Tap to switch to Service View")
+        self._stat_services.mousePressEvent = lambda _: self._switch_view(_SERVICE_VIEW)
+
+        self._stat_warnings = create_stat_card("0", "Warnings", "\u26A0", "#ED8B00")
+        stats_layout.addWidget(self._stat_hosts)
+        stats_layout.addWidget(self._stat_services)
+        stats_layout.addWidget(self._stat_warnings)
+        stats_layout.addStretch()
+
+        # Refresh button
+        self._btn_refresh = QPushButton("\u21BB  Refresh")
+        self._btn_refresh.setObjectName("infoTile")
+        self._btn_refresh.setToolTip("Refresh all data from DDS")
+        self._btn_refresh.clicked.connect(self._on_refresh)
+        stats_layout.addWidget(self._btn_refresh)
+
+        content_layout.addLayout(stats_layout)
+
+        # -- View mode toggle bar --
+        toggle_bar = QHBoxLayout()
+        toggle_bar.setSpacing(8)
+
+        self._btn_host_view = QPushButton("\u2302  Host View")
+        self._btn_host_view.setObjectName("viewToggleActive")
+        self._btn_host_view.clicked.connect(lambda: self._switch_view(_HOST_VIEW))
+
+        self._btn_svc_view = QPushButton("\u2699  Service View")
+        self._btn_svc_view.setObjectName("viewToggle")
+        self._btn_svc_view.clicked.connect(lambda: self._switch_view(_SERVICE_VIEW))
+
+        toggle_bar.addWidget(self._btn_host_view)
+        toggle_bar.addWidget(self._btn_svc_view)
+        toggle_bar.addStretch()
+
+        self._btn_start_all = QPushButton("\u25B6  Start All")
+        self._btn_start_all.setObjectName("viewToggle")
+        self._btn_start_all.setVisible(False)
+        self._btn_start_all.clicked.connect(self._on_start_all)
+
+        self._btn_stop_all = QPushButton("\u25A0  Stop All")
+        self._btn_stop_all.setObjectName("viewToggle")
+        self._btn_stop_all.setVisible(False)
+        self._btn_stop_all.clicked.connect(self._on_stop_all)
+
+        toggle_bar.addWidget(self._btn_start_all)
+        toggle_bar.addWidget(self._btn_stop_all)
+        content_layout.addLayout(toggle_bar)
+
+        # -- Stacked widget: Host View (0) / Service View (1) --
+        self._view_stack = QStackedWidget()
+
+        # Host view — scrollable tile grid
+        self._host_scroll = QScrollArea()
+        self._host_scroll.setWidgetResizable(True)
+        self._host_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._host_container = QWidget()
+        self._host_flow = FlowLayout(self._host_container, hspacing=12, vspacing=12)
+        self._host_scroll.setWidget(self._host_container)
+        self._host_empty = create_empty_state(
+            "Searching for service hosts\u2026", "\u25CE"
         )
-        self._host_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self._host_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self._host_table.setAlternatingRowColors(True)
-        host_layout.addWidget(self._host_table)
-        content_layout.addWidget(host_group)
+        self._host_page = QStackedWidget()
+        self._host_page.addWidget(self._host_empty)
+        self._host_page.addWidget(self._host_scroll)
+        self._view_stack.addWidget(self._host_page)
 
-        # -- Services table --
-        svc_group = QGroupBox("Service States")
-        svc_layout = QVBoxLayout(svc_group)
-        self._svc_table = QTableWidget(0, 3)
-        self._svc_table.setHorizontalHeaderLabels(["Service ID", "Host", "State"])
-        self._svc_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-        self._svc_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self._svc_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self._svc_table.setAlternatingRowColors(True)
-        svc_layout.addWidget(self._svc_table)
-        content_layout.addWidget(svc_group)
+        # Service view — scrollable tile grid
+        self._svc_scroll = QScrollArea()
+        self._svc_scroll.setWidgetResizable(True)
+        self._svc_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._svc_container = QWidget()
+        self._svc_flow = FlowLayout(self._svc_container, hspacing=12, vspacing=12)
+        self._svc_scroll.setWidget(self._svc_container)
+        self._svc_empty = create_empty_state("No services reported yet", "\u2261")
+        self._svc_page = QStackedWidget()
+        self._svc_page.addWidget(self._svc_empty)
+        self._svc_page.addWidget(self._svc_scroll)
+        self._view_stack.addWidget(self._svc_page)
 
-        # -- Action buttons --
-        btn_layout = QHBoxLayout()
-        self._btn_start = QPushButton("Start Service")
-        self._btn_stop = QPushButton("Stop Service")
-        self._btn_capabilities = QPushButton("Capabilities")
-        self._btn_health = QPushButton("Health")
-        self._btn_start.clicked.connect(self._on_start_clicked)
-        self._btn_stop.clicked.connect(self._on_stop_clicked)
-        self._btn_capabilities.clicked.connect(self._on_capabilities_clicked)
-        self._btn_health.clicked.connect(self._on_health_clicked)
-        btn_layout.addWidget(self._btn_start)
-        btn_layout.addWidget(self._btn_stop)
-        btn_layout.addWidget(self._btn_capabilities)
-        btn_layout.addWidget(self._btn_health)
-        btn_layout.addStretch()
-        content_layout.addLayout(btn_layout)
+        content_layout.addWidget(self._view_stack, stretch=1)
+        root_layout.addWidget(content, stretch=1)
 
-        layout.addWidget(content, stretch=1)
+        # -- Floating action overlay (bottom-center, above status bar) --
+        self._action_overlay = QFrame(self)
+        self._action_overlay.setObjectName("actionOverlay")
+        self._action_overlay.setVisible(False)
+        self._overlay_layout = QHBoxLayout(self._action_overlay)
+        self._overlay_layout.setContentsMargins(20, 12, 20, 12)
+        self._overlay_layout.setSpacing(12)
+
+        # -- Floating result card (center, for health/capabilities) --
+        self._result_card = QFrame(self)
+        self._result_card.setObjectName("resultCard")
+        self._result_card.setVisible(False)
 
         # Status bar
         self._status_bar = QStatusBar()
         self.setStatusBar(self._status_bar)
-        self._status_bar.showMessage("Discovering service hosts...")
+        self._status_bar.showMessage("Discovering service hosts\u2026")
 
-        self.resize(800, 600)
+        self.resize(900, 700)
 
     # ------------------------------------------------------------------ #
-    # DDS polling (UI thread — non-blocking)                               #
+    # View switching                                                       #
     # ------------------------------------------------------------------ #
 
-    def _poll_dds(self) -> None:
-        """Poll DDS readers on the UI thread (non-blocking)."""
-        # -- HostCatalog --
+    def _switch_view(self, view: int) -> None:
+        """Switch between Host View and Service View."""
+        self._deselect_all()
+        self._view_stack.setCurrentIndex(view)
+        if view == _HOST_VIEW:
+            self._btn_host_view.setObjectName("viewToggleActive")
+            self._btn_svc_view.setObjectName("viewToggle")
+            self._btn_start_all.setVisible(False)
+            self._btn_stop_all.setVisible(False)
+        else:
+            self._btn_host_view.setObjectName("viewToggle")
+            self._btn_svc_view.setObjectName("viewToggleActive")
+            self._btn_start_all.setVisible(True)
+            self._btn_stop_all.setVisible(True)
+        # Force style refresh after objectName change
+        self._btn_host_view.style().unpolish(self._btn_host_view)
+        self._btn_host_view.style().polish(self._btn_host_view)
+        self._btn_svc_view.style().unpolish(self._btn_svc_view)
+        self._btn_svc_view.style().polish(self._btn_svc_view)
+
+    # ------------------------------------------------------------------ #
+    # Selection management                                                 #
+    # ------------------------------------------------------------------ #
+
+    def _select_host(self, host_id: str) -> None:
+        """Select a host tile and show action overlay."""
+        if self._selected_host_id == host_id:
+            self._deselect_all()
+            return
+        self._selected_host_id = host_id
+        self._selected_svc_key = None
+        self._show_action_overlay()
+        self._update_tile_highlights()
+
+    def _select_service(self, host_id: str, service_id: str) -> None:
+        """Select a service tile and show action overlay."""
+        svc_key = (host_id, service_id)
+        if self._selected_svc_key == svc_key:
+            self._deselect_all()
+            return
+        self._selected_svc_key = svc_key
+        self._selected_host_id = host_id
+        self._show_action_overlay()
+        self._update_tile_highlights()
+
+    def _deselect_all(self) -> None:
+        """Clear selection and hide action overlay."""
+        self._selected_host_id = None
+        self._selected_svc_key = None
+        self._action_overlay.setVisible(False)
+        self._update_tile_highlights()
+
+    def _update_tile_highlights(self) -> None:
+        """Update the 'selected' dynamic property on all tiles for QSS."""
+        for container in (self._host_container, self._svc_container):
+            for child in container.findChildren(QFrame):
+                obj_name = child.objectName()
+                if obj_name == "hostCard":
+                    is_sel = child.property("hostId") == self._selected_host_id
+                    child.setProperty("selected", is_sel)
+                elif obj_name == "serviceCard":
+                    h = child.property("hostId")
+                    s = child.property("serviceId")
+                    is_sel = self._selected_svc_key == (h, s)
+                    child.setProperty("selected", is_sel)
+                else:
+                    continue
+                child.style().unpolish(child)
+                child.style().polish(child)
+
+    # ------------------------------------------------------------------ #
+    # Action overlay positioning                                           #
+    # ------------------------------------------------------------------ #
+
+    def _show_action_overlay(self) -> None:
+        """Show the floating action overlay with context-appropriate buttons."""
+        # Clear previous buttons
+        while self._overlay_layout.count():
+            item = self._overlay_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+
+        if self._selected_svc_key:
+            # Service selected: show Start/Configure + Stop
+            host_id, svc_id = self._selected_svc_key
+            status = self._service_states.get(self._selected_svc_key)
+            is_running = status is not None and _state_name(status.state).upper() in (
+                "RUNNING",
+                "STARTED",
+                "ACTIVE",
+            )
+            if is_running:
+                btn_cfg = QPushButton("\u2699  Configure")
+                btn_cfg.setObjectName("infoTile")
+                btn_cfg.clicked.connect(self._on_configure_selected)
+                self._overlay_layout.addWidget(btn_cfg)
+            else:
+                btn_start = QPushButton("\u25B6  Start")
+                btn_start.setObjectName("actionTile")
+                btn_start.clicked.connect(self._on_start_selected)
+                self._overlay_layout.addWidget(btn_start)
+
+            btn_stop = QPushButton("\u25A0  Stop")
+            btn_stop.setObjectName("stopTile")
+            btn_stop.clicked.connect(self._on_stop_selected)
+            self._overlay_layout.addWidget(btn_stop)
+        elif self._selected_host_id:
+            # Host selected: show Health + Capabilities
+            btn_health = QPushButton("\u2764  Health")
+            btn_health.setObjectName("infoTile")
+            btn_health.clicked.connect(self._on_health_selected)
+            self._overlay_layout.addWidget(btn_health)
+
+            btn_caps = QPushButton("\u2699  Capabilities")
+            btn_caps.setObjectName("infoTile")
+            btn_caps.clicked.connect(self._on_capabilities_selected)
+            self._overlay_layout.addWidget(btn_caps)
+
+        self._action_overlay.setVisible(True)
+        self._position_action_overlay()
+
+    def _position_action_overlay(self) -> None:
+        """Center the action overlay at the bottom of the window."""
+        overlay = self._action_overlay
+        # Force the layout to recalculate after adding/removing buttons
+        overlay.layout().activate()
+        QApplication.processEvents()
+        ow = max(overlay.sizeHint().width(), 200)
+        oh = max(overlay.sizeHint().height(), 52)
+        x = (self.width() - ow) // 2
+        y = self.height() - oh - 40
+        overlay.setGeometry(x, y, ow, oh)
+        overlay.raise_()
+
+    # ------------------------------------------------------------------ #
+    # Tile builders                                                        #
+    # ------------------------------------------------------------------ #
+
+    def _build_host_tile(
+        self, host_id: str, catalog: Orchestration.HostCatalog
+    ) -> QFrame:
+        """Build a fixed-size tappable tile for a service host."""
+        tile = QFrame()
+        tile.setObjectName("hostCard")
+        tile.setProperty("hostId", host_id)
+        tile.setFixedSize(_TILE_W, _TILE_H)
+        tile_layout = QVBoxLayout(tile)
+        tile_layout.setContentsMargins(14, 12, 14, 12)
+        tile_layout.setSpacing(4)
+
+        name_lbl = QLabel(f"\u2302  {host_id}")
+        name_lbl.setObjectName("cardTitle")
+        name_lbl.setWordWrap(True)
+        tile_layout.addWidget(name_lbl)
+
+        cap_lbl = QLabel(f"Capacity: {catalog.capacity}")
+        cap_lbl.setObjectName("cardMeta")
+        tile_layout.addWidget(cap_lbl)
+
+        svc_count = len(catalog.supported_services)
+        count_lbl = QLabel(f"{svc_count} service{'s' if svc_count != 1 else ''}")
+        count_lbl.setObjectName("cardMeta")
+        tile_layout.addWidget(count_lbl)
+
+        if catalog.health_summary:
+            health_lbl = QLabel(catalog.health_summary)
+            health_lbl.setObjectName("cardDescription")
+            health_lbl.setWordWrap(True)
+            tile_layout.addWidget(health_lbl)
+
+        tile_layout.addStretch()
+        tile.setCursor(Qt.CursorShape.PointingHandCursor)
+        tile.mousePressEvent = lambda ev, hid=host_id: (
+            ev.accept(),
+            self._select_host(hid),
+        )
+        return tile
+
+    def _build_service_tile(
+        self,
+        host_id: str,
+        service_id: str,
+        status: Optional[Orchestration.ServiceStatus],
+        show_host: bool = False,
+    ) -> QFrame:
+        """Build a fixed-size tappable tile for a service."""
+        tile = QFrame()
+        tile.setObjectName("serviceCard")
+        tile.setProperty("hostId", host_id)
+        tile.setProperty("serviceId", service_id)
+        tile.setFixedSize(_TILE_W, _TILE_H)
+        tile_layout = QVBoxLayout(tile)
+        tile_layout.setContentsMargins(14, 12, 14, 12)
+        tile_layout.setSpacing(4)
+
+        name_lbl = QLabel(f"\u2699  {service_id}")
+        name_lbl.setObjectName("cardTitle")
+        name_lbl.setMaximumHeight(36)
+        name_lbl.setWordWrap(False)
+        tile_layout.addWidget(name_lbl)
+
+        if show_host:
+            host_lbl = QLabel(f"Host: {host_id}")
+            host_lbl.setObjectName("cardMeta")
+            tile_layout.addWidget(host_lbl)
+
+        if status is not None:
+            state_name = _state_name(status.state)
+            chip = create_status_chip(state_name)
+            tile_layout.addWidget(chip)
+        else:
+            tile_layout.addWidget(create_status_chip("UNKNOWN"))
+
+        tile_layout.addStretch()
+        tile.setCursor(Qt.CursorShape.PointingHandCursor)
+        tile.mousePressEvent = lambda ev, h=host_id, s=service_id: (
+            ev.accept(),
+            self._select_service(h, s),
+        )
+        return tile
+
+    # ------------------------------------------------------------------ #
+    # View rebuilders (called only on data change)                         #
+    # ------------------------------------------------------------------ #
+
+    def _rebuild_host_view(self) -> None:
+        """Rebuild the Host View tile grid from current state."""
+        if not self._hosts:
+            self._host_page.setCurrentIndex(0)
+            return
+        self._host_page.setCurrentIndex(1)
+
+        _clear_flow(self._host_flow)
+
+        for host_id, catalog in sorted(self._hosts.items()):
+            tile = self._build_host_tile(host_id, catalog)
+            self._host_flow.addWidget(tile)
+
+        self._update_tile_highlights()
+
+    def _rebuild_service_view(self) -> None:
+        """Rebuild the Service View tile grid from current state."""
+        if not self._service_states:
+            self._svc_page.setCurrentIndex(0)
+            return
+        self._svc_page.setCurrentIndex(1)
+
+        _clear_flow(self._svc_flow)
+
+        for (host_id, svc_id), status in sorted(self._service_states.items()):
+            tile = self._build_service_tile(host_id, svc_id, status, show_host=True)
+            self._svc_flow.addWidget(tile)
+
+        self._update_tile_highlights()
+
+    def _refresh_stat_cards(self) -> None:
+        """Update the summary KPI stat cards."""
+        host_val = self._stat_hosts.findChild(QLabel, "statValue")
+        if host_val is not None:
+            host_val.setText(str(len(self._hosts)))
+
+        running = sum(
+            1
+            for s in self._service_states.values()
+            if _state_name(s.state).upper() in ("RUNNING", "STARTED", "ACTIVE")
+        )
+        svc_val = self._stat_services.findChild(QLabel, "statValue")
+        if svc_val is not None:
+            svc_val.setText(str(running))
+
+        warnings = sum(
+            1
+            for s in self._service_states.values()
+            if _state_name(s.state).upper() in ("WARNING", "PAUSED", "ERROR")
+        )
+        warn_val = self._stat_warnings.findChild(QLabel, "statValue")
+        if warn_val is not None:
+            warn_val.setText(str(warnings))
+
+    # ------------------------------------------------------------------ #
+    # Async DDS receive loops                                              #
+    # ------------------------------------------------------------------ #
+
+    async def _receive_host_catalog(self) -> None:
+        """Consume HostCatalog samples asynchronously.
+
+        Uses ``take_async()`` (not ``take_data_async()``) so we can
+        capture the publication handle from SampleInfo for each writer.
+        This mapping lets ``_monitor_liveliness`` identify *which* host
+        died when a writer loses liveliness.
+        """
+        async for sample in self._catalog_reader.take_async():
+            if sample.info.valid:
+                self._pub_handle_to_host[sample.info.publication_handle] = (
+                    sample.data.host_id
+                )
+                self._update_host(sample.data)
+
+    async def _receive_service_status(self) -> None:
+        """Consume ServiceStatus samples asynchronously."""
+        async for data in self._status_reader.take_data_async():
+            self._update_service_status(data)
+
+    async def _monitor_liveliness(self) -> None:
+        """Monitor HostCatalog writer liveliness via StatusCondition.
+
+        Uses ``wait_async`` (not ``dispatch_async``) so that the
+        liveliness-change processing runs inline on the asyncio/Qt
+        event-loop thread.  ``dispatch_async`` invokes the handler on a
+        DDS internal thread, which is unsafe for Qt widget operations.
+        """
+        status_cond = dds.StatusCondition(self._catalog_reader)
+        status_cond.enabled_statuses = dds.StatusMask.LIVELINESS_CHANGED
+
+        waitset = dds.WaitSet()
+        waitset += status_cond
+        try:
+            while self._running:
+                try:
+                    await waitset.wait_async(dds.Duration(seconds=1))
+                except dds.TimeoutError:
+                    continue
+
+                # Back on the event-loop thread — safe to touch Qt widgets
+                changed = self._catalog_reader.status_changes
+                if dds.StatusMask.LIVELINESS_CHANGED not in changed:
+                    continue
+                # Reading the status resets the condition trigger
+                st = self._catalog_reader.liveliness_changed_status
+                if self._conn_dot is not None:
+                    self._conn_dot.set_connected(st.alive_count > 0)
+
+                if st.not_alive_count_change > 0:
+                    # Identify the dead host via cached handle mapping
+                    host_id = self._pub_handle_to_host.pop(
+                        st.last_publication_handle, None
+                    )
+                    if host_id is not None:
+                        self._remove_host(host_id)
+                    # Fallback: if no writers remain, purge all hosts
+                    if st.alive_count == 0 and self._hosts:
+                        for hid in list(self._hosts):
+                            self._remove_host(hid)
+                        self._pub_handle_to_host.clear()
+        finally:
+            waitset -= status_cond
+
+    def _update_host(self, catalog: Orchestration.HostCatalog) -> None:
+        """Process a HostCatalog sample and update the UI."""
+        host_id = catalog.host_id
+        self._hosts[host_id] = catalog
+        self._rebuild_host_view()
+        self._refresh_stat_cards()
+        if self._conn_dot is not None:
+            self._conn_dot.set_connected(True)
+        self._status_bar.showMessage(f"Discovered {len(self._hosts)} host(s)", 3000)
+        log.informational(f"HostCatalog received: host_id={host_id}")
+
+    def _remove_host(self, host_id: str) -> None:
+        """Remove a host and its services after liveliness loss."""
+        self._hosts.pop(host_id, None)
+        dead_keys = [k for k in self._service_states if k[0] == host_id]
+        for k in dead_keys:
+            del self._service_states[k]
+        # Close stale RPC requester for this host
+        req = self._requesters.pop(host_id, None)
+        if req is not None:
+            try:
+                req.close()
+            except Exception:
+                pass
+        # Clear selection if it pointed at the dead host
+        if self._selected_host_id == host_id:
+            self._deselect_all()
+        self._rebuild_host_view()
+        self._rebuild_service_view()
+        self._refresh_stat_cards()
+        self._status_bar.showMessage(f"Host {host_id} disconnected", 5000)
+        log.warning(f"Host {host_id} lost liveliness \u2014 removed")
+
+    def _update_service_status(self, status: Orchestration.ServiceStatus) -> None:
+        """Process a ServiceStatus sample and update the UI."""
+        key = (status.host_id, status.service_id)
+        self._service_states[key] = status
+        self._rebuild_host_view()
+        self._rebuild_service_view()
+        self._refresh_stat_cards()
+
+    # ------------------------------------------------------------------ #
+    # Lifecycle (async)                                                    #
+    # ------------------------------------------------------------------ #
+
+    async def _ui_consistency_sweep(self) -> None:
+        """Periodic UI rebuild from in-memory state.
+
+        Catches any missed visual updates without re-reading from DDS
+        (avoids sample-stealing race with take_data_async). Runs at
+        ~2 Hz — lightweight since it only touches cached dicts.
+        """
+        while self._running:
+            await asyncio.sleep(_UI_SWEEP_INTERVAL)
+            self._rebuild_host_view()
+            self._rebuild_service_view()
+            self._refresh_stat_cards()
+
+    async def start(self) -> None:
+        """Start all async DDS receive tasks."""
+        self._running = True
+        loop = asyncio.get_event_loop()
+        self._tasks = [
+            loop.create_task(self._receive_host_catalog()),
+            loop.create_task(self._receive_service_status()),
+            loop.create_task(self._monitor_liveliness()),
+            loop.create_task(self._ui_consistency_sweep()),
+        ]
+        log.informational("ProcedureController: async DDS receive tasks started")
+
+    def stop(self) -> None:
+        """Signal async tasks to stop and schedule async cleanup."""
+        self._running = False
+        asyncio.ensure_future(self._async_cleanup())
+
+    async def _async_cleanup(self) -> None:
+        """Cancel tasks, await their unwinding, then close participants."""
+        for task in self._tasks:
+            task.cancel()
+        for task in self._tasks:
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        self._tasks.clear()
+        self._close_participants()
+
+    def _on_refresh(self) -> None:
+        """User-initiated refresh: drain both readers synchronously."""
         try:
             for sample in self._catalog_reader.take():
                 if sample.info.valid:
+                    self._pub_handle_to_host[sample.info.publication_handle] = (
+                        sample.data.host_id
+                    )
                     self._update_host(sample.data)
         except dds.AlreadyClosedError:
-            return
-
-        # -- ServiceStatus --
+            pass
         try:
             for sample in self._status_reader.take():
                 if sample.info.valid:
                     self._update_service_status(sample.data)
         except dds.AlreadyClosedError:
-            return
-
-    def _update_host(self, catalog: Orchestration.HostCatalog) -> None:
-        """Process a HostCatalog sample and update the hosts table."""
-        host_id = catalog.host_id
-        self._hosts[host_id] = catalog
-        self._refresh_host_table()
-        self._status_bar.showMessage(f"Discovered {len(self._hosts)} host(s)", 3000)
-        log.informational(f"HostCatalog received: host_id={host_id}")
-
-    def _update_service_status(self, status: Orchestration.ServiceStatus) -> None:
-        """Process a ServiceStatus sample and update the services table."""
-        key = (status.host_id, status.service_id)
-        self._service_states[key] = status
-        self._refresh_svc_table()
-
-    def _refresh_host_table(self) -> None:
-        """Rebuild the hosts table from current state."""
-        self._host_table.setRowCount(len(self._hosts))
-        for row, (host_id, catalog) in enumerate(sorted(self._hosts.items())):
-            self._host_table.setItem(row, 0, QTableWidgetItem(host_id))
-            self._host_table.setItem(row, 1, QTableWidgetItem(catalog.health_summary))
-            self._host_table.setItem(row, 2, QTableWidgetItem(str(catalog.capacity)))
-            self._host_table.setItem(
-                row, 3, QTableWidgetItem(", ".join(catalog.supported_services))
-            )
-
-    def _refresh_svc_table(self) -> None:
-        """Rebuild the services table from current state."""
-        self._svc_table.setRowCount(len(self._service_states))
-        for row, ((host_id, svc_id), status) in enumerate(
-            sorted(self._service_states.items())
-        ):
-            self._svc_table.setItem(row, 0, QTableWidgetItem(svc_id))
-            self._svc_table.setItem(row, 1, QTableWidgetItem(host_id))
-            state_name = _state_name(status.state)
-            item = QTableWidgetItem(state_name)
-            self._svc_table.setItem(row, 2, item)
+            pass
+        self._status_bar.showMessage("Refreshed", 2000)
 
     # ------------------------------------------------------------------ #
     # RPC operations (worker thread)                                       #
@@ -317,109 +799,289 @@ class ProcedureController(QMainWindow):
             log.informational(f"RPC requester created for host {host_id}")
         return self._requesters[host_id]
 
-    def _send_rpc_async(
-        self,
-        host_id: str,
-        call: object,
-        op_name: str,
-    ) -> None:
-        """Send an RPC call on a worker thread, emit signal on completion."""
+    async def _do_rpc(self, host_id: str, call: object, op_name: str) -> None:
+        """Execute a single RPC call using native async Requester API.
 
-        def _worker() -> None:
-            try:
-                req = self._get_requester(host_id)
+        Uses ``send_request`` (non-blocking write) followed by
+        ``await wait_for_replies_async`` and ``take_replies`` so the
+        Qt/asyncio event loop is never blocked.  No thread pool needed.
+        """
+        try:
+            req = self._get_requester(host_id)
+            ok = await req.wait_for_service_async(_RPC_TIMEOUT)
+            if not ok:
+                msg = f"{host_id}: service not available"
+            else:
                 request_id = req.send_request(call)
-                replies = req.receive_replies(
+                ok = await req.wait_for_replies_async(
                     max_wait=_RPC_TIMEOUT,
                     related_request_id=request_id,
                 )
-                for reply, info in replies:
-                    if info.valid:
-                        result = _extract_rpc_result(reply, op_name)
-                        self._rpc_result_signal.emit(
-                            op_name,
-                            f"{host_id}: {result}",
-                        )
-                        return
-                self._rpc_result_signal.emit(
-                    op_name, f"{host_id}: timeout — no reply received"
-                )
-            except Exception as exc:
-                self._rpc_result_signal.emit(op_name, f"{host_id}: error — {exc}")
+                if not ok:
+                    msg = f"{host_id}: timeout \u2014 no reply received"
+                else:
+                    replies = req.take_replies(related_request_id=request_id)
+                    result = None
+                    for reply, info in replies:
+                        if info.valid:
+                            result = _extract_rpc_result(reply, op_name)
+                            break
+                    msg = (
+                        f"{host_id}: {result}"
+                        if result
+                        else (f"{host_id}: no valid reply")
+                    )
+        except Exception as exc:
+            msg = f"{host_id}: error \u2014 {exc}"
 
-        thread = threading.Thread(target=_worker, daemon=True)
-        thread.start()
+        self._status_bar.showMessage(f"{op_name}: {msg}", 5000)
+        log.informational(f"RPC {op_name}: {msg}")
+        # Drain latest DDS data so service states are current
+        self._on_refresh()
+        # Refresh the action overlay to reflect new state
+        if self._selected_svc_key or self._selected_host_id:
+            self._show_action_overlay()
 
-    def _on_rpc_result(self, op_name: str, message: str) -> None:
-        """Handle RPC result delivered from worker thread via signal."""
-        self._status_bar.showMessage(f"{op_name}: {message}", 5000)
-        log.informational(f"RPC {op_name}: {message}")
+    async def _do_rpc_batch(self, calls: list[tuple[str, object, str]]) -> None:
+        """Execute a batch of RPC calls sequentially via the executor."""
+        for host_id, call, op_name in calls:
+            await self._do_rpc(host_id, call, op_name)
 
-    def _selected_service(self) -> tuple[str, str] | None:
-        """Return (host_id, service_id) from the service table selection."""
-        rows = self._svc_table.selectionModel().selectedRows()
-        if not rows:
-            # Fall back to host table selection
-            host_rows = self._host_table.selectionModel().selectedRows()
-            if not host_rows:
-                self._status_bar.showMessage("Select a service or host first", 3000)
-                return None
-            host_id = self._host_table.item(host_rows[0].row(), 0).text()
-            catalog = self._hosts.get(host_id)
-            if catalog and catalog.supported_services:
-                return host_id, catalog.supported_services[0]
-            self._status_bar.showMessage("No services on selected host", 3000)
-            return None
-        row = rows[0].row()
-        svc_id = self._svc_table.item(row, 0).text()
-        host_id = self._svc_table.item(row, 1).text()
-        return host_id, svc_id
+    # ------------------------------------------------------------------ #
+    # RPC action handlers (from action bar)                                #
+    # ------------------------------------------------------------------ #
 
-    def _selected_host(self) -> str | None:
-        """Return host_id from host table selection."""
-        rows = self._host_table.selectionModel().selectedRows()
-        if not rows:
-            self._status_bar.showMessage("Select a host first", 3000)
-            return None
-        return self._host_table.item(rows[0].row(), 0).text()
+    def _on_start_selected(self) -> None:
+        """Start the selected service."""
+        if self._selected_svc_key:
+            host_id, svc_id = self._selected_svc_key
+            self._on_start(host_id, svc_id)
 
-    def _on_start_clicked(self) -> None:
-        """Handle Start Service button click."""
-        sel = self._selected_service()
-        if sel is None:
-            return
-        host_id, svc_id = sel
-        call = _make_start_call(svc_id)
-        self._status_bar.showMessage(f"Starting {svc_id} on {host_id}...")
-        self._send_rpc_async(host_id, call, "start_service")
+    def _on_stop_selected(self) -> None:
+        """Stop the selected service."""
+        if self._selected_svc_key:
+            host_id, svc_id = self._selected_svc_key
+            self._on_stop(host_id, svc_id)
 
-    def _on_stop_clicked(self) -> None:
-        """Handle Stop Service button click."""
-        sel = self._selected_service()
-        if sel is None:
-            return
-        host_id, svc_id = sel
-        call = _make_stop_call(svc_id)
-        self._status_bar.showMessage(f"Stopping {svc_id} on {host_id}...")
-        self._send_rpc_async(host_id, call, "stop_service")
+    def _on_configure_selected(self) -> None:
+        """Configure the selected service."""
+        if self._selected_svc_key:
+            host_id, svc_id = self._selected_svc_key
+            self._on_configure(host_id, svc_id)
 
-    def _on_capabilities_clicked(self) -> None:
-        """Handle Capabilities button click."""
-        host_id = self._selected_host()
-        if host_id is None:
-            return
+    def _on_capabilities_selected(self) -> None:
+        """Query capabilities of the selected host."""
+        if self._selected_host_id:
+            self._on_capabilities(self._selected_host_id)
+
+    def _on_health_selected(self) -> None:
+        """Query health of the selected host."""
+        if self._selected_host_id:
+            self._on_health(self._selected_host_id)
+
+    def _on_start_all(self) -> None:
+        """Start all discovered services across all hosts."""
+        calls = []
+        for host_id, catalog in self._hosts.items():
+            for svc_name in catalog.supported_services:
+                calls.append((host_id, _make_start_call(svc_name), "start_service"))
+        if calls:
+            self._status_bar.showMessage(f"Starting {len(calls)} service(s)\u2026")
+            asyncio.get_event_loop().create_task(self._do_rpc_batch(calls))
+
+    def _on_stop_all(self) -> None:
+        """Stop all discovered services across all hosts."""
+        calls = []
+        for host_id, catalog in self._hosts.items():
+            for svc_name in catalog.supported_services:
+                calls.append((host_id, _make_stop_call(svc_name), "stop_service"))
+        if calls:
+            self._status_bar.showMessage(f"Stopping {len(calls)} service(s)\u2026")
+            asyncio.get_event_loop().create_task(self._do_rpc_batch(calls))
+
+    def _on_start(self, host_id: str, service_id: str) -> None:
+        """Handle Start action for a specific service."""
+        call = _make_start_call(service_id)
+        self._status_bar.showMessage(f"Starting {service_id} on {host_id}\u2026")
+        asyncio.get_event_loop().create_task(
+            self._do_rpc(host_id, call, "start_service")
+        )
+
+    def _on_stop(self, host_id: str, service_id: str) -> None:
+        """Handle Stop action for a specific service."""
+        call = _make_stop_call(service_id)
+        self._status_bar.showMessage(f"Stopping {service_id} on {host_id}\u2026")
+        asyncio.get_event_loop().create_task(
+            self._do_rpc(host_id, call, "stop_service")
+        )
+
+    def _on_configure(self, host_id: str, service_id: str) -> None:
+        """Handle Configure action for a specific service."""
+        call = _make_configure_call(service_id)
+        self._status_bar.showMessage(f"Configuring {service_id} on {host_id}\u2026")
+        asyncio.get_event_loop().create_task(
+            self._do_rpc(host_id, call, "configure_service")
+        )
+
+    def _on_capabilities(self, host_id: str) -> None:
+        """Handle Capabilities query for a host."""
         call = _make_get_capabilities_call()
-        self._status_bar.showMessage(f"Querying capabilities of {host_id}...")
-        self._send_rpc_async(host_id, call, "get_capabilities")
+        self._status_bar.showMessage(f"Querying capabilities of {host_id}\u2026")
+        asyncio.get_event_loop().create_task(
+            self._do_rpc_display(host_id, call, "get_capabilities")
+        )
 
-    def _on_health_clicked(self) -> None:
-        """Handle Health button click."""
-        host_id = self._selected_host()
-        if host_id is None:
-            return
+    def _on_health(self, host_id: str) -> None:
+        """Handle Health query for a host."""
         call = _make_get_health_call()
-        self._status_bar.showMessage(f"Querying health of {host_id}...")
-        self._send_rpc_async(host_id, call, "get_health")
+        self._status_bar.showMessage(f"Querying health of {host_id}\u2026")
+        asyncio.get_event_loop().create_task(
+            self._do_rpc_display(host_id, call, "get_health")
+        )
+
+    async def _do_rpc_display(self, host_id: str, call: object, op_name: str) -> None:
+        """Execute an RPC and show the result in a floating card."""
+        try:
+            req = self._get_requester(host_id)
+            ok = await req.wait_for_service_async(_RPC_TIMEOUT)
+            if not ok:
+                self._show_result_card(host_id, op_name, "Service not available")
+                return
+
+            request_id = req.send_request(call)
+            ok = await req.wait_for_replies_async(
+                max_wait=_RPC_TIMEOUT,
+                related_request_id=request_id,
+            )
+            if not ok:
+                self._show_result_card(host_id, op_name, "No reply received")
+                return
+
+            replies = req.take_replies(related_request_id=request_id)
+            result = None
+            for reply, info in replies:
+                if info.valid:
+                    branch = getattr(reply, op_name)
+                    result = branch.result.return_
+                    break
+
+            if result is None:
+                self._show_result_card(host_id, op_name, "No reply received")
+            elif op_name == "get_capabilities":
+                self._show_result_card(
+                    host_id,
+                    "Capabilities",
+                    None,
+                    [
+                        ("Services", ", ".join(result.supported_services)),
+                        ("Capacity", str(result.capacity)),
+                    ],
+                )
+            elif op_name == "get_health":
+                self._show_result_card(
+                    host_id,
+                    "Health",
+                    None,
+                    [
+                        ("Alive", "\u25CF  Yes" if result.alive else "\u25CB  No"),
+                        ("Summary", result.summary or "\u2014"),
+                        ("Diagnostics", result.diagnostics or "\u2014"),
+                    ],
+                )
+            else:
+                self._show_result_card(host_id, op_name, str(result))
+        except Exception as exc:
+            self._show_result_card(host_id, op_name, f"Error: {exc}")
+
+    # ------------------------------------------------------------------ #
+    # Result card overlay                                                  #
+    # ------------------------------------------------------------------ #
+
+    def _show_result_card(
+        self,
+        host_id: str,
+        title: str,
+        message: Optional[str] = None,
+        rows: Optional[list[tuple[str, str]]] = None,
+    ) -> None:
+        """Show a floating result card with structured RPC response data."""
+        card = self._result_card
+
+        # Clear previous content
+        old_layout = card.layout()
+        if old_layout is not None:
+            while old_layout.count():
+                item = old_layout.takeAt(0)
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
+                sub = item.layout()
+                if sub is not None:
+                    while sub.count():
+                        si = sub.takeAt(0)
+                        sw = si.widget()
+                        if sw is not None:
+                            sw.deleteLater()
+        else:
+            old_layout = QVBoxLayout(card)
+            old_layout.setContentsMargins(24, 20, 24, 20)
+            old_layout.setSpacing(12)
+
+        layout = old_layout
+
+        # Header row: title + close button
+        header = QHBoxLayout()
+        title_lbl = QLabel(f"\u2302  {host_id} \u2014 {title}")
+        title_lbl.setObjectName("cardTitle")
+        header.addWidget(title_lbl)
+        header.addStretch()
+        close_btn = QPushButton("\u2715")
+        close_btn.setObjectName("resultClose")
+        close_btn.setFixedSize(32, 32)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.clicked.connect(self._dismiss_result_card)
+        header.addWidget(close_btn)
+        layout.addLayout(header)
+
+        if message:
+            msg_lbl = QLabel(message)
+            msg_lbl.setObjectName("cardDescription")
+            msg_lbl.setWordWrap(True)
+            layout.addWidget(msg_lbl)
+
+        if rows:
+            for label, value in rows:
+                row = QHBoxLayout()
+                row.setSpacing(12)
+                key_lbl = QLabel(label)
+                key_lbl.setObjectName("cardMeta")
+                key_lbl.setMinimumWidth(90)
+                val_lbl = QLabel(value)
+                val_lbl.setObjectName("cardDescription")
+                val_lbl.setWordWrap(True)
+                row.addWidget(key_lbl)
+                row.addWidget(val_lbl, stretch=1)
+                layout.addLayout(row)
+
+        card.setVisible(True)
+        self._position_result_card()
+
+    def _dismiss_result_card(self) -> None:
+        """Hide the result card overlay."""
+        self._result_card.setVisible(False)
+
+    def _position_result_card(self) -> None:
+        """Center the result card in the window."""
+        card = self._result_card
+        card.adjustSize()
+        cw = min(card.sizeHint().width(), self.width() - 40)
+        ch = min(card.sizeHint().height(), self.height() - 100)
+        cw = max(cw, 320)
+        ch = max(ch, 120)
+        x = (self.width() - cw) // 2
+        y = (self.height() - ch) // 2
+        card.setGeometry(x, y, cw, ch)
+        card.raise_()
 
     # ------------------------------------------------------------------ #
     # Public accessors (for testing)                                       #
@@ -451,9 +1113,8 @@ class ProcedureController(QMainWindow):
     # Cleanup                                                              #
     # ------------------------------------------------------------------ #
 
-    def close_dds(self) -> None:
-        """Close DDS resources."""
-        self._poll_timer.stop()
+    def _close_participants(self) -> None:
+        """Close DDS participants and RPC requesters."""
         for req in self._requesters.values():
             try:
                 req.close()
@@ -474,10 +1135,141 @@ class ProcedureController(QMainWindow):
             self._hosp_participant = None
         log.informational("ProcedureController: DDS resources closed")
 
+    def close_dds(self) -> None:
+        """Close DDS resources (legacy compat + test cleanup)."""
+        self._running = False
+        self._close_participants()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 — Qt override
+        """Reposition floating overlays on window resize."""
+        super().resizeEvent(event)
+        if hasattr(self, "_action_overlay") and self._action_overlay.isVisible():
+            self._position_action_overlay()
+        if hasattr(self, "_result_card") and self._result_card.isVisible():
+            self._position_result_card()
+
     def closeEvent(self, event) -> None:  # noqa: N802 — Qt override
-        """Qt close event: clean up DDS before window closes."""
-        self.close_dds()
+        """Qt close event: cancel async tasks (DDS cleanup in __main__)."""
+        self._running = False
+        for task in self._tasks:
+            task.cancel()
+        self._tasks.clear()
         super().closeEvent(event)
+
+
+# ---------------------------------------------------------------------------
+# Layout utilities
+# ---------------------------------------------------------------------------
+
+# Tile dimensions (touch-friendly: min 48 px targets, enough for content)
+_TILE_W = 200
+_TILE_H = 160
+
+
+def _clear_flow(layout: "FlowLayout") -> None:
+    """Remove all widgets from a FlowLayout."""
+    while layout.count():
+        item = layout.takeAt(0)
+        widget = item.widget()
+        if widget is not None:
+            widget.setParent(None)
+            widget.deleteLater()
+
+
+class _ClickableWidget(QWidget):
+    """QWidget that calls *on_click* when clicked on empty space."""
+
+    def __init__(
+        self, on_click: Optional[object] = None, parent: QWidget | None = None
+    ) -> None:
+        super().__init__(parent)
+        self._on_click = on_click
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        if self._on_click is not None:
+            self._on_click()
+        super().mousePressEvent(event)
+
+
+class FlowLayout(QLayout):
+    """A flow layout that arranges widgets left-to-right, wrapping to the
+    next row when the container width is exceeded.
+
+    Based on the Qt C++ FlowLayout example, adapted for PySide6.
+    """
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        hspacing: int = 12,
+        vspacing: int = 12,
+    ) -> None:
+        super().__init__(parent)
+        self._hspacing = hspacing
+        self._vspacing = vspacing
+        self._items: list[QWidgetItem] = []
+
+    def addItem(self, item) -> None:  # noqa: N802
+        self._items.append(item)
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def itemAt(self, index: int):  # noqa: N802
+        if 0 <= index < len(self._items):
+            return self._items[index]
+        return None
+
+    def takeAt(self, index: int):  # noqa: N802
+        if 0 <= index < len(self._items):
+            return self._items.pop(index)
+        return None
+
+    def expandingDirections(self):  # noqa: N802
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802
+        return True
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802
+        return self._do_layout(QRect(0, 0, width, 0), test_only=True)
+
+    def setGeometry(self, rect: QRect) -> None:  # noqa: N802
+        super().setGeometry(rect)
+        self._do_layout(rect, test_only=False)
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        return self.minimumSize()
+
+    def minimumSize(self) -> QSize:  # noqa: N802
+        size = QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        m = self.contentsMargins()
+        size += QSize(m.left() + m.right(), m.top() + m.bottom())
+        return size
+
+    def _do_layout(self, rect: QRect, test_only: bool) -> int:
+        m = self.contentsMargins()
+        effective = rect.adjusted(m.left(), m.top(), -m.right(), -m.bottom())
+        x = effective.x()
+        y = effective.y()
+        row_height = 0
+
+        for item in self._items:
+            sz = item.sizeHint()
+            next_x = x + sz.width() + self._hspacing
+            if next_x - self._hspacing > effective.right() and row_height > 0:
+                x = effective.x()
+                y = y + row_height + self._vspacing
+                next_x = x + sz.width() + self._hspacing
+                row_height = 0
+            if not test_only:
+                item.setGeometry(QRect(QPoint(x, y), sz))
+            x = next_x
+            row_height = max(row_height, sz.height())
+
+        return y + row_height - rect.y() + m.bottom()
 
 
 # ---------------------------------------------------------------------------
@@ -519,19 +1311,30 @@ def _make_get_health_call() -> object:
     return call
 
 
+def _make_configure_call(service_id: str, configuration: str = "") -> object:
+    """Build RPC call for configure_service."""
+    call = _CallType()
+    _in = _CallType.in_structs[-1680089419][1]()
+    _in.req = Orchestration.ConfigureRequest(
+        service_id=service_id, configuration=configuration
+    )
+    call.configure_service = _in
+    return call
+
+
 def _extract_rpc_result(reply: object, op_name: str) -> str:
     """Extract a human-readable result from an RPC reply."""
     try:
         branch = getattr(reply, op_name)
         result = branch.result.return_
         if op_name == "start_service":
-            return f"{result.code} — {result.message}"
+            return f"{result.code} \u2014 {result.message}"
         elif op_name == "stop_service":
-            return f"{result.code} — {result.message}"
+            return f"{result.code} \u2014 {result.message}"
+        elif op_name == "configure_service":
+            return f"{result.code} \u2014 {result.message}"
         elif op_name == "get_capabilities":
-            return (
-                f"services={result.supported_services}, " f"capacity={result.capacity}"
-            )
+            return f"services={result.supported_services}, capacity={result.capacity}"
         elif op_name == "get_health":
             return f"alive={result.alive}, summary={result.summary}"
         return str(result)

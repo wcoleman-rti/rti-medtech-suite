@@ -838,11 +838,13 @@ thin wrappers that register factories and delegate to `make_service_host`.
 
 **Rules for new Service Hosts and Services:**
 
-1. **ServiceFactory signature**: `(const Common::EntityId& service_id) →
-   unique_ptr<Service>` (C++) / `(str) → Service` (Python). The framework
-   passes the registered service_id as the single argument. All other
-   context (room, procedure, device IDs, logger) is captured in the
-   closure at registration time.
+1. **ServiceFactory signature**: `(const Orchestration::ServiceRequest& req) →
+   unique_ptr<Service>` (C++) / `(Orchestration.ServiceRequest) → Service` (Python). The framework
+   passes the full `ServiceRequest` (containing `service_id` and a
+   sequence of `ServiceProperty` name-value pairs) so that factories
+   can extract configuration properties relevant to their service.
+   All other context (room, procedure, device IDs, logger) is captured
+   in the closure at registration time.
 
 2. **Domain-agnostic framework**: The generic `ServiceHost` creates an
    Orchestration domain participant from XML configuration. It does **not**
@@ -861,7 +863,9 @@ thin wrappers that register factories and delegate to `make_service_host`.
 5. **`Common::EntityId` as service key**: The factory map, slot map,
    `ServiceRequest`, `HostCatalog`, and `ServiceStatus` all use
    `Common::EntityId` (IDL `string<MAX_ID_LENGTH>`) as the service
-   identifier. Service Hosts, Services, and Orchestration clients must
+   identifier. `ServiceRequest` additionally carries a sequence of
+   `ServiceProperty` name-value pairs for runtime configuration.
+   Service Hosts, Services, and Orchestration clients must
    use consistent `EntityId` values.
 
 6. **C++/Python parity**: The C++ and Python implementations mirror each

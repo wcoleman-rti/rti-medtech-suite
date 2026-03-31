@@ -208,11 +208,13 @@ the Procedure Controller and digital twin display.
 
 ### Work
 
-- Extend the `start_service` RPC flow to pass `table_position` in the
-  service configuration:
-  - Procedure Controller includes `table_position` in the `ServiceRequest`
-    config when issuing `start_service` to a Robot Service Host
-  - Service Host passes the `table_position` to the arm service constructor
+- Extend the `start_service` RPC flow to pass `table_position` as a
+  `ServiceProperty` in the `ServiceRequest`:
+  - Procedure Controller includes a `ServiceProperty` with
+    `name="table_position"` in the `ServiceRequest.properties` sequence
+    when issuing `start_service` to a Robot Service Host
+  - Service Host factory receives the full `ServiceRequest` and extracts
+    the `table_position` property to pass to the arm service constructor
 - Author integration test for the full orchestration flow:
   1. Procedure Controller issues `start_service` RPCs for N arms at
      distinct table positions

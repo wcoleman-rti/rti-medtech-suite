@@ -20,12 +20,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import sys
 import time
 from dataclasses import asdict, dataclass, field
 
-import os
 import rti.connextdds as dds
 
 # ── Factory QoS Reset ────────────────────────────────────────────────
@@ -161,10 +161,7 @@ def check_participants(
 ) -> CheckResult:
     """Verify that at least one application participant exists."""
     # Filter out the diagnostic participant itself
-    app_parts = [
-        p for p in participants
-        if _participant_name(p) != "medtech-diag"
-    ]
+    app_parts = [p for p in participants if _participant_name(p) != "medtech-diag"]
     names = []
     for p in app_parts:
         name = _participant_name(p)
@@ -370,7 +367,9 @@ def run_domain_checks(
     if tags:
         for tag in tags:
             participant = _create_diagnostic_participant(
-                domain_id, peers=peers, domain_tag=tag,
+                domain_id,
+                peers=peers,
+                domain_tag=tag,
             )
             try:
                 parts, pubs, subs = _discover(participant)
@@ -468,9 +467,7 @@ def format_json(results: list[CheckResult]) -> str:
         "summary": {
             "passed": sum(1 for r in results if r.status == "PASS"),
             "failed": sum(1 for r in results if r.status == "FAIL"),
-            "overall": (
-                "PASS" if all(r.status == "PASS" for r in results) else "FAIL"
-            ),
+            "overall": ("PASS" if all(r.status == "PASS" for r in results) else "FAIL"),
         },
     }
     return json.dumps(output, indent=2) + "\n"

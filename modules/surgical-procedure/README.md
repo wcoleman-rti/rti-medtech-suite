@@ -8,6 +8,24 @@ one OR and runs in an isolated DDS partition. The module publishes
 robot control, patient vitals, camera feeds, device telemetry, and
 procedure context onto the Procedure domain.
 
+Every service implements the `medtech::Service` interface and supports
+two operating modes:
+
+- **Standalone** — service creates its own `DomainParticipant`, sets
+  partitions, and runs independently (development, debugging)
+- **Hosted** — a Service Host creates the Orchestration participant,
+  registers an RPC endpoint, and starts/stops services on command
+  from the Procedure Controller
+
+Four Service Hosts package the services for orchestrated deployment:
+
+| Service Host | Language | Hosted Services |
+|--------------|----------|-----------------|
+| Robot Service Host | C++ | `RobotControllerService` |
+| Operator Service Host | Python | `OperatorConsoleService` |
+| Clinical Service Host | Python | `BedsideMonitorService`, `DeviceTelemetryService` |
+| Operational Service Host | Python | `CameraService`, `ProcedureContextService` |
+
 All participants operate on the **Procedure domain** across three
 domain tags:
 
@@ -16,13 +34,20 @@ domain tags:
 - **clinical** — Patient vitals, waveforms, alarms, device telemetry
 - **operational** — Procedure context, procedure status, camera frames
 
+Service Hosts additionally create a participant on the
+**Orchestration domain** (no domain tags) for host catalog
+advertisement, service status reporting, and DDS RPC command
+reception.
+
 | Connext Feature | How It Is Used |
 |-----------------|----------------|
 | DDS topics | `RobotState`, `OperatorInput`, `RobotCommand`, `SafetyInterlock`, `PatientVitals`, `WaveformData`, `AlarmMessages`, `DeviceTelemetry`, `ProcedureContext`, `ProcedureStatus`, `CameraFrame`, `CameraConfig` |
+| Orchestration topics | `HostCatalog`, `ServiceStatus` |
+| DDS RPC | `ServiceHostControl/<host_id>` — start, stop, configure, capabilities, health |
 | QoS profiles | `TopicProfiles::*` per topic — State, Stream, Command patterns loaded from `NDDS_QOS_PROFILES` XML |
 | Domain tags | `control`, `clinical`, `operational` — each tag uses a separate `DomainParticipant` |
 | Partitions | `room/<ROOM_ID>/procedure/<PROCEDURE_ID>` — set programmatically at participant startup |
-| TRANSIENT_LOCAL durability | State-pattern topics (`RobotState`, `PatientVitals`, `ProcedureContext`, `ProcedureStatus`, `DeviceTelemetry`, `SafetyInterlock`) for late-joiner support |
+| TRANSIENT_LOCAL durability | State-pattern topics for late-joiner support; `HostCatalog` and `ServiceStatus` for controller restart reconstruction |
 | Exclusive ownership | `DeviceTelemetry` supports primary/backup failover via ownership strength |
 | Time-based filter | Digital twin applies 100 ms minimum separation on high-rate readers (`RobotState`, `OperatorInput`) for 60 Hz rendering |
 | Cloud Discovery Service | All participants discover peers through CDS (`NDDS_DISCOVERY_PEERS`) |
@@ -64,7 +89,35 @@ export PROCEDURE_ID="proc-001"
 
 ### Run
 
-Individual simulators (local, outside Docker):
+#### Orchestrated mode (recommended)
+
+Start the Service Hosts and use the Procedure Controller to manage
+service lifecycle:
+
+```bash
+# Robot Service Host (C++)
+HOST_ID=robot-host-or1 ROOM_ID=OR-1 PROCEDURE_ID=proc-001 \
+    robot-service-host
+
+# Operator Service Host (Python)
+HOST_ID=operator-host-or1 ROOM_ID=OR-1 PROCEDURE_ID=proc-001 \
+    python -m surgical_procedure.operator_service_host
+
+# Clinical Service Host (Python)
+HOST_ID=clinical-host-or1 ROOM_ID=OR-1 PROCEDURE_ID=proc-001 \
+    python -m surgical_procedure.clinical_service_host
+
+# Operational Service Host (Python)
+HOST_ID=operational-host-or1 ROOM_ID=OR-1 PROCEDURE_ID=proc-001 \
+    python -m surgical_procedure.operational_service_host
+
+# Then use the Procedure Controller to start/stop services via RPC
+python -m hospital_dashboard.procedure_controller
+```
+
+#### Standalone mode (development)
+
+Individual simulators can run without orchestration:
 
 ```bash
 # Procedure context publisher
@@ -89,7 +142,7 @@ python -m surgical_procedure.device_telemetry_sim
 python -m surgical_procedure.digital_twin
 ```
 
-Docker Compose (two OR instances):
+#### Docker Compose (two OR instances, orchestrated)
 
 ```bash
 docker compose up -d
@@ -106,6 +159,18 @@ modules/surgical-procedure/
 │   ├── robot_controller.hpp    Pure logic state machine
 │   ├── robot_controller.cpp    State machine implementation
 │   └── robot_controller_service.cpp + main.cpp  DDS application entry point
+├── robot_service_host/          C++ Service Host for RobotControllerService
+│   ├── robot_service_host.hpp  Factory wrapper (make_service_host<1>)
+│   └── main.cpp                Entry point with SIGINT/SIGTERM handling
+├── operator_service_host/       Python Service Host for operator services
+│   ├── operator_service_host.py  Factory: OperatorConsoleService
+│   └── __main__.py             Entry point (rti.asyncio.run)
+├── clinical_service_host/       Python Service Host for clinical services
+│   ├── clinical_service_host.py  Factory: BedsideMonitor + DeviceTelemetry
+│   └── __main__.py             Entry point (rti.asyncio.run)
+├── operational_service_host/    Python Service Host for operational services
+│   ├── operational_service_host.py  Factory: Camera + ProcedureContext
+│   └── __main__.py             Entry point (rti.asyncio.run)
 ├── operator_sim/               Operator console simulator
 │   └── operator_console_service.py     OperatorInput + RobotCommand + SafetyInterlock
 ├── vitals_sim/                 Bedside monitor simulator
@@ -177,6 +242,15 @@ domain tag: `control`
 | DataReader | `SafetyInterlock` | `TopicProfiles::SafetyInterlock` | No TBF (safety-critical) |
 | DataReader | `RobotCommand` | `TopicProfiles::RobotCommand` | No TBF (command delivery) |
 
+**Orchestration** (`OrchestrationParticipants::Orchestration`) —
+Orchestration domain, no domain tags. Created by each Service Host.
+
+| Entity | Topic | QoS Profile | Notes |
+|--------|-------|-------------|-------|
+| DataWriter | `HostCatalog` | `OrchestrationProfiles::HostCatalog` | TRANSIENT_LOCAL, liveliness 2 s |
+| DataWriter | `ServiceStatus` | `OrchestrationProfiles::ServiceStatus` | TRANSIENT_LOCAL, write-on-change |
+| RPC Service | `ServiceHostControl/<host_id>` | `Pattern.RPC` | RELIABLE, KEEP_ALL |
+
 ### Threading Model
 
 **Robot controller (C++):** Dual `AsyncWaitSet` architecture with
@@ -192,6 +266,22 @@ thread pool size 1 each:
   threaded dispatch prevents reader races on shared state.
 - A `std::shared_mutex` protects the shared controller state between
   publisher (read-lock) and subscriber (write-lock) threads.
+
+**Robot Service Host (C++):** The generic `medtech::ServiceHost`
+creates an Orchestration domain participant and runs an RPC server
+(`dds::rpc::Server` with thread pool size 1). A polling loop (100 ms
+interval) on the main thread publishes `ServiceStatus` on state
+transitions. The hosted `RobotControllerService` runs on a dedicated
+thread. Service creation and destruction happen on worker threads to
+avoid `AsyncWaitSet` level-nesting deadlocks between the RPC server's
+AWSet and the service's AWSet.
+
+**Python Service Hosts:** Use `rti.asyncio.run()` with signal
+handlers registered on the running event loop. The generic
+`ServiceHost` runs RPC dispatch (`rti.rpc.Service.run()`) and status
+polling as concurrent asyncio tasks. Hosted services are started via
+`asyncio.ensure_future()`. Shutdown cancels the RPC task with a 2 s
+timeout and awaits all hosted service coroutines.
 
 **Python simulators:** Single-threaded — each simulator runs a
 blocking `time.sleep()` loop on a background thread or in a main
@@ -211,6 +301,7 @@ reader status to detect robot disconnection.
 |----------|------|---------|-------------|
 | `ROOM_ID` | string | `"OR-1"` | Operating room identifier |
 | `PROCEDURE_ID` | string | `"proc-001"` | Procedure identifier |
+| `HOST_ID` | string | (per host) | Service Host identifier (e.g., `robot-host-or1`) |
 | `ROBOT_ID` | string | `"001"` | Robot numeric ID (prefixed to `robot-001`) |
 | `MEDTECH_SIM_SEED` | integer | (system entropy) | RNG seed for deterministic simulation |
 | `MEDTECH_SIM_PROFILE` | string | `"stable"` | Vitals scenario profile (`stable`, `hemorrhage_onset`) |
@@ -270,6 +361,9 @@ python -m pytest tests/integration/test_robot_controller.py \
                  tests/integration/test_procedure_context_service.py \
                  tests/integration/test_exclusive_ownership.py \
                  tests/integration/test_partition_isolation.py \
+                 tests/integration/test_robot_service_host.py \
+                 tests/integration/test_clinical_service_host.py \
+                 tests/integration/test_operational_service_host.py \
                  tests/gui/test_digital_twin.py \
                  -v
 ```
@@ -283,6 +377,9 @@ python -m pytest tests/ -m integration
 # GUI tests only
 python -m pytest tests/ -m gui
 
+# Orchestration tests
+python -m pytest tests/ -m orchestration
+
 # Partition isolation tests
 python -m pytest tests/ -m partition
 
@@ -294,6 +391,7 @@ python -m pytest tests/ -m failover
 |--------|-------------|
 | `integration` | Tests requiring two or more DDS participants |
 | `gui` | PySide6 GUI verification tests |
+| `orchestration` | Service Host and Procedure Controller tests |
 | `partition` | Partition-based isolation tests |
 | `failover` | Exclusive ownership failover tests |
 | `streaming` | High-rate best-effort streaming tests |
@@ -304,6 +402,8 @@ python -m pytest tests/ -m failover
 
 - [spec/surgical-procedure.md](../../docs/agent/spec/surgical-procedure.md)
   — behavioral specification (GWT scenarios)
+- [spec/orchestration.md](../../docs/agent/spec/orchestration.md) — Service
+  Host orchestration specification (service lifecycle, RPC, failover)
 - [vision/data-model.md](../../docs/agent/vision/data-model.md) — topic
   definitions, QoS profiles, domain layout
 - [vision/system-architecture.md](../../docs/agent/vision/system-architecture.md)
@@ -312,7 +412,9 @@ python -m pytest tests/ -m failover
   — vitals signal model, scenario profiles, cross-signal correlation
 - [implementation/phase-2-surgical.md](../../docs/agent/implementation/phase-2-surgical.md)
   — implementation plan and test gates
-- [modules/hospital-dashboard/](../hospital-dashboard/) — downstream
-  consumer of surgical data via Routing Service
+- [implementation/phase-5-orchestration.md](../../docs/agent/implementation/phase-5-orchestration.md)
+  — orchestration implementation plan
+- [modules/hospital-dashboard/](../hospital-dashboard/) — Procedure
+  Controller GUI and downstream consumer of surgical data
 - [modules/clinical-alerts/](../clinical-alerts/) — risk scoring engine
   consuming vitals and device telemetry

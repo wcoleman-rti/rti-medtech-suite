@@ -29,12 +29,12 @@ framework, Procedure Controller GUI, and the Orchestration domain
   - `OperationResultCode` enum: `OK`, `INVALID_SERVICE`, `INVALID_CONFIG`, `BUSY`, `ALREADY_RUNNING`, `NOT_RUNNING`, `INTERNAL_ERROR`
   - `HostCatalog` struct (keyed on `host_id`): host ID, supported service types, capacity, health summary
   - `ServiceStatus` struct (keyed on `host_id` + `service_id`): host ID, service ID, `ServiceState`, timestamp
-  - `ServiceRequest` struct: service_id, configuration parameters
-  - `ConfigureRequest` struct: service_id, configuration parameters
+  - `ServiceProperty` `@final @nested` struct: name, value (bounded strings)
+  - `ServiceRequest` struct: service_id, sequence of `ServiceProperty` name-value pairs
   - `OperationResult` struct: `OperationResultCode`, message string
   - `CapabilityReport` struct: supported services, capacity
   - `HealthReport` struct: alive flag, summary, diagnostics
-  - `@service("DDS") interface ServiceHostControl`: `start_service`, `stop_service`, `configure_service`, `get_capabilities`, `get_health`
+  - `@service("DDS") interface ServiceHostControl`: `start_service`, `stop_service`, `update_service`, `get_capabilities`, `get_health`
 - Add `connextdds_rtiddsgen_run()` calls for C++11 and Python code generation of the orchestration IDL
 - Add Domain 15 definition to `interfaces/domains/Domains.xml` with no domain tag
 - Author `Pattern.RPC` QoS profile in `interfaces/qos/Patterns.xml`: RELIABLE, KEEP_ALL, appropriate history depth
@@ -160,6 +160,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
   - Polls `RobotController::state()` and publishes `ServiceStatus` (write-on-change)
   - Implements `start_service`: constructs `RobotController` in hosted mode, spawns `run()` on a dedicated thread
   - Implements `stop_service`: calls `stop()`, joins thread
+  - Implements `update_service`: accepts updated configuration (no-op in V1.0)
   - Implements `get_capabilities` and `get_health`
   - Reconciliation on startup: publishes current (empty) state; controller detects mismatch via TRANSIENT_LOCAL
 - Author entry point (`main.cpp`) that reads `HOST_ID`, `ROOM_ID` from environment and passes to the Service Host constructor
@@ -193,7 +194,10 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - Author the Operational Service Host (`modules/surgical-procedure/operational_service_host.py`):
   - Manages: `CameraSimulator`, `ProcedureContextPublisher`
   - Same pattern
-- Author entry points and Docker Compose services for both
+- Author the Operator Service Host (`modules/surgical-procedure/operator_service_host/`):
+  - Manages: `OperatorConsoleService`
+  - Same pattern: thin factory wrapper, delegates to `make_service_host()`
+- Author entry points and Docker Compose services for all three
 
 ### Test Gate
 
@@ -243,11 +247,11 @@ framework, Procedure Controller GUI, and the Orchestration domain
 ### Work
 
 - Author Docker Compose target for the full orchestration scenario:
-  - Robot Service Host (C++) + Clinical Service Host (Python) + Operational Service Host (Python) + Procedure Controller
+  - Robot Service Host (C++) + Operator Service Host (Python) + Clinical Service Host (Python) + Operational Service Host (Python) + Procedure Controller
   - All on `hospital-net`
   - Routing Service still bridges Procedure → Hospital (unchanged)
 - Author integration tests covering the full lifecycle:
-  1. Controller discovers all three Service Hosts
+  1. Controller discovers all four Service Hosts
   2. Controller starts services on each host via RPC
   3. Services reach `RUNNING` state, surgical data flows on Procedure domain
   4. Controller stops services; state returns to `STOPPED`

@@ -9,6 +9,7 @@ line-length = 88
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "benchmark: performance benchmark tests (require observability stack)",
     "consistency: DDS consistency contract tests (vision/dds-consistency.md)",

@@ -317,9 +317,9 @@ Infrastructure lifecycle management layer for procedure service orchestration. T
 
 | Operation | Request | Reply | Semantics |
 |-----------|---------|-------|-----------|
-| `start_service` | `ServiceRequest` (service_id, config) | `OperationResult` (code, message) | Start a service on the target host |
-| `stop_service` | `ServiceRequest` (service_id) | `OperationResult` | Gracefully stop a running service |
-| `configure_service` | `ConfigureRequest` (service_id, config) | `OperationResult` | Update service configuration |
+| `start_service` | `ServiceRequest` (service_id, properties) | `OperationResult` (code, message) | Start a service on the target host |
+| `stop_service` | `Common::EntityId` (service_id) | `OperationResult` | Gracefully stop a running service |
+| `update_service` | `ServiceRequest` (service_id, properties) | `OperationResult` | Update service configuration |
 | `get_capabilities` | (no params) | `CapabilityReport` (supported services, capacity) | Query host capabilities |
 | `get_health` | (no params) | `HealthReport` (alive, summary, diagnostics) | Query host health |
 
@@ -331,7 +331,7 @@ Types defined in `module Orchestration`:
 
 - **Pub/sub state types:** `HostCatalog`, `ServiceStatus`
 - **RPC interface:** `ServiceHostControl` — `@service("DDS")` interface
-- **RPC parameter types:** `ServiceRequest`, `ConfigureRequest`, `OperationResult`, `CapabilityReport`, `HealthReport`
+- **RPC parameter types:** `ServiceProperty` (`@final @nested` name-value pair), `ServiceRequest` (service_id + sequence of `ServiceProperty`), `OperationResult`, `CapabilityReport`, `HealthReport`
 - **Enums:**
   - `ServiceState` — `STOPPED`, `STARTING`, `RUNNING`, `STOPPING`, `FAILED`, `UNKNOWN`
   - `OperationResultCode` — `OK`, `INVALID_SERVICE`, `INVALID_CONFIG`, `BUSY`, `ALREADY_RUNNING`, `NOT_RUNNING`, `INTERNAL_ERROR`

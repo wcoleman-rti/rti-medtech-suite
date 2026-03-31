@@ -33,7 +33,7 @@ to an OR use the `unassigned` partition.
 | Procedure Controller domains | Orchestration + Hospital |
 | Orchestration → Procedure domain isolation | Complete — orchestration failure must not disrupt surgical data |
 | Service context injection | All context via constructor/setter — never environment variables |
-| RPC operations | `start_service`, `stop_service`, `configure_service`, `get_capabilities`, `get_health` |
+| RPC operations | `start_service`, `stop_service`, `update_service`, `get_capabilities`, `get_health` |
 
 *This table must be updated whenever a concrete value in the scenarios below
 is added or changed.*
@@ -157,9 +157,9 @@ is added or changed.*
 ### Scenario: Service Host starts a service via RPC `@integration` `@orchestration`
 
 **Given** the Procedure Controller sends a `start_service` RPC request to a Service Host
-**And** the request specifies `service_id` and configuration parameters
+**And** the request specifies a `ServiceRequest` with `service_id` and configuration properties
 **When** the Service Host receives the request
-**Then** the Service Host constructs the requested service in hosted mode (passing a participant)
+**Then** the Service Host constructs the requested service in hosted mode (passing the `ServiceRequest` to the factory)
 **And** invokes the service's `run()` method (on a dedicated thread for C++, or as a gathered coroutine for Python)
 **And** returns an `OperationResult` with code `OK`
 **And** publishes an updated `ServiceStatus` reflecting the service's state transitions

@@ -71,6 +71,8 @@ In practice, not every process needs all three tags:
 |---------|--------------------|-------------|
 | Robot controller (standalone) | 1 (+1 Observability) | Procedure `control` |
 | Robot Service Host | 1 Orchestration + 1 Procedure `control` (+1 Observability) | Orchestration domain + Procedure `control` |
+| Operator console sim (standalone) | 1 (+1 Observability) | Procedure `control` |
+| Operator Service Host | 1 Orchestration + 1 Procedure `control` (+1 Observability) | Orchestration domain + Procedure `control` |
 | Bedside monitor / vitals sim (standalone) | 1 (+1 Observability) | Procedure `clinical` |
 | Clinical Service Host | 1 Orchestration + 1 Procedure `clinical` (+1 Observability) | Orchestration domain + Procedure `clinical` |
 | Camera simulator (standalone) | 1 (+1 Observability) | Procedure `operational` |

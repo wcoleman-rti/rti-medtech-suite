@@ -31,7 +31,7 @@ import app_names
 import rti.connextdds as dds
 import surgery
 from medtech_dds_init.dds_init import initialize_connext
-from medtech_gui import init_theme
+from medtech_gui import ConnectionDot, init_theme
 from medtech_logging import ModuleName, init_logging
 from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 
@@ -150,15 +150,17 @@ class DigitalTwinDisplay(QMainWindow):
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Shared GUI header (RTI logo + theme)
+        # Shared GUI header (RTI logo + theme + connection dot)
         app = self._qt_app()
+        self._conn_dot = None
         if app is not None:
             header = init_theme(app)
             layout.addWidget(header)
+            self._conn_dot = header.findChild(ConnectionDot)
 
         self._robot_widget = RobotWidget()
         layout.addWidget(self._robot_widget, stretch=1)
-        self.resize(640, 500)
+        self.resize(720, 560)
 
     @staticmethod
     def _qt_app():
@@ -198,8 +200,12 @@ class DigitalTwinDisplay(QMainWindow):
             status = self._robot_state_reader.liveliness_changed_status
             if status.alive_count == 0 and status.not_alive_count > 0:
                 self._robot_widget.set_connected(False)
+                if self._conn_dot is not None:
+                    self._conn_dot.set_connected(False)
             elif status.alive_count > 0:
                 self._robot_widget.set_connected(True)
+                if self._conn_dot is not None:
+                    self._conn_dot.set_connected(True)
             await asyncio.sleep(_LIVELINESS_POLL_INTERVAL)
 
     # ------------------------------------------------------------------ #
@@ -222,7 +228,12 @@ class DigitalTwinDisplay(QMainWindow):
     def stop(self) -> None:
         """Signal async tasks to stop and schedule async cleanup."""
         self._running = False
-        asyncio.ensure_future(self._async_cleanup())
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._async_cleanup())
+        except RuntimeError:
+            # No running event loop (e.g. test teardown) — clean up directly
+            self._sync_cleanup()
 
     async def _async_cleanup(self) -> None:
         """Cancel tasks, await their unwinding, then close the participant."""
@@ -242,8 +253,30 @@ class DigitalTwinDisplay(QMainWindow):
             self._participant = None
         log.informational("DigitalTwinDisplay: stopped")
 
+    def _sync_cleanup(self) -> None:
+        """Synchronous fallback cleanup when no event loop is running."""
+        for task in self._tasks:
+            task.cancel()
+        self._tasks.clear()
+        if self._participant is not None:
+            try:
+                self._participant.close()
+            except dds.AlreadyClosedError:
+                pass
+            self._participant = None
+        log.informational("DigitalTwinDisplay: stopped (sync)")
+
+    def close_dds(self) -> None:
+        """Close DDS resources (called after event loop exits)."""
+        self._running = False
+        self._sync_cleanup()
+
     def closeEvent(self, event) -> None:  # noqa: N802
-        self.stop()
+        """Cancel async tasks (DDS cleanup happens in __main__)."""
+        self._running = False
+        for task in self._tasks:
+            task.cancel()
+        self._tasks.clear()
         super().closeEvent(event)
 
     # ------------------------------------------------------------------ #

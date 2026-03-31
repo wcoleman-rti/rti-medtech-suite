@@ -190,10 +190,13 @@ class TestHostCatalogDiscovery:
 
             _publish_catalog(catalog_writer, HOST_ID, ["SvcA", "SvcB"])
 
-            # Poll until controller discovers the host
+            # Poll until controller discovers the host.
+            # Tests run without an asyncio event loop, so async tasks are
+            # not active — call _on_refresh() to drain the reader.
             deadline = time.time() + 10
             while time.time() < deadline:
                 _process_events(qapp, 200)
+                controller._on_refresh()
                 if HOST_ID in controller.hosts:
                     break
 
@@ -240,6 +243,7 @@ class TestServiceStatusDisplay:
             found = False
             while time.time() < deadline:
                 _process_events(qapp, 200)
+                controller._on_refresh()
                 if (HOST_ID, "SvcA") in controller.service_states:
                     found = True
                     break
@@ -408,6 +412,7 @@ class TestTransientLocalReconstruction:
             found_status = False
             while time.time() < deadline:
                 _process_events(qapp, 200)
+                controller._on_refresh()
                 if host_id_tl in controller.hosts:
                     found_host = True
                 if (host_id_tl, "SvcTL") in controller.service_states:
@@ -521,15 +526,8 @@ class TestStartStopRpc:
             # Initially no requesters
             assert len(controller._requesters) == 0
 
-            # Trigger RPC call creation (will fail to connect but requester
-            # will be created)
-            from hospital_dashboard.procedure_controller import _make_start_call
-
-            call = _make_start_call("TestSvc")
-            controller._send_rpc_async("some-host", call, "start_service")
-
-            # Wait a bit for the worker thread to create the requester
-            _process_events(qapp, 2000)
+            # Lazily create a requester for a host
+            controller._get_requester("some-host")
 
             # Requester should have been created for "some-host"
             assert "some-host" in controller._requesters
