@@ -133,14 +133,15 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - `ProcedureContextService.run()` is self-contained: publishes initial context/status internally
 - All `__main__.py` entry points use only the public Service interface
 - `request_shutdown()` removed from C++ in favor of `stop()`
+- `OperatorConsoleService` entity lookup validation added (was missing null-check on `find_datawriter` results — fixed to match other services' pattern)
 
 ### Test Gate
 
 - [x] All existing V1.0 test suite passes (`bash scripts/ci.sh`) — zero regressions (12/12 gates)
 - [x] Each refactored service constructs in standalone mode with `None`/`null` participant
-- [ ] Each refactored service constructs in hosted mode with a provided participant
-- [ ] Entity lookup validation: test that an invalid participant config raises/throws with the entity name
-- [ ] State transitions verified for each service class
+- [x] Each refactored service constructs in hosted mode with a provided participant
+- [x] Entity lookup validation: test that an invalid participant config raises/throws with the entity name
+- [x] State transitions verified for each service class
 - [x] No service class reads environment variables directly (CI lint check passes)
 - [x] Docker Compose deployment still starts all services in standalone mode (Gate 12 smoke test)
 
@@ -175,7 +176,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - [x] `stop_service` RPC stops the service; `ServiceStatus` transitions to `STOPPED`
 - [x] `ALREADY_RUNNING` returned on duplicate start
 - [x] `NOT_RUNNING` returned on stopping a non-running service
-- [ ] Liveliness lost detected when Service Host process is killed (within 2 s)
+- [x] Liveliness lost detected when Service Host process is killed (within 2 s)
 - [x] Orchestration domain is isolated from Procedure domain (no cross-domain discovery)
 - [x] `bash scripts/ci.sh` passes
 
@@ -206,7 +207,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - [x] `ServiceStatus` reflects hosted service state transitions
 - [x] `stop_service` cancels service coroutines; state transitions to `STOPPED`
 - [x] Operational Service Host same test coverage
-- [ ] Partition isolation: `room/OR-1` host not discoverable by `room/OR-3` controller
+- [x] Partition isolation: `room/OR-1` host not discoverable by `room/OR-3` controller
 - [x] `bash scripts/ci.sh` passes
 
 ---
@@ -278,19 +279,19 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Test Gate
 
-- [ ] Full Docker Compose orchestration scenario runs end-to-end
-- [ ] All `@orchestration` spec scenarios pass
-- [ ] All V1.0 spec scenarios pass (zero regressions)
-- [ ] Orchestration domain isolation verified (no cross-domain data leakage)
-- [ ] Service Host crash → liveliness lost detected within 2 s
-- [ ] Procedure Controller crash → surgical data unaffected
-- [ ] `@acceptance` orchestration workflow test passes
-- [ ] `@acceptance` standalone surgical-procedure workflow test passes (Phase 2 retroactive)
-- [ ] All quality gates pass: `bash scripts/ci.sh`
+- [x] Full Docker Compose orchestration scenario runs end-to-end
+- [x] All `@orchestration` spec scenarios pass
+- [x] All V1.0 spec scenarios pass (zero regressions)
+- [x] Orchestration domain isolation verified (no cross-domain data leakage)
+- [x] Service Host crash → liveliness lost detected within 2 s
+- [x] Procedure Controller crash → surgical data unaffected
+- [x] `@acceptance` orchestration workflow test passes
+- [x] `@acceptance` standalone surgical-procedure workflow test passes (Phase 2 retroactive)
+- [x] All quality gates pass: `bash scripts/ci.sh`
 
 ---
 
-## Step 5.8 — Documentation & Performance Baseline (in progress)
+## Step 5.8 — Documentation & Performance Baseline ✅ `75ae84b`
 
 ### Work
 
@@ -307,8 +308,8 @@ framework, Procedure Controller GUI, and the Orchestration domain
 ### Test Gate
 
 - [x] All module READMEs pass `markdownlint` and section-order lint
-- [ ] `tests/performance/baselines/phase-5.json` committed
-- [ ] No performance regression against Phase 2 baseline (within defined thresholds)
+- [x] `tests/performance/baselines/phase-5.json` committed
+- [x] No performance regression against Phase 2 baseline (within defined thresholds)
 - [x] `bash scripts/ci.sh` passes — all 12 quality gates green
 
 ---
@@ -320,13 +321,13 @@ Phase 5 is part of the V1.0.0 release. The full V1.0.0 release gate
 [implementation/README.md](README.md#v100-release-gate). Phase 5’s
 contribution to that gate:
 
-- [ ] Full test suite passes (`bash scripts/ci.sh`) — zero failures, zero skips
-- [ ] All `@orchestration` spec scenarios pass
-- [ ] All V1.0 spec scenarios from Phases 1–2 still pass (no regressions)
-- [ ] Full Docker Compose environment runs end-to-end: standalone deployment + orchestrated deployment
-- [ ] Procedure Controller discovers, starts, stops, and monitors services across all three Service Host types
-- [ ] Orchestration domain is fully isolated from Procedure and Hospital domains
-- [ ] All module READMEs pass lint
-- [ ] Performance benchmark passes against Phase 5 baseline
-- [ ] No open incidents in `docs/agent/incidents.md`
-- [ ] `tests/performance/baselines/phase-5.json` committed
+- [x] Full test suite passes (`bash scripts/ci.sh`) — zero failures, zero skips
+- [x] All `@orchestration` spec scenarios pass
+- [x] All V1.0 spec scenarios from Phases 1–2 still pass (no regressions)
+- [x] Full Docker Compose environment runs end-to-end: standalone deployment + orchestrated deployment
+- [x] Procedure Controller discovers, starts, stops, and monitors services across all three Service Host types
+- [x] Orchestration domain is fully isolated from Procedure and Hospital domains
+- [x] All module READMEs pass lint
+- [x] Performance benchmark passes against Phase 5 baseline
+- [ ] No open incidents in `docs/agent/incidents.md` *(INC-041, INC-042 remain open — Phase 2 discovery issues, not Phase 5 blockers)*
+- [x] `tests/performance/baselines/phase-5.json` committed

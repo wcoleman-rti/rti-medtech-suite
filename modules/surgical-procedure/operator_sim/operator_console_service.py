@@ -78,15 +78,20 @@ class OperatorConsoleService(Service):
         else:
             self._participant = participant
 
-        self._input_writer = dds.DataWriter(
-            self._participant.find_datawriter(names.OPERATOR_INPUT_WRITER)
-        )
-        self._cmd_writer = dds.DataWriter(
-            self._participant.find_datawriter(names.ROBOT_COMMAND_WRITER)
-        )
-        self._interlock_writer = dds.DataWriter(
-            self._participant.find_datawriter(names.SAFETY_INTERLOCK_WRITER)
-        )
+        input_any = self._participant.find_datawriter(names.OPERATOR_INPUT_WRITER)
+        cmd_any = self._participant.find_datawriter(names.ROBOT_COMMAND_WRITER)
+        interlock_any = self._participant.find_datawriter(names.SAFETY_INTERLOCK_WRITER)
+
+        if input_any is None:
+            raise RuntimeError(f"Writer not found: {names.OPERATOR_INPUT_WRITER}")
+        if cmd_any is None:
+            raise RuntimeError(f"Writer not found: {names.ROBOT_COMMAND_WRITER}")
+        if interlock_any is None:
+            raise RuntimeError(f"Writer not found: {names.SAFETY_INTERLOCK_WRITER}")
+
+        self._input_writer = dds.DataWriter(input_any)
+        self._cmd_writer = dds.DataWriter(cmd_any)
+        self._interlock_writer = dds.DataWriter(interlock_any)
 
     def _start(self) -> None:
         """Enable participant and begin DDS discovery."""
