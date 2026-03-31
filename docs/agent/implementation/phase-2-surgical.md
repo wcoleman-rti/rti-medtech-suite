@@ -83,7 +83,7 @@
 > **Prerequisite:** [revision-dds-consistency.md](revision-dds-consistency.md) must be
 > complete before starting this step. All new code from this step onward
 > must use generated entity name constants from `app_names.idl`, import
-> `initialize_connext()` from the shared `medtech_dds_init` package, and
+> `initialize_connext()` from the shared `medtech.dds` module, and
 > follow the application architecture pattern in
 > [vision/dds-consistency.md §3](../vision/dds-consistency.md). Refer to
 > the [new module checklist](../vision/dds-consistency.md) (§9) for each

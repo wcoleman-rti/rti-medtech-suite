@@ -25,7 +25,7 @@ class TestSharedInitialization:
     def test_initialize_connext_sets_xtypes_mask(self):
         """After initialize_connext(), XTypes mask includes
         accept_unknown_enum_value."""
-        from medtech_dds_init.dds_init import initialize_connext
+        from medtech.dds import initialize_connext
 
         initialize_connext()
 
@@ -40,7 +40,7 @@ class TestSharedInitialization:
         """After initialize_connext(), XML participant creation succeeds,
         which requires all referenced types to be registered."""
         import app_names
-        from medtech_dds_init.dds_init import initialize_connext
+        from medtech.dds import initialize_connext
 
         initialize_connext()
 
@@ -73,7 +73,7 @@ class TestXmlParticipantCreation:
         """Verify that create_participant_from_config() works with the
         generated entity name constants."""
         import app_names
-        from medtech_dds_init.dds_init import initialize_connext
+        from medtech.dds import initialize_connext
 
         initialize_connext()
 

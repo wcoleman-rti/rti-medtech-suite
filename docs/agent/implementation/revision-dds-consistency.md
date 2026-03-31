@@ -66,18 +66,18 @@ QoS architecture changes. All existing tests must continue to pass.
 ### Work
 
 - Move `modules/surgical-procedure/dds_init.py` to
-  `modules/shared/medtech_dds_init/dds_init.py` (or equivalent package
+  `modules/shared/medtech/dds.py` (consolidated package
   structure aligned with the C++ header location)
 - Update all Python imports that reference `dds_init` to use the new
   shared package path
 - Add CMake install rule to place the shared Python init module in
-  `install/lib/python/site-packages/medtech_dds_init/`
+  `install/lib/python/site-packages/medtech/`
 - Verify the shared module is importable after `source install/setup.bash`
 - Ensure the module remains idempotent per dds-consistency.md §1 Step 1
 
 ### Test Gate
 
-- [ ] `from medtech_dds_init.dds_init import initialize_connext` succeeds
+- [ ] `from medtech.dds import initialize_connext` succeeds
       after install
 - [ ] `modules/surgical-procedure/` no longer contains `dds_init.py`
 - [ ] All Python modules (`procedure_context.py`,
@@ -260,7 +260,7 @@ class pattern in dds-consistency.md §3:
 
 4. **Import from shared location (from R.2):**
    ```python
-   from medtech_dds_init.dds_init import initialize_connext
+   from medtech.dds import initialize_connext
    ```
 
 ### Existing Tests — Update Strategy

@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from medtech_gui._widgets import ConnectionDot
+from medtech.gui._widgets import ConnectionDot
 from PySide6.QtCore import QObject, QSettings, Qt, Signal
 from PySide6.QtGui import QFontDatabase, QPalette, QPixmap
 from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QPushButton
@@ -156,7 +156,7 @@ def _resource_dir() -> Path:
         return Path(env)
     # Fallback: assume typical install tree relative to repo root
     here = Path(__file__).resolve()
-    repo = here.parents[3]  # modules/shared/medtech_gui/ -> repo root
+    repo = here.parents[4]  # modules/shared/medtech/gui/ -> repo root
     return repo / "install" / "share" / "resources"
 
 

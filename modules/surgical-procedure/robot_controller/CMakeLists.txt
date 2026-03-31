@@ -6,8 +6,7 @@ add_library(robot_controller_service STATIC
 
 target_include_directories(robot_controller_service PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/modules/shared/medtech_logging/include
-    ${CMAKE_SOURCE_DIR}/modules/shared/medtech_dds_init/include
+    ${CMAKE_SOURCE_DIR}/modules/shared/include
 )
 
 target_link_libraries(robot_controller_service PUBLIC
@@ -21,8 +20,7 @@ add_executable(robot-controller
 
 target_include_directories(robot-controller PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/modules/shared/medtech_logging/include
-    ${CMAKE_SOURCE_DIR}/modules/shared/medtech_dds_init/include
+    ${CMAKE_SOURCE_DIR}/modules/shared/include
 )
 
 target_link_libraries(robot-controller PRIVATE

@@ -226,21 +226,21 @@
 
 ---
 
-## Step 1.6 — Shared GUI Bootstrap (`medtech_gui`) ✅ `3908384`
+## Step 1.6 — Shared GUI Bootstrap (`medtech.gui`) ✅ `3908384`
 
 ### Work
 
-- Create the `medtech_gui` Python package under `modules/shared/medtech_gui/`
+- Create the `medtech.gui` subpackage under `modules/shared/medtech/gui/`
 - Implement `init_theme(app: QApplication)` per [vision/technology.md](../vision/technology.md) GUI Design Standard:
   - Loads `resources/styles/medtech.qss` and applies it to the QApplication
   - Registers bundled fonts (Roboto Condensed, Montserrat, Roboto Mono) via `QFontDatabase`
   - Creates and returns a header widget with RTI Blue (`#004C97`) background, white text, left-aligned RTI logo
-- Add CMake install rule to place the package in `lib/python/site-packages/medtech_gui/`
+- Add CMake install rule to place the package in `lib/python/site-packages/medtech/gui/`
 - The package must be importable after `source install/setup.bash`
 
 ### Test Gate
 
-- [x] `python -c "from medtech_gui import init_theme"` succeeds after install
+- [x] `python -c "from medtech.gui import init_theme"` succeeds after install
 - [x] `init_theme(app)` loads the stylesheet without errors (pytest-qt test)
 - [x] Fonts are registered and available after `init_theme()` call
 - [x] Header widget renders with correct background color and logo
@@ -251,7 +251,7 @@
 
 ### Work
 
-- Create a shared logging utility module (Python: `medtech_logging`; C++: header-only or static library)
+- Create a shared logging utility module (Python: `medtech.log`; C++: header-only or static library)
 - **Python** — provide `init_logging(module_name)` that:
   - Returns the `rti.connextdds.Logger.instance` singleton for application use
   - Does **not** set any verbosity — verbosity is configured entirely via QoS XML (`<participant_factory_qos><logging>`) loaded at startup

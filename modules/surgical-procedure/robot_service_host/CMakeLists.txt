@@ -3,8 +3,7 @@ add_library(robot_service_host INTERFACE)
 
 target_include_directories(robot_service_host INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/modules/shared/medtech_logging/include
-    ${CMAKE_SOURCE_DIR}/modules/shared/medtech_dds_init/include
+    ${CMAKE_SOURCE_DIR}/modules/shared/include
     ${CMAKE_SOURCE_DIR}/modules/surgical-procedure/robot_controller
 )
 
@@ -19,8 +18,7 @@ add_executable(robot-service-host
 
 target_include_directories(robot-service-host PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/modules/shared/medtech_logging/include
-    ${CMAKE_SOURCE_DIR}/modules/shared/medtech_dds_init/include
+    ${CMAKE_SOURCE_DIR}/modules/shared/include
 )
 
 target_link_libraries(robot-service-host PRIVATE

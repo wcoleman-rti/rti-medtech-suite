@@ -66,7 +66,7 @@ medtech-suite/
 │   ├── surgical-procedure/
 │   ├── hospital-dashboard/
 │   ├── clinical-alerts/
-│   └── shared/          # Shared utilities (medtech_gui, medtech_logging)
+│   └── shared/          # Shared framework (medtech package)
 ├── services/            # Infrastructure services (Routing, CDS, etc.)
 ├── resources/           # Shared GUI assets (fonts, images, stylesheets)
 ├── tests/               # Test suites

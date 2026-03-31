@@ -24,7 +24,7 @@ import common
 import rti.connextdds as dds
 import rti.rpc
 from medtech.service import Service, ServiceState
-from medtech_dds_init.dds_init import initialize_connext
+from medtech.dds import initialize_connext
 from orchestration import Orchestration
 
 orch_names = app_names.MedtechEntityNames.OrchestrationParticipants

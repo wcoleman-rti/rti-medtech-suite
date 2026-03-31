@@ -47,7 +47,7 @@ add_test(NAME app_names COMMAND test_app_names)
 # --- medtech::Service interface tests ---
 add_executable(test_service test_service.cpp)
 target_include_directories(test_service PRIVATE
-    ${CMAKE_SOURCE_DIR}/modules/shared/medtech_dds_init/include
+    ${CMAKE_SOURCE_DIR}/modules/shared/include
 )
 target_link_libraries(test_service
     PRIVATE

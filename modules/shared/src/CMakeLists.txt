@@ -4,8 +4,7 @@ add_library(service_host STATIC
 )
 
 target_include_directories(service_host PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/modules/shared/medtech_logging/include
+    ${CMAKE_SOURCE_DIR}/modules/shared/include
 )
 
 target_link_libraries(service_host PUBLIC

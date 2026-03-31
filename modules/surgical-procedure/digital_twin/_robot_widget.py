@@ -129,7 +129,7 @@ class RobotWidget(QWidget):
 
         # Listen for theme changes
         try:
-            from medtech_gui._theme import ThemeManager
+            from medtech.gui._theme import ThemeManager
 
             mgr = ThemeManager.instance()
             if mgr is not None:

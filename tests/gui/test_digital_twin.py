@@ -220,7 +220,7 @@ class TestQosConfiguration:
     @pytest.fixture(scope="class")
     def twin_participant(self):
         """Create a ControlDigitalTwin participant (class scope, auto-cleanup)."""
-        from medtech_dds_init.dds_init import initialize_connext
+        from medtech.dds import initialize_connext
 
         initialize_connext()
         provider = dds.QosProvider.default

@@ -33,15 +33,15 @@ from typing import Optional
 import app_names
 import rti.connextdds as dds
 import rti.rpc
-from medtech_dds_init.dds_init import initialize_connext
-from medtech_gui import (
+from medtech.dds import initialize_connext
+from medtech.gui import (
     ConnectionDot,
     create_empty_state,
     create_stat_card,
     create_status_chip,
     init_theme,
 )
-from medtech_logging import ModuleName, init_logging
+from medtech.log import ModuleName, init_logging
 from orchestration import Orchestration
 from PySide6.QtCore import QPoint, QRect, QSize, Qt
 from PySide6.QtWidgets import (

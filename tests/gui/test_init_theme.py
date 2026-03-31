@@ -1,10 +1,10 @@
-"""Tests for medtech_gui.init_theme — Step 1.6 test gate.
+"""Tests for medtech.gui.init_theme — Step 1.6 test gate.
 
 Tags: @gui @integration
 """
 
 import pytest
-from medtech_gui import init_theme
+from medtech.gui import init_theme
 from PySide6.QtGui import QFontDatabase
 
 pytestmark = [pytest.mark.gui, pytest.mark.integration]

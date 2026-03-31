@@ -232,21 +232,22 @@ else
 fi
 
 # Source install environment for test gates
+# RTI's rtisetenv script references unset variables (LD_LIBRARY_PATH etc.)
+# which crashes under set -u.  Temporarily relax nounset/errexit.
 # shellcheck disable=SC1091
+set +eu
 source install/setup.bash 2>/dev/null || true
+set -eu
 
 # ─── Gate 8: Full test suite (Python) ─────────────────────────────
 gate "Python test suite (pytest)"
 
-pytest_output=$(pytest tests/ -q --tb=line 2>&1) || true
-echo "$pytest_output" | tail -3
-if echo "$pytest_output" | grep -q "failed"; then
-    fail "pytest reported failures"
-elif echo "$pytest_output" | grep -q "passed"; then
-    pass
-else
-    fail "pytest did not report any passed tests"
+pytest_rc=0
+python -m pytest tests/ -x --tb=short -q || pytest_rc=$?
+if [ "$pytest_rc" -ne 0 ]; then
+    fail "pytest exited with code $pytest_rc"
 fi
+pass
 
 # ─── Gate 9: C++ test suite (CTest) ───────────────────────────────
 gate "C++ test suite (CTest)"

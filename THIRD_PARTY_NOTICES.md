@@ -20,7 +20,7 @@ the [Docker Images](#docker-images) section.
 | **Pinned commit** | `3d6da8b416357e1f6a32fbff76b22d52ad1e9bc5` |
 | **Fetched by** | `resources/fonts/CMakeLists.txt` via `file(DOWNLOAD)` at configure time |
 | **Verification** | SHA-256 hash per file |
-| **Usage** | GUI typography in PySide6 applications (see `modules/shared/medtech_gui/`) |
+| **Usage** | GUI typography in PySide6 applications (see `modules/shared/medtech/gui/`) |
 
 The OFL permits free use, redistribution, and bundling in software
 products, provided font files are not sold by themselves.

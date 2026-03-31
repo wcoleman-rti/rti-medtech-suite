@@ -36,7 +36,7 @@ _DEFAULT_CHIP_COLORS = ("#ECEFF1", "#63666A", "#2D3139", "#63666A")
 def _is_dark_theme() -> bool:
     """Check if the current effective theme is dark."""
     try:
-        from medtech_gui._theme import ThemeManager
+        from medtech.gui._theme import ThemeManager
 
         mgr = ThemeManager.instance()
         if mgr is not None:

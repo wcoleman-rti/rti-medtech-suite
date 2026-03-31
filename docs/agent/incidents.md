@@ -1966,3 +1966,26 @@ after closure. They form the project's decision log.
   planning docs → module READMEs.  Missing any layer causes a build
   or runtime failure.  Start from the IDL and work outward.
 - **Date closed:** 2026-03-31
+
+---
+
+## INC-063: Shared package consolidation — isort requires re-run after mass renames
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Revision: Shared Package Consolidation / Steps RC.1–RC.2
+- **Documents involved:** `modules/shared/medtech/service_host.py`,
+  `modules/surgical-procedure/` (multiple service files)
+- **Description:** After renaming imports from `medtech_dds_init`,
+  `medtech_logging`, and `medtech_gui` to `medtech.dds`, `medtech.log`,
+  and `medtech.gui`, the new import paths sort differently under isort's
+  known-first-party classification. Automated `multi_replace_string_in_file`
+  preserves the old line positions but does not re-sort the import block.
+  Gate 1 (isort `--check`) caught 8 source files with incorrect ordering.
+- **Resolution:** Ran `isort modules/ tests/` to auto-fix all affected files.
+  Reinstalled to propagate fixes to the install tree. All 12 CI gates pass.
+- **Guideline:** After any mass import rename, always run
+  `isort modules/ tests/` before CI to fix sort order. Prefer running
+  `bash scripts/ci.sh --lint` as an early smoke test after bulk edits.
+- **Date closed:** 2026-03-31

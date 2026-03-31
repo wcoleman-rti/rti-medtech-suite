@@ -55,7 +55,7 @@ endif()
 
 # --- Subdirectories ---
 add_subdirectory(interfaces)
-add_subdirectory(modules/shared/medtech_dds_init)
+add_subdirectory(modules/shared/src)
 add_subdirectory(modules/surgical-procedure/robot_controller)
 add_subdirectory(modules/surgical-procedure/robot_service_host)
 if(BUILD_TESTING)
@@ -94,22 +94,14 @@ install(FILES
 add_subdirectory(resources)
 
 # --- Install shared Python packages ---
-install(DIRECTORY modules/shared/medtech_gui/
-    DESTINATION lib/python/site-packages/medtech_gui
-    FILES_MATCHING PATTERN "*.py")
-install(DIRECTORY modules/shared/medtech_logging/
-    DESTINATION lib/python/site-packages/medtech_logging
-    FILES_MATCHING PATTERN "*.py")
-install(DIRECTORY modules/shared/medtech_dds_init/
-    DESTINATION lib/python/site-packages/medtech_dds_init
-    FILES_MATCHING PATTERN "*.py"
-    PATTERN "include" EXCLUDE)
 install(DIRECTORY modules/shared/medtech/
     DESTINATION lib/python/site-packages/medtech
-    FILES_MATCHING PATTERN "*.py")
+    FILES_MATCHING PATTERN "*.py"
+    PATTERN "include" EXCLUDE
+    PATTERN "src" EXCLUDE)
 
 # --- Install shared C++ headers ---
-install(DIRECTORY modules/shared/medtech_logging/include/
+install(DIRECTORY modules/shared/include/
     DESTINATION include
     FILES_MATCHING PATTERN "*.hpp")
 

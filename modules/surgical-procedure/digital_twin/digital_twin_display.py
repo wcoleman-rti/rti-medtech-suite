@@ -30,9 +30,9 @@ from typing import Optional
 import app_names
 import rti.connextdds as dds
 import surgery
-from medtech_dds_init.dds_init import initialize_connext
-from medtech_gui import ConnectionDot, init_theme
-from medtech_logging import ModuleName, init_logging
+from medtech.dds import initialize_connext
+from medtech.gui import ConnectionDot, init_theme
+from medtech.log import ModuleName, init_logging
 from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 
 from ._robot_widget import RobotWidget
