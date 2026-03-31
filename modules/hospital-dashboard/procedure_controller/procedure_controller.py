@@ -173,7 +173,7 @@ class ProcedureController(QMainWindow):
         self._hosp_participant = provider.create_participant_from_config(
             orch_names.PROCEDURE_CONTROLLER_HOSPITAL
         )
-        hosp_partition = f"room/{room_id}"
+        hosp_partition = f"room/{room_id}/procedure/*"
         hosp_qos = self._hosp_participant.qos
         hosp_qos.partition.name = [hosp_partition]
         self._hosp_participant.qos = hosp_qos

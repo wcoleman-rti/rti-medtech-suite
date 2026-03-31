@@ -2136,3 +2136,47 @@ after closure. They form the project's decision log.
 - **Guideline:** Any README that is part of the project documentation
   surface should be included in the markdownlint CI gate.
 - **Date closed:** 2026-03-31
+
+---
+
+## INC-070: Routing Service cannot propagate participant-level partitions
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Phase 3 / Step 3.1
+- **Documents involved:** `vision/system-architecture.md`,
+  `services/routing/RoutingService.xml`
+- **Description:** The system architecture document states "Routing
+  Service preserves the source partition" and "Data bridged from
+  `room/OR-3/procedure/proc-001` is published on the Hospital domain
+  with the same partition string." However, RTI Routing Service 7.6.0
+  does **not** automatically propagate participant-level partition QoS
+  from the input side to the output side. Verified via
+  `rti-chatbot-mcp`: "Routing Service does not automatically propagate
+  participant-level partitions." The RS output participant uses whatever
+  partition is configured in its own `<domain_participant_qos>`, not
+  the source participant's partition. The `<propagation_qos>` element
+  does not exist for participant-level partitions in RS 7.6.0.
+- **Possible resolutions:**
+  1. Use wildcard partition `room/*/procedure/*` on both input and
+     output RS participants. Hospital domain consumers match using
+     compatible wildcards (e.g., `room/*` or `room/*/procedure/*`).
+     Room/patient identity is carried in the data model fields.
+  2. Create multiple RS output participants per room (static config).
+  3. Implement a custom RS processor plugin for dynamic propagation.
+- **Resolution:** Resolution 1 adopted. All RS participants (input and
+  output) use `room/*/procedure/*` at the DomainParticipant QoS
+  partition level. Hospital dashboard uses a compatible wildcard.
+  Procedure Controller Hospital participant updated from `room/{room_id}`
+  to `room/{room_id}/procedure/*` for RS compatibility. Data model fields
+  (`room_id`, `patient.id`) provide the room/patient identity for
+  UI filtering and content-filtered topics. This approach is consistent
+  with the aggregation use case — the Hospital domain is a facility-wide
+  view, not a per-room view.
+- **Guideline:** When using participant-level partitions with Routing
+  Service, configure matching wildcard partitions on both input and
+  output RS participants. Do not rely on automatic partition propagation.
+  Carry context identity (room, patient, procedure) in the data model
+  for filtering, not solely in partition strings.
+- **Date closed:** 2026-03-31

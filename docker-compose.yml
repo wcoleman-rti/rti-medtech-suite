@@ -584,6 +584,41 @@ services:
       cloud-discovery-service:
         condition: service_healthy
 
+  # ─── Routing Service (Procedure → Hospital bridge) ───────────────
+
+  routing-service:
+    image: medtech/routing-service
+    build:
+      context: .
+      dockerfile: docker/routing-service.Dockerfile
+      additional_contexts:
+        connext: "${NDDSHOME:-/opt/rti.com/rti_connext_dds-7.6.0}"
+      args:
+        <<: *build-args
+    container_name: routing-service
+    command:
+      - "-cfgFile"
+      - "/opt/medtech/config/RoutingService.xml"
+      - "-cfgName"
+      - "MedtechBridge"
+      - "-verbosity"
+      - "WARN"
+    volumes:
+      - ./services/routing/RoutingService.xml:/opt/medtech/config/RoutingService.xml:ro
+      - ${RTI_LICENSE_FILE:-./rti_license.dat}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro
+    networks:
+      surgical-net:
+      hospital-net:
+    depends_on:
+      cloud-discovery-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /proc/1/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   # ─── Placeholder Services (network verification) ───────────────
 
   hospital-placeholder:
