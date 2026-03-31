@@ -128,6 +128,7 @@ class TestCameraServiceIntegration:
         p = dds.DomainParticipant.default_participant_qos
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "operational"
+        p.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
         dp = dds.DomainParticipant(10, p)
 
         provider = dds.QosProvider.default

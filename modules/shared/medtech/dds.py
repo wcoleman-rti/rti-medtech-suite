@@ -12,8 +12,10 @@ and find_datareader().
 
 from __future__ import annotations
 
+import clinical_alerts
 import common  # noqa: F401  — generated; registers Common types
 import devices
+import hospital
 import imaging
 import monitoring
 import orchestration
@@ -84,4 +86,15 @@ def initialize_connext() -> None:
     )
     dds.DomainParticipant.register_idl_type(
         orchestration.Orchestration.ServiceStatus, "Orchestration::ServiceStatus"
+    )
+
+    # Hospital module
+    dds.DomainParticipant.register_idl_type(
+        clinical_alerts.ClinicalAlerts.ClinicalAlert, "ClinicalAlerts::ClinicalAlert"
+    )
+    dds.DomainParticipant.register_idl_type(
+        clinical_alerts.ClinicalAlerts.RiskScore, "ClinicalAlerts::RiskScore"
+    )
+    dds.DomainParticipant.register_idl_type(
+        hospital.Hospital.ResourceAvailability, "Hospital::ResourceAvailability"
     )

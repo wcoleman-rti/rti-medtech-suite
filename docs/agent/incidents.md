@@ -2180,3 +2180,63 @@ after closure. They form the project's decision log.
   Carry context identity (room, patient, procedure) in the data model
   for filtering, not solely in partition strings.
 - **Date closed:** 2026-03-31
+
+---
+
+## INC-071: Hospital domain types not registered in initialize_connext()
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Phase 3 / Step 3.2
+- **Documents involved:** `modules/shared/medtech/dds.py`,
+  `interfaces/domains/Domains.xml`
+- **Description:** `initialize_connext()` registered types for the
+  Procedure, Monitoring, Imaging, Devices, and Orchestration domains but
+  not for Hospital domain types (`ClinicalAlerts::ClinicalAlert`,
+  `ClinicalAlerts::RiskScore`, `Hospital::ResourceAvailability`).
+  Creating the HospitalDashboard participant via
+  `create_participant_from_config()` failed with
+  "failed to get type definition for XML register_type
+  name='ClinicalAlerts::ClinicalAlert'".
+- **Resolution:** Added `clinical_alerts` and `hospital` imports and
+  registered all three types in `initialize_connext()`. Any new domain
+  or type added to `Domains.xml` requires a corresponding
+  `register_idl_type()` call in `dds.py`.
+- **Guideline:** When adding new XML-defined domains or topics that
+  reference new IDL types, always update `initialize_connext()` with
+  the corresponding `register_idl_type()` calls. The
+  `create_participant_from_config()` API cannot resolve type references
+  in domain library XML without prior IDL type registration.
+- **Date closed:** 2026-03-31
+
+---
+
+## INC-072: test_camera_sim transport QoS mismatch in xdist parallel runs
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Phase 3 / Step 3.2
+- **Documents involved:** `tests/integration/test_camera_sim.py`,
+  INC-051
+- **Description:** `test_camera_sim.py::TestCameraServiceIntegration`
+  created a test participant on domain 10 using
+  `DomainParticipant.default_participant_qos` without setting
+  `message_size_max=1400`. When running in parallel via pytest-xdist,
+  this participant (message_size_max=65507) discovered other test
+  participants with AvoidIPFragmentation (message_size_max=1400),
+  causing transport mismatch errors and intermittent test failures.
+  INC-051 previously fixed this in conftest participants but missed
+  the camera test's inline participant creation.
+- **Resolution:** Added
+  `p.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"`
+  to the camera test's `frame_reader` fixture. All test participants
+  on Procedure domain 10 now use consistent transport QoS.
+- **Guideline:** Every test participant that creates a
+  `DomainParticipant` on a production domain (10, 11, 15, 20) must set
+  `message_size_max=1400` via the UDPv4 property to match the project's
+  AvoidIPFragmentation transport profile. Use the `participant_factory`
+  conftest fixture when possible; when creating participants inline,
+  always set the property explicitly.
+- **Date closed:** 2026-03-31

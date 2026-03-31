@@ -75,4 +75,21 @@ module MedtechEntityNames {
         const string CTRL_PROCEDURE_CONTEXT_READER = "ControllerHospSubscriber::ProcedureContextReader";
         const string CTRL_PATIENT_VITALS_READER    = "ControllerHospSubscriber::PatientVitalsReader";
     };
+
+    // --- HospitalDashboard participant (in OrchestrationParticipants library) ---
+    module HospitalDashboard {
+
+        // Participant config name — create_participant_from_config()
+        const string HOSPITAL_DASHBOARD = "OrchestrationParticipants::HospitalDashboard";
+
+        // Reader names — find_datareader()
+        const string PROCEDURE_STATUS_READER      = "DashboardSubscriber::ProcedureStatusReader";
+        const string PROCEDURE_CONTEXT_READER     = "DashboardSubscriber::ProcedureContextReader";
+        const string PATIENT_VITALS_READER        = "DashboardSubscriber::PatientVitalsReader";
+        const string ALARM_MESSAGES_READER        = "DashboardSubscriber::AlarmMessagesReader";
+        const string DEVICE_TELEMETRY_READER      = "DashboardSubscriber::DeviceTelemetryReader";
+        const string ROBOT_STATE_READER           = "DashboardSubscriber::RobotStateReader";
+        const string CLINICAL_ALERT_READER        = "DashboardSubscriber::ClinicalAlertReader";
+        const string RESOURCE_AVAILABILITY_READER = "DashboardSubscriber::ResourceAvailabilityReader";
+    };
 };

@@ -28,5 +28,6 @@ markers = [
     "orchestration: tests for the orchestration domain and Service Host framework",
     "routing: tests for Routing Service configuration and bridging",
     "filtering: tests for content-filtered topics",
+    "dashboard: tests for the Hospital Dashboard GUI module",
     "unit: tests runnable with a single component in isolation",
 ]
