@@ -121,8 +121,8 @@ class TestMultiInstanceIsolation:
         r3 = reader_factory(p_r3, t_r3)
 
         # Same-partition pairs discover
-        assert wait_for_discovery(w1, r1, timeout_sec=10)
-        assert wait_for_discovery(w3, r3, timeout_sec=10)
+        assert wait_for_discovery(w1, r1)
+        assert wait_for_discovery(w3, r3)
 
         # Publish distinct samples
         w1.write(_make_robot_state("OR-1"))
@@ -131,24 +131,20 @@ class TestMultiInstanceIsolation:
         data1 = wait_for_data(r1, timeout_sec=5)
         data3 = wait_for_data(r3, timeout_sec=5)
 
-        assert len(data1) >= 1
-        assert data1[0].data.robot_id == "robot-OR-1"
+        assert data1
+        assert r1.take_data()[0].robot_id == "robot-OR-1"
 
-        assert len(data3) >= 1
-        assert data3[0].data.robot_id == "robot-OR-3"
+        assert data3
+        assert r3.take_data()[0].robot_id == "robot-OR-3"
 
         # Verify no cross-partition leaking
         # Reader1 should have ONLY OR-1 data
-        all_r1 = r1.read()
-        for s in all_r1:
-            if s.info.valid:
-                assert s.data.robot_id == "robot-OR-1"
+        for s in r1.read_data():
+            assert s.robot_id == "robot-OR-1"
 
         # Reader3 should have ONLY OR-3 data
-        all_r3 = r3.read()
-        for s in all_r3:
-            if s.info.valid:
-                assert s.data.robot_id == "robot-OR-3"
+        for s in r3.read_data():
+            assert s.robot_id == "robot-OR-3"
 
     def test_vitals_isolation(
         self, participant_factory, writer_factory, reader_factory
@@ -169,8 +165,8 @@ class TestMultiInstanceIsolation:
         r1 = reader_factory(p_r1, t_r1)
         r3 = reader_factory(p_r3, t_r3)
 
-        assert wait_for_discovery(w1, r1, timeout_sec=10)
-        assert wait_for_discovery(w3, r3, timeout_sec=10)
+        assert wait_for_discovery(w1, r1)
+        assert wait_for_discovery(w3, r3)
 
         w1.write(_make_vitals("patient-OR1", 80))
         w3.write(_make_vitals("patient-OR3", 90))
@@ -178,13 +174,15 @@ class TestMultiInstanceIsolation:
         data1 = wait_for_data(r1, timeout_sec=5)
         data3 = wait_for_data(r3, timeout_sec=5)
 
-        assert len(data1) >= 1
-        assert data1[0].data.patient_id == "patient-OR1"
-        assert data1[0].data.heart_rate == 80
+        assert data1
+        d1 = r1.take_data()[0]
+        assert d1.patient_id == "patient-OR1"
+        assert d1.heart_rate == 80
 
-        assert len(data3) >= 1
-        assert data3[0].data.patient_id == "patient-OR3"
-        assert data3[0].data.heart_rate == 90
+        assert data3
+        d3 = r3.take_data()[0]
+        assert d3.patient_id == "patient-OR3"
+        assert d3.heart_rate == 90
 
     def test_procedure_context_isolation(
         self, participant_factory, writer_factory, reader_factory
@@ -205,8 +203,8 @@ class TestMultiInstanceIsolation:
         r1 = reader_factory(p_r1, t_r1)
         r3 = reader_factory(p_r3, t_r3)
 
-        assert wait_for_discovery(w1, r1, timeout_sec=10)
-        assert wait_for_discovery(w3, r3, timeout_sec=10)
+        assert wait_for_discovery(w1, r1)
+        assert wait_for_discovery(w3, r3)
 
         w1.write(_make_procedure_context("OR1-001", "OR-1"))
         w3.write(_make_procedure_context("OR3-001", "OR-3"))
@@ -214,13 +212,11 @@ class TestMultiInstanceIsolation:
         data1 = wait_for_data(r1, timeout_sec=5)
         data3 = wait_for_data(r3, timeout_sec=5)
 
-        assert len(data1) >= 1
-        assert data1[0].data.procedure_id == "OR1-001"
-        assert data1[0].data.room == "OR-1"
+        assert data1
+        assert r1.take_data()[0].procedure_id == "OR1-001"
 
-        assert len(data3) >= 1
-        assert data3[0].data.procedure_id == "OR3-001"
-        assert data3[0].data.room == "OR-3"
+        assert data3
+        assert r3.take_data()[0].procedure_id == "OR3-001"
 
     def test_camera_frame_isolation(
         self, participant_factory, writer_factory, reader_factory
@@ -241,8 +237,8 @@ class TestMultiInstanceIsolation:
         r1 = reader_factory(p_r1, t_r1)
         r3 = reader_factory(p_r3, t_r3)
 
-        assert wait_for_discovery(w1, r1, timeout_sec=10)
-        assert wait_for_discovery(w3, r3, timeout_sec=10)
+        assert wait_for_discovery(w1, r1)
+        assert wait_for_discovery(w3, r3)
 
         w1.write(_make_camera_frame("cam-OR1", 1))
         w3.write(_make_camera_frame("cam-OR3", 1))
@@ -250,11 +246,11 @@ class TestMultiInstanceIsolation:
         data1 = wait_for_data(r1, timeout_sec=5)
         data3 = wait_for_data(r3, timeout_sec=5)
 
-        assert len(data1) >= 1
-        assert data1[0].data.camera_id == "cam-OR1"
+        assert data1
+        assert r1.take_data()[0].camera_id == "cam-OR1"
 
-        assert len(data3) >= 1
-        assert data3[0].data.camera_id == "cam-OR3"
+        assert data3
+        assert r3.take_data()[0].camera_id == "cam-OR3"
 
     def test_device_telemetry_isolation(
         self, participant_factory, writer_factory, reader_factory
@@ -275,8 +271,8 @@ class TestMultiInstanceIsolation:
         r1 = reader_factory(p_r1, t_r1)
         r3 = reader_factory(p_r3, t_r3)
 
-        assert wait_for_discovery(w1, r1, timeout_sec=10)
-        assert wait_for_discovery(w3, r3, timeout_sec=10)
+        assert wait_for_discovery(w1, r1)
+        assert wait_for_discovery(w3, r3)
 
         w1.write(_make_device_telemetry("pump-OR1"))
         w3.write(_make_device_telemetry("pump-OR3"))
@@ -284,11 +280,11 @@ class TestMultiInstanceIsolation:
         data1 = wait_for_data(r1, timeout_sec=5)
         data3 = wait_for_data(r3, timeout_sec=5)
 
-        assert len(data1) >= 1
-        assert data1[0].data.device_id == "pump-OR1"
+        assert data1
+        assert r1.take_data()[0].device_id == "pump-OR1"
 
-        assert len(data3) >= 1
-        assert data3[0].data.device_id == "pump-OR3"
+        assert data3
+        assert r3.take_data()[0].device_id == "pump-OR3"
 
 
 class TestMultiInstanceConcurrent:
@@ -331,9 +327,7 @@ class TestMultiInstanceConcurrent:
 
         # Wait for all pairs to discover
         for name, w, r in or1_pairs + or3_pairs:
-            assert wait_for_discovery(
-                w, r, timeout_sec=10
-            ), f"{name} failed to discover"
+            assert wait_for_discovery(w, r), f"{name} failed to discover"
 
         # Publish on all topics in both instances simultaneously
         for (name, w1, _), (_, w3, _) in zip(or1_pairs, or3_pairs):
@@ -354,12 +348,10 @@ class TestMultiInstanceConcurrent:
         time.sleep(0.5)
 
         for (name, _, r1), (_, _, r3) in zip(or1_pairs, or3_pairs):
-            data1 = r1.read()
-            valid1 = [s for s in data1 if s.info.valid]
+            valid1 = r1.read_data()
             assert len(valid1) >= 1, f"OR-1 {name}: expected data"
 
-            data3 = r3.read()
-            valid3 = [s for s in data3 if s.info.valid]
+            valid3 = r3.read_data()
             assert len(valid3) >= 1, f"OR-3 {name}: expected data"
 
     def test_cross_partition_zero_samples(
@@ -381,8 +373,7 @@ class TestMultiInstanceConcurrent:
         w3.write(_make_vitals("patient-OR3", 99))
         time.sleep(0.5)
 
-        data = r1.read()
-        valid = [s for s in data if s.info.valid]
+        valid = r1.read_data()
         assert len(valid) == 0, "OR-1 reader must receive zero samples from OR-3 writer"
 
 

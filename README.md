@@ -3,27 +3,29 @@
 A multi-domain DDS simulation platform built on RTI Connext Professional
 7.6.0, demonstrating real-time surgical robotics, patient monitoring,
 clinical decision support, and hospital-wide coordination on a layered
-databus architecture.
+databus architecture. V1.0 includes full service orchestration with DDS
+RPC-based lifecycle management, multi-host discovery, and liveliness
+monitoring across four Service Host types.
 
 ## Platform Support
 
-| Platform | Status |
-|----------|--------|
-| Linux x86-64 (`x64Linux4gcc8.5.0`) | Supported |
-| Windows x64 | Planned (V3.0) |
-| macOS ARM / x64 | Planned (V3.0) |
-| QNX AArch64 | Planned (V3.0) |
+| Platform                           | Status         |
+|------------------------------------|----------------|
+| Linux x86-64 (`x64Linux4gcc8.5.0`) | Supported      |
+| Windows x64                        | Planned (V3.0) |
+| macOS ARM / x64                    | Planned (V3.0) |
+| QNX AArch64                        | Planned (V3.0) |
 
 ## System Requirements
 
-| Component | Version |
-|-----------|---------|
-| RTI Connext DDS Professional | 7.6.0 |
-| GCC | 8.5+ |
-| CMake | 3.16+ |
-| Python | 3.10+ |
-| Docker | Latest stable |
-| Docker Compose | V2 |
+| Component                    | Version       |
+|------------------------------|---------------|
+| RTI Connext DDS Professional | 7.6.0         |
+| GCC                          | 8.5+          |
+| CMake                        | 3.16+         |
+| Python                       | 3.10+         |
+| Docker                       | Latest stable |
+| Docker Compose               | V2            |
 
 ## Compiler / Toolchain
 

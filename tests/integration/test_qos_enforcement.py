@@ -79,10 +79,10 @@ class TestDeadline:
         w = writer_factory(p1, topic1, qos=wqos)
         r = reader_factory(p2, topic2, qos=rqos)
 
-        assert wait_for_discovery(w, r, timeout_sec=10)
+        assert wait_for_discovery(w, r)
 
         w.write(_make_vitals("patient-001", 72))
-        wait_for_data(r, timeout_sec=5, count=1)
+        assert wait_for_data(r, timeout_sec=5, count=1)
 
         # Stop publishing and wait for deadline to expire
         time.sleep(deadline_sec * 2.5)
@@ -112,23 +112,22 @@ class TestLiveliness:
         topic2 = dds.Topic(p2, "LivelinessTest", PatientVitals)
 
         wqos = dds.DataWriterQos()
-        wqos.liveliness.kind = dds.LivelinessKind.MANUAL_BY_PARTICIPANT
+        wqos.liveliness.kind = dds.LivelinessKind.AUTOMATIC
         wqos.liveliness.lease_duration = dds.Duration.from_seconds(lease_sec)
         wqos.reliability.kind = dds.ReliabilityKind.RELIABLE
 
         rqos = dds.DataReaderQos()
-        rqos.liveliness.kind = dds.LivelinessKind.MANUAL_BY_PARTICIPANT
+        rqos.liveliness.kind = dds.LivelinessKind.AUTOMATIC
         rqos.liveliness.lease_duration = dds.Duration.from_seconds(lease_sec)
         rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
 
         w = writer_factory(p1, topic1, qos=wqos)
         r = reader_factory(p2, topic2, qos=rqos)
 
-        assert wait_for_discovery(w, r, timeout_sec=10)
+        assert wait_for_discovery(w, r)
 
-        p1.assert_liveliness()
         w.write(_make_vitals("test", 1))
-        wait_for_data(r, timeout_sec=5)
+        assert wait_for_data(r, timeout_sec=5)
 
         # Confirm liveliness is alive before close
         assert r.liveliness_changed_status.alive_count >= 1
@@ -189,11 +188,10 @@ class TestLifespan:
 
         # Now create reader — stale sample should NOT be delivered
         r = reader_factory(p2, topic2, qos=rqos)
-        wait_for_discovery(w, r, timeout_sec=10)
+        wait_for_discovery(w, r)
         time.sleep(0.5)
 
-        received = r.read()
-        valid = [s for s in received if s.info.valid]
+        valid = r.read_data()
         assert len(valid) == 0, "Stale sample (beyond lifespan) should not be delivered"
 
 
@@ -234,17 +232,16 @@ class TestKeepLast:
         # Small delay, then create reader
         time.sleep(0.1)
         r = reader_factory(p2, topic2, qos=rqos)
-        assert wait_for_discovery(w, r, timeout_sec=10)
+        assert wait_for_discovery(w, r)
         try:
             r.wait_for_historical_data(dds.Duration(5))
         except dds.TimeoutError:
             pass
 
-        received = r.take()
-        valid = [s for s in received if s.info.valid]
+        valid = r.take_data()
         assert (
             len(valid) == 1
         ), f"KEEP_LAST 1 should deliver exactly 1 sample, got {len(valid)}"
         assert (
-            valid[0].data.heart_rate == 5
+            valid[0].heart_rate == 5
         ), "Should receive the most recent sample (heart_rate=5)"

@@ -88,7 +88,7 @@ def operational_service_host():
     yield proc
     proc.send_signal(signal.SIGTERM)
     try:
-        proc.wait(timeout=10)
+        proc.wait(timeout=3)
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
@@ -165,9 +165,9 @@ class TestOperationalServiceCatalog:
         deadline = time.monotonic() + 15.0
         service_ids: set[str] = set()
         while time.monotonic() < deadline:
-            for s in catalog_reader.read():
-                if s.info.valid and s.data.host_id == HOST_ID:
-                    service_ids.add(s.data.service_id)
+            for s in catalog_reader.read_data():
+                if s.host_id == HOST_ID:
+                    service_ids.add(s.service_id)
             if len(service_ids) >= 2:
                 break
             time.sleep(0.2)
@@ -188,11 +188,10 @@ class TestOperationalServiceStatus:
         deadline = time.monotonic() + 15
         svc_ids: set[str] = set()
         while True:
-            samples = status_reader.read()
-            for s in samples:
-                if s.info.valid and s.data.host_id == HOST_ID:
-                    svc_ids.add(s.data.service_id)
-                    assert s.data.state == Orchestration.ServiceState.STOPPED
+            for s in status_reader.read_data():
+                if s.host_id == HOST_ID:
+                    svc_ids.add(s.service_id)
+                    assert s.state == Orchestration.ServiceState.STOPPED
             if len(svc_ids) >= 2:
                 break
             remaining = deadline - time.monotonic()

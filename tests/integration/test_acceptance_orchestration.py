@@ -90,7 +90,7 @@ def _start_robot_host(host_id):
     )
 
 
-def _terminate_proc(proc, timeout=10):
+def _terminate_proc(proc, timeout=3):
     if proc.poll() is not None:
         return
     proc.send_signal(signal.SIGTERM)
@@ -101,7 +101,7 @@ def _terminate_proc(proc, timeout=10):
         proc.wait()
 
 
-def _wait_for_catalog(host_ids, timeout=20):
+def _wait_for_catalog(host_ids, timeout=5):
     qos = dds.DomainParticipantQos()
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
@@ -125,9 +125,9 @@ def _wait_for_catalog(host_ids, timeout=20):
                 ws.wait(dds.Duration(int(remaining), 0))
             except dds.TimeoutError:
                 pass
-            for sample in reader.read():
-                if sample.info.valid and sample.data.host_id in remaining_hosts:
-                    remaining_hosts.discard(sample.data.host_id)
+            for sample in reader.read_data():
+                if sample.host_id in remaining_hosts:
+                    remaining_hosts.discard(sample.host_id)
             if remaining_hosts:
                 time.sleep(0.1)
     finally:
@@ -285,7 +285,7 @@ class TestAcceptanceOrchestration:
         # Wait for at least one RobotState sample (the robot controller
         # publishes periodic state)
         samples = wait_for_data(reader, timeout_sec=15)
-        assert len(samples) >= 1, "No RobotState samples received"
+        assert samples, "No RobotState samples received"
 
         reader.close()
 
@@ -304,7 +304,7 @@ class TestAcceptanceOrchestration:
         assert matched, "PatientVitals reader did not match any writer"
 
         samples = wait_for_data(reader, timeout_sec=15)
-        assert len(samples) >= 1, "No PatientVitals samples received"
+        assert samples, "No PatientVitals samples received"
 
         reader.close()
 

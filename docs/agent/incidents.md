@@ -1989,3 +1989,150 @@ after closure. They form the project's decision log.
   `isort modules/ tests/` before CI to fix sort order. Prefer running
   `bash scripts/ci.sh --lint` as an early smoke test after bulk edits.
 - **Date closed:** 2026-03-31
+
+---
+
+## INC-064: markdownlint 0.48.0 MD060 table column alignment
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Phase 5 / Step 5.8
+- **Documents involved:** `modules/hospital-dashboard/README.md`,
+  `modules/surgical-procedure/README.md`, `README.md`
+- **Description:** markdownlint-cli 0.48.0 introduced rule MD060
+  (table-column-count) which requires pipe characters to be
+  consistently aligned across all rows in a Markdown table. All three
+  project READMEs had tables with inconsistent column widths that
+  passed under older markdownlint versions but fail under 0.48.0.
+  Additionally, markdownlint 0.48.0 requires Node 20+ (uses regex `/v`
+  flag unavailable in Node 18).
+- **Resolution:** Wrote a Python auto-alignment script to reformat all
+  tables with consistent pipe positions. Also fixed one MD040
+  (fenced-code-block-language) violation in hospital-dashboard README.
+  CI Gate 2 invokes markdownlint via `nvm use 20` to ensure Node 20
+  compatibility.
+- **Guideline:** When authoring Markdown tables, align pipe characters
+  so every row has the same column widths. Use Node 20+ for
+  markdownlint 0.48.0. Run `bash scripts/ci.sh --lint` after any
+  README edits.
+- **Date closed:** 2026-03-31
+
+---
+
+## INC-065: Docker BuildKit cache mount speeds up pip installs
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Phase 5 / Step 5.8
+- **Documents involved:** `docker/runtime-python.Dockerfile`,
+  `scripts/ci.sh`
+- **Description:** The Python runtime Dockerfile ran `pip install`
+  without caching, re-downloading all packages on every build even
+  when `requirements.txt` was unchanged. Docker Gate 7 was also
+  building images sequentially.
+- **Resolution:** Added `# syntax=docker/dockerfile:1` header and
+  `RUN --mount=type=cache,target=/root/.cache/pip` to
+  `runtime-python.Dockerfile`. Added `--parallel` flag to
+  `docker compose build` in ci.sh. Extended `--skip-build` flag to
+  also skip Gate 7.
+- **Guideline:** Always use BuildKit cache mounts for package manager
+  installs in Dockerfiles. Use `--parallel` for multi-image builds.
+- **Date closed:** 2026-03-31
+
+---
+
+## INC-066: Test timeout defaults reduced 60–80% without failures
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Phase 5 / Step 5.8
+- **Documents involved:** `tests/conftest.py`, multiple test files
+- **Description:** Default timeouts in conftest helpers were set
+  conservatively during initial development: `wait_for_discovery` 5 s,
+  `wait_for_data` 5 s, `wait_for_replier` 10 s, `wait_for_status`
+  and `wait_for_all_states` 15 s. These defaults dominated test wall
+  time in failure scenarios and were far above actual DDS latency
+  (~50–200 ms for intra-host discovery, ~10 ms for data delivery).
+  Reduced to: discovery 2 s, data 1 s, replier 3 s, status 5 s,
+  all_states 5 s. Also reduced `_terminate_proc` defaults from 10 s
+  to 3 s and `proc.wait()` timeouts to 3 s across service host tests.
+  Full suite (321 tests) passes at the lower defaults. Test wall time
+  dropped from ~33 s to ~29 s.
+- **Resolution:** Lowered all defaults in `conftest.py`. Removed
+  explicit `timeout_sec=10` overrides from `wait_for_discovery` in
+  pure DDS tests (9 files). Subprocess-hosted tests retain explicit
+  overrides where process startup requires more time.
+- **Guideline:** Set test timeouts to 2–5× the expected latency, not
+  10–50×. Pure DDS entity operations (discovery, data delivery) on
+  localhost complete in under 500 ms; 1–2 s defaults are sufficient.
+  Subprocess startup may need 3–5 s. Reserve 10+ s only for
+  multi-process orchestration scenarios.
+- **Date closed:** 2026-03-31
+
+---
+
+## INC-067: QueryCondition negative assertions replace sleep-based proofs
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Phase 5 / Step 5.8
+- **Documents involved:** `tests/integration/test_orchestration_e2e.py`
+- **Description:** The partition isolation negative test in
+  `test_best_effort_wildcard_coexistence` used `time.sleep(3)` followed
+  by `read_data()` to prove no data arrived. This wasted 3 s of wall
+  time per run and was not deterministic — it proved "no data arrived
+  within 3 s" rather than "no data was deliverable."
+- **Resolution:** Replaced with `dds.QueryCondition` filtering on the
+  expected key field (`host_id = 'partition-test-host'`) combined with
+  `assert not wait_for_data(reader, timeout_sec=1, conditions=...)`.
+  This is faster (1 s worst-case) and semantically clearer: if the
+  condition triggers, partition isolation is broken.
+- **Guideline:** For negative data assertions ("this reader should NOT
+  receive data"), use a `QueryCondition` with `wait_for_data()` and
+  assert it returns `False`. Avoid `time.sleep()` + `read_data()`.
+- **Date closed:** 2026-03-31
+
+---
+
+## INC-068: sed bulk edits require black auto-format pass
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Phase 5 / Step 5.8
+- **Documents involved:** Multiple test files under `tests/integration/`
+- **Description:** Using `sed -i` to bulk-remove `timeout_sec=10` from
+  `wait_for_discovery()` calls across 9 test files left trailing
+  formatting artifacts (extra line breaks, misaligned arguments) that
+  violated black's formatting rules. Gate 1 caught 5 files with
+  violations.
+- **Resolution:** Ran `black .` after the sed pass to auto-fix all
+  formatting. All 5 files reformatted cleanly.
+- **Guideline:** After any `sed`-based bulk edit, always run
+  `black .` (and `isort .` if imports were affected) before
+  committing. Prefer `bash scripts/ci.sh --lint` as a quick check.
+- **Date closed:** 2026-03-31
+
+---
+
+## INC-069: Root README.md excluded from markdownlint CI gate
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Phase 5 / Step 5.8
+- **Documents involved:** `scripts/ci.sh`, `README.md`
+- **Description:** CI Gate 2 (markdownlint) only linted READMEs under
+  `modules/` and `services/`. The root `README.md` was excluded,
+  allowing MD060 table alignment violations to accumulate undetected.
+- **Resolution:** Updated Gate 2 in `ci.sh` to include `README.md` in
+  the glob pattern alongside `modules/*/README.md` and
+  `services/*/README.md`. Fixed MD060 violations in the root README.
+  Updated gate label to "Markdown lint (project + module READMEs)".
+- **Guideline:** Any README that is part of the project documentation
+  surface should be included in the markdownlint CI gate.
+- **Date closed:** 2026-03-31

@@ -1,6 +1,6 @@
 ---
 description: "Use when implementing the medtech suite project — writing code, building modules, creating IDL/XML/Docker/CMake files, running tests, and executing the phased implementation plan. Implementation-mode agent for building from completed design docs."
-tools: [read, edit, execute, search, web, todo, rti-chatbot-mcp/*]
+tools: [execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/runTask, execute/createAndRunTask, execute/runNotebookCell, execute/testFailure, execute/runTests, execute/runInTerminal, read/terminalSelection, read/terminalLastCommand, read/getTaskOutput, read/getNotebookSummary, read/problems, read/readFile, read/viewImage, read/readNotebookCellOutput, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/searchSubagent, search/usages, web/fetch, web/githubRepo, rti-chatbot-mcp/*, rti.connext-vc-copilot/*, todo]
 ---
 
 You are the **Medtech Suite Implementer** — an implementation-mode agent that

@@ -242,7 +242,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ---
 
-## Step 5.7 — End-to-End Orchestration Integration
+## Step 5.7 — End-to-End Orchestration Integration ✅ `00da821`
 
 ### Work
 
@@ -290,7 +290,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ---
 
-## Step 5.8 — Documentation & Performance Baseline
+## Step 5.8 — Documentation & Performance Baseline (in progress)
 
 ### Work
 
@@ -306,10 +306,10 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Test Gate
 
-- [ ] All module READMEs pass `markdownlint` and section-order lint
+- [x] All module READMEs pass `markdownlint` and section-order lint
 - [ ] `tests/performance/baselines/phase-5.json` committed
 - [ ] No performance regression against Phase 2 baseline (within defined thresholds)
-- [ ] `bash scripts/ci.sh` passes — all 12 quality gates green
+- [x] `bash scripts/ci.sh` passes — all 12 quality gates green
 
 ---
 

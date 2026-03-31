@@ -384,9 +384,6 @@ class TestTransientLocalReconstruction:
             Orchestration.ServiceState.RUNNING,
         )
 
-        # Allow time for samples to settle
-        time.sleep(1)
-
         # Create a NEW controller (simulates restart)
         # Use programmatic readers since we need fresh ones
         sub = dds.Subscriber(orch_participant)
@@ -416,7 +413,7 @@ class TestTransientLocalReconstruction:
             status_reader=st_reader,
         )
         try:
-            deadline = time.time() + 15
+            deadline = time.time() + 5
             found_host = False
             found_status = False
             while time.time() < deadline:
@@ -429,8 +426,8 @@ class TestTransientLocalReconstruction:
                 if found_host and found_status:
                     break
 
-            assert found_host, "Controller did not receive ServiceCatalog within 15 s"
-            assert found_status, "Controller did not receive ServiceStatus within 15 s"
+            assert found_host, "Controller did not receive ServiceCatalog within 5 s"
+            assert found_status, "Controller did not receive ServiceStatus within 5 s"
         finally:
             controller.close_dds()
             cat_reader.close()

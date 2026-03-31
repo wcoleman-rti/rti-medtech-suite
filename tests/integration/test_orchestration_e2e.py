@@ -109,7 +109,7 @@ def _start_robot_host(host_id):
     )
 
 
-def _terminate_proc(proc, timeout=10):
+def _terminate_proc(proc, timeout=3):
     """Send SIGTERM and wait, then SIGKILL if needed."""
     if proc.poll() is not None:
         return
@@ -121,7 +121,7 @@ def _terminate_proc(proc, timeout=10):
         proc.wait()
 
 
-def _wait_for_catalog(host_ids, timeout=20):
+def _wait_for_catalog(host_ids, timeout=5):
     """Wait until ServiceCatalog samples from all host_ids appear."""
     qos = dds.DomainParticipantQos()
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
@@ -147,9 +147,9 @@ def _wait_for_catalog(host_ids, timeout=20):
                 ws.wait(dds.Duration(int(remaining), 0))
             except dds.TimeoutError:
                 pass
-            for sample in reader.read():
-                if sample.info.valid and sample.data.host_id in remaining_hosts:
-                    remaining_hosts.discard(sample.data.host_id)
+            for sample in reader.read_data():
+                if sample.host_id in remaining_hosts:
+                    remaining_hosts.discard(sample.host_id)
             if remaining_hosts:
                 time.sleep(0.1)
     finally:
@@ -180,14 +180,14 @@ def all_service_hosts():
     # Verify all started
     time.sleep(1)
     for hid, proc in procs.items():
-        assert proc.poll() is None, (
-            f"{hid} exited immediately with code {proc.returncode}"
-        )
+        assert (
+            proc.poll() is None
+        ), f"{hid} exited immediately with code {proc.returncode}"
 
     # Wait for all to publish ServiceCatalog
-    assert _wait_for_catalog(ALL_HOST_IDS, timeout=20), (
-        "Not all Service Hosts published ServiceCatalog within 20 s"
-    )
+    assert _wait_for_catalog(
+        ALL_HOST_IDS, timeout=20
+    ), "Not all Service Hosts published ServiceCatalog within 20 s"
 
     yield procs
 
@@ -259,9 +259,9 @@ class TestMultiHostDiscovery:
         deadline = time.monotonic() + 15.0
         discovered_hosts: set[str] = set()
         while time.monotonic() < deadline:
-            for sample in catalog_reader.read():
-                if sample.info.valid and sample.data.host_id in ALL_HOST_IDS:
-                    discovered_hosts.add(sample.data.host_id)
+            for sample in catalog_reader.read_data():
+                if sample.host_id in ALL_HOST_IDS:
+                    discovered_hosts.add(sample.host_id)
             if discovered_hosts >= set(ALL_HOST_IDS):
                 break
             time.sleep(0.2)
@@ -271,21 +271,18 @@ class TestMultiHostDiscovery:
     def test_all_services_registered(self, all_service_hosts, catalog_reader):
         """Each host advertises the correct services in its catalog."""
         # Read all available samples (filter to E2E hosts only)
-        all_samples = catalog_reader.read()
-        valid = [
-            s for s in all_samples
-            if s.info.valid and s.data.host_id in ALL_HOST_IDS
-        ]
+        all_samples = catalog_reader.read_data()
+        valid = [s for s in all_samples if s.host_id in ALL_HOST_IDS]
         catalog_map: dict[str, set[str]] = {}
         for s in valid:
-            catalog_map.setdefault(s.data.host_id, set()).add(s.data.service_id)
+            catalog_map.setdefault(s.host_id, set()).add(s.service_id)
 
         for hid, expected_services in ALL_SERVICES.items():
             assert hid in catalog_map, f"No catalog entries for {hid}"
             for svc_id in expected_services:
-                assert svc_id in catalog_map[hid], (
-                    f"Service {svc_id} not advertised by {hid}"
-                )
+                assert (
+                    svc_id in catalog_map[hid]
+                ), f"Service {svc_id} not advertised by {hid}"
 
 
 # ---------------------------------------------------------------------------
@@ -296,25 +293,26 @@ class TestMultiHostDiscovery:
 class TestFullLifecycle:
     """Scenario: Start services on each host → RUNNING → stop → STOPPED."""
 
-    def test_start_all_services(self, all_service_hosts, orch_participant,
-                                 status_reader):
+    def test_start_all_services(
+        self, all_service_hosts, orch_participant, status_reader
+    ):
         """Start all services on all hosts via RPC and reach RUNNING."""
         for hid, service_ids in ALL_SERVICES.items():
             req = _make_requester(orch_participant, hid)
             try:
-                assert wait_for_replier(req, timeout_sec=15), (
-                    f"RPC requester did not discover replier for {hid}"
-                )
+                assert wait_for_replier(
+                    req, timeout_sec=15
+                ), f"RPC requester did not discover replier for {hid}"
                 for svc_id in service_ids:
                     call = make_start_call(svc_id)
                     reply = send_rpc(req, call)
-                    assert reply is not None, (
-                        f"No reply for start_service {svc_id} on {hid}"
-                    )
+                    assert (
+                        reply is not None
+                    ), f"No reply for start_service {svc_id} on {hid}"
                     result = reply.start_service.result.return_
-                    assert result.code == Orchestration.OperationResultCode.OK, (
-                        f"start_service {svc_id} on {hid} failed: {result.message}"
-                    )
+                    assert (
+                        result.code == Orchestration.OperationResultCode.OK
+                    ), f"start_service {svc_id} on {hid} failed: {result.message}"
             finally:
                 req.close()
 
@@ -327,25 +325,26 @@ class TestFullLifecycle:
         missed = wait_for_all_states(status_reader, expected, timeout_sec=20)
         assert not missed, f"Services did not reach RUNNING: {missed}"
 
-    def test_stop_all_services(self, all_service_hosts, orch_participant,
-                                status_reader):
+    def test_stop_all_services(
+        self, all_service_hosts, orch_participant, status_reader
+    ):
         """Stop all services on all hosts via RPC and reach STOPPED."""
         for hid, service_ids in ALL_SERVICES.items():
             req = _make_requester(orch_participant, hid)
             try:
-                assert wait_for_replier(req, timeout_sec=10), (
-                    f"RPC requester did not discover replier for {hid}"
-                )
+                assert wait_for_replier(
+                    req, timeout_sec=10
+                ), f"RPC requester did not discover replier for {hid}"
                 for svc_id in service_ids:
                     call = make_stop_call(svc_id)
                     reply = send_rpc(req, call)
-                    assert reply is not None, (
-                        f"No reply for stop_service {svc_id} on {hid}"
-                    )
+                    assert (
+                        reply is not None
+                    ), f"No reply for stop_service {svc_id} on {hid}"
                     result = reply.stop_service.result.return_
-                    assert result.code == Orchestration.OperationResultCode.OK, (
-                        f"stop_service {svc_id} on {hid} failed: {result.message}"
-                    )
+                    assert (
+                        result.code == Orchestration.OperationResultCode.OK
+                    ), f"stop_service {svc_id} on {hid} failed: {result.message}"
             finally:
                 req.close()
 
@@ -375,14 +374,10 @@ class TestLivelinessDetection:
         # Create the monitoring reader FIRST, before starting the host,
         # so we are guaranteed to discover and match the host's writer.
         qos = dds.DomainParticipantQos()
-        qos.property[
-            "dds.transport.UDPv4.builtin.parent.message_size_max"
-        ] = "1400"
+        qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
         dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
         dp.enable()
-        topic = dds.Topic(
-            dp, "ServiceCatalog", Orchestration.ServiceCatalog
-        )
+        topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
         rqos = dds.DataReaderQos()
         rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
         rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
@@ -391,20 +386,15 @@ class TestLivelinessDetection:
         reader = dds.DataReader(dds.Subscriber(dp), topic, rqos)
 
         # Start a dedicated host for this destructive test
-        proc = _start_python_host(
-            "surgical_procedure.operator_service_host", host_id
-        )
+        proc = _start_python_host("surgical_procedure.operator_service_host", host_id)
         try:
             # Wait until we receive ServiceCatalog data from THIS host
             # (not just any host on the domain).
             deadline = time.monotonic() + 15.0
             found = False
             while time.monotonic() < deadline and not found:
-                for sample in reader.take():
-                    if (
-                        sample.info.valid
-                        and sample.data.host_id == host_id
-                    ):
+                for sample in reader.take_data():
+                    if sample.host_id == host_id:
                         found = True
                         break
                 if not found:
@@ -437,9 +427,7 @@ class TestLivelinessDetection:
                     detected = True
                     break
 
-            assert detected, (
-                "Liveliness loss not detected within 10 s after host kill"
-            )
+            assert detected, "Liveliness loss not detected within 10 s after host kill"
         finally:
             dp.close()
             if proc.poll() is None:
@@ -454,9 +442,7 @@ class TestLivelinessDetection:
 class TestOrchestrationFailureIsolation:
     """Scenario: Orchestration failure does not disrupt surgical data."""
 
-    def test_procedure_data_unaffected_by_controller_crash(
-        self, all_service_hosts
-    ):
+    def test_procedure_data_unaffected_by_controller_crash(self, all_service_hosts):
         """When a simulated Procedure Controller crashes, Procedure domain
         data continues flowing.
 
@@ -466,9 +452,9 @@ class TestOrchestrationFailureIsolation:
         """
         # Create a mock controller participant on the Orchestration domain
         ctrl_qos = dds.DomainParticipantQos()
-        ctrl_qos.property[
-            "dds.transport.UDPv4.builtin.parent.message_size_max"
-        ] = "1400"
+        ctrl_qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = (
+            "1400"
+        )
         ctrl_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, ctrl_qos)
         ctrl_dp.enable()
 
@@ -481,9 +467,7 @@ class TestOrchestrationFailureIsolation:
         proc_dp = dds.DomainParticipant(PROCEDURE_DOMAIN_ID, proc_qos)
         proc_dp.enable()
 
-        topic = dds.Topic(
-            proc_dp, "RobotState", surgery.Surgery.RobotState
-        )
+        topic = dds.Topic(proc_dp, "RobotState", surgery.Surgery.RobotState)
         wqos = dds.DataWriterQos()
         wqos.reliability.kind = dds.ReliabilityKind.RELIABLE
         writer = dds.DataWriter(dds.Publisher(proc_dp), topic, wqos)
@@ -510,12 +494,12 @@ class TestOrchestrationFailureIsolation:
 
         # Verify Procedure domain still works
         time.sleep(0.5)
-        assert writer.publication_matched_status.current_count > 0, (
-            "Procedure domain writer lost match after orchestration crash"
-        )
-        assert reader.subscription_matched_status.current_count > 0, (
-            "Procedure domain reader lost match after orchestration crash"
-        )
+        assert (
+            writer.publication_matched_status.current_count > 0
+        ), "Procedure domain writer lost match after orchestration crash"
+        assert (
+            reader.subscription_matched_status.current_count > 0
+        ), "Procedure domain reader lost match after orchestration crash"
 
         proc_dp.close()
 
@@ -544,35 +528,28 @@ class TestPartitionIsolation:
             stderr=subprocess.STDOUT,
         )
         try:
-            assert _wait_for_catalog(["partition-test-host"], timeout=15), (
-                "Partition test host did not publish catalog"
-            )
+            assert _wait_for_catalog(
+                ["partition-test-host"], timeout=15
+            ), "Partition test host did not publish catalog"
 
             # Create a reader on OR-3 partition
             qos = dds.DomainParticipantQos()
-            qos.property[
-                "dds.transport.UDPv4.builtin.parent.message_size_max"
-            ] = "1400"
+            qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
             qos.partition.name = ["room/OR-3"]
             dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
             dp.enable()
-            topic = dds.Topic(
-                dp, "ServiceCatalog", Orchestration.ServiceCatalog
-            )
+            topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
             rqos = dds.DataReaderQos()
             rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
             rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
             reader = dds.DataReader(dds.Subscriber(dp), topic, rqos)
 
-            # Wait briefly and verify no data from OR-1
-            time.sleep(3)
-            samples = reader.read()
-            or1_samples = [
-                s
-                for s in samples
-                if s.info.valid and s.data.host_id == "partition-test-host"
-            ]
-            assert len(or1_samples) == 0, (
+            # Verify no data from OR-1 using negative wait
+            cond = dds.QueryCondition(
+                dds.Query(reader, "host_id = 'partition-test-host'"),
+                dds.DataState.any_data,
+            )
+            assert not wait_for_data(reader, timeout_sec=1, conditions=[(cond, 1)]), (
                 "OR-3 controller received ServiceCatalog from OR-1 host — "
                 "partition isolation is broken"
             )
@@ -599,28 +576,22 @@ class TestStateReconstruction:
         dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
         dp.enable()
 
-        cat_topic = dds.Topic(
-            dp, "ServiceCatalog", Orchestration.ServiceCatalog
-        )
+        cat_topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
         rqos = dds.DataReaderQos()
         rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
         rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
         cat_reader = dds.DataReader(dds.Subscriber(dp), cat_topic, rqos)
 
-        status_topic = dds.Topic(
-            dp, "ServiceStatus", Orchestration.ServiceStatus
-        )
+        status_topic = dds.Topic(dp, "ServiceStatus", Orchestration.ServiceStatus)
         status_reader = dds.DataReader(dds.Subscriber(dp), status_topic, rqos)
 
         # Wait for TRANSIENT_LOCAL delivery
-        cat_samples = wait_for_data(cat_reader, timeout_sec=15, count=1)
-        assert len(cat_samples) >= 1, (
-            "Late-joining reader did not receive ServiceCatalog"
-        )
+        assert wait_for_data(
+            cat_reader, timeout_sec=15, count=1
+        ), "Late-joining reader did not receive ServiceCatalog"
 
-        status_samples = wait_for_data(status_reader, timeout_sec=15, count=1)
-        assert len(status_samples) >= 1, (
-            "Late-joining reader did not receive ServiceStatus"
-        )
+        assert wait_for_data(
+            status_reader, timeout_sec=15, count=1
+        ), "Late-joining reader did not receive ServiceStatus"
 
         dp.close()

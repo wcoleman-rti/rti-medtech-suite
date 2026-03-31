@@ -65,7 +65,7 @@ ruff check $PY_DIRS 2>&1 | tail -3 || fail "ruff lint violations"
 pass
 
 # ─── Gate 2: Markdown lint ────────────────────────────────────────
-gate "Markdown lint (module/service READMEs)"
+gate "Markdown lint (project + module/service READMEs)"
 
 MDLINT=""
 if command -v markdownlint >/dev/null 2>&1; then
@@ -75,8 +75,13 @@ elif [ -x /tmp/mdlint/node_modules/.bin/markdownlint ]; then
 fi
 
 readme_files=$(find modules/ services/ -maxdepth 2 -name "README.md" 2>/dev/null || true)
+# Include the project-root README as well
+if [ -f README.md ]; then
+    readme_files="README.md${readme_files:+
+$readme_files}"
+fi
 if [ -z "$readme_files" ]; then
-    echo "  No module/service READMEs found — skipping markdownlint."
+    echo "  No READMEs found — skipping markdownlint."
     pass
 elif [ -z "$MDLINT" ]; then
     echo "  WARNING: markdownlint not found — skipping."
@@ -222,8 +227,11 @@ fi
 
 # ─── Gate 7: Docker multi-stage build ─────────────────────────────
 gate "Docker multi-stage build"
-if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    docker compose --profile build build 2>&1 | tail -5 \
+if [ "$SKIP_BUILD" = true ]; then
+    echo "  (skipped via --skip-build)"
+    pass
+elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    docker compose --profile build build --parallel 2>&1 | tail -5 \
         || fail "docker compose build failed"
     pass
 else

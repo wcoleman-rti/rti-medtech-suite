@@ -65,19 +65,18 @@ class TestTransientLocalLateJoiner:
         rqos.history.depth = 1
 
         r = reader_factory(p2, topic2, qos=rqos)
-        assert wait_for_discovery(w, r, timeout_sec=10)
+        assert wait_for_discovery(w, r)
         try:
             r.wait_for_historical_data(dds.Duration(5))
         except dds.TimeoutError:
             pass
 
-        received = r.take()
-        valid = [s for s in received if s.info.valid]
+        valid = r.take_data()
         assert (
             len(valid) == 1
         ), f"Late joiner should receive exactly 1 sample, got {len(valid)}"
-        assert valid[0].data.procedure_id == "proc-001"
-        assert valid[0].data.room == "OR-5", "Should receive the most recent sample"
+        assert valid[0].procedure_id == "proc-001"
+        assert valid[0].room == "OR-5", "Should receive the most recent sample"
 
 
 class TestVolatileNoHistory:
@@ -119,11 +118,10 @@ class TestVolatileNoHistory:
         rqos.durability.kind = dds.DurabilityKind.VOLATILE
 
         r = reader_factory(p2, topic2, qos=rqos)
-        assert wait_for_discovery(w, r, timeout_sec=10)
+        assert wait_for_discovery(w, r)
         time.sleep(0.5)
 
-        received = r.read()
-        valid = [s for s in received if s.info.valid]
+        valid = r.read_data()
         assert (
             len(valid) == 0
         ), "VOLATILE late joiner should receive no historical samples"
@@ -151,13 +149,14 @@ class TestVolatileNoHistory:
 
         w = writer_factory(p1, topic1, qos=wqos)
         r = reader_factory(p2, topic2, qos=rqos)
-        assert wait_for_discovery(w, r, timeout_sec=10)
+        assert wait_for_discovery(w, r)
 
         sample = RobotCommand()
         sample.command_id = 99
         sample.robot_id = "robot-1"
         w.write(sample)
 
-        received = wait_for_data(r, timeout_sec=5)
-        assert len(received) >= 1, "Should receive samples published after join"
-        assert received[0].data.command_id == 99
+        assert wait_for_data(
+            r, timeout_sec=5
+        ), "Should receive samples published after join"
+        assert r.take_data()[0].command_id == 99

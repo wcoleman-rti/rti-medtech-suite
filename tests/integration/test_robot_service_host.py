@@ -15,7 +15,6 @@ Tests that the Robot Service Host:
 import os
 import signal
 import subprocess
-import time
 
 import pytest
 import rti.connextdds as dds
@@ -107,7 +106,7 @@ def robot_service_host():
     yield proc
     proc.send_signal(signal.SIGTERM)
     try:
-        proc.wait(timeout=5)
+        proc.wait(timeout=3)
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
@@ -182,16 +181,16 @@ class TestServiceCatalog:
     def test_service_catalog_published(self, robot_service_host, catalog_reader):
         """Robot Service Host publishes ServiceCatalog with correct host_id
         and service_id."""
-        samples = wait_for_data(catalog_reader, timeout_sec=15)
-        assert len(samples) >= 1, "No ServiceCatalog samples received"
+        assert wait_for_data(
+            catalog_reader, timeout_sec=15
+        ), "No ServiceCatalog samples received"
         matching = [
             s
-            for s in samples
-            if s.data.host_id == HOST_ID
-            and s.data.service_id == "RobotControllerService"
+            for s in catalog_reader.take_data()
+            if s.host_id == HOST_ID and s.service_id == "RobotControllerService"
         ]
         assert matching, f"No ServiceCatalog for {HOST_ID}/RobotControllerService"
-        catalog = matching[0].data
+        catalog = matching[0]
         assert catalog.display_name == "Robot Controller"
 
     def test_service_catalog_transient_local(
@@ -209,14 +208,12 @@ class TestServiceCatalog:
         late_reader = dds.DataReader(sub, topic, rqos)
         try:
             samples = wait_for_data(late_reader, timeout_sec=10)
-            assert (
-                len(samples) >= 1
-            ), "Late-joining reader did not receive ServiceCatalog"
-            matching = [s for s in samples if s.data.host_id == HOST_ID]
+            assert samples, "Late-joining reader did not receive ServiceCatalog"
+            matching = [s for s in late_reader.take_data() if s.host_id == HOST_ID]
             assert (
                 matching
             ), f"Late-joining reader did not receive ServiceCatalog for {HOST_ID}"
-            assert matching[0].data.host_id == HOST_ID
+            assert matching[0].host_id == HOST_ID
         finally:
             late_reader.close()
 
@@ -226,11 +223,12 @@ class TestServiceStatus:
 
     def test_initial_status_stopped(self, robot_service_host, status_reader):
         """Robot Service Host publishes initial ServiceStatus with STOPPED."""
-        samples = wait_for_data(status_reader, timeout_sec=15)
-        assert len(samples) >= 1, "No ServiceStatus samples received"
-        matching = [s for s in samples if s.data.host_id == HOST_ID]
+        assert wait_for_data(
+            status_reader, timeout_sec=15
+        ), "No ServiceStatus samples received"
+        matching = [s for s in status_reader.take_data() if s.host_id == HOST_ID]
         assert matching, f"No ServiceStatus for {HOST_ID}"
-        status = matching[0].data
+        status = matching[0]
         assert status.state == Orchestration.ServiceState.STOPPED
 
 
@@ -355,12 +353,9 @@ class TestDomainIsolation:
             rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
             reader = dds.DataReader(sub, topic, rqos)
 
-            # Wait briefly — should get nothing
-            time.sleep(0.5)
-            samples = reader.read()
-            valid = [s for s in samples if s.info.valid]
-            assert (
-                len(valid) == 0
+            # Should receive nothing — domains are isolated
+            assert not wait_for_data(
+                reader, timeout_sec=1
             ), "Procedure domain received ServiceCatalog — isolation broken"
             reader.close()
         finally:

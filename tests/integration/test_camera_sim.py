@@ -157,10 +157,10 @@ class TestCameraServiceIntegration:
 
         # Wait for delivery (best-effort — some may be lost)
         _wait_data_available(frame_reader)
-        samples = [s for s in frame_reader.take() if s.info.valid]
+        samples = frame_reader.take_data()
         assert len(samples) >= 1, "No CameraFrame samples received"
 
-        sample = samples[-1].data
+        sample = samples[-1]
         assert sample.camera_id == "cam-int-1"
         assert sample.frame_id.startswith("cam-int-1-")
         assert sample.format == "jpeg"
@@ -185,9 +185,7 @@ class TestCameraServiceIntegration:
         for i in range(frame_count):
             camera.tick()
             # Drain reader periodically to avoid overwriting history
-            for s in frame_reader.take():
-                if s.info.valid:
-                    received.append(s.data)
+            received.extend(frame_reader.take_data())
             elapsed = time.monotonic() - start
             next_tick = (i + 1) * interval
             sleep_time = next_tick - elapsed
@@ -200,9 +198,7 @@ class TestCameraServiceIntegration:
 
         # Final drain
         time.sleep(0.2)
-        for s in frame_reader.take():
-            if s.info.valid:
-                received.append(s.data)
+        received.extend(frame_reader.take_data())
 
         # Best-effort on localhost — should get most frames
         assert (

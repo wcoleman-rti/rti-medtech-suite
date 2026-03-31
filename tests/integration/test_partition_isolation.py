@@ -45,7 +45,7 @@ class TestSamePartition:
         r = reader_factory(p2, topic2)
 
         assert wait_for_discovery(
-            w, r, timeout_sec=10
+            w, r
         ), "Same-partition endpoints should discover each other"
 
     def test_same_partition_exchanges_data(
@@ -64,14 +64,14 @@ class TestSamePartition:
         w = writer_factory(p1, topic1)
         r = reader_factory(p2, topic2)
 
-        assert wait_for_discovery(w, r, timeout_sec=10)
+        assert wait_for_discovery(w, r)
 
         w.write(_make_vitals("patient-001", 72))
 
-        received = wait_for_data(r, timeout_sec=5)
-        assert len(received) >= 1, "Should receive data in same partition"
-        assert received[0].data.patient_id == "patient-001"
-        assert received[0].data.heart_rate == 72
+        assert wait_for_data(r, timeout_sec=5), "Should receive data in same partition"
+        data = r.take_data()[0]
+        assert data.patient_id == "patient-001"
+        assert data.heart_rate == 72
 
 
 class TestDifferentPartitions:
@@ -129,8 +129,7 @@ class TestDifferentPartitions:
         w.write(_make_vitals("patient-001", 99))
 
         time.sleep(0.5)
-        received = r.read()
-        valid = [s for s in received if s.info.valid]
+        valid = r.read_data()
         assert len(valid) == 0, "No data should cross partition boundary"
 
 
@@ -164,13 +163,26 @@ class TestWildcardPartition:
         w2 = writer_factory(p2, topic2)
         r = reader_factory(p_agg, topic_agg)
 
-        assert wait_for_discovery(w1, r, timeout_sec=10), "Wildcard should match OR-3"
-        assert wait_for_discovery(w2, r, timeout_sec=10), "Wildcard should match OR-5"
+        assert wait_for_discovery(w1, r), "Wildcard should match OR-3"
+        assert wait_for_discovery(w2, r), "Wildcard should match OR-5"
 
-        w1.write(_make_vitals("from-OR-3", 1))
-        w2.write(_make_vitals("from-OR-5", 2))
+        # QueryConditions — one per expected source key.  Both must be
+        # satisfied for the test to pass.  Best-effort delivery may drop
+        # individual samples, so we write a burst per writer.
+        cond_or3 = dds.QueryCondition(
+            dds.Query(r, "patient_id = 'from-OR-3'"),
+            dds.DataState.new_data,
+        )
+        cond_or5 = dds.QueryCondition(
+            dds.Query(r, "patient_id = 'from-OR-5'"),
+            dds.DataState.new_data,
+        )
 
-        received = wait_for_data(r, timeout_sec=5, count=2)
-        ids = {s.data.patient_id for s in received}
-        assert "from-OR-3" in ids, "Should receive from OR-3"
-        assert "from-OR-5" in ids, "Should receive from OR-5"
+        burst = 5
+        for i in range(burst):
+            w1.write(_make_vitals("from-OR-3", i))
+            w2.write(_make_vitals("from-OR-5", i))
+
+        assert wait_for_data(
+            r, timeout_sec=5, conditions=[(cond_or3, 1), (cond_or5, 1)]
+        ), "Should receive from both OR-3 and OR-5"

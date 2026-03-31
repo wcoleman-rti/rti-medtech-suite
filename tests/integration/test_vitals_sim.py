@@ -497,10 +497,10 @@ class TestBedsideMonitorServiceIntegration:
         monitor.tick_vitals()
 
         _wait_data_available(vitals_reader)
-        samples = [s for s in vitals_reader.take() if s.info.valid]
+        samples = vitals_reader.take_data()
         assert len(samples) >= 1, "No vitals samples received"
 
-        sample = samples[-1].data
+        sample = samples[-1]
         assert sample.patient_id == "p1"
         assert 30 <= sample.heart_rate <= 220
         assert 50 <= sample.spo2 <= 100
@@ -523,13 +523,13 @@ class TestBedsideMonitorServiceIntegration:
         while time.monotonic() < deadline:
             monitor.tick_waveform()
             _wait_data_available(waveform_reader, timeout_sec=0.5)
-            samples = [s for s in waveform_reader.take() if s.info.valid]
+            samples = waveform_reader.take_data()
             if samples:
                 break
 
         assert len(samples) >= 1, "No waveform samples received"
 
-        sample = samples[-1].data
+        sample = samples[-1]
         assert sample.patient_id == "p1"
         assert sample.waveform_kind == WaveformKind.ECG
         assert len(sample.samples) == 10  # 10-sample blocks
@@ -569,7 +569,7 @@ class TestBedsideMonitorServiceIntegration:
         except dds.TimeoutError:
             pass
 
-        received = [s.data for s in reader.take() if s.info.valid]
+        received = reader.take_data()
 
         dp.close()
         assert len(received) >= 1, "Late joiner did not receive TRANSIENT_LOCAL vitals"
@@ -587,11 +587,11 @@ class TestBedsideMonitorServiceIntegration:
         monitor.tick_vitals()
 
         _wait_data_available(alarm_reader)
-        samples = [s for s in alarm_reader.take() if s.info.valid]
+        samples = alarm_reader.take_data()
         hr_active = [
-            s.data
+            s
             for s in samples
-            if s.data.alarm_code == "HR_HIGH" and s.data.state == AlarmState.ACTIVE
+            if s.alarm_code == "HR_HIGH" and s.state == AlarmState.ACTIVE
         ]
         assert len(hr_active) >= 1, "HR_HIGH alarm was not published"
 
@@ -599,10 +599,8 @@ class TestBedsideMonitorServiceIntegration:
         alarm_reader.take()  # drain
         monitor.tick_vitals()  # still high HR
         _wait_data_available(alarm_reader, timeout_sec=0.3)
-        stable_samples = [s for s in alarm_reader.take() if s.info.valid]
-        stable_hr_alarms = [
-            s.data for s in stable_samples if s.data.alarm_code == "HR_HIGH"
-        ]
+        stable_samples = alarm_reader.take_data()
+        stable_hr_alarms = [s for s in stable_samples if s.alarm_code == "HR_HIGH"]
         # No new transitions while alarm state is unchanged
         assert len(stable_hr_alarms) == 0, "Alarm re-published without state transition"
 
@@ -612,10 +610,10 @@ class TestBedsideMonitorServiceIntegration:
         monitor.tick_vitals()
 
         _wait_data_available(alarm_reader)
-        cleared_samples = [s for s in alarm_reader.take() if s.info.valid]
+        cleared_samples = alarm_reader.take_data()
         hr_cleared = [
-            s.data
+            s
             for s in cleared_samples
-            if s.data.alarm_code == "HR_HIGH" and s.data.state == AlarmState.CLEARED
+            if s.alarm_code == "HR_HIGH" and s.state == AlarmState.CLEARED
         ]
         assert len(hr_cleared) >= 1, "HR_HIGH alarm clear was not published"

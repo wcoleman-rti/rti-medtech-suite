@@ -180,7 +180,7 @@ def _to_duration(timeout_sec):
     return dds.Duration(sec, nanosec)
 
 
-def wait_for_discovery(writer, reader, timeout_sec=5.0):
+def wait_for_discovery(writer, reader, timeout_sec=2.0):
     """Wait until a writer and reader have discovered each other.
 
     Uses StatusCondition + WaitSet for event-driven wakeup instead of
@@ -218,7 +218,7 @@ def wait_for_discovery(writer, reader, timeout_sec=5.0):
             return discovered()
 
 
-def wait_for_reader_match(reader, timeout_sec=5.0):
+def wait_for_reader_match(reader, timeout_sec=2.0):
     """Wait until a reader has at least one matched publication.
 
     Uses StatusCondition + WaitSet for event-driven wakeup.
@@ -247,43 +247,69 @@ def wait_for_reader_match(reader, timeout_sec=5.0):
             return reader.subscription_matched_status.current_count > 0
 
 
-def wait_for_data(reader, timeout_sec=5.0, count=1):
-    """Wait until reader has at least ``count`` unread valid samples.
+def wait_for_data(reader, timeout_sec=1.0, count=1, conditions=None):
+    """Wait until data conditions are satisfied on the reader.
 
-    Uses a ReadCondition(NOT_READ, ANY, ALIVE) + WaitSet so the wait
-    only triggers when genuinely new, alive data arrives — avoiding
-    spurious wakeups from lifecycle events or already-read samples.
+    When ``conditions`` is None (default), creates a single ReadCondition
+    for NOT_READ + ALIVE data and waits for ``count`` matching samples.
+
+    When ``conditions`` is provided, it must be a list of
+    ``(condition, required_count)`` tuples.  Each condition is attached
+    to a shared WaitSet and must accumulate ``required_count`` read hits
+    before the deadline.  Satisfied conditions are detached from the
+    WaitSet to reduce noise.
+
+    In both modes the function only calls ``read()`` — never ``take()`` —
+    so the caller can inspect or take data afterward.
+
+    Returns True if all conditions were satisfied, False otherwise.
     """
-    condition = dds.ReadCondition(
-        reader,
-        dds.DataState(
-            dds.SampleState.NOT_READ,
-            dds.ViewState.ANY,
-            dds.InstanceState.ALIVE,
-        ),
-    )
+    if conditions is None:
+        conditions = [
+            (
+                dds.ReadCondition(
+                    reader,
+                    dds.DataState(
+                        dds.SampleState.NOT_READ,
+                        dds.ViewState.ANY,
+                        dds.InstanceState.ALIVE,
+                    ),
+                ),
+                count,
+            )
+        ]
+
     waitset = dds.WaitSet()
-    waitset += condition
+    remaining = []  # list of [cond, needed]
+    for cond, needed in conditions:
+        waitset += cond
+        remaining.append([cond, needed])
 
     deadline = time.monotonic() + timeout_sec
-    collected = []
-    while len(collected) < count:
-        for sample in reader.select().condition(condition).read():
-            if sample.info.valid:
-                collected.append(sample)
-        if len(collected) >= count:
+    while remaining:
+        still_pending = []
+        for entry in remaining:
+            cond, needed = entry
+            hits = len(reader.select().condition(cond).read_data())
+            needed -= hits
+            if needed > 0:
+                still_pending.append([cond, needed])
+            else:
+                waitset -= cond
+        remaining = still_pending
+        if not remaining:
             break
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
+        left = deadline - time.monotonic()
+        if left <= 0:
             break
         try:
-            waitset.wait(_to_duration(remaining))
+            waitset.wait(_to_duration(left))
         except dds.TimeoutError:
             break
-    return collected
+    return len(remaining) == 0
 
 
-def wait_for_status(reader, host_id, service_id, target_state, timeout_sec=15.0):
+def wait_for_status(reader, host_id, service_id, target_state, timeout_sec=5.0):
     """Wait for a ServiceStatus sample matching host/service/state.
 
     Uses a ReadCondition(NOT_READ, ANY, ALIVE) + WaitSet to avoid
@@ -303,12 +329,11 @@ def wait_for_status(reader, host_id, service_id, target_state, timeout_sec=15.0)
 
     deadline = time.monotonic() + timeout_sec
     while True:
-        for sample in reader.select().condition(condition).take():
+        for sample in reader.select().condition(condition).take_data():
             if (
-                sample.info.valid
-                and sample.data.host_id == host_id
-                and sample.data.service_id == service_id
-                and sample.data.state == target_state
+                sample.host_id == host_id
+                and sample.service_id == service_id
+                and sample.state == target_state
             ):
                 return True
         remaining = deadline - time.monotonic()
@@ -320,7 +345,7 @@ def wait_for_status(reader, host_id, service_id, target_state, timeout_sec=15.0)
             return False
 
 
-def wait_for_all_states(reader, expected, timeout_sec=15.0):
+def wait_for_all_states(reader, expected, timeout_sec=5.0):
     """Wait for multiple (host_id, service_id) pairs to reach target states.
 
     ``expected`` is a dict mapping ``(host_id, service_id)`` tuples to the
@@ -345,11 +370,9 @@ def wait_for_all_states(reader, expected, timeout_sec=15.0):
 
     deadline = time.monotonic() + timeout_sec
     while remaining:
-        for sample in reader.select().condition(condition).take():
-            if not sample.info.valid:
-                continue
-            key = (sample.data.host_id, sample.data.service_id)
-            if key in remaining and sample.data.state == remaining[key]:
+        for sample in reader.select().condition(condition).take_data():
+            key = (sample.host_id, sample.service_id)
+            if key in remaining and sample.state == remaining[key]:
                 del remaining[key]
         if not remaining:
             break
@@ -363,7 +386,7 @@ def wait_for_all_states(reader, expected, timeout_sec=15.0):
     return set(remaining.keys())
 
 
-def wait_for_replier(requester, timeout_sec=10.0):
+def wait_for_replier(requester, timeout_sec=3.0):
     """Wait until the requester has matched at least one replier.
 
     Requester exposes no StatusCondition — poll at 50 ms.

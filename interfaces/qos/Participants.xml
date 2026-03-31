@@ -10,6 +10,10 @@
     <configuration_variables>
         <value>
             <element>
+                <name>MEDTECH_APP_NAME</name>
+                <value>medtech-app</value>
+            </element>
+            <element>
                 <name>MEDTECH_TRANSPORT_PROFILE</name>
                 <value>Default</value>
             </element>

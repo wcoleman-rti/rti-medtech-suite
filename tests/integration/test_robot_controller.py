@@ -57,7 +57,7 @@ class TestRobotStateQoS:
         writer = writer_factory(writer_p, topic_w, qos=writer_qos)
         reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
-        assert wait_for_discovery(writer, reader, timeout_sec=10)
+        assert wait_for_discovery(writer, reader)
 
         state = RobotState(
             robot_id="robot-001",
@@ -69,8 +69,8 @@ class TestRobotStateQoS:
         writer.write(state)
 
         received = wait_for_data(reader, timeout_sec=5)
-        assert len(received) >= 1
-        data = received[0].data
+        assert received
+        data = reader.take_data()[0]
         assert data.robot_id == "robot-001"
         assert len(data.joint_positions) == 7
         assert abs(data.joint_positions[0] - 0.1) < 1e-9
@@ -114,8 +114,8 @@ class TestRobotStateQoS:
         reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
         received = wait_for_data(reader, timeout_sec=5)
-        assert len(received) >= 1
-        assert received[0].data.robot_id == "robot-late"
+        assert received
+        assert reader.take_data()[0].robot_id == "robot-late"
 
 
 class TestOperatorInputQoS:
@@ -146,7 +146,7 @@ class TestOperatorInputQoS:
         writer = writer_factory(writer_p, topic_w, qos=w_qos)
         reader = reader_factory(reader_p, topic_r, qos=r_qos)
 
-        assert wait_for_discovery(writer, reader, timeout_sec=10)
+        assert wait_for_discovery(writer, reader)
 
         op_input = OperatorInput(
             operator_id="op-001",
@@ -164,16 +164,13 @@ class TestOperatorInputQoS:
         deadline = time.time() + 5.0
         received = []
         while time.time() < deadline:
-            samples = reader.take()
-            valid = [s for s in samples if s.info.valid]
-            if valid:
-                received = valid
+            received = reader.take_data()
+            if received:
                 break
             time.sleep(0.002)  # 2 ms poll — must beat 20 ms lifespan
         assert len(received) >= 1, "No OperatorInput received"
-        data = received[0].data
-        assert data.operator_id == "op-001"
-        assert abs(data.x_axis - 5.0) < 1e-9
+        assert received[0].operator_id == "op-001"
+        assert abs(received[0].x_axis - 5.0) < 1e-9
 
     def test_stale_operator_input_discarded_by_lifespan(
         self, participant_factory, writer_factory, reader_factory
@@ -204,7 +201,7 @@ class TestOperatorInputQoS:
         writer = writer_factory(writer_p, topic_w, qos=w_qos)
         reader = reader_factory(reader_p, topic_r, qos=r_qos)
 
-        assert wait_for_discovery(writer, reader, timeout_sec=10)
+        assert wait_for_discovery(writer, reader)
 
         op_input = OperatorInput(
             operator_id="op-stale",
@@ -217,8 +214,7 @@ class TestOperatorInputQoS:
         time.sleep(0.2)
 
         # Any samples should have expired — take() returns nothing valid
-        samples = reader.take()
-        valid = [s for s in samples if s.info.valid]
+        valid = reader.take_data()
         assert (
             len(valid) == 0
         ), f"Expected 0 valid samples after lifespan expiry, got {len(valid)}"
@@ -251,7 +247,7 @@ class TestSafetyInterlockQoS:
         writer = writer_factory(writer_p, topic_w, qos=w_qos)
         reader = reader_factory(reader_p, topic_r, qos=r_qos)
 
-        assert wait_for_discovery(writer, reader, timeout_sec=10)
+        assert wait_for_discovery(writer, reader)
 
         interlock = SafetyInterlock(
             robot_id="robot-001",
@@ -261,8 +257,8 @@ class TestSafetyInterlockQoS:
         writer.write(interlock)
 
         received = wait_for_data(reader, timeout_sec=5)
-        assert len(received) >= 1
-        data = received[0].data
+        assert received
+        data = reader.take_data()[0]
         assert data.interlock_active == True  # noqa: E712 — DDS returns int
         assert data.reason == "E-stop pressed"
 
@@ -295,7 +291,7 @@ class TestRobotCommandQoS:
         writer = writer_factory(writer_p, topic_w, qos=w_qos)
         reader = reader_factory(reader_p, topic_r, qos=r_qos)
 
-        assert wait_for_discovery(writer, reader, timeout_sec=10)
+        assert wait_for_discovery(writer, reader)
 
         # Send 3 commands with different keys to avoid KEEP_LAST 1 overlap
         for i in range(3):
@@ -309,13 +305,12 @@ class TestRobotCommandQoS:
             writer.write(cmd)
 
         time.sleep(0.5)
-        samples = reader.take()
-        valid = [s for s in samples if s.info.valid]
+        valid = reader.take_data()
 
         # Should receive all 3 (different keys = distinct instances)
         assert len(valid) >= 3, f"Expected 3 commands, got {len(valid)}"
         # Verify ordering by checking command_ids are ascending
-        ids = [s.data.command_id for s in valid]
+        ids = [s.command_id for s in valid]
         assert ids == sorted(ids), f"Commands out of order: {ids}"
 
     def test_operator_input_deadline_qos_enforced(
@@ -348,7 +343,7 @@ class TestRobotCommandQoS:
         writer = writer_factory(writer_p, topic_w, qos=w_qos)
         reader = reader_factory(reader_p, topic_r, qos=r_qos)
 
-        assert wait_for_discovery(writer, reader, timeout_sec=10)
+        assert wait_for_discovery(writer, reader)
 
         # Write one sample to start the deadline clock
         op_input = OperatorInput(

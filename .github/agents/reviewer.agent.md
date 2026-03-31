@@ -1,6 +1,6 @@
 ---
 description: "Use when auditing project compliance — verifying spec-to-test traceability, QoS rules, threading model, coding standards, documentation coverage, or running the quality gates checklist from workflow.md. Read-only compliance auditor."
-tools: [read, search, execute, todo, rti-chatbot-mcp/*]
+tools: [read, search, execute, todo, rti-chatbot-mcp/*, rti.connext-vc-copilot/*]
 ---
 
 You are the **Medtech Suite Reviewer** — a read-only compliance auditor that

@@ -10,20 +10,20 @@ and service states, and issues start/stop commands via DDS RPC.
 The Procedure Controller does **not** host any surgical services — it is
 a pure consumer and orchestrator. It creates two DomainParticipants:
 
-| Participant | Domain | Role |
-|-------------|--------|------|
+| Participant   | Domain              | Role                                                            |
+| ------------- | ------------------- | --------------------------------------------------------------- |
 | Orchestration | 15 (no domain tags) | Subscribe to ServiceCatalog + ServiceStatus; issue RPC commands |
-| Hospital | Hospital domain | Read-only subscriber for scheduling context |
+| Hospital      | Hospital domain     | Read-only subscriber for scheduling context                     |
 
 ### Connext Features Used
 
-| Feature | Where |
-|---------|-------|
-| XML App Creation | Both participants created via `QosProvider.create_participant_from_config` |
-| DDS RPC | `rti.rpc.Requester` for `ServiceHostControl` — start/stop/capabilities/health |
-| Content-Filtered Topics | — |
-| Multiple Domains | Orchestration (15) + Hospital |
-| Partition QoS | Hospital participant: `room/<room_id>` |
+| Feature                 | Where                                                                         |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| XML App Creation        | Both participants created via `QosProvider.create_participant_from_config`    |
+| DDS RPC                 | `rti.rpc.Requester` for `ServiceHostControl` — start/stop/capabilities/health |
+| Content-Filtered Topics | —                                                                             |
+| Multiple Domains        | Orchestration (15) + Hospital                                                 |
+| Partition QoS           | Hospital participant: `room/<room_id>`                                        |
 
 ## Quick Start
 
@@ -52,7 +52,7 @@ domain.
 
 ### Component Structure
 
-```
+```text
 modules/hospital-dashboard/
 ├── __init__.py
 └── procedure_controller/
@@ -65,26 +65,26 @@ modules/hospital-dashboard/
 
 **Orchestration Participant** — `ProcedureController::Orchestration`
 
-| Entity | Topic / Service | Type | QoS |
-|--------|-----------------|------|-----|
-| DataReader | `ServiceCatalog` | `Orchestration::ServiceCatalog` | RELIABLE / TRANSIENT_LOCAL |
-| DataReader | `ServiceStatus` | `Orchestration::ServiceStatus` | RELIABLE / TRANSIENT_LOCAL |
-| RPC Requester | `ServiceHostControl/<host_id>` | Request/Reply | Created on-demand per host |
+| Entity        | Topic / Service                | Type                            | QoS                        |
+| ------------- | ------------------------------ | ------------------------------- | -------------------------- |
+| DataReader    | `ServiceCatalog`               | `Orchestration::ServiceCatalog` | RELIABLE / TRANSIENT_LOCAL |
+| DataReader    | `ServiceStatus`                | `Orchestration::ServiceStatus`  | RELIABLE / TRANSIENT_LOCAL |
+| RPC Requester | `ServiceHostControl/<host_id>` | Request/Reply                   | Created on-demand per host |
 
 **Hospital Participant** — `ProcedureController::Hospital`
 
-| Entity | Topic | Type | QoS |
-|--------|-------|------|-----|
-| (read-only) | Scheduling context | — | — |
+| Entity      | Topic              | Type | QoS |
+| ----------- | ------------------ | ---- | --- |
+| (read-only) | Scheduling context | —    | —   |
 
 The Hospital participant is partitioned with `room/<room_id>` and
 enabled in read-only mode (no DataWriters).
 
 ### Threading Model
 
-| Thread | Responsibility |
-|--------|---------------|
-| Qt UI thread | `QTimer` polls DDS readers at 10 Hz (`_poll_dds`), updates tables |
+| Thread             | Responsibility                                                                                |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| Qt UI thread       | `QTimer` polls DDS readers at 10 Hz (`_poll_dds`), updates tables                             |
 | RPC worker threads | One `threading.Thread` per RPC call (`_send_rpc_async`), results delivered to UI via `Signal` |
 
 The Procedure Controller performs **no DDS writes on the UI thread**.
@@ -96,12 +96,12 @@ thread-safe widget updates.
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ROOM_ID` | `OR-1` | Operating room identifier; sets Hospital partition |
-| `CONNEXTDDS_DIR` | — | RTI Connext installation directory |
-| `QT_QPA_PLATFORM` | — | Set to `offscreen` for headless / CI environments |
-| `MEDTECH_APP_NAME` | — | Application name for structured logging |
+| Variable           | Default | Description                                        |
+| ------------------ | ------- | -------------------------------------------------- |
+| `ROOM_ID`          | `OR-1`  | Operating room identifier; sets Hospital partition |
+| `CONNEXTDDS_DIR`   | —       | RTI Connext installation directory                 |
+| `QT_QPA_PLATFORM`  | —       | Set to `offscreen` for headless / CI environments  |
+| `MEDTECH_APP_NAME` | —       | Application name for structured logging            |
 
 ### XML Configuration
 
@@ -129,17 +129,17 @@ python -m pytest tests/ -m gui
 
 Key test scenarios (from `test_procedure_controller.py`):
 
-| Test | Verifies |
-|------|----------|
-| `test_host_catalog_discovery` | ServiceCatalog samples populate the hosts table |
-| `test_service_status_tracking` | ServiceStatus samples populate the services table |
-| `test_hospital_domain_read_only` | Hospital participant has zero DataWriters |
-| `test_start_service_rpc_call` | Start button produces correct RPC request |
-| `test_stop_service_rpc_call` | Stop button produces correct RPC request |
-| `test_rpc_requester_creation` | On-demand requester creation per host |
-| `test_rpc_timeout_handling` | Timeout produces status bar message (no crash) |
-| `test_close_dds_cleanup` | `close_dds()` closes participants and requesters |
-| `test_dds_entities_use_generated_names` | All entity names match `app_names` constants |
+| Test                                    | Verifies                                          |
+| --------------------------------------- | ------------------------------------------------- |
+| `test_host_catalog_discovery`           | ServiceCatalog samples populate the hosts table   |
+| `test_service_status_tracking`          | ServiceStatus samples populate the services table |
+| `test_hospital_domain_read_only`        | Hospital participant has zero DataWriters         |
+| `test_start_service_rpc_call`           | Start button produces correct RPC request         |
+| `test_stop_service_rpc_call`            | Stop button produces correct RPC request          |
+| `test_rpc_requester_creation`           | On-demand requester creation per host             |
+| `test_rpc_timeout_handling`             | Timeout produces status bar message (no crash)    |
+| `test_close_dds_cleanup`                | `close_dds()` closes participants and requesters  |
+| `test_dds_entities_use_generated_names` | All entity names match `app_names` constants      |
 
 ## Going Further
 

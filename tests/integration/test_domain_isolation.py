@@ -83,9 +83,7 @@ class TestDomainTagIsolation:
         w = writer_factory(p1, topic1)
         r = reader_factory(p2, topic2)
 
-        assert wait_for_discovery(
-            w, r, timeout_sec=10
-        ), "Same domain tag should discover"
+        assert wait_for_discovery(w, r), "Same domain tag should discover"
 
 
 class TestCrossDomainIsolation:
@@ -134,6 +132,5 @@ class TestCrossDomainIsolation:
         w.write(sample)
 
         time.sleep(0.5)
-        received = r.read()
-        valid = [s for s in received if s.info.valid]
+        valid = r.read_data()
         assert len(valid) == 0, "No data should cross domain boundaries"

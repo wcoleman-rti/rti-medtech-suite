@@ -75,7 +75,7 @@ def _start_robot_controller():
     )
 
 
-def _terminate_proc(proc, timeout=10):
+def _terminate_proc(proc, timeout=3):
     if proc.poll() is not None:
         return
     proc.send_signal(signal.SIGTERM)
@@ -103,7 +103,7 @@ def standalone_services():
         extra_env={"MEDTECH_SIM_PROFILE": "cardiac_event"},
     )
     procs["operator-sim"] = _start_standalone("surgical_procedure.operator_sim")
-    time.sleep(2)
+    time.sleep(1)
     for name, proc in procs.items():
         assert (
             proc.poll() is None
@@ -156,7 +156,7 @@ class TestAcceptanceStandalone:
         assert matched, "RobotState reader did not match robot-controller"
 
         samples = wait_for_data(reader, timeout_sec=15)
-        assert len(samples) >= 1, "No RobotState samples received"
+        assert samples, "No RobotState samples received"
 
         reader.close()
 
@@ -173,7 +173,7 @@ class TestAcceptanceStandalone:
         assert matched, "PatientVitals reader did not match vitals-sim"
 
         samples = wait_for_data(reader, timeout_sec=15)
-        assert len(samples) >= 1, "No PatientVitals samples received"
+        assert samples, "No PatientVitals samples received"
 
         reader.close()
 
@@ -196,7 +196,7 @@ class TestAcceptanceStandalone:
 
         # The alarm profile should trigger alarms within a few cycles
         samples = wait_for_data(reader, timeout_sec=30)
-        assert len(samples) >= 1, (
+        assert samples, (
             "No AlarmMessage samples received — alarm profile may not be "
             "triggering thresholds"
         )

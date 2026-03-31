@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM ubuntu:24.04
 
 ARG CONNEXT_VERSION=7.6.0
@@ -31,7 +32,8 @@ RUN python3 -m venv /opt/medtech/.venv
 ENV PATH="/opt/medtech/.venv/bin:${PATH}"
 
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
 
 WORKDIR /opt/medtech

@@ -32,23 +32,31 @@ def _make_telemetry(
 
 
 def _make_exclusive_writer_qos(strength: int) -> dds.DataWriterQos:
-    """Create DataWriterQos with exclusive ownership and given strength."""
+    """Create DataWriterQos with exclusive ownership and given strength.
+
+    Uses AUTOMATIC liveliness with a 2 s lease to match the application
+    QoS profile (Snippets::Liveliness2s).
+    """
     qos = dds.DataWriterQos()
     qos.ownership.kind = dds.OwnershipKind.EXCLUSIVE
     qos.ownership_strength.value = strength
     qos.reliability.kind = dds.ReliabilityKind.RELIABLE
-    qos.liveliness.kind = dds.LivelinessKind.MANUAL_BY_PARTICIPANT
-    qos.liveliness.lease_duration = dds.Duration.from_seconds(1.0)
+    qos.liveliness.kind = dds.LivelinessKind.AUTOMATIC
+    qos.liveliness.lease_duration = dds.Duration.from_seconds(2.0)
     return qos
 
 
 def _make_exclusive_reader_qos() -> dds.DataReaderQos:
-    """Create DataReaderQos with exclusive ownership."""
+    """Create DataReaderQos with exclusive ownership.
+
+    Uses AUTOMATIC liveliness with a 2 s lease to match the application
+    QoS profile (Snippets::Liveliness2s).
+    """
     qos = dds.DataReaderQos()
     qos.ownership.kind = dds.OwnershipKind.EXCLUSIVE
     qos.reliability.kind = dds.ReliabilityKind.RELIABLE
-    qos.liveliness.kind = dds.LivelinessKind.MANUAL_BY_PARTICIPANT
-    qos.liveliness.lease_duration = dds.Duration.from_seconds(1.0)
+    qos.liveliness.kind = dds.LivelinessKind.AUTOMATIC
+    qos.liveliness.lease_duration = dds.Duration.from_seconds(2.0)
     return qos
 
 
@@ -83,25 +91,19 @@ class TestHigherStrengthPreferred:
         )
         r = reader_factory(p_r, topic_r, qos=_make_exclusive_reader_qos())
 
-        p_a.assert_liveliness()
-        p_b.assert_liveliness()
-
-        assert wait_for_discovery(w_a, r, timeout_sec=10)
-        assert wait_for_discovery(w_b, r, timeout_sec=10)
+        assert wait_for_discovery(w_a, r)
+        assert wait_for_discovery(w_b, r)
 
         # Both writers publish for the same device (same key)
         w_a.write(_make_telemetry("device-001", battery=90.0))
-        p_a.assert_liveliness()
         time.sleep(0.1)
         w_b.write(_make_telemetry("device-001", battery=50.0))
-        p_b.assert_liveliness()
         time.sleep(0.5)
 
-        received = r.take()
-        valid = [s for s in received if s.info.valid]
-        assert len(valid) >= 1, "Should receive at least one sample"
+        received = r.take_data()
+        assert len(received) >= 1, "Should receive at least one sample"
         # Only writer A's data should be delivered (battery=90)
-        batteries = [s.data.battery_percent for s in valid]
+        batteries = [s.battery_percent for s in received]
         assert all(
             b == 90.0 for b in batteries
         ), f"All samples should be from strong writer (90.0), got {batteries}"
@@ -138,41 +140,40 @@ class TestFailoverToBackup:
         )
         r = reader_factory(p_r, topic_r, qos=_make_exclusive_reader_qos())
 
-        p_a.assert_liveliness()
-        p_b.assert_liveliness()
-
-        assert wait_for_discovery(w_a, r, timeout_sec=10)
-        assert wait_for_discovery(w_b, r, timeout_sec=10)
+        assert wait_for_discovery(w_a, r)
+        assert wait_for_discovery(w_b, r)
 
         # Confirm primary is delivering
         w_a.write(_make_telemetry("device-001", battery=90.0))
-        p_a.assert_liveliness()
         time.sleep(0.1)
         w_b.write(_make_telemetry("device-001", battery=50.0))
-        p_b.assert_liveliness()
 
         received = wait_for_data(r, timeout_sec=5)
+        assert received, "Should initially receive from primary"
+        samples = r.take_data()
         assert any(
-            s.data.battery_percent == 90.0 for s in received
+            s.battery_percent == 90.0 for s in samples
         ), "Should initially receive from primary (battery=90)"
 
         # Drain the reader
         r.take()
 
-        # Kill primary (simulates crash)
+        # Kill primary (simulates crash) — AUTOMATIC liveliness detects
+        # the closed participant and the reader switches ownership to B.
         p_a.close()
 
-        # Keep backup alive and publishing
-        for _ in range(5):
-            p_b.assert_liveliness()
-            w_b.write(_make_telemetry("device-001", battery=55.0))
-            time.sleep(0.5)
+        # Wait for liveliness expiry (2 s lease + margin)
+        time.sleep(3.0)
 
-        received = r.take()
-        valid = [s for s in received if s.info.valid]
-        assert len(valid) >= 1, "Backup should deliver data after primary failure"
+        # Backup keeps publishing
+        for _ in range(3):
+            w_b.write(_make_telemetry("device-001", battery=55.0))
+            time.sleep(0.2)
+
+        received = r.take_data()
+        assert len(received) >= 1, "Backup should deliver data after primary failure"
         assert any(
-            s.data.battery_percent == 55.0 for s in valid
+            s.battery_percent == 55.0 for s in received
         ), "Should receive backup writer's data (battery=55)"
 
 
@@ -207,23 +208,19 @@ class TestPrimaryReclaim:
         )
         r = reader_factory(p_r, topic_r, qos=_make_exclusive_reader_qos())
 
-        p_a.assert_liveliness()
-        p_b.assert_liveliness()
-
-        assert wait_for_discovery(w_a, r, timeout_sec=10)
-        assert wait_for_discovery(w_b, r, timeout_sec=10)
+        assert wait_for_discovery(w_a, r)
+        assert wait_for_discovery(w_b, r)
 
         # Primary writes, then "fails" (close participant)
         w_a.write(_make_telemetry("device-001", battery=90.0))
-        p_a.assert_liveliness()
         time.sleep(0.2)
         p_a.close()
 
-        # Backup takes over
+        # Wait for liveliness expiry then let backup take over
+        time.sleep(3.0)
         for _ in range(3):
-            p_b.assert_liveliness()
             w_b.write(_make_telemetry("device-001", battery=55.0))
-            time.sleep(0.5)
+            time.sleep(0.2)
 
         r.take()  # Drain
 
@@ -235,23 +232,19 @@ class TestPrimaryReclaim:
             topic_a2,
             qos=_make_exclusive_writer_qos(100),
         )
-        p_a2.assert_liveliness()
-        assert wait_for_discovery(w_a2, r, timeout_sec=10)
+        assert wait_for_discovery(w_a2, r)
 
         # Both write — primary should reclaim
         w_a2.write(_make_telemetry("device-001", battery=95.0))
-        p_a2.assert_liveliness()
         time.sleep(0.1)
         w_b.write(_make_telemetry("device-001", battery=55.0))
-        p_b.assert_liveliness()
         time.sleep(0.5)
 
-        received = r.take()
-        valid = [s for s in received if s.info.valid]
-        assert len(valid) >= 1, "Should receive data after recovery"
+        received = r.take_data()
+        assert len(received) >= 1, "Should receive data after recovery"
         # Last sample should be from recovered primary
-        last = valid[-1]
-        assert last.data.battery_percent == 95.0, (
+        last = received[-1]
+        assert last.battery_percent == 95.0, (
             f"Recovered primary should reclaim ownership, "
-            f"got battery={last.data.battery_percent}"
+            f"got battery={last.battery_percent}"
         )

@@ -321,9 +321,9 @@ class TestDurabilityLateJoin:
         # Late joiner should receive without waiting for the next publish
         received = wait_for_data(late_reader, timeout_sec=5.0, count=1)
         assert (
-            len(received) >= 1
+            received
         ), "Late-joining RobotState reader should receive TRANSIENT_LOCAL data"
-        assert received[0].data.operational_mode == RobotMode.OPERATIONAL
+        assert late_reader.take_data()[0].operational_mode == RobotMode.OPERATIONAL
 
 
 # ---------------------------------------------------------------------------

@@ -245,12 +245,13 @@ class TestDeviceTelemetryPublished:
             r = reader_factory(p, topic, qos=qos)
 
             # Wait for discovery and data
-            assert wait_for_discovery(gw.writer, r, timeout_sec=10)
-            received = wait_for_data(r, timeout_sec=10, count=1)
-            assert len(received) >= 1, "Should receive at least one telemetry sample"
+            assert wait_for_discovery(gw.writer, r)
+            assert wait_for_data(
+                r, timeout_sec=10, count=1
+            ), "Should receive at least one telemetry sample"
 
             # Verify device IDs are present in received data
-            device_ids = {s.data.device_id for s in received}
+            device_ids = {s.device_id for s in r.take_data()}
             assert len(device_ids) >= 1, "Should receive samples with device IDs"
         finally:
             gw.close()
@@ -433,8 +434,8 @@ class TestExclusiveOwnershipFailover:
         w_qos_a.ownership.kind = dds.OwnershipKind.EXCLUSIVE
         w_qos_a.ownership_strength.value = 100
         w_qos_a.reliability.kind = dds.ReliabilityKind.RELIABLE
-        w_qos_a.liveliness.kind = dds.LivelinessKind.MANUAL_BY_PARTICIPANT
-        w_qos_a.liveliness.lease_duration = dds.Duration.from_seconds(1.0)
+        w_qos_a.liveliness.kind = dds.LivelinessKind.AUTOMATIC
+        w_qos_a.liveliness.lease_duration = dds.Duration.from_seconds(2.0)
         w_a = writer_factory(p_primary, topic_a, qos=w_qos_a)
 
         # Backup: strength 50
@@ -442,23 +443,20 @@ class TestExclusiveOwnershipFailover:
         w_qos_b.ownership.kind = dds.OwnershipKind.EXCLUSIVE
         w_qos_b.ownership_strength.value = 50
         w_qos_b.reliability.kind = dds.ReliabilityKind.RELIABLE
-        w_qos_b.liveliness.kind = dds.LivelinessKind.MANUAL_BY_PARTICIPANT
-        w_qos_b.liveliness.lease_duration = dds.Duration.from_seconds(1.0)
+        w_qos_b.liveliness.kind = dds.LivelinessKind.AUTOMATIC
+        w_qos_b.liveliness.lease_duration = dds.Duration.from_seconds(2.0)
         w_b = writer_factory(p_backup, topic_b, qos=w_qos_b)
 
         # EXCLUSIVE reader
         r_qos = dds.DataReaderQos()
         r_qos.ownership.kind = dds.OwnershipKind.EXCLUSIVE
         r_qos.reliability.kind = dds.ReliabilityKind.RELIABLE
-        r_qos.liveliness.kind = dds.LivelinessKind.MANUAL_BY_PARTICIPANT
-        r_qos.liveliness.lease_duration = dds.Duration.from_seconds(1.0)
+        r_qos.liveliness.kind = dds.LivelinessKind.AUTOMATIC
+        r_qos.liveliness.lease_duration = dds.Duration.from_seconds(2.0)
         r = reader_factory(p_sub, topic_r, qos=r_qos)
 
-        p_primary.assert_liveliness()
-        p_backup.assert_liveliness()
-
-        assert wait_for_discovery(w_a, r, timeout_sec=10)
-        assert wait_for_discovery(w_b, r, timeout_sec=10)
+        assert wait_for_discovery(w_a, r)
+        assert wait_for_discovery(w_b, r)
 
         # Primary publishes
         sample_a = DeviceTelemetry()
@@ -466,7 +464,6 @@ class TestExclusiveOwnershipFailover:
         sample_a.device_kind = DeviceKind.INFUSION_PUMP
         sample_a.battery_percent = 90.0
         w_a.write(sample_a)
-        p_primary.assert_liveliness()
 
         time.sleep(0.1)
 
@@ -476,30 +473,29 @@ class TestExclusiveOwnershipFailover:
         sample_b.device_kind = DeviceKind.INFUSION_PUMP
         sample_b.battery_percent = 50.0
         w_b.write(sample_b)
-        p_backup.assert_liveliness()
 
         time.sleep(0.5)
-        received = r.take()
-        valid = [s for s in received if s.info.valid]
+        valid = r.take_data()
         assert len(valid) >= 1, "Should receive data"
         assert any(
-            s.data.battery_percent == 90.0 for s in valid
+            s.battery_percent == 90.0 for s in valid
         ), "Primary should be delivering"
 
         # Kill primary
         r.take()  # drain
         p_primary.close()
 
-        # Backup keeps publishing
-        for _ in range(5):
-            p_backup.assert_liveliness()
-            w_b.write(sample_b)
-            time.sleep(0.5)
+        # Wait for liveliness expiry (2 s lease + margin)
+        time.sleep(3.0)
 
-        received = r.take()
-        valid = [s for s in received if s.info.valid]
+        # Backup keeps publishing
+        for _ in range(3):
+            w_b.write(sample_b)
+            time.sleep(0.2)
+
+        valid = r.take_data()
         assert len(valid) >= 1, "Backup should deliver after primary failure"
-        assert any(s.data.battery_percent == 50.0 for s in valid)
+        assert any(s.battery_percent == 50.0 for s in valid)
 
 
 # -----------------------------------------------------------------------

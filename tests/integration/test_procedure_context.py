@@ -99,15 +99,16 @@ class TestProcedureContext:
         reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
         assert wait_for_discovery(
-            writer, reader, timeout_sec=10
+            writer,
+            reader,
         ), "Writer did not discover reader"
 
         ctx = _make_context()
         writer.write(ctx)
 
         received = wait_for_data(reader, timeout_sec=5)
-        assert len(received) >= 1, "No ProcedureContext sample received"
-        data = received[0].data
+        assert received, "No ProcedureContext sample received"
+        data = reader.take_data()[0]
         assert data.procedure_id == "proc-001"
         assert data.hospital == "General Hospital"
         assert data.room == "OR-3"
@@ -165,8 +166,8 @@ class TestProcedureContext:
         reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
         received = wait_for_data(reader, timeout_sec=5)
-        assert len(received) >= 1, "Late joiner did not receive ProcedureContext"
-        data = received[0].data
+        assert received, "Late joiner did not receive ProcedureContext"
+        data = reader.take_data()[0]
         assert data.procedure_id == "proc-002"
         assert data.room == "OR-5"
 
@@ -202,7 +203,7 @@ class TestProcedureContext:
         writer = writer_factory(writer_p, topic_w, qos=writer_qos)
         reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
-        assert wait_for_discovery(writer, reader, timeout_sec=10)
+        assert wait_for_discovery(writer, reader)
 
         # Publish initial context
         ctx1 = _make_context(procedure_id="proc-003", surgeon="Dr. Chen")
@@ -217,8 +218,8 @@ class TestProcedureContext:
         writer.write(ctx2)
 
         received = wait_for_data(reader, timeout_sec=5)
-        assert len(received) >= 1, "Did not receive updated ProcedureContext"
-        data = received[0].data
+        assert received, "Did not receive updated ProcedureContext"
+        data = reader.take_data()[0]
         assert data.surgeon == "Dr. Chen, Dr. Williams"
 
 
@@ -263,8 +264,8 @@ class TestProcedureStatus:
         reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
         received = wait_for_data(reader, timeout_sec=5)
-        assert len(received) >= 1, "Late joiner did not receive ProcedureStatus"
-        data = received[0].data
+        assert received, "Late joiner did not receive ProcedureStatus"
+        data = reader.take_data()[0]
         assert data.procedure_id == "proc-010"
         assert data.status_message == "Procedure in progress"
 
@@ -300,7 +301,7 @@ class TestProcedureStatus:
         writer = writer_factory(writer_p, topic_w, qos=writer_qos)
         reader = reader_factory(reader_p, topic_r, qos=reader_qos)
 
-        assert wait_for_discovery(writer, reader, timeout_sec=10)
+        assert wait_for_discovery(writer, reader)
 
         # Publish IN_PROGRESS
         writer.write(_make_status(procedure_id="proc-011", message="In progress"))
@@ -317,7 +318,7 @@ class TestProcedureStatus:
         )
 
         received = wait_for_data(reader, timeout_sec=5)
-        assert len(received) >= 1, "Did not receive updated ProcedureStatus"
-        data = received[0].data
+        assert received, "Did not receive updated ProcedureStatus"
+        data = reader.take_data()[0]
         assert data.procedure_id == "proc-011"
         assert data.status_message == "Completing"

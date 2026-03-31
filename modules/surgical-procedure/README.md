@@ -19,12 +19,12 @@ two operating modes:
 
 Four Service Hosts package the services for orchestrated deployment:
 
-| Service Host | Language | Hosted Services |
-|--------------|----------|-----------------|
-| Robot Service Host | C++ | `RobotControllerService` |
-| Operator Service Host | Python | `OperatorConsoleService` |
-| Clinical Service Host | Python | `BedsideMonitorService`, `DeviceTelemetryService` |
-| Operational Service Host | Python | `CameraService`, `ProcedureContextService` |
+| Service Host             | Language | Hosted Services                                   |
+| ------------------------ | -------- | ------------------------------------------------- |
+| Robot Service Host       | C++      | `RobotControllerService`                          |
+| Operator Service Host    | Python   | `OperatorConsoleService`                          |
+| Clinical Service Host    | Python   | `BedsideMonitorService`, `DeviceTelemetryService` |
+| Operational Service Host | Python   | `CameraService`, `ProcedureContextService`        |
 
 All participants operate on the **Procedure domain** across three
 domain tags:
@@ -39,19 +39,19 @@ Service Hosts additionally create a participant on the
 advertisement, service status reporting, and DDS RPC command
 reception.
 
-| Connext Feature | How It Is Used |
-|-----------------|----------------|
-| DDS topics | `RobotState`, `OperatorInput`, `RobotCommand`, `SafetyInterlock`, `PatientVitals`, `WaveformData`, `AlarmMessages`, `DeviceTelemetry`, `ProcedureContext`, `ProcedureStatus`, `CameraFrame`, `CameraConfig` |
-| Orchestration topics | `ServiceCatalog`, `ServiceStatus` |
-| DDS RPC | `ServiceHostControl/<host_id>` — start, stop, configure, capabilities, health |
-| QoS profiles | `TopicProfiles::*` per topic — State, Stream, Command patterns loaded from `NDDS_QOS_PROFILES` XML |
-| Domain tags | `control`, `clinical`, `operational` — each tag uses a separate `DomainParticipant` |
-| Partitions | `room/<ROOM_ID>/procedure/<PROCEDURE_ID>` — set programmatically at participant startup |
-| TRANSIENT_LOCAL durability | State-pattern topics for late-joiner support; `ServiceCatalog` and `ServiceStatus` for controller restart reconstruction |
-| Exclusive ownership | `DeviceTelemetry` supports primary/backup failover via ownership strength |
-| Time-based filter | Digital twin applies 100 ms minimum separation on high-rate readers (`RobotState`, `OperatorInput`) for 60 Hz rendering |
-| Cloud Discovery Service | All participants discover peers through CDS (`NDDS_DISCOVERY_PEERS`) |
-| Monitoring Library 2.0 | Telemetry forwarded to Collector Service for Prometheus/Grafana |
+| Connext Feature            | How It Is Used                                                                                                                                                                                              |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DDS topics                 | `RobotState`, `OperatorInput`, `RobotCommand`, `SafetyInterlock`, `PatientVitals`, `WaveformData`, `AlarmMessages`, `DeviceTelemetry`, `ProcedureContext`, `ProcedureStatus`, `CameraFrame`, `CameraConfig` |
+| Orchestration topics       | `ServiceCatalog`, `ServiceStatus`                                                                                                                                                                           |
+| DDS RPC                    | `ServiceHostControl/<host_id>` — start, stop, configure, capabilities, health                                                                                                                               |
+| QoS profiles               | `TopicProfiles::*` per topic — State, Stream, Command patterns loaded from `NDDS_QOS_PROFILES` XML                                                                                                          |
+| Domain tags                | `control`, `clinical`, `operational` — each tag uses a separate `DomainParticipant`                                                                                                                         |
+| Partitions                 | `room/<ROOM_ID>/procedure/<PROCEDURE_ID>` — set programmatically at participant startup                                                                                                                     |
+| TRANSIENT_LOCAL durability | State-pattern topics for late-joiner support; `ServiceCatalog` and `ServiceStatus` for controller restart reconstruction                                                                                    |
+| Exclusive ownership        | `DeviceTelemetry` supports primary/backup failover via ownership strength                                                                                                                                   |
+| Time-based filter          | Digital twin applies 100 ms minimum separation on high-rate readers (`RobotState`, `OperatorInput`) for 60 Hz rendering                                                                                     |
+| Cloud Discovery Service    | All participants discover peers through CDS (`NDDS_DISCOVERY_PEERS`)                                                                                                                                        |
+| Monitoring Library 2.0     | Telemetry forwarded to Collector Service for Prometheus/Grafana                                                                                                                                             |
 
 ## Quick Start
 
@@ -198,58 +198,58 @@ after participant creation.
 **OperationalPub** (`SurgicalParticipants::OperationalPub`) —
 domain tag: `operational`
 
-| Entity | Topic | QoS Profile | Publication Model |
-|--------|-------|-------------|-------------------|
+| Entity     | Topic              | QoS Profile                       | Publication Model                        |
+| ---------- | ------------------ | --------------------------------- | ---------------------------------------- |
 | DataWriter | `ProcedureContext` | `TopicProfiles::ProcedureContext` | Write-on-change (State, TRANSIENT_LOCAL) |
-| DataWriter | `ProcedureStatus` | `TopicProfiles::ProcedureStatus` | Write-on-change (State, TRANSIENT_LOCAL) |
-| DataWriter | `CameraFrame` | `TopicProfiles::CameraFrame` | Continuous-stream (30 Hz, BEST_EFFORT) |
-| DataWriter | `CameraConfig` | `TopicProfiles::CameraConfig` | Write-on-change (State) |
+| DataWriter | `ProcedureStatus`  | `TopicProfiles::ProcedureStatus`  | Write-on-change (State, TRANSIENT_LOCAL) |
+| DataWriter | `CameraFrame`      | `TopicProfiles::CameraFrame`      | Continuous-stream (30 Hz, BEST_EFFORT)   |
+| DataWriter | `CameraConfig`     | `TopicProfiles::CameraConfig`     | Write-on-change (State)                  |
 
 **ControlRobot** (`SurgicalParticipants::ControlRobot`) —
 domain tag: `control`
 
-| Entity | Topic | QoS Profile | Publication Model |
-|--------|-------|-------------|-------------------|
-| DataWriter | `RobotState` | `TopicProfiles::RobotState` | Periodic-snapshot (100 Hz, RELIABLE, TRANSIENT_LOCAL) |
-| DataReader | `OperatorInput` | `TopicProfiles::OperatorInput` | Continuous-stream |
-| DataReader | `RobotCommand` | `TopicProfiles::RobotCommand` | Command pattern (RELIABLE) |
-| DataReader | `SafetyInterlock` | `TopicProfiles::SafetyInterlock` | State (RELIABLE, TRANSIENT_LOCAL) |
+| Entity     | Topic             | QoS Profile                      | Publication Model                                     |
+| ---------- | ----------------- | -------------------------------- | ----------------------------------------------------- |
+| DataWriter | `RobotState`      | `TopicProfiles::RobotState`      | Periodic-snapshot (100 Hz, RELIABLE, TRANSIENT_LOCAL) |
+| DataReader | `OperatorInput`   | `TopicProfiles::OperatorInput`   | Continuous-stream                                     |
+| DataReader | `RobotCommand`    | `TopicProfiles::RobotCommand`    | Command pattern (RELIABLE)                            |
+| DataReader | `SafetyInterlock` | `TopicProfiles::SafetyInterlock` | State (RELIABLE, TRANSIENT_LOCAL)                     |
 
 **ClinicalMonitor** (`SurgicalParticipants::ClinicalMonitor`) —
 domain tag: `clinical`
 
-| Entity | Topic | QoS Profile | Publication Model |
-|--------|-------|-------------|-------------------|
+| Entity     | Topic           | QoS Profile                    | Publication Model                                   |
+| ---------- | --------------- | ------------------------------ | --------------------------------------------------- |
 | DataWriter | `PatientVitals` | `TopicProfiles::PatientVitals` | Periodic-snapshot (1 Hz, RELIABLE, TRANSIENT_LOCAL) |
-| DataWriter | `WaveformData` | `TopicProfiles::WaveformData` | Continuous-stream (50 Hz, BEST_EFFORT) |
-| DataWriter | `AlarmMessages` | `TopicProfiles::AlarmMessages` | Write-on-change (alarm state transitions only) |
+| DataWriter | `WaveformData`  | `TopicProfiles::WaveformData`  | Continuous-stream (50 Hz, BEST_EFFORT)              |
+| DataWriter | `AlarmMessages` | `TopicProfiles::AlarmMessages` | Write-on-change (alarm state transitions only)      |
 
 **ClinicalDeviceGateway**
 (`SurgicalParticipants::ClinicalDeviceGateway`) —
 domain tag: `clinical`
 
-| Entity | Topic | QoS Profile | Publication Model |
-|--------|-------|-------------|-------------------|
+| Entity     | Topic             | QoS Profile                      | Publication Model                            |
+| ---------- | ----------------- | -------------------------------- | -------------------------------------------- |
 | DataWriter | `DeviceTelemetry` | `TopicProfiles::DeviceTelemetry` | Write-on-change (State, exclusive ownership) |
 
 **ControlDigitalTwin** (`SurgicalParticipants::ControlDigitalTwin`) —
 domain tag: `control`
 
-| Entity | Topic | QoS Profile | Notes |
-|--------|-------|-------------|-------|
-| DataReader | `RobotState` | `TopicProfiles::GuiRobotState` | Time-based filter ~100 ms |
-| DataReader | `OperatorInput` | `TopicProfiles::GuiOperatorInput` | Time-based filter ~100 ms |
-| DataReader | `SafetyInterlock` | `TopicProfiles::SafetyInterlock` | No TBF (safety-critical) |
-| DataReader | `RobotCommand` | `TopicProfiles::RobotCommand` | No TBF (command delivery) |
+| Entity     | Topic             | QoS Profile                       | Notes                     |
+| ---------- | ----------------- | --------------------------------- | ------------------------- |
+| DataReader | `RobotState`      | `TopicProfiles::GuiRobotState`    | Time-based filter ~100 ms |
+| DataReader | `OperatorInput`   | `TopicProfiles::GuiOperatorInput` | Time-based filter ~100 ms |
+| DataReader | `SafetyInterlock` | `TopicProfiles::SafetyInterlock`  | No TBF (safety-critical)  |
+| DataReader | `RobotCommand`    | `TopicProfiles::RobotCommand`     | No TBF (command delivery) |
 
 **Orchestration** (`OrchestrationParticipants::Orchestration`) —
 Orchestration domain, no domain tags. Created by each Service Host.
 
-| Entity | Topic | QoS Profile | Notes |
-|--------|-------|-------------|-------|
-| DataWriter | `ServiceCatalog` | `OrchestrationProfiles::ServiceCatalog` | TRANSIENT_LOCAL, liveliness 2 s |
-| DataWriter | `ServiceStatus` | `OrchestrationProfiles::ServiceStatus` | TRANSIENT_LOCAL, write-on-change |
-| RPC Service | `ServiceHostControl/<host_id>` | `Pattern.RPC` | RELIABLE, KEEP_ALL |
+| Entity      | Topic                          | QoS Profile                             | Notes                            |
+| ----------- | ------------------------------ | --------------------------------------- | -------------------------------- |
+| DataWriter  | `ServiceCatalog`               | `OrchestrationProfiles::ServiceCatalog` | TRANSIENT_LOCAL, liveliness 2 s  |
+| DataWriter  | `ServiceStatus`                | `OrchestrationProfiles::ServiceStatus`  | TRANSIENT_LOCAL, write-on-change |
+| RPC Service | `ServiceHostControl/<host_id>` | `Pattern.RPC`                           | RELIABLE, KEEP_ALL               |
 
 ### Threading Model
 
@@ -297,31 +297,31 @@ reader status to detect robot disconnection.
 
 ### Environment Variables
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `ROOM_ID` | string | `"OR-1"` | Operating room identifier |
-| `PROCEDURE_ID` | string | `"proc-001"` | Procedure identifier |
-| `HOST_ID` | string | (per host) | Service Host identifier (e.g., `robot-host-or1`) |
-| `ROBOT_ID` | string | `"001"` | Robot numeric ID (prefixed to `robot-001`) |
-| `MEDTECH_SIM_SEED` | integer | (system entropy) | RNG seed for deterministic simulation |
-| `MEDTECH_SIM_PROFILE` | string | `"stable"` | Vitals scenario profile (`stable`, `hemorrhage_onset`) |
-| `MEDTECH_APP_NAME` | string | (module default) | Monitoring Library 2.0 application name |
-| `QT_QPA_PLATFORM` | string | (system default) | Qt platform plugin (`offscreen` for headless) |
-| `NDDS_QOS_PROFILES` | string | (set by `setup.bash`) | Semicolon-separated QoS XML file paths |
-| `NDDS_DISCOVERY_PEERS` | string | (set by `setup.bash`) | DDS discovery peer list |
+| Variable               | Type    | Default               | Description                                            |
+| ---------------------- | ------- | --------------------- | ------------------------------------------------------ |
+| `ROOM_ID`              | string  | `"OR-1"`              | Operating room identifier                              |
+| `PROCEDURE_ID`         | string  | `"proc-001"`          | Procedure identifier                                   |
+| `HOST_ID`              | string  | (per host)            | Service Host identifier (e.g., `robot-host-or1`)       |
+| `ROBOT_ID`             | string  | `"001"`               | Robot numeric ID (prefixed to `robot-001`)             |
+| `MEDTECH_SIM_SEED`     | integer | (system entropy)      | RNG seed for deterministic simulation                  |
+| `MEDTECH_SIM_PROFILE`  | string  | `"stable"`            | Vitals scenario profile (`stable`, `hemorrhage_onset`) |
+| `MEDTECH_APP_NAME`     | string  | (module default)      | Monitoring Library 2.0 application name                |
+| `QT_QPA_PLATFORM`      | string  | (system default)      | Qt platform plugin (`offscreen` for headless)          |
+| `NDDS_QOS_PROFILES`    | string  | (set by `setup.bash`) | Semicolon-separated QoS XML file paths                 |
+| `NDDS_DISCOVERY_PEERS` | string  | (set by `setup.bash`) | DDS discovery peer list                                |
 
 ### XML Configuration Files
 
 All QoS and entity configuration is loaded from XML via
 `NDDS_QOS_PROFILES` (set by `source install/setup.bash`):
 
-| File | Content |
-|------|---------|
-| `share/qos/Snippets.xml` | Reusable QoS snippets (reliability, durability) |
-| `share/qos/Patterns.xml` | QoS patterns (State, Stream, Command) |
-| `share/qos/Topics.xml` | Per-topic QoS profiles (`TopicProfiles::*`) |
-| `share/qos/Participants.xml` | Transport and participant base QoS |
-| `share/domains/Domains.xml` | Domain library (Procedure, Hospital domain IDs and tags) |
+| File                         | Content                                                  |
+| ---------------------------- | -------------------------------------------------------- |
+| `share/qos/Snippets.xml`     | Reusable QoS snippets (reliability, durability)          |
+| `share/qos/Patterns.xml`     | QoS patterns (State, Stream, Command)                    |
+| `share/qos/Topics.xml`       | Per-topic QoS profiles (`TopicProfiles::*`)              |
+| `share/qos/Participants.xml` | Transport and participant base QoS                       |
+| `share/domains/Domains.xml`  | Domain library (Procedure, Hospital domain IDs and tags) |
 
 Participant configurations are in
 `interfaces/participants/SurgicalParticipants.xml`, which is included
@@ -364,6 +364,9 @@ python -m pytest tests/integration/test_robot_controller.py \
                  tests/integration/test_robot_service_host.py \
                  tests/integration/test_clinical_service_host.py \
                  tests/integration/test_operational_service_host.py \
+                 tests/integration/test_orchestration_e2e.py \
+                 tests/integration/test_acceptance_orchestration.py \
+                 tests/integration/test_acceptance_standalone.py \
                  tests/gui/test_digital_twin.py \
                  -v
 ```
@@ -373,6 +376,9 @@ Run by marker:
 ```bash
 # Integration tests only
 python -m pytest tests/ -m integration
+
+# Acceptance tests (end-to-end workflow verification)
+python -m pytest tests/ -m acceptance
 
 # GUI tests only
 python -m pytest tests/ -m gui
@@ -387,16 +393,17 @@ python -m pytest tests/ -m partition
 python -m pytest tests/ -m failover
 ```
 
-| Marker | Description |
-|--------|-------------|
-| `integration` | Tests requiring two or more DDS participants |
-| `gui` | PySide6 GUI verification tests |
-| `orchestration` | Service Host and Procedure Controller tests |
-| `partition` | Partition-based isolation tests |
-| `failover` | Exclusive ownership failover tests |
-| `streaming` | High-rate best-effort streaming tests |
-| `durability` | TRANSIENT_LOCAL and VOLATILE behavior tests |
-| `consistency` | DDS consistency contract tests |
+| Marker          | Description                                   |
+| --------------- | --------------------------------------------- |
+| `integration`   | Tests requiring two or more DDS participants  |
+| `acceptance`    | End-to-end workflow acceptance tests (Rule 8) |
+| `gui`           | PySide6 GUI verification tests                |
+| `orchestration` | Service Host and Procedure Controller tests   |
+| `partition`     | Partition-based isolation tests               |
+| `failover`      | Exclusive ownership failover tests            |
+| `streaming`     | High-rate best-effort streaming tests         |
+| `durability`    | TRANSIENT_LOCAL and VOLATILE behavior tests   |
+| `consistency`   | DDS consistency contract tests                |
 
 ## Going Further
 
