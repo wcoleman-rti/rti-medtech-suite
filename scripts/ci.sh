@@ -269,13 +269,20 @@ fi
 
 # ─── Gate 10: Performance benchmark ───────────────────────────────
 gate "Performance benchmark"
-if [ -f tests/performance/benchmark.py ]; then
-    python tests/performance/benchmark.py --help >/dev/null 2>&1 || fail "benchmark harness broken"
-    echo "  Benchmark harness available (run with observability stack for full benchmark)."
-else
+if [ ! -f tests/performance/benchmark.py ]; then
     echo "  Benchmark harness not yet implemented (Step 1.9)."
+    pass
+elif curl -sf http://localhost:9090/api/v1/status/buildinfo >/dev/null 2>&1; then
+    echo "  Prometheus reachable — running benchmark comparison."
+    python tests/performance/benchmark.py || fail "performance benchmark regression detected"
+    pass
+else
+    python tests/performance/benchmark.py --help >/dev/null 2>&1 || fail "benchmark harness broken"
+    echo "  Prometheus not reachable — harness verified, full benchmark skipped."
+    echo "  Run the full benchmark with: bash scripts/benchmark.sh"
+    echo "  Record a baseline with:      bash scripts/benchmark.sh --record --phase <name>"
+    pass
 fi
-pass
 
 # ─── Gate 11: QoS compatibility check ─────────────────────────────
 gate "QoS compatibility pre-flight check"

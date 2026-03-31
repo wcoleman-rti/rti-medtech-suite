@@ -50,7 +50,7 @@ def _kill_zombie_service_hosts():
                 continue
             try:
                 os.kill(pid, signal.SIGTERM)
-            except ProcessLookupError:
+            except (ProcessLookupError, PermissionError):
                 pass
     time.sleep(0.5)
     yield

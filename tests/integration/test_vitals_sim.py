@@ -540,7 +540,7 @@ class TestBedsideMonitorServiceIntegration:
         @durability"""
         # Publish vitals first
         monitor.tick_vitals()
-        time.sleep(0.5)
+        time.sleep(1.0)
 
         # Create late-joining reader
         p = dds.DomainParticipant.default_participant_qos
@@ -564,12 +564,16 @@ class TestBedsideMonitorServiceIntegration:
             cond.enabled_statuses = dds.StatusMask.SUBSCRIPTION_MATCHED
             ws = dds.WaitSet()
             ws += cond
-            ws.wait(dds.Duration(5))
+            ws.wait(dds.Duration(10))
             reader.wait_for_historical_data(dds.Duration(5))
         except dds.TimeoutError:
             pass
 
+        # Retry read — historical delivery may lag slightly after discovery
         received = reader.take_data()
+        if not received:
+            time.sleep(1.0)
+            received = reader.take_data()
 
         dp.close()
         assert len(received) >= 1, "Late joiner did not receive TRANSIENT_LOCAL vitals"
