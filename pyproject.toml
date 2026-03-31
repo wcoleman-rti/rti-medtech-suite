@@ -12,6 +12,7 @@ addopts = "-n auto --dist loadgroup"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
+    "acceptance: Rule 8 acceptance tests (full workflow verification)",
     "benchmark: performance benchmark tests (require observability stack)",
     "consistency: DDS consistency contract tests (vision/dds-consistency.md)",
     "e2e: end-to-end tests requiring full Docker Compose environment",

@@ -22,7 +22,6 @@ from conftest import (
     make_start_call,
     make_stop_call,
     send_rpc,
-    wait_for_data,
     wait_for_replier,
     wait_for_status,
 )
@@ -163,11 +162,15 @@ class TestOperationalServiceCatalog:
 
     def test_service_catalog_published(self, operational_service_host, catalog_reader):
         """Operational Service Host publishes ServiceCatalog for each service."""
-        samples = wait_for_data(catalog_reader, timeout_sec=15, count=2)
-        assert len(samples) >= 2, "Expected at least 2 ServiceCatalog samples"
-        matching = [s for s in samples if s.data.host_id == HOST_ID]
-        assert len(matching) >= 2, f"No ServiceCatalog for {HOST_ID}"
-        service_ids = {s.data.service_id for s in matching}
+        deadline = time.monotonic() + 15.0
+        service_ids: set[str] = set()
+        while time.monotonic() < deadline:
+            for s in catalog_reader.read():
+                if s.info.valid and s.data.host_id == HOST_ID:
+                    service_ids.add(s.data.service_id)
+            if len(service_ids) >= 2:
+                break
+            time.sleep(0.2)
         assert "CameraService" in service_ids
         assert "ProcedureContextService" in service_ids
 

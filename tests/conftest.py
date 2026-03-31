@@ -320,6 +320,49 @@ def wait_for_status(reader, host_id, service_id, target_state, timeout_sec=15.0)
             return False
 
 
+def wait_for_all_states(reader, expected, timeout_sec=15.0):
+    """Wait for multiple (host_id, service_id) pairs to reach target states.
+
+    ``expected`` is a dict mapping ``(host_id, service_id)`` tuples to the
+    desired ``ServiceState``.  Returns a set of ``(host_id, service_id)``
+    pairs that did **not** reach the target state before the deadline.
+    An empty set means all succeeded.
+
+    Unlike sequential ``wait_for_status`` calls, this function processes
+    all targets in a single take loop so no samples are silently discarded.
+    """
+    remaining = dict(expected)
+    condition = dds.ReadCondition(
+        reader,
+        dds.DataState(
+            dds.SampleState.NOT_READ,
+            dds.ViewState.ANY,
+            dds.InstanceState.ALIVE,
+        ),
+    )
+    waitset = dds.WaitSet()
+    waitset += condition
+
+    deadline = time.monotonic() + timeout_sec
+    while remaining:
+        for sample in reader.select().condition(condition).take():
+            if not sample.info.valid:
+                continue
+            key = (sample.data.host_id, sample.data.service_id)
+            if key in remaining and sample.data.state == remaining[key]:
+                del remaining[key]
+        if not remaining:
+            break
+        left = deadline - time.monotonic()
+        if left <= 0:
+            break
+        try:
+            waitset.wait(_to_duration(left))
+        except dds.TimeoutError:
+            break
+    return set(remaining.keys())
+
+
 def wait_for_replier(requester, timeout_sec=10.0):
     """Wait until the requester has matched at least one replier.
 

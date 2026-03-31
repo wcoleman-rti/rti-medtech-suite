@@ -21,9 +21,9 @@ import app_names
 import common
 import imaging
 import rti.connextdds as dds
-from medtech.service import Service, ServiceState
 from medtech.dds import initialize_connext
 from medtech.log import ModuleName, init_logging
+from medtech.service import Service, ServiceState
 
 names = app_names.MedtechEntityNames.SurgicalParticipants
 

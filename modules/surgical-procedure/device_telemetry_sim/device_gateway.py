@@ -21,9 +21,9 @@ import time
 import app_names
 import devices
 import rti.connextdds as dds
-from medtech.service import Service, ServiceState
 from medtech.dds import initialize_connext
 from medtech.log import ModuleName, init_logging
+from medtech.service import Service, ServiceState
 
 from ._device_model import DEVICE_PROFILES, DeviceProfile, DeviceStateModel
 

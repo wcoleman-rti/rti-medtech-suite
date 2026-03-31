@@ -21,9 +21,9 @@ import app_names
 import common
 import monitoring
 import rti.connextdds as dds
-from medtech.service import Service, ServiceState
 from medtech.dds import initialize_connext
 from medtech.log import ModuleName, init_logging
+from medtech.service import Service, ServiceState
 
 from ._alarm import AlarmEvaluator
 from ._profiles import PROFILES, ScenarioProfile
