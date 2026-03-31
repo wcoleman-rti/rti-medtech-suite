@@ -170,56 +170,117 @@ code patterns, consult these additional resources (in priority order):
 
 ### Test Commands Reference
 
-`scripts/ci.sh` is the **single authoritative quality gate script**.
-Whenever this document or any agent persona says "run the full test
-suite" or "run the quality gates," the concrete command is:
+There are exactly **three test commands**. No other invocations,
+flags, pipes, or output-parsing patterns are permitted.
+
+#### Command 1 — Full quality gate pipeline
 
 ```bash
 bash scripts/ci.sh
 ```
 
-The script is self-contained — it sources its own environment
-(`install/setup.bash`) internally. No pre-sourcing is needed.
+**When to use:** Session start, pre-commit, session end — the three
+mandatory checkpoints. Also use when C++, IDL, CMake, Docker, or
+markdown files changed (gates 2–7, 9, 12 cover these).
 
-The script runs 12 gates in order (fast lint → build → test → Docker).
-It exits non-zero on the first failure. Two convenience flags exist
-for faster feedback during mid-step iteration:
+**Behavior:** Self-contained. Sources its own environment internally.
+No `source install/setup.bash` is needed. Runs all 12 gates in order
+(lint → build → install → Python tests → C++ tests → Docker). Exits
+non-zero on the first failure.
 
-| Context | Command | What it checks |
-|---------|---------|----------------|
-| **Full gate pipeline** (session start, session end, pre-commit) | `bash scripts/ci.sh` | All 12 quality gates from Section 7 |
-| **Fast lint only** (~5 s, before committing) | `bash scripts/ci.sh --lint` | Code style, markdownlint, README sections, prohibited patterns, generated files |
-| **Python tests only** (mid-step iteration, Python changed) | See below | Python unit + integration tests |
-| **C++ tests only** (mid-step iteration, C++/IDL/CMake changed) | See below | C++ GTest tests via CTest |
-| **Skip rebuild** (tests only, install tree already current) | `bash scripts/ci.sh --skip-build` | All gates except CMake build/install |
+**Convenience flags (same script, narrower scope):**
 
-#### Standalone test commands (require environment setup)
+- `bash scripts/ci.sh --lint` — lint/style gates only (~5 s).
+- `bash scripts/ci.sh --skip-build` — all gates except CMake
+  build/install.
 
-The standalone `pytest` and `ctest` commands require
-`install/setup.bash` to be sourced first. This sets
-`NDDS_QOS_PROFILES`, `LD_LIBRARY_PATH`, `PYTHONPATH`, and activates
-the Python venv. Source it once per terminal session.
-
-**Python tests:**
+#### Command 2 — Python tests only
 
 ```bash
 source install/setup.bash
-python -m pytest tests/ -x -q
+python -m pytest -x --tb=short -q
 ```
 
-**C++ tests:**
+**When to use:** Mid-step iteration when only Python source or test
+files changed. This is the fast-feedback loop — use it freely while
+coding. It must NOT replace Command 1 at mandatory checkpoints.
+
+**Flags are mandatory and fixed:**
+
+| Flag | Purpose |
+|------|---------|
+| `-x` | Stop on first failure — fix before continuing |
+| `--tb=short` | Show concise tracebacks — enough to diagnose, not excessive |
+| `-q` | Quiet progress — summary line at the end |
+
+Note: `pyproject.toml` defines `addopts = "-n auto --dist loadgroup"`
+which enables parallel execution via pytest-xdist. These flags are
+always active and must not be overridden unless explicitly debugging
+an xdist-specific issue (in which case use `-o "addopts="` to disable
+temporarily, then restore before committing).
+
+To run a single test file or test class during focused iteration:
+
+```bash
+source install/setup.bash
+python -m pytest tests/path/to/test_file.py -x --tb=short -q
+```
+
+To run a single test by name:
+
+```bash
+source install/setup.bash
+python -m pytest tests/path/to/test_file.py::TestClass::test_name -x --tb=short -q
+```
+
+#### Command 3 — C++ tests only
+
+```bash
+source install/setup.bash
+ctest --test-dir build --output-on-failure
+```
+
+**When to use:** Mid-step iteration when C++, IDL, or CMake files
+changed. Always rebuild first:
 
 ```bash
 source install/setup.bash
 cmake --build build && ctest --test-dir build --output-on-failure
 ```
 
-**Expected result for every gate command:** zero failures, zero skips,
-zero expected-failures. Any non-zero exit code blocks the current step.
+#### Interpreting results
 
-During a step, agents may use the standalone commands for fast feedback.
-At the three mandatory checkpoints — session start, pre-commit, and
-session end — the full `bash scripts/ci.sh` is required.
+**The exit code is the sole source of truth.** Exit code 0 means all
+tests passed. Non-zero means something failed.
+
+Do not pipe test output through `grep`, `tail`, `head`, `awk`, or
+any other filter to determine pass/fail. Do not parse stdout for
+strings like "passed" or "failed." Do not re-run a test command
+because output was truncated by a pipe or timeout.
+
+If a command produces too much output to read, use the flags above
+(`--tb=short -q` for pytest, `--output-on-failure` for ctest) —
+these are already calibrated for the right verbosity level.
+
+#### Terminal execution rules
+
+1. **No timeouts on test commands.** Use timeout 0 (unlimited) when
+   executing test commands in a terminal tool. Tests have their own
+   internal timeouts. Prematurely killing a test run wastes time and
+   requires a re-run.
+2. **No output pipes.** Run test commands bare — no `| tail`, no
+   `| grep`, no `2>&1 | head`. The full output must be visible for
+   diagnosis if a test fails.
+3. **One run is authoritative.** If a test command exits 0, the gate
+   is passed. Do not re-run "to be sure." If it exits non-zero, the
+   gate is failed — diagnose and fix, do not re-run hoping for a
+   different result (if flakiness is suspected, that is a separate
+   issue to investigate and fix, not to retry past).
+4. **Environment sourcing.** Commands 2 and 3 require
+   `source install/setup.bash` once per terminal session. This sets
+   `NDDS_QOS_PROFILES`, `LD_LIBRARY_PATH`, `PYTHONPATH`, and
+   activates the Python venv. Command 1 (`ci.sh`) handles this
+   internally and requires no pre-sourcing.
 
 ---
 

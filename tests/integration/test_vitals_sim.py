@@ -437,6 +437,7 @@ class TestBedsideMonitorServiceIntegration:
         p = dds.DomainParticipant.default_participant_qos
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
+        p.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
         dp = dds.DomainParticipant(10, p)
 
         provider = dds.QosProvider.default
@@ -456,6 +457,7 @@ class TestBedsideMonitorServiceIntegration:
         p = dds.DomainParticipant.default_participant_qos
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
+        p.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
         dp = dds.DomainParticipant(10, p)
 
         provider = dds.QosProvider.default
@@ -473,6 +475,7 @@ class TestBedsideMonitorServiceIntegration:
         p = dds.DomainParticipant.default_participant_qos
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
+        p.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
         dp = dds.DomainParticipant(10, p)
 
         provider = dds.QosProvider.default
@@ -511,10 +514,19 @@ class TestBedsideMonitorServiceIntegration:
         block size @integration @streaming"""
         assert wait_for_reader_match(waveform_reader, timeout_sec=5)
 
-        monitor.tick_waveform()
+        # WaveformData uses Patterns::Stream (BEST_EFFORT).  The writer
+        # may not have completed endpoint discovery even after the reader
+        # sees it — writes to an unmatched reader are silently discarded.
+        # Retry publish-then-check until data arrives or timeout.
+        deadline = time.monotonic() + 5.0
+        samples = []
+        while time.monotonic() < deadline:
+            monitor.tick_waveform()
+            _wait_data_available(waveform_reader, timeout_sec=0.5)
+            samples = [s for s in waveform_reader.take() if s.info.valid]
+            if samples:
+                break
 
-        _wait_data_available(waveform_reader)
-        samples = [s for s in waveform_reader.take() if s.info.valid]
         assert len(samples) >= 1, "No waveform samples received"
 
         sample = samples[-1].data
@@ -534,6 +546,7 @@ class TestBedsideMonitorServiceIntegration:
         p = dds.DomainParticipant.default_participant_qos
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
+        p.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
         dp = dds.DomainParticipant(10, p)
 
         provider = dds.QosProvider.default
@@ -585,7 +598,7 @@ class TestBedsideMonitorServiceIntegration:
         # Now send normal readings — no alarm transitions expected (stable)
         alarm_reader.take()  # drain
         monitor.tick_vitals()  # still high HR
-        time.sleep(0.3)
+        _wait_data_available(alarm_reader, timeout_sec=0.3)
         stable_samples = [s for s in alarm_reader.take() if s.info.valid]
         stable_hr_alarms = [
             s.data for s in stable_samples if s.data.alarm_code == "HR_HIGH"

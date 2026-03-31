@@ -19,6 +19,14 @@ import time
 
 import pytest
 import rti.connextdds as dds
+from conftest import (
+    make_start_call,
+    make_stop_call,
+    send_rpc,
+    wait_for_data,
+    wait_for_replier,
+    wait_for_status,
+)
 from orchestration import Orchestration
 from rti.rpc import Requester
 
@@ -163,77 +171,6 @@ def rpc_requester(orch_participant):
     req.close()
 
 
-def _wait_for_data(reader, timeout_sec=10.0, min_count=1):
-    """Wait until reader has at least min_count valid samples."""
-    samples = reader.read()
-    valid = [s for s in samples if s.info.valid]
-    if len(valid) >= min_count:
-        return valid
-
-    cond = dds.StatusCondition(reader)
-    cond.enabled_statuses = dds.StatusMask.DATA_AVAILABLE
-    ws = dds.WaitSet()
-    ws += cond
-
-    deadline = time.monotonic() + timeout_sec
-    while True:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            return []
-        try:
-            ws.wait(dds.Duration(int(remaining), int((remaining % 1) * 1_000_000_000)))
-        except dds.TimeoutError:
-            pass
-        samples = reader.read()
-        valid = [s for s in samples if s.info.valid]
-        if len(valid) >= min_count:
-            return valid
-
-
-def _wait_for_replier(requester, timeout_sec=10.0):
-    """Wait until the requester has matched at least one replier."""
-    deadline = time.time() + timeout_sec
-    while time.time() < deadline:
-        if requester.matched_replier_count > 0:
-            return True
-        time.sleep(0.2)
-    return False
-
-
-def _send_rpc(requester, call):
-    """Send an RPC call and return the reply."""
-    request_id = requester.send_request(call)
-    replies = requester.receive_replies(
-        max_wait=dds.Duration(seconds=10),
-        related_request_id=request_id,
-    )
-    for reply, info in replies:
-        if info.valid:
-            return reply
-    return None
-
-
-_CallType = Orchestration.ServiceHostControl.call_type
-
-
-def _make_start_call(service_id: str) -> object:
-    """Build RPC call for start_service."""
-    call = _CallType()
-    _in = _CallType.in_structs[-522153841][1]()
-    _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=[])
-    call.start_service = _in
-    return call
-
-
-def _make_stop_call(service_id: str) -> object:
-    """Build RPC call for stop_service."""
-    call = _CallType()
-    _in = _CallType.in_structs[123337698][1]()
-    _in.service_id = service_id
-    call.stop_service = _in
-    return call
-
-
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -245,7 +182,7 @@ class TestServiceCatalog:
     def test_service_catalog_published(self, robot_service_host, catalog_reader):
         """Robot Service Host publishes ServiceCatalog with correct host_id
         and service_id."""
-        samples = _wait_for_data(catalog_reader, timeout_sec=15)
+        samples = wait_for_data(catalog_reader, timeout_sec=15)
         assert len(samples) >= 1, "No ServiceCatalog samples received"
         matching = [
             s
@@ -271,7 +208,7 @@ class TestServiceCatalog:
         rqos.history.depth = 1
         late_reader = dds.DataReader(sub, topic, rqos)
         try:
-            samples = _wait_for_data(late_reader, timeout_sec=10)
+            samples = wait_for_data(late_reader, timeout_sec=10)
             assert (
                 len(samples) >= 1
             ), "Late-joining reader did not receive ServiceCatalog"
@@ -289,7 +226,7 @@ class TestServiceStatus:
 
     def test_initial_status_stopped(self, robot_service_host, status_reader):
         """Robot Service Host publishes initial ServiceStatus with STOPPED."""
-        samples = _wait_for_data(status_reader, timeout_sec=15)
+        samples = wait_for_data(status_reader, timeout_sec=15)
         assert len(samples) >= 1, "No ServiceStatus samples received"
         matching = [s for s in samples if s.data.host_id == HOST_ID]
         assert matching, f"No ServiceStatus for {HOST_ID}"
@@ -302,31 +239,31 @@ class TestRpcServiceControl:
 
     def test_rpc_discovery(self, robot_service_host, rpc_requester):
         """RPC requester discovers the ServiceHostControl replier."""
-        found = _wait_for_replier(rpc_requester, timeout_sec=15)
+        found = wait_for_replier(rpc_requester, timeout_sec=15)
         assert found, f"RPC requester did not discover ServiceHostControl/{HOST_ID}"
 
     def test_get_capabilities(self, robot_service_host, rpc_requester):
         """get_capabilities returns supported services."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
+        wait_for_replier(rpc_requester, timeout_sec=10)
         call = Orchestration.ServiceHostControl.call_type()
         # get_capabilities takes no parameters — use the In struct directly
         # The union discriminator selects get_capabilities when set
         call.get_capabilities = Orchestration.ServiceHostControl.call_type.in_structs[
             -385927898
         ][1]()
-        reply = _send_rpc(rpc_requester, call)
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for get_capabilities"
         result = reply.get_capabilities.result.return_
         assert result.capacity >= 1
 
     def test_get_health(self, robot_service_host, rpc_requester):
         """get_health returns alive=True."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
+        wait_for_replier(rpc_requester, timeout_sec=10)
         call = Orchestration.ServiceHostControl.call_type()
         call.get_health = Orchestration.ServiceHostControl.call_type.in_structs[
             -1076937166
         ][1]()
-        reply = _send_rpc(rpc_requester, call)
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for get_health"
         result = reply.get_health.result.return_
         assert result.alive
@@ -335,18 +272,18 @@ class TestRpcServiceControl:
         self, robot_service_host, rpc_requester
     ):
         """stop_service on a non-running service returns NOT_RUNNING."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_stop_call("RobotControllerService")
-        reply = _send_rpc(rpc_requester, call)
+        wait_for_replier(rpc_requester, timeout_sec=10)
+        call = make_stop_call("RobotControllerService")
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for stop_service"
         result = reply.stop_service.result.return_
         assert result.code == Orchestration.OperationResultCode.NOT_RUNNING
 
     def test_start_service_ok(self, robot_service_host, rpc_requester, status_reader):
         """start_service creates and starts the RobotControllerService."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_start_call("RobotControllerService")
-        reply = _send_rpc(rpc_requester, call)
+        wait_for_replier(rpc_requester, timeout_sec=10)
+        call = make_start_call("RobotControllerService")
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for start_service"
         assert (
             reply.discriminator != 0
@@ -355,61 +292,42 @@ class TestRpcServiceControl:
         assert result.code == Orchestration.OperationResultCode.OK
 
         # Wait for RUNNING state to be published via ServiceStatus
-        deadline = time.time() + 15
-        found_running = False
-        while time.time() < deadline:
-            samples = status_reader.take()
-            for s in samples:
-                if (
-                    s.info.valid
-                    and s.data.host_id == HOST_ID
-                    and s.data.state == Orchestration.ServiceState.RUNNING
-                ):
-                    found_running = True
-                    break
-            if found_running:
-                break
-            time.sleep(0.2)
-        assert found_running, "ServiceStatus never reached RUNNING"
+        assert wait_for_status(
+            status_reader,
+            HOST_ID,
+            "RobotControllerService",
+            Orchestration.ServiceState.RUNNING,
+        ), "ServiceStatus never reached RUNNING"
 
     def test_start_already_running_returns_already_running(
         self, robot_service_host, rpc_requester
     ):
         """start_service on an already-running service returns ALREADY_RUNNING."""
         # Service was started by the previous test (module-scoped host)
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_start_call("RobotControllerService")
-        reply = _send_rpc(rpc_requester, call)
+        wait_for_replier(rpc_requester, timeout_sec=10)
+        call = make_start_call("RobotControllerService")
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for start_service"
         result = reply.start_service.result.return_
         assert result.code == Orchestration.OperationResultCode.ALREADY_RUNNING
 
     def test_stop_service_ok(self, robot_service_host, rpc_requester, status_reader):
         """stop_service stops the running service and publishes STOPPED."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_stop_call("RobotControllerService")
-        reply = _send_rpc(rpc_requester, call)
+        wait_for_replier(rpc_requester, timeout_sec=10)
+        call = make_stop_call("RobotControllerService")
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for stop_service"
         result = reply.stop_service.result.return_
         assert result.code == Orchestration.OperationResultCode.OK
 
         # Verify STOPPED state published
-        deadline = time.time() + 10
-        found_stopped = False
-        while time.time() < deadline:
-            samples = status_reader.take()
-            for s in samples:
-                if (
-                    s.info.valid
-                    and s.data.host_id == HOST_ID
-                    and s.data.state == Orchestration.ServiceState.STOPPED
-                ):
-                    found_stopped = True
-                    break
-            if found_stopped:
-                break
-            time.sleep(0.2)
-        assert found_stopped, "ServiceStatus never reached STOPPED after stop"
+        assert wait_for_status(
+            status_reader,
+            HOST_ID,
+            "RobotControllerService",
+            Orchestration.ServiceState.STOPPED,
+            timeout_sec=10.0,
+        ), "ServiceStatus never reached STOPPED after stop"
 
 
 class TestDomainIsolation:

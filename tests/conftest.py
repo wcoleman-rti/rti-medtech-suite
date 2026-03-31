@@ -6,10 +6,54 @@ per vision/data-model.md). QoS profiles are loaded from NDDS_QOS_PROFILES.
 """
 
 import os
+import signal
+import subprocess
 import time
 
 import pytest
 import rti.connextdds as dds
+
+# -------------------------------------------------------------------
+# Zombie process guard
+# -------------------------------------------------------------------
+
+_SERVICE_HOST_PATTERNS = [
+    "surgical_procedure.clinical_service_host",
+    "surgical_procedure.operational_service_host",
+    "robot-service-host",
+]
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _kill_zombie_service_hosts():
+    """Kill leftover service-host processes from prior test runs.
+
+    DDS participants in zombie processes publish stale ServiceCatalog/
+    ServiceStatus data that contaminates readers in the current run.
+    """
+    my_pid = os.getpid()
+    for pattern in _SERVICE_HOST_PATTERNS:
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", pattern],
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            break  # pgrep not available
+        for line in result.stdout.strip().splitlines():
+            pid_str = line.strip()
+            if not pid_str:
+                continue
+            pid = int(pid_str)
+            if pid == my_pid:
+                continue
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+    time.sleep(0.5)
+    yield
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -204,33 +248,128 @@ def wait_for_reader_match(reader, timeout_sec=5.0):
 
 
 def wait_for_data(reader, timeout_sec=5.0, count=1):
-    """Wait until reader has at least `count` valid samples.
+    """Wait until reader has at least ``count`` unread valid samples.
 
-    Uses StatusCondition(DATA_AVAILABLE) + WaitSet for event-driven
-    wakeup instead of polling, so data is detected within milliseconds
-    of arrival.
+    Uses a ReadCondition(NOT_READ, ANY, ALIVE) + WaitSet so the wait
+    only triggers when genuinely new, alive data arrives — avoiding
+    spurious wakeups from lifecycle events or already-read samples.
     """
-    # Fast path: data already available
-    samples = reader.read()
-    valid = [s for s in samples if s.info.valid]
-    if len(valid) >= count:
-        return valid
-
-    cond = dds.StatusCondition(reader)
-    cond.enabled_statuses = dds.StatusMask.DATA_AVAILABLE
+    condition = dds.ReadCondition(
+        reader,
+        dds.DataState(
+            dds.SampleState.NOT_READ,
+            dds.ViewState.ANY,
+            dds.InstanceState.ALIVE,
+        ),
+    )
     waitset = dds.WaitSet()
-    waitset += cond
+    waitset += condition
 
     deadline = time.monotonic() + timeout_sec
-    while True:
+    collected = []
+    while len(collected) < count:
+        for sample in reader.select().condition(condition).read():
+            if sample.info.valid:
+                collected.append(sample)
+        if len(collected) >= count:
+            break
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            return []
+            break
         try:
             waitset.wait(_to_duration(remaining))
         except dds.TimeoutError:
-            pass
-        samples = reader.read()
-        valid = [s for s in samples if s.info.valid]
-        if len(valid) >= count:
-            return valid
+            break
+    return collected
+
+
+def wait_for_status(reader, host_id, service_id, target_state, timeout_sec=15.0):
+    """Wait for a ServiceStatus sample matching host/service/state.
+
+    Uses a ReadCondition(NOT_READ, ANY, ALIVE) + WaitSet to avoid
+    wakeups from already-consumed transitions.  Samples are taken
+    (consumed) so repeated calls see only new transitions.
+    """
+    condition = dds.ReadCondition(
+        reader,
+        dds.DataState(
+            dds.SampleState.NOT_READ,
+            dds.ViewState.ANY,
+            dds.InstanceState.ALIVE,
+        ),
+    )
+    waitset = dds.WaitSet()
+    waitset += condition
+
+    deadline = time.monotonic() + timeout_sec
+    while True:
+        for sample in reader.select().condition(condition).take():
+            if (
+                sample.info.valid
+                and sample.data.host_id == host_id
+                and sample.data.service_id == service_id
+                and sample.data.state == target_state
+            ):
+                return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        try:
+            waitset.wait(_to_duration(remaining))
+        except dds.TimeoutError:
+            return False
+
+
+def wait_for_replier(requester, timeout_sec=10.0):
+    """Wait until the requester has matched at least one replier.
+
+    Requester exposes no StatusCondition — poll at 50 ms.
+    """
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        if requester.matched_replier_count > 0:
+            return True
+        time.sleep(0.05)
+    return False
+
+
+def send_rpc(requester, call, timeout_sec=10):
+    """Send an RPC call and return the first valid reply (or None)."""
+    request_id = requester.send_request(call)
+    replies = requester.receive_replies(
+        max_wait=dds.Duration(seconds=timeout_sec),
+        related_request_id=request_id,
+    )
+    for reply, info in replies:
+        if info.valid:
+            return reply
+    return None
+
+
+# -------------------------------------------------------------------
+# Orchestration RPC call builders (lazy-import orchestration module)
+# -------------------------------------------------------------------
+
+
+def make_start_call(service_id: str):
+    """Build an RPC call to start_service."""
+    from orchestration import Orchestration
+
+    ct = Orchestration.ServiceHostControl.call_type
+    call = ct()
+    _in = ct.in_structs[-522153841][1]()
+    _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=[])
+    call.start_service = _in
+    return call
+
+
+def make_stop_call(service_id: str):
+    """Build an RPC call to stop_service."""
+    from orchestration import Orchestration
+
+    ct = Orchestration.ServiceHostControl.call_type
+    call = ct()
+    _in = ct.in_structs[123337698][1]()
+    _in.service_id = service_id
+    call.stop_service = _in
+    return call

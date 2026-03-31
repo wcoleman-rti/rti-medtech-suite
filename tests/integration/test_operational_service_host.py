@@ -18,6 +18,14 @@ import time
 
 import pytest
 import rti.connextdds as dds
+from conftest import (
+    make_start_call,
+    make_stop_call,
+    send_rpc,
+    wait_for_data,
+    wait_for_replier,
+    wait_for_status,
+)
 from orchestration import Orchestration
 from rti.rpc import Requester
 
@@ -145,62 +153,6 @@ def rpc_requester(orch_participant):
     req.close()
 
 
-def _wait_for_data(reader, timeout_sec=10.0, min_count=1):
-    """Wait until reader has at least min_count valid samples."""
-    deadline = time.time() + timeout_sec
-    while time.time() < deadline:
-        samples = reader.read()
-        valid = [s for s in samples if s.info.valid]
-        if len(valid) >= min_count:
-            return valid
-        time.sleep(0.2)
-    return []
-
-
-def _wait_for_replier(requester, timeout_sec=10.0):
-    """Wait until the requester has matched at least one replier."""
-    deadline = time.time() + timeout_sec
-    while time.time() < deadline:
-        if requester.matched_replier_count > 0:
-            return True
-        time.sleep(0.2)
-    return False
-
-
-def _send_rpc(requester, call):
-    """Send an RPC call and return the reply."""
-    request_id = requester.send_request(call)
-    replies = requester.receive_replies(
-        max_wait=dds.Duration(seconds=10),
-        related_request_id=request_id,
-    )
-    for reply, info in replies:
-        if info.valid:
-            return reply
-    return None
-
-
-_CallType = Orchestration.ServiceHostControl.call_type
-
-
-def _make_start_call(service_id: str) -> object:
-    """Build RPC call for start_service."""
-    call = _CallType()
-    _in = _CallType.in_structs[-522153841][1]()
-    _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=[])
-    call.start_service = _in
-    return call
-
-
-def _make_stop_call(service_id: str) -> object:
-    """Build RPC call for stop_service."""
-    call = _CallType()
-    _in = _CallType.in_structs[123337698][1]()
-    _in.service_id = service_id
-    call.stop_service = _in
-    return call
-
-
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -211,7 +163,7 @@ class TestOperationalServiceCatalog:
 
     def test_service_catalog_published(self, operational_service_host, catalog_reader):
         """Operational Service Host publishes ServiceCatalog for each service."""
-        samples = _wait_for_data(catalog_reader, timeout_sec=15, min_count=2)
+        samples = wait_for_data(catalog_reader, timeout_sec=15, count=2)
         assert len(samples) >= 2, "Expected at least 2 ServiceCatalog samples"
         matching = [s for s in samples if s.data.host_id == HOST_ID]
         assert len(matching) >= 2, f"No ServiceCatalog for {HOST_ID}"
@@ -225,9 +177,14 @@ class TestOperationalServiceStatus:
 
     def test_initial_status_stopped(self, operational_service_host, status_reader):
         """Operational Service Host publishes initial ServiceStatus STOPPED."""
-        deadline = time.time() + 15
+        cond = dds.StatusCondition(status_reader)
+        cond.enabled_statuses = dds.StatusMask.DATA_AVAILABLE
+        ws = dds.WaitSet()
+        ws += cond
+
+        deadline = time.monotonic() + 15
         svc_ids: set[str] = set()
-        while time.time() < deadline:
+        while True:
             samples = status_reader.read()
             for s in samples:
                 if s.info.valid and s.data.host_id == HOST_ID:
@@ -235,7 +192,15 @@ class TestOperationalServiceStatus:
                     assert s.data.state == Orchestration.ServiceState.STOPPED
             if len(svc_ids) >= 2:
                 break
-            time.sleep(0.2)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                ws.wait(
+                    dds.Duration(int(remaining), int((remaining % 1) * 1_000_000_000))
+                )
+            except dds.TimeoutError:
+                break
         assert "CameraService" in svc_ids
         assert "ProcedureContextService" in svc_ids
 
@@ -245,17 +210,17 @@ class TestOperationalRpcControl:
 
     def test_rpc_discovery(self, operational_service_host, rpc_requester):
         """RPC requester discovers the ServiceHostControl replier."""
-        found = _wait_for_replier(rpc_requester, timeout_sec=15)
+        found = wait_for_replier(rpc_requester, timeout_sec=15)
         assert found, f"Requester did not discover ServiceHostControl/{HOST_ID}"
 
     def test_get_capabilities(self, operational_service_host, rpc_requester):
         """get_capabilities returns both operational services."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
+        wait_for_replier(rpc_requester, timeout_sec=10)
         call = Orchestration.ServiceHostControl.call_type()
         call.get_capabilities = Orchestration.ServiceHostControl.call_type.in_structs[
             -385927898
         ][1]()
-        reply = _send_rpc(rpc_requester, call)
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for get_capabilities"
         result = reply.get_capabilities.result.return_
         assert result.capacity == 2
@@ -264,65 +229,43 @@ class TestOperationalRpcControl:
         self, operational_service_host, rpc_requester, status_reader
     ):
         """start_service starts CameraService."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_start_call("CameraService")
-        reply = _send_rpc(rpc_requester, call)
+        wait_for_replier(rpc_requester, timeout_sec=10)
+        call = make_start_call("CameraService")
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None
         result = reply.start_service.result.return_
         assert result.code == Orchestration.OperationResultCode.OK
 
-        deadline = time.time() + 15
-        found_running = False
-        while time.time() < deadline:
-            samples = status_reader.take()
-            for s in samples:
-                if (
-                    s.info.valid
-                    and s.data.host_id == HOST_ID
-                    and s.data.service_id == "CameraService"
-                    and s.data.state == Orchestration.ServiceState.RUNNING
-                ):
-                    found_running = True
-                    break
-            if found_running:
-                break
-            time.sleep(0.2)
-        assert found_running, "CameraService never reached RUNNING"
+        assert wait_for_status(
+            status_reader,
+            HOST_ID,
+            "CameraService",
+            Orchestration.ServiceState.RUNNING,
+        ), "CameraService never reached RUNNING"
 
     def test_start_procedure_context(
         self, operational_service_host, rpc_requester, status_reader
     ):
         """start_service starts ProcedureContextService."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_start_call("ProcedureContextService")
-        reply = _send_rpc(rpc_requester, call)
+        wait_for_replier(rpc_requester, timeout_sec=10)
+        call = make_start_call("ProcedureContextService")
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None
         result = reply.start_service.result.return_
         assert result.code == Orchestration.OperationResultCode.OK
 
-        deadline = time.time() + 15
-        found_running = False
-        while time.time() < deadline:
-            samples = status_reader.take()
-            for s in samples:
-                if (
-                    s.info.valid
-                    and s.data.host_id == HOST_ID
-                    and s.data.service_id == "ProcedureContextService"
-                    and s.data.state == Orchestration.ServiceState.RUNNING
-                ):
-                    found_running = True
-                    break
-            if found_running:
-                break
-            time.sleep(0.2)
-        assert found_running, "ProcedureContextService never reached RUNNING"
+        assert wait_for_status(
+            status_reader,
+            HOST_ID,
+            "ProcedureContextService",
+            Orchestration.ServiceState.RUNNING,
+        ), "ProcedureContextService never reached RUNNING"
 
     def test_start_already_running(self, operational_service_host, rpc_requester):
         """start_service on already-running service returns ALREADY_RUNNING."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_start_call("CameraService")
-        reply = _send_rpc(rpc_requester, call)
+        wait_for_replier(rpc_requester, timeout_sec=10)
+        call = make_start_call("CameraService")
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None
         result = reply.start_service.result.return_
         assert result.code == Orchestration.OperationResultCode.ALREADY_RUNNING
@@ -331,36 +274,26 @@ class TestOperationalRpcControl:
         self, operational_service_host, rpc_requester, status_reader
     ):
         """stop_service stops CameraService."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_stop_call("CameraService")
-        reply = _send_rpc(rpc_requester, call)
+        wait_for_replier(rpc_requester, timeout_sec=10)
+        call = make_stop_call("CameraService")
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None
         result = reply.stop_service.result.return_
         assert result.code == Orchestration.OperationResultCode.OK
 
-        deadline = time.time() + 10
-        found_stopped = False
-        while time.time() < deadline:
-            samples = status_reader.take()
-            for s in samples:
-                if (
-                    s.info.valid
-                    and s.data.host_id == HOST_ID
-                    and s.data.service_id == "CameraService"
-                    and s.data.state == Orchestration.ServiceState.STOPPED
-                ):
-                    found_stopped = True
-                    break
-            if found_stopped:
-                break
-            time.sleep(0.2)
-        assert found_stopped, "CameraService never reached STOPPED"
+        assert wait_for_status(
+            status_reader,
+            HOST_ID,
+            "CameraService",
+            Orchestration.ServiceState.STOPPED,
+            timeout_sec=10.0,
+        ), "CameraService never reached STOPPED"
 
     def test_stop_non_running(self, operational_service_host, rpc_requester):
         """stop_service on non-running service returns NOT_RUNNING."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_stop_call("CameraService")
-        reply = _send_rpc(rpc_requester, call)
+        wait_for_replier(rpc_requester, timeout_sec=10)
+        call = make_stop_call("CameraService")
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None
         result = reply.stop_service.result.return_
         assert result.code == Orchestration.OperationResultCode.NOT_RUNNING
@@ -369,27 +302,17 @@ class TestOperationalRpcControl:
         self, operational_service_host, rpc_requester, status_reader
     ):
         """stop_service stops ProcedureContextService."""
-        _wait_for_replier(rpc_requester, timeout_sec=10)
-        call = _make_stop_call("ProcedureContextService")
-        reply = _send_rpc(rpc_requester, call)
+        wait_for_replier(rpc_requester, timeout_sec=10)
+        call = make_stop_call("ProcedureContextService")
+        reply = send_rpc(rpc_requester, call)
         assert reply is not None
         result = reply.stop_service.result.return_
         assert result.code == Orchestration.OperationResultCode.OK
 
-        deadline = time.time() + 10
-        found_stopped = False
-        while time.time() < deadline:
-            samples = status_reader.take()
-            for s in samples:
-                if (
-                    s.info.valid
-                    and s.data.host_id == HOST_ID
-                    and s.data.service_id == "ProcedureContextService"
-                    and s.data.state == Orchestration.ServiceState.STOPPED
-                ):
-                    found_stopped = True
-                    break
-            if found_stopped:
-                break
-            time.sleep(0.2)
-        assert found_stopped, "ProcedureContextService never reached STOPPED"
+        assert wait_for_status(
+            status_reader,
+            HOST_ID,
+            "ProcedureContextService",
+            Orchestration.ServiceState.STOPPED,
+            timeout_sec=10.0,
+        ), "ProcedureContextService never reached STOPPED"
