@@ -58,7 +58,7 @@ class TestDomainTagIsolation:
         r = reader_factory(p2, topic2)
 
         # Wait and verify no discovery
-        time.sleep(2)
+        time.sleep(0.5)
         assert (
             not w.matched_subscriptions
         ), f"Tag '{tag_a}' writer should not match tag '{tag_b}' reader"
@@ -107,7 +107,7 @@ class TestCrossDomainIsolation:
         r = reader_factory(p2, topic2)
 
         # Wait for discovery timeout
-        time.sleep(2)
+        time.sleep(0.5)
         assert not w.matched_subscriptions, "Cross-domain endpoints should not match"
         assert not r.matched_publications, "Cross-domain endpoints should not match"
 
@@ -126,14 +126,14 @@ class TestCrossDomainIsolation:
         w = writer_factory(p1, topic1)
         r = reader_factory(p2, topic2)
 
-        time.sleep(2)
+        time.sleep(0.5)
 
         sample = PatientVitals()
         sample.patient_id = "cross-domain-msg"
         sample.heart_rate = 42
         w.write(sample)
 
-        time.sleep(1)
+        time.sleep(0.5)
         received = r.read()
         valid = [s for s in received if s.info.valid]
         assert len(valid) == 0, "No data should cross domain boundaries"

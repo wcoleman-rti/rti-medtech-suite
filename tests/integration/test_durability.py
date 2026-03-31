@@ -66,7 +66,10 @@ class TestTransientLocalLateJoiner:
 
         r = reader_factory(p2, topic2, qos=rqos)
         assert wait_for_discovery(w, r, timeout_sec=10)
-        time.sleep(1)
+        try:
+            r.wait_for_historical_data(dds.Duration(5))
+        except dds.TimeoutError:
+            pass
 
         received = r.take()
         valid = [s for s in received if s.info.valid]
@@ -117,7 +120,7 @@ class TestVolatileNoHistory:
 
         r = reader_factory(p2, topic2, qos=rqos)
         assert wait_for_discovery(w, r, timeout_sec=10)
-        time.sleep(1)
+        time.sleep(0.5)
 
         received = r.read()
         valid = [s for s in received if s.info.valid]

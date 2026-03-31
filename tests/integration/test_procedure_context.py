@@ -153,7 +153,6 @@ class TestProcedureContext:
             anesthesiologist="Dr. Baker",
         )
         writer.write(ctx)
-        time.sleep(0.5)
 
         # Now create the late-joining reader
         reader_p = participant_factory(
@@ -208,7 +207,7 @@ class TestProcedureContext:
         # Publish initial context
         ctx1 = _make_context(procedure_id="proc-003", surgeon="Dr. Chen")
         writer.write(ctx1)
-        time.sleep(0.3)
+        writer.wait_for_acknowledgments(dds.Duration(5))
 
         # Consume initial sample
         reader.take()
@@ -252,7 +251,6 @@ class TestProcedureStatus:
         # Publish in-progress status
         status = _make_status(procedure_id="proc-010")
         writer.write(status)
-        time.sleep(0.5)
 
         # Late-joining reader
         reader_p = participant_factory(
@@ -306,7 +304,7 @@ class TestProcedureStatus:
 
         # Publish IN_PROGRESS
         writer.write(_make_status(procedure_id="proc-011", message="In progress"))
-        time.sleep(0.3)
+        writer.wait_for_acknowledgments(dds.Duration(5))
         reader.take()  # consume initial
 
         # Transition to COMPLETING

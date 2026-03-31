@@ -617,6 +617,107 @@ per [vision/data-model.md](data-model.md) System Contract #7.
 - Test helpers and factories live in `conftest.py` (Python) or a `testing/`
   support directory (C++), not inline in test files.
 
+### Integration Test Timing Patterns (Python)
+
+DDS integration tests must **never** use `time.sleep()` to wait for
+discovery or data delivery. Use the appropriate DDS blocking primitive
+instead. `time.sleep()` is permitted only for negative-proof assertions
+(see below).
+
+#### Discovery Waits
+
+Use `StatusCondition` with `SUBSCRIPTION_MATCHED` or
+`PUBLICATION_MATCHED` and a `WaitSet`:
+
+```python
+from conftest import wait_for_discovery, wait_for_reader_match
+
+# When you have both writer and reader:
+wait_for_discovery(writer, reader, timeout_sec=5.0)
+
+# When writing against a service (writer is encapsulated):
+wait_for_reader_match(reader, timeout_sec=5.0)
+```
+
+Do not use `time.sleep()` for discovery — it adds 20× more delay than
+necessary on localhost.
+
+#### Data Delivery Waits
+
+Use `StatusCondition(DATA_AVAILABLE)` + `WaitSet`:
+
+```python
+from conftest import wait_for_data
+
+samples = wait_for_data(reader, timeout_sec=5.0, count=1)
+```
+
+#### TRANSIENT_LOCAL Late-Joiner Reads
+
+Use `DataReader.wait_for_historical_data()`:
+
+```python
+reader.wait_for_historical_data(dds.Duration(5))
+samples = reader.take()
+```
+
+This blocks until cached historical samples have been delivered by the
+matched writer.
+
+#### Reliable Write-Then-Read
+
+Use `DataWriter.wait_for_acknowledgments()` after writing, before the
+reader takes:
+
+```python
+writer.write(sample)
+writer.wait_for_acknowledgments(dds.Duration(5))
+received = reader.take()
+```
+
+#### Subprocess / Service Host Readiness
+
+When a fixture launches a subprocess that creates DDS entities, do not
+use `time.sleep()`. Instead, create a probe reader on the subprocess's
+topic and wait for discovery + historical data:
+
+```python
+probe = dds.DynamicData.DataReader(participant, topic, reader_qos)
+wait_for_reader_match(probe, timeout_sec=10.0)
+probe.wait_for_historical_data(dds.Duration(5))
+probe.close()
+```
+
+#### Negative-Proof Assertions (Non-Delivery)
+
+The only acceptable use of `time.sleep()` in integration tests is for
+negative proofs — verifying that data does **not** arrive on an
+isolated reader (e.g., cross-domain or cross-partition isolation).
+Use `time.sleep(0.5)`. Do not exceed 1 second unless testing a
+time-dependent QoS such as lifespan expiry.
+
+```python
+time.sleep(0.5)
+assert len(isolated_reader.take()) == 0, "Data leaked across domains"
+```
+
+#### Parallel Execution (pytest-xdist)
+
+The test suite runs in parallel via `pytest-xdist` with
+`--dist loadgroup`. Tests that share DDS domain 15 (orchestration)
+must be grouped:
+
+```python
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.xdist_group("orch"),
+]
+```
+
+Domain 10 tests are safe for parallel execution because domain tags
+(`clinical`, `operational`, `control`) provide partition-level
+isolation. Tests on domain 0 or unique domains are also safe.
+
 ---
 
 ## Enforcement

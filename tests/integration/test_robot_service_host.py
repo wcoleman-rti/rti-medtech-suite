@@ -22,7 +22,11 @@ import rti.connextdds as dds
 from orchestration import Orchestration
 from rti.rpc import Requester
 
-pytestmark = [pytest.mark.integration, pytest.mark.orchestration]
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.orchestration,
+    pytest.mark.xdist_group("orch"),
+]
 
 ORCHESTRATION_DOMAIN_ID = 15
 PROCEDURE_DOMAIN_ID = 10
@@ -39,7 +43,8 @@ ROOM_ID = "OR-1"
 def robot_service_host():
     """Start the robot-service-host binary as a subprocess and yield it.
 
-    Waits for the process to be alive, then tears it down after the module.
+    Waits for the process to publish HostCatalog, then tears it down
+    after the module.
     """
     bin_path = os.path.join(
         os.environ.get("MEDTECH_INSTALL", "install"), "bin", "robot-service-host"
@@ -64,11 +69,33 @@ def robot_service_host():
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    # Give it time to start
-    time.sleep(3)
+    # Wait for HostCatalog publication instead of fixed sleep
+    qos = dds.DomainParticipantQos()
+    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+    probe_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
+    probe_dp.enable()
+    topic = dds.Topic(probe_dp, "HostCatalog", Orchestration.HostCatalog)
+    rqos = dds.DataReaderQos()
+    rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
+    rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
+    probe_reader = dds.DataReader(dds.Subscriber(probe_dp), topic, rqos)
+    # Wait for discovery, then for TRANSIENT_LOCAL historical data
+    cond = dds.StatusCondition(probe_reader)
+    cond.enabled_statuses = dds.StatusMask.SUBSCRIPTION_MATCHED
+    ws = dds.WaitSet()
+    ws += cond
+    ready = False
+    try:
+        ws.wait(dds.Duration(10))
+        probe_reader.wait_for_historical_data(dds.Duration(5))
+        ready = True
+    except dds.TimeoutError:
+        pass
+    probe_dp.close()
     assert (
         proc.poll() is None
     ), f"robot-service-host exited immediately with code {proc.returncode}"
+    assert ready, "robot-service-host did not publish HostCatalog within 10 s"
     yield proc
     proc.send_signal(signal.SIGTERM)
     try:
@@ -138,14 +165,29 @@ def rpc_requester(orch_participant):
 
 def _wait_for_data(reader, timeout_sec=10.0, min_count=1):
     """Wait until reader has at least min_count valid samples."""
-    deadline = time.time() + timeout_sec
-    while time.time() < deadline:
+    samples = reader.read()
+    valid = [s for s in samples if s.info.valid]
+    if len(valid) >= min_count:
+        return valid
+
+    cond = dds.StatusCondition(reader)
+    cond.enabled_statuses = dds.StatusMask.DATA_AVAILABLE
+    ws = dds.WaitSet()
+    ws += cond
+
+    deadline = time.monotonic() + timeout_sec
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return []
+        try:
+            ws.wait(dds.Duration(int(remaining), int((remaining % 1) * 1_000_000_000)))
+        except dds.TimeoutError:
+            pass
         samples = reader.read()
         valid = [s for s in samples if s.info.valid]
         if len(valid) >= min_count:
             return valid
-        time.sleep(0.2)
-    return []
 
 
 def _wait_for_replier(requester, timeout_sec=10.0):
@@ -389,7 +431,7 @@ class TestDomainIsolation:
             reader = dds.DataReader(sub, topic, rqos)
 
             # Wait briefly — should get nothing
-            time.sleep(3)
+            time.sleep(0.5)
             samples = reader.read()
             valid = [s for s in samples if s.info.valid]
             assert (

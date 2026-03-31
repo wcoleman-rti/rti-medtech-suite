@@ -129,23 +129,108 @@ def reader_factory():
             pass
 
 
+def _to_duration(timeout_sec):
+    """Convert a float timeout to a dds.Duration."""
+    sec = int(timeout_sec)
+    nanosec = int((timeout_sec - sec) * 1_000_000_000)
+    return dds.Duration(sec, nanosec)
+
+
 def wait_for_discovery(writer, reader, timeout_sec=5.0):
-    """Wait until a writer and reader have discovered each other."""
-    deadline = time.time() + timeout_sec
-    while time.time() < deadline:
-        if writer.matched_subscriptions and reader.matched_publications:
+    """Wait until a writer and reader have discovered each other.
+
+    Uses StatusCondition + WaitSet for event-driven wakeup instead of
+    polling, so discovery is detected within milliseconds of occurring.
+    """
+
+    def discovered():
+        return (
+            writer.publication_matched_status.current_count > 0
+            and reader.subscription_matched_status.current_count > 0
+        )
+
+    if discovered():
+        return True
+
+    writer_cond = dds.StatusCondition(writer)
+    writer_cond.enabled_statuses = dds.StatusMask.PUBLICATION_MATCHED
+    reader_cond = dds.StatusCondition(reader)
+    reader_cond.enabled_statuses = dds.StatusMask.SUBSCRIPTION_MATCHED
+
+    waitset = dds.WaitSet()
+    waitset += writer_cond
+    waitset += reader_cond
+
+    deadline = time.monotonic() + timeout_sec
+    while True:
+        if discovered():
             return True
-        time.sleep(0.05)
-    return False
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        try:
+            waitset.wait(_to_duration(remaining))
+        except dds.TimeoutError:
+            return discovered()
+
+
+def wait_for_reader_match(reader, timeout_sec=5.0):
+    """Wait until a reader has at least one matched publication.
+
+    Uses StatusCondition + WaitSet for event-driven wakeup.
+    Use this when the writer is encapsulated inside a service object
+    and not directly accessible.
+    """
+    if reader.subscription_matched_status.current_count > 0:
+        return True
+
+    cond = dds.StatusCondition(reader)
+    cond.enabled_statuses = dds.StatusMask.SUBSCRIPTION_MATCHED
+
+    waitset = dds.WaitSet()
+    waitset += cond
+
+    deadline = time.monotonic() + timeout_sec
+    while True:
+        if reader.subscription_matched_status.current_count > 0:
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        try:
+            waitset.wait(_to_duration(remaining))
+        except dds.TimeoutError:
+            return reader.subscription_matched_status.current_count > 0
 
 
 def wait_for_data(reader, timeout_sec=5.0, count=1):
-    """Wait until reader has at least `count` samples available."""
-    deadline = time.time() + timeout_sec
-    while time.time() < deadline:
+    """Wait until reader has at least `count` valid samples.
+
+    Uses StatusCondition(DATA_AVAILABLE) + WaitSet for event-driven
+    wakeup instead of polling, so data is detected within milliseconds
+    of arrival.
+    """
+    # Fast path: data already available
+    samples = reader.read()
+    valid = [s for s in samples if s.info.valid]
+    if len(valid) >= count:
+        return valid
+
+    cond = dds.StatusCondition(reader)
+    cond.enabled_statuses = dds.StatusMask.DATA_AVAILABLE
+    waitset = dds.WaitSet()
+    waitset += cond
+
+    deadline = time.monotonic() + timeout_sec
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return []
+        try:
+            waitset.wait(_to_duration(remaining))
+        except dds.TimeoutError:
+            pass
         samples = reader.read()
         valid = [s for s in samples if s.info.valid]
         if len(valid) >= count:
             return valid
-        time.sleep(0.05)
-    return []

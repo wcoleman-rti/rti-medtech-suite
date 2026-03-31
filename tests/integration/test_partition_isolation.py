@@ -99,7 +99,7 @@ class TestDifferentPartitions:
         r = reader_factory(p2, topic2)
 
         # Give discovery time, then confirm no match
-        time.sleep(2)
+        time.sleep(0.5)
         assert not w.matched_subscriptions, "Different partitions should not match"
         assert not r.matched_publications, "Different partitions should not match"
 
@@ -124,7 +124,7 @@ class TestDifferentPartitions:
         w = writer_factory(p1, topic1)
         r = reader_factory(p2, topic2)
 
-        time.sleep(2)
+        time.sleep(0.5)
 
         w.write(_make_vitals("patient-001", 99))
 

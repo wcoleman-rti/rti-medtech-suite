@@ -26,6 +26,7 @@ import common
 import monitoring
 import pytest
 import rti.connextdds as dds
+from conftest import wait_for_reader_match
 from surgical_procedure.vitals_sim._alarm import AlarmEvaluator
 from surgical_procedure.vitals_sim._profiles import PROFILES, baroreceptor_reflex
 from surgical_procedure.vitals_sim._signal import SignalModel
@@ -42,6 +43,20 @@ AlarmState = monitoring.Monitoring.AlarmState
 # -----------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------
+
+
+def _wait_data_available(reader, timeout_sec=2.0):
+    """Block until DATA_AVAILABLE fires on *reader*, or timeout."""
+    cond = dds.StatusCondition(reader)
+    cond.enabled_statuses = dds.StatusMask.DATA_AVAILABLE
+    ws = dds.WaitSet()
+    ws += cond
+    try:
+        sec = int(timeout_sec)
+        nsec = int((timeout_sec - sec) * 1_000_000_000)
+        ws.wait(dds.Duration(sec, nsec))
+    except dds.TimeoutError:
+        pass
 
 
 def _env_override(monkeypatch, **kwargs):
@@ -474,13 +489,11 @@ class TestBedsideMonitorServiceIntegration:
     def test_vitals_published_with_all_fields(self, monitor, vitals_reader):
         """spec: Vitals snapshot published periodically with all required
         measurements @integration"""
-        # Wait for discovery
-        time.sleep(2.0)
+        assert wait_for_reader_match(vitals_reader, timeout_sec=5)
 
         monitor.tick_vitals()
 
-        # Wait for delivery
-        time.sleep(0.5)
+        _wait_data_available(vitals_reader)
         samples = [s for s in vitals_reader.take() if s.info.valid]
         assert len(samples) >= 1, "No vitals samples received"
 
@@ -496,12 +509,11 @@ class TestBedsideMonitorServiceIntegration:
     def test_waveform_published_with_correct_block_size(self, monitor, waveform_reader):
         """spec: Waveform data streams at configured frequency with correct
         block size @integration @streaming"""
-        # Wait for discovery
-        time.sleep(2.0)
+        assert wait_for_reader_match(waveform_reader, timeout_sec=5)
 
         monitor.tick_waveform()
 
-        time.sleep(0.5)
+        _wait_data_available(waveform_reader)
         samples = [s for s in waveform_reader.take() if s.info.valid]
         assert len(samples) >= 1, "No waveform samples received"
 
@@ -533,16 +545,18 @@ class TestBedsideMonitorServiceIntegration:
         reader = dds.DataReader(sub, topic, reader_qos)
         dp.enable()
 
-        # Wait for discovery and TRANSIENT_LOCAL delivery
-        deadline = time.time() + 5.0
-        received = []
-        while time.time() < deadline:
-            for s in reader.take():
-                if s.info.valid:
-                    received.append(s.data)
-            if received:
-                break
-            time.sleep(0.1)
+        # Wait for discovery then TRANSIENT_LOCAL historical data
+        try:
+            cond = dds.StatusCondition(reader)
+            cond.enabled_statuses = dds.StatusMask.SUBSCRIPTION_MATCHED
+            ws = dds.WaitSet()
+            ws += cond
+            ws.wait(dds.Duration(5))
+            reader.wait_for_historical_data(dds.Duration(5))
+        except dds.TimeoutError:
+            pass
+
+        received = [s.data for s in reader.take() if s.info.valid]
 
         dp.close()
         assert len(received) >= 1, "Late joiner did not receive TRANSIENT_LOCAL vitals"
@@ -551,7 +565,7 @@ class TestBedsideMonitorServiceIntegration:
     def test_alarm_published_on_state_transition(self, monitor, alarm_reader):
         """spec: AlarmMessages publishes only on state transitions
         (write-on-change model) @integration"""
-        time.sleep(2.0)
+        assert wait_for_reader_match(alarm_reader, timeout_sec=5)
 
         # Force HR above alarm threshold
         monitor.signals["heart_rate"].set_value(135.0)
@@ -559,7 +573,7 @@ class TestBedsideMonitorServiceIntegration:
 
         monitor.tick_vitals()
 
-        time.sleep(0.5)
+        _wait_data_available(alarm_reader)
         samples = [s for s in alarm_reader.take() if s.info.valid]
         hr_active = [
             s.data
@@ -584,7 +598,7 @@ class TestBedsideMonitorServiceIntegration:
         monitor.signals["heart_rate"].target = 75.0
         monitor.tick_vitals()
 
-        time.sleep(0.5)
+        _wait_data_available(alarm_reader)
         cleared_samples = [s for s in alarm_reader.take() if s.info.valid]
         hr_cleared = [
             s.data

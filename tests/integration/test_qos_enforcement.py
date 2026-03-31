@@ -190,7 +190,7 @@ class TestLifespan:
         # Now create reader — stale sample should NOT be delivered
         r = reader_factory(p2, topic2, qos=rqos)
         wait_for_discovery(w, r, timeout_sec=10)
-        time.sleep(1)
+        time.sleep(0.5)
 
         received = r.read()
         valid = [s for s in received if s.info.valid]
@@ -235,7 +235,10 @@ class TestKeepLast:
         time.sleep(0.1)
         r = reader_factory(p2, topic2, qos=rqos)
         assert wait_for_discovery(w, r, timeout_sec=10)
-        time.sleep(1)
+        try:
+            r.wait_for_historical_data(dds.Duration(5))
+        except dds.TimeoutError:
+            pass
 
         received = r.take()
         valid = [s for s in received if s.info.valid]

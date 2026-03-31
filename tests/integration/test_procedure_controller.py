@@ -30,7 +30,12 @@ PROCEDURE_DOMAIN_ID = 10
 ROOM_ID = "OR-TEST"
 HOST_ID = "test-host-1"
 
-pytestmark = [pytest.mark.integration, pytest.mark.orchestration, pytest.mark.gui]
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.orchestration,
+    pytest.mark.gui,
+    pytest.mark.xdist_group("orch"),
+]
 
 
 # ---------------------------------------------------------------------------
@@ -310,7 +315,7 @@ class TestHospitalReadOnly:
                 rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
                 rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
                 reader = dds.DataReader(sub, topic, rqos)
-                time.sleep(2)
+                time.sleep(0.5)
                 # The controller should have no matched publications
                 assert len(reader.matched_publications) == 0, (
                     "Hospital domain reader matched publications from controller "

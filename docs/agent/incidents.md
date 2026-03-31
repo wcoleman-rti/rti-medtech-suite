@@ -1756,3 +1756,126 @@ after closure. They form the project's decision log.
   `await wait_for_service_async()` → `send_request()` →
   `await wait_for_replies_async()` → `take_replies()`.
 - **Date closed:** 2026-03-30
+
+---
+
+## INC-058: Integration tests used time.sleep() for DDS discovery waits
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Test Suite Optimization
+- **Documents involved:** `tests/conftest.py`,
+  `tests/integration/test_vitals_sim.py`,
+  `tests/integration/test_camera_sim.py`,
+  `docs/agent/vision/coding-standards.md`
+- **Description:** Integration tests used `time.sleep(2.0)` after
+  creating DDS entities to wait for discovery. This added ~20 seconds
+  of fixed delay across the suite. DDS discovery on localhost typically
+  completes in <100 ms, making these sleeps 20× longer than necessary.
+  The proper approach is to use `StatusCondition` with
+  `StatusMask.PUBLICATION_MATCHED` / `StatusMask.SUBSCRIPTION_MATCHED`
+  and a `WaitSet` to block until discovery actually completes, with a
+  generous timeout as a safety net.
+- **Resolution:** Added `wait_for_discovery(writer, reader)` and
+  `wait_for_reader_match(reader)` helpers to `conftest.py`. Both use
+  `StatusCondition` + `WaitSet` and return as soon as matched status
+  counts are > 0. All discovery sleeps in integration tests replaced
+  with these helpers.
+- **Guideline:** Never use `time.sleep()` to wait for DDS discovery.
+  Use `StatusCondition(SUBSCRIPTION_MATCHED / PUBLICATION_MATCHED)` +
+  `WaitSet.wait()` with a timeout. See `conftest.py` helpers.
+- **Date closed:** 2026-03-31
+
+---
+
+## INC-059: Integration tests used polling loops and sleep for data delivery
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Test Suite Optimization
+- **Documents involved:** `tests/conftest.py`,
+  `tests/integration/test_vitals_sim.py`,
+  `tests/integration/test_camera_sim.py`,
+  `tests/integration/test_robot_service_host.py`
+- **Description:** Tests waiting for data samples used either
+  `time.sleep(0.5)` or polling loops with `time.sleep(0.05)`. The DDS
+  API provides `StatusCondition(StatusMask.DATA_AVAILABLE)` + `WaitSet`
+  for event-driven notification. For TRANSIENT_LOCAL late-joiner
+  scenarios, `DataReader.wait_for_historical_data(Duration)` blocks
+  until cached samples are delivered. For reliable write-then-read
+  patterns, `DataWriter.wait_for_acknowledgments(Duration)` ensures
+  the reader has received the sample before proceeding.
+- **Resolution:** Rewrote `wait_for_data()` in `conftest.py` to use
+  `DATA_AVAILABLE` StatusCondition + WaitSet. Applied
+  `wait_for_historical_data()` in durability and QoS enforcement tests.
+  Applied `wait_for_acknowledgments()` in procedure context tests where
+  writes precede takes.
+- **Guideline:** Use the appropriate DDS blocking primitive:
+  - **Discovery:** `StatusCondition(SUBSCRIPTION/PUBLICATION_MATCHED)` +
+    `WaitSet`
+  - **Data arrival:** `StatusCondition(DATA_AVAILABLE)` + `WaitSet`
+  - **Late-joiner (TRANSIENT_LOCAL):** `reader.wait_for_historical_data()`
+  - **Write confirmation (RELIABLE):** `writer.wait_for_acknowledgments()`
+  See the Integration Test Timing Patterns section of
+  `docs/agent/vision/coding-standards.md`.
+- **Date closed:** 2026-03-31
+
+---
+
+## INC-060: Negative-proof sleeps in tests were overly conservative
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Test Suite Optimization
+- **Documents involved:** `tests/integration/test_domain_isolation.py`,
+  `tests/integration/test_partition_isolation.py`,
+  `tests/integration/test_multi_instance.py`,
+  `tests/integration/test_procedure_controller.py`
+- **Description:** "Negative proof" assertions (verifying that data does
+  NOT arrive on an isolated reader) used `time.sleep(2)` or
+  `time.sleep(3)`. On localhost, if data were going to leak across
+  domains or partitions, it would arrive within milliseconds. A 0.5 s
+  sleep provides a generous margin while saving ~1.5–2.5 s per
+  occurrence (accumulated ~15 s across the suite).
+- **Resolution:** Reduced all negative-proof sleeps to `time.sleep(0.5)`.
+- **Guideline:** For negative-proof tests (asserting non-delivery),
+  `time.sleep(0.5)` is sufficient on localhost. Do not exceed 1 second
+  unless testing a time-dependent QoS (e.g., lifespan expiry).
+- **Date closed:** 2026-03-31
+
+---
+
+## INC-061: Parallel test execution requires domain-aware grouping
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-03-31
+- **Phase/Step:** Test Suite Optimization
+- **Documents involved:** `pyproject.toml`, `requirements.txt`,
+  `tests/integration/test_robot_service_host.py`,
+  `tests/integration/test_operational_service_host.py`,
+  `tests/integration/test_clinical_service_host.py`,
+  `tests/integration/test_procedure_controller.py`
+- **Description:** Adding `pytest-xdist` with `--dist loadfile` caused
+  4 test failures. Service host tests on domain 15 (orchestration)
+  launch subprocesses that publish/subscribe on shared topics. When
+  multiple test files ran in parallel on domain 15, the service hosts
+  interfered with each other (unexpected samples, premature matches).
+  Tests on domain 10 were safe because they use distinct domain tags
+  (clinical / operational / control) which provide partition-level
+  isolation.
+- **Resolution:** Switched to `--dist loadgroup`. All test files using
+  domain 15 are marked with `@pytest.mark.xdist_group("orch")`, which
+  forces them to run sequentially on a single xdist worker. All other
+  tests run in parallel across workers.
+- **Guideline:** When adding new integration tests:
+  - Tests on domain 15 (orchestration): add
+    `@pytest.mark.xdist_group("orch")` to `pytestmark`.
+  - Tests on domain 10 with domain tags: safe for parallel execution
+    (existing tag isolation is sufficient).
+  - Tests on domain 0 or unique domains: safe for parallel execution.
+  - If a new domain is shared across files, create a new xdist group.
+- **Date closed:** 2026-03-31

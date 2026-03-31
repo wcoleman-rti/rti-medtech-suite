@@ -14,9 +14,24 @@ import time
 import imaging
 import pytest
 import rti.connextdds as dds
+from conftest import wait_for_reader_match
 from surgical_procedure.camera_sim.camera_service import CameraService
 
 CameraFrame = imaging.Imaging.CameraFrame
+
+
+def _wait_data_available(reader, timeout_sec=2.0):
+    """Block until DATA_AVAILABLE fires on *reader*, or timeout."""
+    cond = dds.StatusCondition(reader)
+    cond.enabled_statuses = dds.StatusMask.DATA_AVAILABLE
+    ws = dds.WaitSet()
+    ws += cond
+    try:
+        sec = int(timeout_sec)
+        nsec = int((timeout_sec - sec) * 1_000_000_000)
+        ws.wait(dds.Duration(sec, nsec))
+    except dds.TimeoutError:
+        pass
 
 
 # -----------------------------------------------------------------------
@@ -132,8 +147,7 @@ class TestCameraServiceIntegration:
         metadata: camera_id, frame_id (sequence), timestamp,
         resolution reference, and image format.
         """
-        # Wait for discovery
-        time.sleep(2.0)
+        assert wait_for_reader_match(frame_reader, timeout_sec=5)
 
         # Publish multiple frames
         published = []
@@ -142,7 +156,7 @@ class TestCameraServiceIntegration:
             time.sleep(0.01)
 
         # Wait for delivery (best-effort — some may be lost)
-        time.sleep(0.5)
+        _wait_data_available(frame_reader)
         samples = [s for s in frame_reader.take() if s.info.valid]
         assert len(samples) >= 1, "No CameraFrame samples received"
 
@@ -162,8 +176,7 @@ class TestCameraServiceIntegration:
         The reader has KEEP_LAST depth=4 (Stream QoS), so we must
         read periodically during publication to collect all frames.
         """
-        # Wait for discovery
-        time.sleep(2.0)
+        assert wait_for_reader_match(frame_reader, timeout_sec=5)
 
         frame_count = 30
         interval = 1.0 / camera.frame_rate_hz
@@ -205,8 +218,7 @@ class TestCameraServiceIntegration:
         CameraFrame uses Stream QoS (BEST_EFFORT) so the reader
         never waits for retransmission.
         """
-        # Wait for discovery
-        time.sleep(2.0)
+        assert wait_for_reader_match(frame_reader, timeout_sec=5)
 
         # Verify QoS is BEST_EFFORT on the reader side
         reader_qos = frame_reader.qos

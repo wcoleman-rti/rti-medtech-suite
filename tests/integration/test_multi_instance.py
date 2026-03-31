@@ -376,7 +376,7 @@ class TestMultiInstanceConcurrent:
         tr1 = dds.Topic(pr1, "CrossCheckVitals", PatientVitals)
         r1 = reader_factory(pr1, tr1)
 
-        time.sleep(2)
+        time.sleep(0.5)
 
         w3.write(_make_vitals("patient-OR3", 99))
         time.sleep(0.5)
