@@ -106,7 +106,7 @@ tag.
 
 ---
 
-## Step 3.4 — Vitals Overview
+## Step 3.4 — Vitals Overview ✅ `08bdc56`
 
 ### Work
 
@@ -117,13 +117,13 @@ tag.
 
 ### Test Gate (spec: hospital-dashboard.md — Vitals Overview)
 
-- [ ] Summarized vitals shown per procedure
-- [ ] Vitals are color-coded by severity (normal/warning/critical)
-- [ ] Dashboard receives vitals on startup via durability
+- [x] Summarized vitals shown per procedure
+- [x] Vitals are color-coded by severity (normal/warning/critical)
+- [x] Dashboard receives vitals on startup via durability
 
 ---
 
-## Step 3.5 — Alert Feed
+## Step 3.5 — Alert Feed ✅
 
 ### Work
 
@@ -134,10 +134,10 @@ tag.
 
 ### Test Gate (spec: hospital-dashboard.md — Alert Feed)
 
-- [ ] Alerts from all ORs appear in unified feed
-- [ ] Feed is filterable by severity
-- [ ] Feed is filterable by room
-- [ ] New alerts appear within 2 seconds with visual highlight
+- [x] Alerts from all ORs appear in unified feed
+- [x] Feed is filterable by severity
+- [x] Feed is filterable by room
+- [x] New alerts appear within 2 seconds with visual highlight
 
 ---
 

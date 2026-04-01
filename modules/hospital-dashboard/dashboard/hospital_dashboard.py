@@ -23,6 +23,7 @@ import asyncio
 from typing import Optional
 
 import app_names
+import clinical_alerts
 import rti.connextdds as dds
 import surgery
 from medtech.dds import initialize_connext
@@ -33,8 +34,9 @@ from medtech.gui import (
     init_theme,
 )
 from medtech.log import ModuleName, init_logging
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -170,6 +172,109 @@ class VitalsRow(QFrame):
         self._bp_label.setStyleSheet(f"color: {bp_c}; font-weight: bold;")
 
 
+# Alert severity → display properties
+AlertSeverity = clinical_alerts.ClinicalAlerts.AlertSeverity
+
+_SEVERITY_COLORS: dict[int, str] = {
+    int(AlertSeverity.UNKNOWN): "#BBBCBC",
+    int(AlertSeverity.INFO): "#004C97",  # RTI Blue
+    int(AlertSeverity.WARNING): "#ED8B00",  # RTI Orange
+    int(AlertSeverity.CRITICAL): "#D32F2F",  # Red
+}
+
+_SEVERITY_ICONS: dict[int, str] = {
+    int(AlertSeverity.UNKNOWN): "\u2753",  # ?
+    int(AlertSeverity.INFO): "\u2139",  # ℹ
+    int(AlertSeverity.WARNING): "\u26A0",  # ⚠
+    int(AlertSeverity.CRITICAL): "\u2757",  # ❗
+}
+
+_SEVERITY_TEXT: dict[int, str] = {
+    int(AlertSeverity.UNKNOWN): "UNKNOWN",
+    int(AlertSeverity.INFO): "INFO",
+    int(AlertSeverity.WARNING): "WARNING",
+    int(AlertSeverity.CRITICAL): "CRITICAL",
+}
+
+# Highlight duration for new alerts (ms)
+_ALERT_HIGHLIGHT_MS = 3000
+
+
+class AlertEntry(QFrame):
+    """Widget for a single alert in the alert feed."""
+
+    def __init__(
+        self,
+        alert_id: str,
+        severity: int,
+        room: str,
+        patient_name: str,
+        message: str,
+        category: str = "",
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self.alert_id = alert_id
+        self.severity_int = severity
+        self.room = room
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setObjectName("alertEntry")
+
+        color = _SEVERITY_COLORS.get(severity, "#BBBCBC")
+        icon = _SEVERITY_ICONS.get(severity, "\u2753")
+        sev_text = _SEVERITY_TEXT.get(severity, "UNKNOWN")
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(6, 4, 6, 4)
+        layout.setSpacing(8)
+
+        self._icon_label = QLabel(icon)
+        self._icon_label.setFixedWidth(20)
+        self._icon_label.setStyleSheet(f"color: {color}; font-size: 16px;")
+        layout.addWidget(self._icon_label)
+
+        self._severity_label = QLabel(sev_text)
+        self._severity_label.setFixedWidth(70)
+        self._severity_label.setStyleSheet(f"color: {color}; font-weight: bold;")
+        layout.addWidget(self._severity_label)
+
+        self._room_label = QLabel(room if room else "—")
+        self._room_label.setFixedWidth(60)
+        layout.addWidget(self._room_label)
+
+        self._patient_label = QLabel(patient_name if patient_name else "—")
+        self._patient_label.setFixedWidth(100)
+        layout.addWidget(self._patient_label)
+
+        self._category_label = QLabel(category)
+        self._category_label.setFixedWidth(60)
+        self._category_label.setStyleSheet("color: #666666; font-size: 11px;")
+        layout.addWidget(self._category_label)
+
+        self._msg_label = QLabel(message)
+        self._msg_label.setWordWrap(True)
+        layout.addWidget(self._msg_label, stretch=1)
+
+        # Highlight effect for new alerts
+        self._highlight_active = False
+        self.setStyleSheet(f"QFrame#alertEntry {{ border-left: 3px solid {color}; }}")
+
+    def highlight(self) -> None:
+        """Flash visual highlight for new alert, auto-clears after timeout."""
+        self._highlight_active = True
+        color = _SEVERITY_COLORS.get(self.severity_int, "#BBBCBC")
+        self.setStyleSheet(
+            f"QFrame#alertEntry {{ border-left: 3px solid {color}; "
+            f"background-color: {color}22; }}"
+        )
+        QTimer.singleShot(_ALERT_HIGHLIGHT_MS, self._clear_highlight)
+
+    def _clear_highlight(self) -> None:
+        color = _SEVERITY_COLORS.get(self.severity_int, "#BBBCBC")
+        self.setStyleSheet(f"QFrame#alertEntry {{ border-left: 3px solid {color}; }}")
+        self._highlight_active = False
+
+
 class ProcedureCard(QFrame):
     """Widget for a single procedure in the procedure list.
 
@@ -283,6 +388,10 @@ class HospitalDashboard(QMainWindow):
         self._procedure_cards: dict[str, ProcedureCard] = {}
         self._vitals_rows: dict[str, VitalsRow] = {}
         self._patient_to_procedure: dict[str, str] = {}
+        self._alert_entries: list[AlertEntry] = []
+        self._alert_severity_filter: Optional[int] = None
+        self._alert_room_filter: Optional[str] = None
+        self._known_rooms: set[str] = set()
 
         # ---- DDS readers ----
         injected = all(
@@ -468,6 +577,30 @@ class HospitalDashboard(QMainWindow):
 
         alert_layout.addWidget(create_section_header("Alert Feed", "\u26A0"))
 
+        # Filter controls
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(8)
+
+        filter_row.addWidget(QLabel("Severity:"))
+        self._severity_combo = QComboBox()
+        self._severity_combo.setObjectName("severityFilter")
+        self._severity_combo.addItem("All", None)
+        self._severity_combo.addItem("INFO", int(AlertSeverity.INFO))
+        self._severity_combo.addItem("WARNING", int(AlertSeverity.WARNING))
+        self._severity_combo.addItem("CRITICAL", int(AlertSeverity.CRITICAL))
+        self._severity_combo.currentIndexChanged.connect(self._on_severity_filter)
+        filter_row.addWidget(self._severity_combo)
+
+        filter_row.addWidget(QLabel("Room:"))
+        self._room_combo = QComboBox()
+        self._room_combo.setObjectName("roomFilter")
+        self._room_combo.addItem("All", None)
+        self._room_combo.currentIndexChanged.connect(self._on_room_filter)
+        filter_row.addWidget(self._room_combo)
+
+        filter_row.addStretch()
+        alert_layout.addLayout(filter_row)
+
         self._alert_feed_scroll = QScrollArea()
         self._alert_feed_scroll.setWidgetResizable(True)
         self._alert_feed_scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -504,6 +637,7 @@ class HospitalDashboard(QMainWindow):
             loop.create_task(self._receive_procedure_status()),
             loop.create_task(self._receive_procedure_context()),
             loop.create_task(self._receive_patient_vitals()),
+            loop.create_task(self._receive_clinical_alerts()),
         ]
         log.notice("Dashboard async data reception started")
 
@@ -571,6 +705,62 @@ class HospitalDashboard(QMainWindow):
                 diastolic=float(data.diastolic_bp),
             )
 
+    # ------------------------------------------------------------------ #
+    # Alert feed management                                                #
+    # ------------------------------------------------------------------ #
+
+    def _add_alert(self, entry: AlertEntry) -> None:
+        """Add an alert to the feed at the top (newest first)."""
+        self._alert_entries.append(entry)
+        # Track room for filter combo
+        if entry.room and entry.room not in self._known_rooms:
+            self._known_rooms.add(entry.room)
+            self._room_combo.addItem(entry.room, entry.room)
+        # Insert at top of layout
+        self._alert_feed_layout.insertWidget(0, entry)
+        self._alert_stack.setCurrentIndex(1)
+        self._apply_alert_filters()
+        entry.highlight()
+
+    def _on_severity_filter(self, index: int) -> None:
+        """Handle severity filter combo change."""
+        self._alert_severity_filter = self._severity_combo.currentData()
+        self._apply_alert_filters()
+
+    def _on_room_filter(self, index: int) -> None:
+        """Handle room filter combo change."""
+        self._alert_room_filter = self._room_combo.currentData()
+        self._apply_alert_filters()
+
+    def _apply_alert_filters(self) -> None:
+        """Show/hide alerts based on current filters."""
+        for entry in self._alert_entries:
+            visible = True
+            if (
+                self._alert_severity_filter is not None
+                and entry.severity_int != self._alert_severity_filter
+            ):
+                visible = False
+            if (
+                self._alert_room_filter is not None
+                and entry.room != self._alert_room_filter
+            ):
+                visible = False
+            entry.setVisible(visible)
+
+    async def _receive_clinical_alerts(self) -> None:
+        """Consume ClinicalAlert samples and populate alert feed."""
+        async for data in self._clinical_alert_reader.take_data_async():
+            entry = AlertEntry(
+                alert_id=str(data.alert_id),
+                severity=int(data.severity),
+                room=str(data.room),
+                patient_name=str(data.patient.name),
+                message=str(data.message),
+                category=str(data.category),
+            )
+            self._add_alert(entry)
+
     def close_dds(self) -> None:
         """Cancel tasks and close the DDS participant."""
         self._running = False
@@ -628,3 +818,7 @@ class HospitalDashboard(QMainWindow):
     @property
     def patient_to_procedure(self) -> dict[str, str]:
         return self._patient_to_procedure
+
+    @property
+    def alert_entries(self) -> list[AlertEntry]:
+        return self._alert_entries

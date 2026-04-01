@@ -33,6 +33,7 @@ pytestmark = [
     pytest.mark.gui,
     pytest.mark.integration,
     pytest.mark.dashboard,
+    pytest.mark.xdist_group("dashboard"),
 ]
 
 dash_names = app_names.MedtechEntityNames.HospitalDashboard
@@ -715,3 +716,270 @@ class TestVitalsIntegration:
     def test_receive_patient_vitals_is_coroutine(self, dashboard):
         """_receive_patient_vitals is an async coroutine."""
         assert inspect.iscoroutinefunction(dashboard._receive_patient_vitals)
+
+
+# ---------------------------------------------------------------------------
+# Step 3.5 — Alert Feed
+# ---------------------------------------------------------------------------
+
+AlertSeverity = clinical_alerts.ClinicalAlerts.AlertSeverity
+
+
+class TestAlertEntry:
+    """AlertEntry widget displays alert details with severity styling."""
+
+    def test_alert_entry_severity_critical(self, qapp):
+        """CRITICAL alert shows red color and exclamation icon."""
+        from hospital_dashboard.dashboard.hospital_dashboard import AlertEntry
+
+        entry = AlertEntry(
+            alert_id="alert-001",
+            severity=int(AlertSeverity.CRITICAL),
+            room="OR-1",
+            patient_name="John Doe",
+            message="Heart rate critical",
+        )
+        assert entry.alert_id == "alert-001"
+        assert entry.severity_int == int(AlertSeverity.CRITICAL)
+        assert "#D32F2F" in entry._severity_label.styleSheet()
+        assert "CRITICAL" in entry._severity_label.text()
+
+    def test_alert_entry_severity_warning(self, qapp):
+        """WARNING alert shows amber color."""
+        from hospital_dashboard.dashboard.hospital_dashboard import AlertEntry
+
+        entry = AlertEntry(
+            alert_id="alert-002",
+            severity=int(AlertSeverity.WARNING),
+            room="OR-3",
+            patient_name="Jane Doe",
+            message="SpO2 low",
+        )
+        assert "#ED8B00" in entry._severity_label.styleSheet()
+        assert "WARNING" in entry._severity_label.text()
+
+    def test_alert_entry_severity_info(self, qapp):
+        """INFO alert shows blue color."""
+        from hospital_dashboard.dashboard.hospital_dashboard import AlertEntry
+
+        entry = AlertEntry(
+            alert_id="alert-003",
+            severity=int(AlertSeverity.INFO),
+            room="OR-1",
+            patient_name="John Doe",
+            message="Vitals stable",
+        )
+        assert "#004C97" in entry._severity_label.styleSheet()
+        assert "INFO" in entry._severity_label.text()
+
+    def test_alert_entry_displays_room(self, qapp):
+        """Alert entry shows room identifier."""
+        from hospital_dashboard.dashboard.hospital_dashboard import AlertEntry
+
+        entry = AlertEntry(
+            alert_id="alert-001",
+            severity=int(AlertSeverity.CRITICAL),
+            room="OR-5",
+            patient_name="J. Doe",
+            message="Test",
+        )
+        assert "OR-5" in entry._room_label.text()
+
+    def test_alert_entry_displays_patient(self, qapp):
+        """Alert entry shows patient name."""
+        from hospital_dashboard.dashboard.hospital_dashboard import AlertEntry
+
+        entry = AlertEntry(
+            alert_id="alert-001",
+            severity=int(AlertSeverity.WARNING),
+            room="OR-1",
+            patient_name="Jane Smith",
+            message="BP elevated",
+        )
+        assert "Jane Smith" in entry._patient_label.text()
+
+    def test_alert_entry_displays_message(self, qapp):
+        """Alert entry shows alert message."""
+        from hospital_dashboard.dashboard.hospital_dashboard import AlertEntry
+
+        entry = AlertEntry(
+            alert_id="alert-001",
+            severity=int(AlertSeverity.INFO),
+            room="OR-1",
+            patient_name="J. Doe",
+            message="Patient vitals normalized",
+        )
+        assert "Patient vitals normalized" in entry._msg_label.text()
+
+    def test_alert_highlight(self, qapp):
+        """highlight() activates visual highlight."""
+        from hospital_dashboard.dashboard.hospital_dashboard import AlertEntry
+
+        entry = AlertEntry(
+            alert_id="alert-001",
+            severity=int(AlertSeverity.CRITICAL),
+            room="OR-1",
+            patient_name="J. Doe",
+            message="Test",
+        )
+        entry.highlight()
+        assert entry._highlight_active
+        assert "background-color" in entry.styleSheet()
+
+
+class TestAlertFeedIntegration:
+    """Alert feed management in the dashboard."""
+
+    @pytest.fixture()
+    def dashboard(self, qapp, participant_factory):
+        """Create dashboard with injected readers."""
+        readers = _make_injected_readers(participant_factory)
+        d = HospitalDashboard(**readers)
+        yield d
+        d.close_dds()
+
+    def _make_alert_entry(self, alert_id, severity, room, patient="Test", msg="Alert"):
+        from hospital_dashboard.dashboard.hospital_dashboard import AlertEntry
+
+        return AlertEntry(
+            alert_id=alert_id,
+            severity=severity,
+            room=room,
+            patient_name=patient,
+            message=msg,
+        )
+
+    def test_add_alert_populates_feed(self, dashboard):
+        """Adding an alert switches from empty to populated state.
+
+        spec: Alerts from all ORs appear in unified feed @e2e @gui
+        """
+        entry = self._make_alert_entry("a1", int(AlertSeverity.CRITICAL), "OR-1")
+        dashboard._add_alert(entry)
+        assert len(dashboard.alert_entries) == 1
+        assert dashboard._alert_stack.currentIndex() == 1
+
+    def test_alerts_from_multiple_rooms(self, dashboard):
+        """Alerts from multiple rooms appear in unified feed.
+
+        spec: Alerts from all ORs appear in unified feed @e2e @gui
+        """
+        e1 = self._make_alert_entry("a1", int(AlertSeverity.WARNING), "OR-1")
+        e2 = self._make_alert_entry("a2", int(AlertSeverity.CRITICAL), "OR-3")
+        dashboard._add_alert(e1)
+        dashboard._add_alert(e2)
+        assert len(dashboard.alert_entries) == 2
+
+    def test_severity_filter_critical_only(self, dashboard):
+        """Severity filter shows only matching alerts.
+
+        spec: Feed is filterable by severity @e2e @gui
+        """
+        e_info = self._make_alert_entry("a1", int(AlertSeverity.INFO), "OR-1")
+        e_warn = self._make_alert_entry("a2", int(AlertSeverity.WARNING), "OR-1")
+        e_crit = self._make_alert_entry("a3", int(AlertSeverity.CRITICAL), "OR-3")
+        for e in (e_info, e_warn, e_crit):
+            dashboard._add_alert(e)
+
+        # Set severity filter to CRITICAL
+        dashboard._alert_severity_filter = int(AlertSeverity.CRITICAL)
+        dashboard._apply_alert_filters()
+
+        assert e_info.isHidden()
+        assert e_warn.isHidden()
+        assert not e_crit.isHidden()
+
+    def test_severity_filter_cleared(self, dashboard):
+        """Clearing severity filter shows all alerts.
+
+        spec: Filter can be cleared to show all alerts again
+        """
+        e_info = self._make_alert_entry("a1", int(AlertSeverity.INFO), "OR-1")
+        e_crit = self._make_alert_entry("a2", int(AlertSeverity.CRITICAL), "OR-3")
+        for e in (e_info, e_crit):
+            dashboard._add_alert(e)
+
+        # Filter then clear
+        dashboard._alert_severity_filter = int(AlertSeverity.CRITICAL)
+        dashboard._apply_alert_filters()
+        assert e_info.isHidden()
+
+        dashboard._alert_severity_filter = None
+        dashboard._apply_alert_filters()
+        assert not e_info.isHidden()
+        assert not e_crit.isHidden()
+
+    def test_room_filter(self, dashboard):
+        """Room filter shows only alerts from selected room.
+
+        spec: Feed is filterable by room @e2e @gui
+        """
+        e1 = self._make_alert_entry("a1", int(AlertSeverity.WARNING), "OR-1")
+        e2 = self._make_alert_entry("a2", int(AlertSeverity.CRITICAL), "OR-3")
+        for e in (e1, e2):
+            dashboard._add_alert(e)
+
+        dashboard._alert_room_filter = "OR-1"
+        dashboard._apply_alert_filters()
+        assert not e1.isHidden()
+        assert e2.isHidden()
+
+    def test_room_filter_cleared(self, dashboard):
+        """Clearing room filter shows all alerts."""
+        e1 = self._make_alert_entry("a1", int(AlertSeverity.INFO), "OR-1")
+        e2 = self._make_alert_entry("a2", int(AlertSeverity.WARNING), "OR-3")
+        for e in (e1, e2):
+            dashboard._add_alert(e)
+
+        dashboard._alert_room_filter = "OR-1"
+        dashboard._apply_alert_filters()
+        assert e2.isHidden()
+
+        dashboard._alert_room_filter = None
+        dashboard._apply_alert_filters()
+        assert not e1.isHidden()
+        assert not e2.isHidden()
+
+    def test_combined_severity_and_room_filter(self, dashboard):
+        """Both filters can be active simultaneously."""
+        e1 = self._make_alert_entry("a1", int(AlertSeverity.WARNING), "OR-1")
+        e2 = self._make_alert_entry("a2", int(AlertSeverity.CRITICAL), "OR-1")
+        e3 = self._make_alert_entry("a3", int(AlertSeverity.CRITICAL), "OR-3")
+        for e in (e1, e2, e3):
+            dashboard._add_alert(e)
+
+        dashboard._alert_severity_filter = int(AlertSeverity.CRITICAL)
+        dashboard._alert_room_filter = "OR-1"
+        dashboard._apply_alert_filters()
+        assert e1.isHidden()  # wrong severity
+        assert not e2.isHidden()  # matches both
+        assert e3.isHidden()  # wrong room
+
+    def test_new_room_added_to_combo(self, dashboard):
+        """New rooms are dynamically added to the room filter combo."""
+        e1 = self._make_alert_entry("a1", int(AlertSeverity.INFO), "OR-1")
+        dashboard._add_alert(e1)
+        items = [
+            dashboard._room_combo.itemText(i)
+            for i in range(dashboard._room_combo.count())
+        ]
+        assert "OR-1" in items
+
+    def test_alert_highlighted_on_add(self, dashboard):
+        """New alerts get visual highlight on addition.
+
+        spec: New alerts appear within 2 seconds with visual highlight
+        """
+        entry = self._make_alert_entry("a1", int(AlertSeverity.CRITICAL), "OR-1")
+        dashboard._add_alert(entry)
+        assert entry._highlight_active
+        assert "background-color" in entry.styleSheet()
+
+    def test_receive_clinical_alerts_is_coroutine(self, dashboard):
+        """_receive_clinical_alerts is an async coroutine."""
+        assert inspect.iscoroutinefunction(dashboard._receive_clinical_alerts)
+
+    def test_empty_state_initially(self, dashboard):
+        """Alert feed shows empty state before any alerts."""
+        assert dashboard._alert_stack.currentIndex() == 0
+        assert len(dashboard.alert_entries) == 0
