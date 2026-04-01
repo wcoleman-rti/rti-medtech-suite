@@ -176,10 +176,12 @@ class TestRoutingServiceConfig:
                 ):
                     pytest.fail("Hospital participant must not have a domain tag")
 
-    def test_all_participants_have_wildcard_partition(self):
-        """Every RS participant uses wildcard partition at participant QoS."""
+    def test_procedure_participants_have_wildcard_partition(self):
+        """Every Procedure-side RS participant uses wildcard partition."""
         for p in self.domain_route.findall("participant"):
             name = p.get("name")
+            if not name.startswith("Procedure"):
+                continue
             qos = p.find("domain_participant_qos")
             assert qos is not None, f"{name} missing domain_participant_qos"
             partition = qos.find("partition")
@@ -189,6 +191,23 @@ class TestRoutingServiceConfig:
             assert any(
                 "*" in ps for ps in partitions
             ), f"{name} must have a wildcard partition, got {partitions}"
+
+    def test_hospital_participant_has_no_partition(self):
+        """Hospital participant has no partition — data merges facility-wide."""
+        for p in self.domain_route.findall("participant"):
+            if p.get("name") != "Hospital":
+                continue
+            qos = p.find("domain_participant_qos")
+            if qos is None:
+                return  # No QoS = no partition, OK
+            partition = qos.find("partition")
+            if partition is None:
+                return  # No partition element, OK
+            elements = partition.findall("name/element")
+            partitions = [e.text.strip() for e in elements if e.text]
+            assert (
+                not partitions
+            ), f"Hospital participant must not have a partition, got {partitions}"
 
     def test_two_sessions_defined(self):
         """RS configuration has StatusSession and StreamingSession."""
@@ -284,13 +303,20 @@ class TestRoutingServiceConfig:
                 inp_tn.text.strip() == out_tn.text.strip()
             ), f"Route {route.get('name')}: input/output topic names must match"
 
-    def test_publish_with_original_timestamp_enabled(self):
-        """All topic routes preserve original source timestamps."""
+    def test_publish_with_original_info_enabled(self):
+        """All topic routes propagate original endpoint info and timestamps."""
         for route in self._get_all_topic_routes():
-            ts = route.find("publish_with_original_timestamp")
-            assert ts is not None and ts.text.strip() == "true", (
-                f"Route {route.get('name')} must set "
-                "publish_with_original_timestamp=true"
+            info = route.find("publish_with_original_info")
+            assert info is not None and info.text.strip() == "true", (
+                f"Route {route.get('name')} must set " "publish_with_original_info=true"
+            )
+
+    def test_filter_propagation_enabled(self):
+        """All topic routes enable filter propagation."""
+        for route in self._get_all_topic_routes():
+            fp = route.find("filter_propagation")
+            assert fp is not None and fp.text.strip() == "true", (
+                f"Route {route.get('name')} must set " "filter_propagation=true"
             )
 
 

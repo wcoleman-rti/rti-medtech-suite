@@ -587,14 +587,7 @@ services:
   # ─── Routing Service (Procedure → Hospital bridge) ───────────────
 
   routing-service:
-    image: medtech/routing-service
-    build:
-      context: .
-      dockerfile: docker/routing-service.Dockerfile
-      additional_contexts:
-        connext: "${NDDSHOME:-/opt/rti.com/rti_connext_dds-7.6.0}"
-      args:
-        <<: *build-args
+    image: rticom/routing-service:7.6.0
     container_name: routing-service
     command:
       - "-cfgFile"
@@ -603,8 +596,12 @@ services:
       - "MedtechBridge"
       - "-verbosity"
       - "WARN"
+    environment:
+      <<: *medtech-env
+      NDDS_QOS_PROFILES: "/opt/medtech/share/qos/Snippets.xml;/opt/medtech/share/qos/Patterns.xml;/opt/medtech/share/qos/Topics.xml;/opt/medtech/share/qos/Participants.xml"
     volumes:
       - ./services/routing/RoutingService.xml:/opt/medtech/config/RoutingService.xml:ro
+      - ./interfaces/qos:/opt/medtech/share/qos:ro
       - ${RTI_LICENSE_FILE:-./rti_license.dat}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro
     networks:
       surgical-net:

@@ -215,12 +215,18 @@
             <datareader_qos topic_filter="RiskScore" base_name="TopicProfiles::RiskScore"/>
             <datawriter_qos topic_filter="ResourceAvailability" base_name="TopicProfiles::ResourceAvailability"/>
             <datareader_qos topic_filter="ResourceAvailability" base_name="TopicProfiles::ResourceAvailability"/>
-            <!-- Bridged topics from Procedure domain — same profile as source -->
+            <!-- Bridged topics from Procedure domain — Routing Service writes, apps read -->
+            <datawriter_qos topic_filter="ProcedureStatus" base_name="TopicProfiles::ProcedureStatus"/>
             <datareader_qos topic_filter="ProcedureStatus" base_name="TopicProfiles::ProcedureStatus"/>
+            <datawriter_qos topic_filter="ProcedureContext" base_name="TopicProfiles::ProcedureContext"/>
             <datareader_qos topic_filter="ProcedureContext" base_name="TopicProfiles::ProcedureContext"/>
+            <datawriter_qos topic_filter="PatientVitals" base_name="TopicProfiles::PatientVitals"/>
             <datareader_qos topic_filter="PatientVitals" base_name="TopicProfiles::PatientVitals"/>
+            <datawriter_qos topic_filter="AlarmMessages" base_name="TopicProfiles::AlarmMessages"/>
             <datareader_qos topic_filter="AlarmMessages" base_name="TopicProfiles::AlarmMessages"/>
+            <datawriter_qos topic_filter="DeviceTelemetry" base_name="TopicProfiles::DeviceTelemetry"/>
             <datareader_qos topic_filter="DeviceTelemetry" base_name="TopicProfiles::DeviceTelemetry"/>
+            <datawriter_qos topic_filter="RobotState" base_name="TopicProfiles::RobotState"/>
             <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::RobotState"/>
         </qos_profile>
 
