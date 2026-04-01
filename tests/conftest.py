@@ -29,7 +29,6 @@ except ImportError:
 
 _PYSIDE6_TEST_FILES = frozenset(
     {
-        "test_init_theme.py",
         "test_digital_twin.py",
         "test_hospital_dashboard.py",
         "test_procedure_controller.py",

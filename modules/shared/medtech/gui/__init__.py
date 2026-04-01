@@ -1,14 +1,14 @@
-"""Shared GUI bootstrap for all PySide6 applications in medtech-suite.
+"""Shared NiceGUI utilities for medtech-suite GUI applications."""
 
-Usage::
-
-    from medtech.gui import init_theme
-
-    app = QApplication(sys.argv)
-    header = init_theme(app)
-"""
-
-from medtech.gui._theme import ThemeManager, ThemeMode, init_theme
+from medtech.gui._backend import GuiBackend
+from medtech.gui._colors import BRAND_COLORS
+from medtech.gui._icons import ICONS
+from medtech.gui._theme import (
+    NICEGUI_QUASAR_CONFIG,
+    NICEGUI_STORAGE_SECRET_ENV,
+    create_header,
+    init_theme,
+)
 from medtech.gui._widgets import (
     ConnectionDot,
     create_empty_state,
@@ -18,10 +18,14 @@ from medtech.gui._widgets import (
 )
 
 __all__ = [
+    "BRAND_COLORS",
     "ConnectionDot",
-    "ThemeManager",
-    "ThemeMode",
+    "GuiBackend",
+    "ICONS",
+    "NICEGUI_QUASAR_CONFIG",
+    "NICEGUI_STORAGE_SECRET_ENV",
     "create_empty_state",
+    "create_header",
     "create_section_header",
     "create_stat_card",
     "create_status_chip",
