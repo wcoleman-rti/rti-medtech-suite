@@ -24,6 +24,7 @@ from typing import Optional
 
 import app_names
 import rti.connextdds as dds
+import surgery
 from medtech.dds import initialize_connext
 from medtech.gui import (
     ConnectionDot,
@@ -35,6 +36,8 @@ from medtech.log import ModuleName, init_logging
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
+    QHBoxLayout,
+    QLabel,
     QMainWindow,
     QScrollArea,
     QSplitter,
@@ -49,6 +52,103 @@ log = init_logging(ModuleName.HOSPITAL_DASHBOARD)
 
 # Liveliness poll interval (seconds)
 _LIVELINESS_POLL_INTERVAL = 0.5
+
+# Phase → color mapping (RTI palette + severity)
+_PHASE_COLORS: dict[int, str] = {
+    int(surgery.Surgery.ProcedurePhase.PRE_OP): "#004C97",  # RTI Blue
+    int(surgery.Surgery.ProcedurePhase.IN_PROGRESS): "#A4D65E",  # RTI Green
+    int(surgery.Surgery.ProcedurePhase.COMPLETING): "#FFA300",  # RTI Light Orange
+    int(surgery.Surgery.ProcedurePhase.COMPLETED): "#BBBCBC",  # RTI Gray
+    int(surgery.Surgery.ProcedurePhase.ALERT): "#D32F2F",  # Critical Red
+}
+_DEFAULT_PHASE_COLOR = "#BBBCBC"
+
+# Phase → display text
+_PHASE_TEXT: dict[int, str] = {
+    int(surgery.Surgery.ProcedurePhase.UNKNOWN): "Unknown",
+    int(surgery.Surgery.ProcedurePhase.PRE_OP): "Pre-Op",
+    int(surgery.Surgery.ProcedurePhase.IN_PROGRESS): "In Progress",
+    int(surgery.Surgery.ProcedurePhase.COMPLETING): "Completing",
+    int(surgery.Surgery.ProcedurePhase.COMPLETED): "Completed",
+    int(surgery.Surgery.ProcedurePhase.ALERT): "Alert",
+}
+
+
+class ProcedureCard(QFrame):
+    """Widget for a single procedure in the procedure list.
+
+    Shows room, patient, procedure type, surgeon, and current status
+    with a color-coded status indicator.
+    """
+
+    def __init__(self, procedure_id: str, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.procedure_id = procedure_id
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setObjectName("procedureCard")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(4)
+
+        # Top row: status indicator + room
+        top_row = QHBoxLayout()
+        top_row.setSpacing(6)
+
+        self._status_dot = QLabel("\u25CF")
+        self._status_dot.setFixedWidth(16)
+        self._status_dot.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._status_dot.setStyleSheet(
+            f"color: {_DEFAULT_PHASE_COLOR}; font-size: 14px;"
+        )
+        top_row.addWidget(self._status_dot)
+
+        self._room_label = QLabel("—")
+        self._room_label.setStyleSheet("font-weight: bold; font-size: 13px;")
+        top_row.addWidget(self._room_label, stretch=1)
+
+        self._phase_label = QLabel("Unknown")
+        self._phase_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self._phase_label.setStyleSheet(
+            f"color: {_DEFAULT_PHASE_COLOR}; font-weight: bold;"
+        )
+        top_row.addWidget(self._phase_label)
+
+        layout.addLayout(top_row)
+
+        # Detail row: patient, procedure type, surgeon
+        self._patient_label = QLabel("Patient: —")
+        self._patient_label.setStyleSheet("color: #666666; font-size: 11px;")
+        layout.addWidget(self._patient_label)
+
+        self._type_label = QLabel("Type: —")
+        self._type_label.setStyleSheet("color: #666666; font-size: 11px;")
+        layout.addWidget(self._type_label)
+
+        self._surgeon_label = QLabel("Surgeon: —")
+        self._surgeon_label.setStyleSheet("color: #666666; font-size: 11px;")
+        layout.addWidget(self._surgeon_label)
+
+    def update_status(self, phase_int: int, status_message: str) -> None:
+        """Update the phase indicator and status text."""
+        color = _PHASE_COLORS.get(phase_int, _DEFAULT_PHASE_COLOR)
+        text = _PHASE_TEXT.get(phase_int, "Unknown")
+        self._status_dot.setStyleSheet(f"color: {color}; font-size: 14px;")
+        self._phase_label.setText(text)
+        self._phase_label.setStyleSheet(f"color: {color}; font-weight: bold;")
+
+    def update_context(
+        self, room: str, patient_name: str, procedure_type: str, surgeon: str
+    ) -> None:
+        """Update the procedure context fields."""
+        self._room_label.setText(room if room else "—")
+        self._patient_label.setText(
+            f"Patient: {patient_name}" if patient_name else "Patient: —"
+        )
+        self._type_label.setText(
+            f"Type: {procedure_type}" if procedure_type else "Type: —"
+        )
+        self._surgeon_label.setText(f"Surgeon: {surgeon}" if surgeon else "Surgeon: —")
 
 
 class HospitalDashboard(QMainWindow):
@@ -73,6 +173,7 @@ class HospitalDashboard(QMainWindow):
         self,
         *,
         procedure_status_reader: Optional[dds.DataReader] = None,
+        procedure_context_reader: Optional[dds.DataReader] = None,
         patient_vitals_reader: Optional[dds.DataReader] = None,
         alarm_messages_reader: Optional[dds.DataReader] = None,
         robot_state_reader: Optional[dds.DataReader] = None,
@@ -83,12 +184,14 @@ class HospitalDashboard(QMainWindow):
         self._running = False
         self._tasks: list[asyncio.Task] = []
         self._participant: Optional[dds.DomainParticipant] = None
+        self._procedure_cards: dict[str, ProcedureCard] = {}
 
         # ---- DDS readers ----
         injected = all(
             r is not None
             for r in (
                 procedure_status_reader,
+                procedure_context_reader,
                 patient_vitals_reader,
                 alarm_messages_reader,
                 robot_state_reader,
@@ -98,6 +201,7 @@ class HospitalDashboard(QMainWindow):
         )
         if injected:
             self._procedure_status_reader = dds.DataReader(procedure_status_reader)
+            self._procedure_context_reader = dds.DataReader(procedure_context_reader)
             self._patient_vitals_reader = dds.DataReader(patient_vitals_reader)
             self._alarm_messages_reader = dds.DataReader(alarm_messages_reader)
             self._robot_state_reader = dds.DataReader(robot_state_reader)
@@ -137,6 +241,9 @@ class HospitalDashboard(QMainWindow):
             return dds.DataReader(r)
 
         self._procedure_status_reader = _find_reader(dash_names.PROCEDURE_STATUS_READER)
+        self._procedure_context_reader = _find_reader(
+            dash_names.PROCEDURE_CONTEXT_READER
+        )
         self._patient_vitals_reader = _find_reader(dash_names.PATIENT_VITALS_READER)
         self._alarm_messages_reader = _find_reader(dash_names.ALARM_MESSAGES_READER)
         self._robot_state_reader = _find_reader(dash_names.ROBOT_STATE_READER)
@@ -294,11 +401,46 @@ class HospitalDashboard(QMainWindow):
     async def start(self) -> None:
         """Start async data reception coroutines."""
         self._running = True
+        loop = asyncio.get_event_loop()
+        self._tasks = [
+            loop.create_task(self._receive_procedure_status()),
+            loop.create_task(self._receive_procedure_context()),
+        ]
         log.notice("Dashboard async data reception started")
-        # Data reception tasks will be added in Steps 3.3–3.6b
-        # For now, just keep the event loop alive
-        while self._running:
-            await asyncio.sleep(1.0)
+
+    # ------------------------------------------------------------------ #
+    # Procedure list management                                            #
+    # ------------------------------------------------------------------ #
+
+    def _get_or_create_card(self, procedure_id: str) -> ProcedureCard:
+        """Get an existing card or create a new one for the procedure."""
+        if procedure_id in self._procedure_cards:
+            return self._procedure_cards[procedure_id]
+        card = ProcedureCard(procedure_id)
+        self._procedure_cards[procedure_id] = card
+        self._procedure_list_layout.addWidget(card)
+        # Switch from empty state to populated list
+        self._procedure_list_stack.setCurrentIndex(1)
+        return card
+
+    async def _receive_procedure_status(self) -> None:
+        """Consume ProcedureStatus samples and update procedure cards."""
+        async for data in self._procedure_status_reader.take_data_async():
+            pid = str(data.procedure_id)
+            card = self._get_or_create_card(pid)
+            card.update_status(int(data.phase), str(data.status_message))
+
+    async def _receive_procedure_context(self) -> None:
+        """Consume ProcedureContext samples and update procedure cards."""
+        async for data in self._procedure_context_reader.take_data_async():
+            pid = str(data.procedure_id)
+            card = self._get_or_create_card(pid)
+            card.update_context(
+                room=str(data.room),
+                patient_name=str(data.patient.name),
+                procedure_type=str(data.procedure_type),
+                surgeon=str(data.surgeon),
+            )
 
     def close_dds(self) -> None:
         """Cancel tasks and close the DDS participant."""
@@ -323,6 +465,10 @@ class HospitalDashboard(QMainWindow):
         return self._procedure_status_reader
 
     @property
+    def procedure_context_reader(self) -> dds.DataReader:
+        return self._procedure_context_reader
+
+    @property
     def patient_vitals_reader(self) -> dds.DataReader:
         return self._patient_vitals_reader
 
@@ -341,3 +487,7 @@ class HospitalDashboard(QMainWindow):
     @property
     def resource_reader(self) -> dds.DataReader:
         return self._resource_reader
+
+    @property
+    def procedure_cards(self) -> dict[str, ProcedureCard]:
+        return self._procedure_cards
