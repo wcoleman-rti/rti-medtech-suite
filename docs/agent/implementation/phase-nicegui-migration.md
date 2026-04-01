@@ -43,7 +43,7 @@ to 3D visualization.
 
 ---
 
-## Step N.2 — Shared GUI Module Rewrite
+## Step N.2 — Shared GUI Module Rewrite ✅ `0ca1bb2`
 
 ### Work
 
@@ -71,14 +71,14 @@ to 3D visualization.
 
 ### Test Gate (spec: nicegui-migration.md — Theming & Branding, GuiBackend ABC Contract)
 
-- [ ] `GuiBackend` ABC enforces `start()`, `close()`, and `name` (all abstract)
-- [ ] `GuiBackend` cannot be instantiated directly (pure skeleton, like `Service`)
-- [ ] `app.colors()` applies RTI brand palette
-- [ ] Dark/light toggle works without page reload
-- [ ] Local fonts load correctly (no CDN requests)
-- [ ] All widget helper functions produce correctly styled elements
-- [ ] Icon set enforced as `material-symbols-outlined` via `quasar_config`
-- [ ] `test_init_theme.py` rewritten and passing with NiceGUI fixtures
+- [x] `GuiBackend` ABC enforces `start()`, `close()`, and `name` (all abstract)
+- [x] `GuiBackend` cannot be instantiated directly (pure skeleton, like `Service`)
+- [x] `app.colors()` applies RTI brand palette
+- [x] Dark/light toggle works without page reload
+- [x] Local fonts load correctly (no CDN requests)
+- [x] All widget helper functions produce correctly styled elements
+- [x] Icon set enforced as `material-symbols-outlined` via `quasar_config`
+- [x] `test_init_theme.py` rewritten and passing with NiceGUI fixtures
 
 ---
 
