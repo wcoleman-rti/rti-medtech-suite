@@ -559,3 +559,159 @@ class TestProcedureList:
         assert dashboard._procedure_list_stack.currentIndex() == 0
         dashboard._get_or_create_card("proc-001")
         assert dashboard._procedure_list_stack.currentIndex() == 1
+
+
+# ---------------------------------------------------------------------------
+# Step 3.4 — Vitals Overview
+# ---------------------------------------------------------------------------
+
+
+class TestVitalsRow:
+    """VitalsRow widget displays HR, SpO2, BP with color-coded severity."""
+
+    def test_vitals_row_initial_state(self, qapp):
+        """New VitalsRow shows placeholder text."""
+        from hospital_dashboard.dashboard.hospital_dashboard import VitalsRow
+
+        row = VitalsRow("patient-001")
+        assert row.patient_id == "patient-001"
+        assert "—" in row._hr_label.text()
+        assert "—" in row._spo2_label.text()
+
+    def test_vitals_normal_hr(self, qapp):
+        """Normal HR (< 100) shows green color.
+
+        spec: Vitals are color-coded by severity @e2e @gui
+        """
+        from hospital_dashboard.dashboard.hospital_dashboard import VitalsRow
+
+        row = VitalsRow("patient-001")
+        row.update_vitals(hr=75.0, spo2=98.0, systolic=120.0, diastolic=80.0)
+        assert "75" in row._hr_label.text()
+        assert "#A4D65E" in row._hr_label.styleSheet()
+
+    def test_vitals_warning_hr(self, qapp):
+        """Warning HR (>= 100, < 120) shows amber color.
+
+        spec: HR exceeds 100 bpm → warning color (yellow/amber)
+        """
+        from hospital_dashboard.dashboard.hospital_dashboard import VitalsRow
+
+        row = VitalsRow("patient-001")
+        row.update_vitals(hr=105.0, spo2=97.0, systolic=120.0, diastolic=80.0)
+        assert "105" in row._hr_label.text()
+        assert "#ED8B00" in row._hr_label.styleSheet()
+
+    def test_vitals_critical_hr(self, qapp):
+        """Critical HR (>= 120) shows red color.
+
+        spec: HR exceeds 120 bpm → critical color (red)
+        """
+        from hospital_dashboard.dashboard.hospital_dashboard import VitalsRow
+
+        row = VitalsRow("patient-001")
+        row.update_vitals(hr=130.0, spo2=97.0, systolic=120.0, diastolic=80.0)
+        assert "130" in row._hr_label.text()
+        assert "#D32F2F" in row._hr_label.styleSheet()
+
+    def test_vitals_spo2_normal(self, qapp):
+        """Normal SpO2 (> 94%) shows green."""
+        from hospital_dashboard.dashboard.hospital_dashboard import VitalsRow
+
+        row = VitalsRow("patient-001")
+        row.update_vitals(hr=75.0, spo2=98.0, systolic=120.0, diastolic=80.0)
+        assert "98" in row._spo2_label.text()
+        assert "#A4D65E" in row._spo2_label.styleSheet()
+
+    def test_vitals_spo2_warning(self, qapp):
+        """Warning SpO2 (<= 94%, > 90%) shows amber."""
+        from hospital_dashboard.dashboard.hospital_dashboard import VitalsRow
+
+        row = VitalsRow("patient-001")
+        row.update_vitals(hr=75.0, spo2=93.0, systolic=120.0, diastolic=80.0)
+        assert "93" in row._spo2_label.text()
+        assert "#ED8B00" in row._spo2_label.styleSheet()
+
+    def test_vitals_spo2_critical(self, qapp):
+        """Critical SpO2 (<= 90%) shows red."""
+        from hospital_dashboard.dashboard.hospital_dashboard import VitalsRow
+
+        row = VitalsRow("patient-001")
+        row.update_vitals(hr=75.0, spo2=88.0, systolic=120.0, diastolic=80.0)
+        assert "88" in row._spo2_label.text()
+        assert "#D32F2F" in row._spo2_label.styleSheet()
+
+    def test_vitals_bp_normal(self, qapp):
+        """Normal systolic BP (91-159) shows green."""
+        from hospital_dashboard.dashboard.hospital_dashboard import VitalsRow
+
+        row = VitalsRow("patient-001")
+        row.update_vitals(hr=75.0, spo2=98.0, systolic=120.0, diastolic=80.0)
+        assert "120/80" in row._bp_label.text()
+        assert "#A4D65E" in row._bp_label.styleSheet()
+
+    def test_vitals_bp_high_warning(self, qapp):
+        """High systolic BP (>= 160, < 180) shows amber."""
+        from hospital_dashboard.dashboard.hospital_dashboard import VitalsRow
+
+        row = VitalsRow("patient-001")
+        row.update_vitals(hr=75.0, spo2=98.0, systolic=165.0, diastolic=95.0)
+        assert "165/95" in row._bp_label.text()
+        assert "#ED8B00" in row._bp_label.styleSheet()
+
+    def test_vitals_bp_critical(self, qapp):
+        """Critical systolic BP (>= 180) shows red."""
+        from hospital_dashboard.dashboard.hospital_dashboard import VitalsRow
+
+        row = VitalsRow("patient-001")
+        row.update_vitals(hr=75.0, spo2=98.0, systolic=190.0, diastolic=110.0)
+        assert "190/110" in row._bp_label.text()
+        assert "#D32F2F" in row._bp_label.styleSheet()
+
+
+class TestVitalsIntegration:
+    """Vitals rows are created and managed by the dashboard."""
+
+    @pytest.fixture()
+    def dashboard(self, qapp, participant_factory):
+        """Create dashboard with injected readers."""
+        readers = _make_injected_readers(participant_factory)
+        d = HospitalDashboard(**readers)
+        yield d
+        d.close_dds()
+
+    def test_vitals_row_created(self, dashboard):
+        """_get_or_create_vitals_row creates a VitalsRow for a patient.
+
+        spec: Summarized vitals shown per procedure @e2e @gui
+        """
+        row = dashboard._get_or_create_vitals_row("patient-001")
+        assert "patient-001" in dashboard.vitals_rows
+        assert row.patient_id == "patient-001"
+        assert dashboard._detail_stack.currentIndex() == 1
+
+    def test_multiple_vitals_rows(self, dashboard):
+        """Multiple patients create separate VitalsRow widgets."""
+        dashboard._get_or_create_vitals_row("patient-001")
+        dashboard._get_or_create_vitals_row("patient-002")
+        assert len(dashboard.vitals_rows) == 2
+
+    def test_duplicate_reuses_row(self, dashboard):
+        """Same patient_id reuses the same VitalsRow."""
+        row1 = dashboard._get_or_create_vitals_row("patient-001")
+        row2 = dashboard._get_or_create_vitals_row("patient-001")
+        assert row1 is row2
+        assert len(dashboard.vitals_rows) == 1
+
+    def test_vitals_empty_state_initially(self, dashboard):
+        """Vitals detail panel shows empty state before data."""
+        assert dashboard._detail_stack.currentIndex() == 0
+
+    def test_vitals_populated_state(self, dashboard):
+        """Vitals detail panel shows populated state after data arrives."""
+        dashboard._get_or_create_vitals_row("patient-001")
+        assert dashboard._detail_stack.currentIndex() == 1
+
+    def test_receive_patient_vitals_is_coroutine(self, dashboard):
+        """_receive_patient_vitals is an async coroutine."""
+        assert inspect.iscoroutinefunction(dashboard._receive_patient_vitals)

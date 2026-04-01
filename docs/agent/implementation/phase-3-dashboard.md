@@ -13,7 +13,7 @@
 
 ---
 
-## Step 3.1 — Routing Service Configuration
+## Step 3.1 — Routing Service Configuration ✅ `64710cc`
 
 ### Routing Service Participant Topology
 
@@ -56,14 +56,14 @@ tag.
 
 ### Test Gate (spec: common-behaviors.md — Routing Service)
 
-- [ ] Routing Service bridges configured topics from the Procedure domain to the Hospital domain
-- [ ] Unconfigured topics (e.g., `CameraFrame`) do NOT appear on the Hospital domain
-- [ ] Data integrity preserved across bridge (values match)
-- [ ] Robot state from the Procedure domain (`control` tag) appears on the Hospital domain (read-only)
+- [x] Routing Service bridges configured topics from the Procedure domain to the Hospital domain
+- [x] Unconfigured topics (e.g., `CameraFrame`) do NOT appear on the Hospital domain
+- [x] Data integrity preserved across bridge (values match)
+- [x] Robot state from the Procedure domain (`control` tag) appears on the Hospital domain (read-only)
 
 ---
 
-## Step 3.2 — Dashboard Application Skeleton
+## Step 3.2 — Dashboard Application Skeleton ✅ `2369589`
 
 ### Work
 
@@ -82,14 +82,14 @@ tag.
 
 ### Test Gate
 
-- [ ] Application launches without errors
-- [ ] DDS participant is created on the Hospital domain with correct QoS
-- [ ] UI renders placeholder layout with all panels visible
-- [ ] DDS worker thread does not block the Qt main thread
+- [x] Application launches without errors
+- [x] DDS participant is created on the Hospital domain with correct QoS
+- [x] UI renders placeholder layout with all panels visible
+- [x] DDS worker thread does not block the Qt main thread
 
 ---
 
-## Step 3.3 — Procedure List View
+## Step 3.3 — Procedure List View ✅ `b0fbf80`
 
 ### Work
 
@@ -100,9 +100,9 @@ tag.
 
 ### Test Gate (spec: hospital-dashboard.md — Procedure List)
 
-- [ ] Dashboard displays all active procedures
-- [ ] New procedure appears automatically when a new surgical instance starts
-- [ ] Completed procedure status is updated in display
+- [x] Dashboard displays all active procedures
+- [x] New procedure appears automatically when a new surgical instance starts
+- [x] Completed procedure status is updated in display
 
 ---
 

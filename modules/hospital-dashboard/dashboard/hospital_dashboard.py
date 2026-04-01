@@ -74,6 +74,102 @@ _PHASE_TEXT: dict[int, str] = {
 }
 
 
+# Vitals severity thresholds (spec: hospital-dashboard.md)
+_HR_WARNING = 100.0  # bpm — yellow/amber
+_HR_CRITICAL = 120.0  # bpm — red
+_SPO2_WARNING = 94.0  # % — below this is warning
+_SPO2_CRITICAL = 90.0  # % — below this is critical
+_SBP_WARNING_HIGH = 160.0  # mmHg — above this is warning
+_SBP_CRITICAL_HIGH = 180.0  # mmHg — above this is critical
+_SBP_WARNING_LOW = 90.0  # mmHg — below this is warning
+
+_COLOR_NORMAL = "#A4D65E"  # RTI Green
+_COLOR_WARNING = "#ED8B00"  # RTI Orange
+_COLOR_CRITICAL = "#D32F2F"  # Critical Red
+
+
+def _vitals_color(value: float, warn_above: float, crit_above: float) -> str:
+    """Return severity color for a vital sign (higher = worse)."""
+    if value >= crit_above:
+        return _COLOR_CRITICAL
+    if value >= warn_above:
+        return _COLOR_WARNING
+    return _COLOR_NORMAL
+
+
+def _vitals_color_low(value: float, warn_below: float, crit_below: float) -> str:
+    """Return severity color for a vital sign (lower = worse)."""
+    if value <= crit_below:
+        return _COLOR_CRITICAL
+    if value <= warn_below:
+        return _COLOR_WARNING
+    return _COLOR_NORMAL
+
+
+def _bp_color(systolic: float) -> str:
+    """Return severity color for blood pressure."""
+    if systolic >= _SBP_CRITICAL_HIGH or systolic < 70.0:
+        return _COLOR_CRITICAL
+    if systolic >= _SBP_WARNING_HIGH or systolic <= _SBP_WARNING_LOW:
+        return _COLOR_WARNING
+    return _COLOR_NORMAL
+
+
+class VitalsRow(QFrame):
+    """Widget showing HR, SpO2, and BP for one patient/procedure.
+
+    All values are color-coded by severity thresholds from the spec.
+    """
+
+    def __init__(self, patient_id: str, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.patient_id = patient_id
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setObjectName("vitalsRow")
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSpacing(16)
+
+        self._patient_label = QLabel(patient_id)
+        self._patient_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+        layout.addWidget(self._patient_label)
+
+        self._hr_label = QLabel("HR: —")
+        self._hr_label.setFixedWidth(100)
+        layout.addWidget(self._hr_label)
+
+        self._spo2_label = QLabel("SpO2: —")
+        self._spo2_label.setFixedWidth(100)
+        layout.addWidget(self._spo2_label)
+
+        self._bp_label = QLabel("BP: —/—")
+        self._bp_label.setFixedWidth(120)
+        layout.addWidget(self._bp_label)
+
+        layout.addStretch()
+
+    def update_vitals(
+        self,
+        hr: float,
+        spo2: float,
+        systolic: float,
+        diastolic: float,
+    ) -> None:
+        """Update displayed vitals with color-coded severity."""
+        hr_color = _vitals_color(hr, _HR_WARNING, _HR_CRITICAL)
+        self._hr_label.setText(f"HR: {hr:.0f}")
+        self._hr_label.setStyleSheet(f"color: {hr_color}; font-weight: bold;")
+
+        spo2_color = _vitals_color_low(spo2, _SPO2_WARNING, _SPO2_CRITICAL)
+        self._spo2_label.setText(f"SpO2: {spo2:.0f}%")
+        self._spo2_label.setStyleSheet(f"color: {spo2_color}; font-weight: bold;")
+
+        bp_c = _bp_color(systolic)
+        self._bp_label.setText(f"BP: {systolic:.0f}/{diastolic:.0f}")
+        self._bp_label.setStyleSheet(f"color: {bp_c}; font-weight: bold;")
+
+
 class ProcedureCard(QFrame):
     """Widget for a single procedure in the procedure list.
 
@@ -185,6 +281,8 @@ class HospitalDashboard(QMainWindow):
         self._tasks: list[asyncio.Task] = []
         self._participant: Optional[dds.DomainParticipant] = None
         self._procedure_cards: dict[str, ProcedureCard] = {}
+        self._vitals_rows: dict[str, VitalsRow] = {}
+        self._patient_to_procedure: dict[str, str] = {}
 
         # ---- DDS readers ----
         injected = all(
@@ -334,7 +432,7 @@ class HospitalDashboard(QMainWindow):
         self._vitals_layout.setSpacing(6)
 
         self._detail_empty = create_empty_state(
-            "Select a procedure to view details", "\u25CB"
+            "Waiting for vitals data\u2026", "\u2764"
         )
         self._detail_stack = QStackedWidget()
         self._detail_stack.addWidget(self._detail_empty)
@@ -405,6 +503,7 @@ class HospitalDashboard(QMainWindow):
         self._tasks = [
             loop.create_task(self._receive_procedure_status()),
             loop.create_task(self._receive_procedure_context()),
+            loop.create_task(self._receive_patient_vitals()),
         ]
         log.notice("Dashboard async data reception started")
 
@@ -435,11 +534,41 @@ class HospitalDashboard(QMainWindow):
         async for data in self._procedure_context_reader.take_data_async():
             pid = str(data.procedure_id)
             card = self._get_or_create_card(pid)
+            patient_id = str(data.patient.id)
             card.update_context(
                 room=str(data.room),
                 patient_name=str(data.patient.name),
                 procedure_type=str(data.procedure_type),
                 surgeon=str(data.surgeon),
+            )
+            # Map patient_id → procedure_id for vitals correlation
+            self._patient_to_procedure[patient_id] = pid
+
+    # ------------------------------------------------------------------ #
+    # Vitals management                                                    #
+    # ------------------------------------------------------------------ #
+
+    def _get_or_create_vitals_row(self, patient_id: str) -> VitalsRow:
+        """Get or create a VitalsRow for the given patient."""
+        if patient_id in self._vitals_rows:
+            return self._vitals_rows[patient_id]
+        row = VitalsRow(patient_id)
+        self._vitals_rows[patient_id] = row
+        self._vitals_layout.addWidget(row)
+        # Switch from empty state to populated vitals
+        self._detail_stack.setCurrentIndex(1)
+        return row
+
+    async def _receive_patient_vitals(self) -> None:
+        """Consume PatientVitals samples and update vitals display."""
+        async for data in self._patient_vitals_reader.take_data_async():
+            patient_id = str(data.patient_id)
+            row = self._get_or_create_vitals_row(patient_id)
+            row.update_vitals(
+                hr=float(data.heart_rate),
+                spo2=float(data.spo2),
+                systolic=float(data.systolic_bp),
+                diastolic=float(data.diastolic_bp),
             )
 
     def close_dds(self) -> None:
@@ -491,3 +620,11 @@ class HospitalDashboard(QMainWindow):
     @property
     def procedure_cards(self) -> dict[str, ProcedureCard]:
         return self._procedure_cards
+
+    @property
+    def vitals_rows(self) -> dict[str, VitalsRow]:
+        return self._vitals_rows
+
+    @property
+    def patient_to_procedure(self) -> dict[str, str]:
+        return self._patient_to_procedure
