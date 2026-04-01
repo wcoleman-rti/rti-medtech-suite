@@ -24,7 +24,7 @@ markers = [
     "failover: tests for exclusive ownership failover",
     "streaming: tests for high-rate best-effort streaming topics",
     "durability: tests for TRANSIENT_LOCAL and VOLATILE behavior",
-    "gui: tests involving PySide6 GUI verification",
+    "gui: GUI verification",
     "orchestration: tests for the orchestration domain and Service Host framework",
     "routing: tests for Routing Service configuration and bridging",
     "filtering: tests for content-filtered topics",

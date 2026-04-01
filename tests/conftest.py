@@ -13,6 +13,37 @@ import time
 import pytest
 import rti.connextdds as dds
 
+# ---------------------------------------------------------------------------
+# PySide6 migration guard — exclude PySide6-dependent tests when absent
+# ---------------------------------------------------------------------------
+# During the NiceGUI migration (phase-nicegui-migration.md), PySide6 is
+# removed from requirements.txt. Existing PySide6 tests remain until their
+# NiceGUI equivalents are complete (Step N.9 deletes them).
+
+try:
+    import PySide6  # noqa: F401
+
+    _PYSIDE6_AVAILABLE = True
+except ImportError:
+    _PYSIDE6_AVAILABLE = False
+
+_PYSIDE6_TEST_FILES = frozenset(
+    {
+        "test_init_theme.py",
+        "test_digital_twin.py",
+        "test_hospital_dashboard.py",
+        "test_procedure_controller.py",
+    }
+)
+
+
+def pytest_ignore_collect(collection_path, config):
+    """Skip PySide6-dependent test files when PySide6 is not installed."""
+    if not _PYSIDE6_AVAILABLE and collection_path.name in _PYSIDE6_TEST_FILES:
+        return True
+    return None
+
+
 # -------------------------------------------------------------------
 # Zombie process guard
 # -------------------------------------------------------------------

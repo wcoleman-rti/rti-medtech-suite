@@ -181,17 +181,18 @@ class TestServiceCatalog:
     def test_service_catalog_published(self, robot_service_host, catalog_reader):
         """Robot Service Host publishes ServiceCatalog with correct host_id
         and service_id."""
+        cond = dds.QueryCondition(
+            dds.Query(
+                catalog_reader,
+                f"host_id = '{HOST_ID}'"
+                " AND service_id = 'RobotControllerService'"
+                " AND display_name = 'Robot Controller'",
+            ),
+            dds.DataState.any_data,
+        )
         assert wait_for_data(
-            catalog_reader, timeout_sec=15
-        ), "No ServiceCatalog samples received"
-        matching = [
-            s
-            for s in catalog_reader.take_data()
-            if s.host_id == HOST_ID and s.service_id == "RobotControllerService"
-        ]
-        assert matching, f"No ServiceCatalog for {HOST_ID}/RobotControllerService"
-        catalog = matching[0]
-        assert catalog.display_name == "Robot Controller"
+            catalog_reader, timeout_sec=15, conditions=[(cond, 1)]
+        ), f"No ServiceCatalog for {HOST_ID}/RobotControllerService"
 
     def test_service_catalog_transient_local(
         self, robot_service_host, orch_participant
@@ -207,13 +208,18 @@ class TestServiceCatalog:
         rqos.history.depth = 1
         late_reader = dds.DataReader(sub, topic, rqos)
         try:
-            samples = wait_for_data(late_reader, timeout_sec=10)
-            assert samples, "Late-joining reader did not receive ServiceCatalog"
-            matching = [s for s in late_reader.take_data() if s.host_id == HOST_ID]
-            assert (
-                matching
+            cond = dds.QueryCondition(
+                dds.Query(
+                    late_reader,
+                    f"host_id = '{HOST_ID}'"
+                    " AND service_id = 'RobotControllerService'"
+                    " AND display_name = 'Robot Controller'",
+                ),
+                dds.DataState.any_data,
+            )
+            assert wait_for_data(
+                late_reader, timeout_sec=10, conditions=[(cond, 1)]
             ), f"Late-joining reader did not receive ServiceCatalog for {HOST_ID}"
-            assert matching[0].host_id == HOST_ID
         finally:
             late_reader.close()
 
@@ -223,12 +229,17 @@ class TestServiceStatus:
 
     def test_initial_status_stopped(self, robot_service_host, status_reader):
         """Robot Service Host publishes initial ServiceStatus with STOPPED."""
+        cond = dds.QueryCondition(
+            dds.Query(
+                status_reader,
+                f"host_id = '{HOST_ID}'" " AND service_id = 'RobotControllerService'",
+            ),
+            dds.DataState.any_data,
+        )
         assert wait_for_data(
-            status_reader, timeout_sec=15
-        ), "No ServiceStatus samples received"
-        matching = [s for s in status_reader.take_data() if s.host_id == HOST_ID]
-        assert matching, f"No ServiceStatus for {HOST_ID}"
-        status = matching[0]
+            status_reader, timeout_sec=15, conditions=[(cond, 1)]
+        ), f"No ServiceStatus for {HOST_ID}"
+        status = status_reader.select().condition(cond).read_data()[0]
         assert status.state == Orchestration.ServiceState.STOPPED
 
 

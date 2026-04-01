@@ -15,7 +15,7 @@ elif [[ -f "${_CONNEXT_HOME}/resource/scripts/rtisetenv_${_CONNEXT_ARCH}.bash" ]
     source "${_CONNEXT_HOME}/resource/scripts/rtisetenv_${_CONNEXT_ARCH}.bash"
 fi
 
-# Activate Python venv (pip-installed: rti.connext, PySide6, pytest)
+# Activate Python venv (pip-installed: rti.connext, nicegui, pytest)
 if [[ -f "$_ROOT/.venv/bin/activate" ]]; then
     source "$_ROOT/.venv/bin/activate"
 fi

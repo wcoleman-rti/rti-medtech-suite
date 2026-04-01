@@ -2113,6 +2113,23 @@ after closure. They form the project's decision log.
 - **Resolution:** Ran `black .` after the sed pass to auto-fix all
   formatting. All 5 files reformatted cleanly.
 - **Guideline:** After any `sed`-based bulk edit, always run
+
+---
+
+## INC-069: QueryCondition prevents cross-test DDS sample pollution
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-01
+- **Phase/Step:** Phase N / Step N.1
+- **Documents involved:** `tests/integration/test_robot_service_host.py`, `tests/integration/test_orchestration_e2e.py`
+- **Description:** Several orchestration-domain tests initially used `wait_for_data()` on an unfiltered reader and then filtered the returned samples afterward. In a parallel pytest run, unrelated samples published by other tests on the same DDS topic could satisfy the wait and leave the subsequent filter step empty, producing intermittent failures even though the target host had published correctly.
+- **Possible resolutions:**
+  1. Use a `dds.QueryCondition` inside `wait_for_data(..., conditions=[...])` so the wait itself is satisfied only by the intended content.
+  2. Keep generic waits and add extra post-wait filtering / retries.
+- **Resolution:** Resolution 1 adopted. Robot-service-host tests now wait on content-filtered `QueryCondition` objects keyed to the expected host/service fields, and the `ServiceCatalog` check includes the expected display name. This eliminates the need for a post-wait `take_data()` in the exact-match case and avoids cross-test DDS noise.
+- **Guideline:** When a test needs a specific DDS sample from a shared topic, make the wait content-aware instead of waiting first and filtering later. `QueryCondition` + `wait_for_data()` is the preferred pattern for exact-match assertions in parallel test runs.
+- **Date closed:** 2026-04-01
   `black .` (and `isort .` if imports were affected) before
   committing. Prefer `bash scripts/ci.sh --lint` as a quick check.
 - **Date closed:** 2026-03-31

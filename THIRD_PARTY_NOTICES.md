@@ -20,7 +20,7 @@ the [Docker Images](#docker-images) section.
 | **Pinned commit** | `3d6da8b416357e1f6a32fbff76b22d52ad1e9bc5` |
 | **Fetched by** | `resources/fonts/CMakeLists.txt` via `file(DOWNLOAD)` at configure time |
 | **Verification** | SHA-256 hash per file |
-| **Usage** | GUI typography in PySide6 applications (see `modules/shared/medtech/gui/`) |
+| **Usage** | GUI typography in NiceGUI applications (see `modules/shared/medtech/gui/`) |
 
 The OFL permits free use, redistribution, and bundling in software
 products, provided font files are not sold by themselves.
@@ -62,9 +62,8 @@ Versions are pinned in that file — refer to it for current pins.
 | Package | License | Usage |
 |---------|---------|-------|
 | `rti.connext` | RTI Commercial (requires Connext Professional license) | RTI Connext DDS Python API — DDS entity creation, data publishing/subscribing |
-| `PySide6` | [LGPL-3.0](https://doc.qt.io/qtforpython-6/licenses.html) | Qt 6 Python bindings for GUI applications |
+| `nicegui` | [MIT](https://github.com/zauberzeug/nicegui/blob/main/LICENSE) | Web-based GUI framework (FastAPI + Vue/Quasar) |
 | `pytest` | [MIT](https://github.com/pytest-dev/pytest/blob/main/LICENSE) | Python test framework |
-| `pytest-qt` | [MIT](https://github.com/pytest-dev/pytest-qt/blob/master/LICENSE) | pytest plugin for Qt/PySide6 widget testing |
 | `black` | [MIT](https://github.com/psf/black/blob/main/LICENSE) | Python code formatter |
 | `isort` | [MIT](https://github.com/PyCQA/isort/blob/main/LICENSE) | Python import sorter |
 | `ruff` | [MIT](https://github.com/astral-sh/ruff/blob/main/LICENSE) | Python linter |
