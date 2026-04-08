@@ -170,7 +170,7 @@ to 3D visualization.
 
 ---
 
-## Step N.5 — Digital Twin 3D Migration
+## Step N.5 — Digital Twin 3D Migration ✅ `46ac695`
 
 ### Work
 
@@ -196,11 +196,11 @@ to 3D visualization.
 
 ### Test Gate (spec: nicegui-migration.md — Digital Twin 3D scenarios)
 
-- [ ] 3D scene renders robot arm with joint angles from DDS
-- [ ] Heatmap coloring updates per joint
-- [ ] Orbit/zoom controls work during live data
-- [ ] Safety interlock overlay appears on interlock sample
-- [ ] `test_digital_twin.py` rewritten and passing
+- [x] 3D scene renders robot arm with joint angles from DDS
+- [x] Heatmap coloring updates per joint
+- [x] Orbit/zoom controls work during live data
+- [x] Safety interlock overlay appears on interlock sample
+- [x] `test_digital_twin.py` rewritten and passing (22 tests in `test_nicegui_digital_twin.py`)
 
 ---
 

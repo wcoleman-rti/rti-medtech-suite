@@ -2416,3 +2416,35 @@ after closure. They form the project's decision log.
   participant inline, it must set the UDPv4 `message_size_max`
   property to `"1400"` explicitly.
 - **Date closed:** 2026-04-08
+
+---
+
+## INC-078: Digital twin `__init__.py` PySide6 unconditional import blocks NiceGUI test collection
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-08
+- **Phase/Step:** NiceGUI Migration / Step N.5
+- **Documents involved:** `implementation/phase-nicegui-migration.md`,
+  `modules/surgical-procedure/digital_twin/__init__.py`
+- **Description:** After creating `nicegui_digital_twin.py`, the new
+  test file `test_nicegui_digital_twin.py` imported from
+  `surgical_procedure.digital_twin`, which triggered the package
+  `__init__.py`. The original `__init__.py` unconditionally imported
+  `RobotWidget` and `DigitalTwinDisplay` from PySide6-dependent modules,
+  causing `ModuleNotFoundError: No module named 'PySide6'` even when
+  only the NiceGUI backend was needed.
+- **Possible resolutions:**
+  1. Wrap the PySide6 imports in a try/except ImportError block so the
+     NiceGUI backend remains importable when PySide6 is absent.
+  2. Remove the legacy PySide6 exports from `__init__.py` entirely
+     (too early — PySide6 removal is deferred to Step N.9).
+- **Resolution:** Resolution 1 adopted. The `__init__.py` now exports
+  `DigitalTwinBackend` unconditionally, and wraps the legacy
+  `RobotWidget`/`DigitalTwinDisplay` imports in `try/except ImportError`.
+  All 22 new tests pass with PySide6 absent.
+- **Guideline:** When a NiceGUI implementation module is added alongside
+  a legacy PySide6 module in the same package, the `__init__.py` must
+  guard PySide6 imports so the NiceGUI exports remain importable in
+  environments (CI, runtime containers) where PySide6 is not installed.
+- **Date closed:** 2026-04-08
