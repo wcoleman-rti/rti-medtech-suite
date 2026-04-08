@@ -211,6 +211,43 @@ python tools/qos-checker.py --verbose
 
 ---
 
+## WAN Test Infrastructure
+
+**Authoritative reference:** [`wan-testing-strategy.md`](wan-testing-strategy.md)
+
+WAN-spanning behaviors introduced in V3.0.0 — `UDPv4_WAN`, Cloud Discovery Service
+NAT traversal, and Routing Service WAN bridge — are validated with a Docker-native
+topology that uses **privileged router containers** rather than a network emulation
+framework. The topology provides both WAN impairment injection and real NAT, which
+together exercise the full CDS locator-resolution and peer-to-peer discovery path.
+
+### Inject with Linux, observe with RTI
+
+The governing principle for WAN tests is to separate the roles of the two tool
+categories:
+
+- **Linux `tc` / `iptables`** — inject impairments (delay, loss, jitter, bandwidth
+  cap, blackhole) and model NAT boundaries. This is infrastructure work; it does
+  not make assertions about DDS behavior.
+- **RTI tooling** — observe and assert DDS behavior: route state, locator resolution,
+  throughput, delivery latency, reconnection timing. These are the pass/fail signals
+  for WAN test cases.
+
+| WAN Observation Need | Tool |
+|---------------------|------|
+| Routing Service route state and sample counts | Admin Console → Routing Service view |
+| Throughput / latency per topic under impairment | Grafana Data Flow and Sample Latency dashboards |
+| CDS locator resolution behavior | CDS `-verbosity 5` log output |
+| NAT translation confirmation | `tcpdump` on router container WAN interfaces |
+| Routing Service reconnection events | RTI distributed logging + `medtech-diag` |
+| Discovery timeline under NAT | Admin Console → participant discovery view |
+
+See [`wan-testing-strategy.md`](wan-testing-strategy.md) for the full topology
+diagram, impairment profiles, RTI configuration requirements, and the NAT traversal
+validation checklist.
+
+---
+
 ## Tool Directory Structure
 
 ```
