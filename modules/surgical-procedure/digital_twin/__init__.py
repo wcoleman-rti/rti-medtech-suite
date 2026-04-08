@@ -1,14 +1,20 @@
 """Digital twin display sub-package for the surgical procedure module.
 
 Public API:
-    DigitalTwinDisplay — PySide6 main window subscribing to Procedure
-                         domain (control tag) and rendering a 2D robot
-                         visualization.
+    DigitalTwinBackend — NiceGUI GuiBackend subclass powering the 3D
+                         digital twin web page.
+    DigitalTwinDisplay — PySide6 main window (legacy; guarded by
+                         PySide6 availability in test collection).
     RobotWidget        — QWidget rendering the robot arm, interlock
-                         overlays, and mode labels.
+                         overlays, and mode labels (legacy PySide6).
 """
 
-from ._robot_widget import RobotWidget
-from .digital_twin_display import DigitalTwinDisplay
+from .nicegui_digital_twin import DigitalTwinBackend
 
-__all__ = ["DigitalTwinDisplay", "RobotWidget"]
+try:
+    from ._robot_widget import RobotWidget
+    from .digital_twin_display import DigitalTwinDisplay
+
+    __all__ = ["DigitalTwinBackend", "DigitalTwinDisplay", "RobotWidget"]
+except ImportError:
+    __all__ = ["DigitalTwinBackend"]
