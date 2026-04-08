@@ -100,6 +100,26 @@ def provider():
     return dds.QosProvider.default
 
 
+def test_participant_qos(base=None):
+    """Return a DomainParticipantQos with AvoidIPFragmentation transport.
+
+    Sets message_size_max=1400 on UDPv4 to match the project-wide
+    AvoidIPFragmentation QoS snippet. All test participants MUST use this
+    function (or the ``participant_factory`` fixture which calls it) to
+    prevent transport mismatch errors during pytest-xdist parallel runs.
+    See INC-051, INC-072, INC-077.
+
+    Args:
+        base: Optional starting QoS. Defaults to ``default_participant_qos``.
+
+    Returns:
+        A ``DomainParticipantQos`` with message_size_max=1400.
+    """
+    qos = base if base is not None else dds.DomainParticipant.default_participant_qos
+    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+    return qos
+
+
 def _make_participant(domain_id, domain_tag=None, partition=None, qos=None):
     """Create a DomainParticipant with optional domain tag and partition.
 
@@ -111,12 +131,9 @@ def _make_participant(domain_id, domain_tag=None, partition=None, qos=None):
     configuration is complete.
     """
     if qos is None:
-        qos = dds.DomainParticipant.default_participant_qos
-
-    # Match project-wide AvoidIPFragmentation transport profile (INC-051/072).
-    # All test participants must use consistent message_size_max to prevent
-    # transport mismatch errors during pytest-xdist parallel runs.
-    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+        qos = test_participant_qos()
+    elif "message_size_max" not in str(qos.property.get_all()):
+        qos = test_participant_qos(qos)
 
     if domain_tag is not None:
         qos.property["dds.domain_participant.domain_tag"] = domain_tag

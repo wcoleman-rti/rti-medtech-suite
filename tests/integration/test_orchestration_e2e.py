@@ -25,6 +25,7 @@ from conftest import (
     make_start_call,
     make_stop_call,
     send_rpc,
+    test_participant_qos,
     wait_for_all_states,
     wait_for_data,
     wait_for_replier,
@@ -123,8 +124,7 @@ def _terminate_proc(proc, timeout=3):
 
 def _wait_for_catalog(host_ids, timeout=5):
     """Wait until ServiceCatalog samples from all host_ids appear."""
-    qos = dds.DomainParticipantQos()
-    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+    qos = test_participant_qos()
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     dp.enable()
     topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -198,8 +198,7 @@ def all_service_hosts():
 @pytest.fixture(scope="module")
 def orch_participant():
     """Orchestration domain participant for E2E tests."""
-    qos = dds.DomainParticipantQos()
-    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+    qos = test_participant_qos()
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     p.enable()
     yield p
@@ -373,8 +372,7 @@ class TestLivelinessDetection:
 
         # Create the monitoring reader FIRST, before starting the host,
         # so we are guaranteed to discover and match the host's writer.
-        qos = dds.DomainParticipantQos()
-        qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+        qos = test_participant_qos()
         dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
         dp.enable()
         topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -451,10 +449,7 @@ class TestOrchestrationFailureIsolation:
         verify that Procedure domain writers/readers remain matched.
         """
         # Create a mock controller participant on the Orchestration domain
-        ctrl_qos = dds.DomainParticipantQos()
-        ctrl_qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = (
-            "1400"
-        )
+        ctrl_qos = test_participant_qos()
         ctrl_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, ctrl_qos)
         ctrl_dp.enable()
 
@@ -533,8 +528,7 @@ class TestPartitionIsolation:
             ), "Partition test host did not publish catalog"
 
             # Create a reader on OR-3 partition
-            qos = dds.DomainParticipantQos()
-            qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+            qos = test_participant_qos()
             qos.partition.name = ["room/OR-3"]
             dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
             dp.enable()
@@ -571,8 +565,7 @@ class TestStateReconstruction:
     def test_late_joining_reader_receives_state(self, all_service_hosts):
         """A new Orchestration domain reader receives TRANSIENT_LOCAL
         ServiceCatalog and ServiceStatus from running hosts."""
-        qos = dds.DomainParticipantQos()
-        qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+        qos = test_participant_qos()
         dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
         dp.enable()
 

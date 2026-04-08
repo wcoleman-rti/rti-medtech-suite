@@ -24,6 +24,7 @@ from conftest import (
     make_start_call,
     make_stop_call,
     send_rpc,
+    test_participant_qos,
     wait_for_all_states,
     wait_for_data,
     wait_for_reader_match,
@@ -102,8 +103,7 @@ def _terminate_proc(proc, timeout=3):
 
 
 def _wait_for_catalog(host_ids, timeout=5):
-    qos = dds.DomainParticipantQos()
-    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+    qos = test_participant_qos()
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     dp.enable()
     topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -171,8 +171,7 @@ def all_hosts():
 @pytest.fixture(scope="module")
 def orch_dp():
     """Orchestration domain participant."""
-    qos = dds.DomainParticipantQos()
-    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+    qos = test_participant_qos()
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     dp.enable()
     yield dp

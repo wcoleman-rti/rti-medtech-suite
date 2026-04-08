@@ -15,6 +15,7 @@ import asyncio
 import app_names
 import pytest
 import rti.connextdds as dds
+from conftest import test_participant_qos
 from medtech.dds import initialize_connext
 from medtech.service import ServiceState
 from surgical_procedure.camera_sim.camera_service import CameraService
@@ -57,8 +58,7 @@ def _create_xml_participant(config_name: str) -> dds.DomainParticipant:
 
 def _bare_participant() -> dds.DomainParticipant:
     """Create a minimal DDS participant with no XML-defined entities."""
-    qos = dds.DomainParticipantQos()
-    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+    qos = test_participant_qos()
     return dds.DomainParticipant(0, qos)
 
 

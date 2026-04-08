@@ -20,6 +20,7 @@ import time
 
 import pytest
 import rti.connextdds as dds
+from conftest import test_participant_qos
 from orchestration import Orchestration
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
@@ -57,8 +58,7 @@ def qapp():
 @pytest.fixture(scope="module")
 def orch_participant():
     """Test participant on the Orchestration domain for publishing test data."""
-    qos = dds.DomainParticipantQos()
-    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+    qos = test_participant_qos()
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     p.enable()
     yield p
