@@ -6,13 +6,15 @@ import os
 from pathlib import Path
 from typing import Any
 
+from medtech.gui._colors import BRAND_COLORS, OPACITY
+from medtech.gui._icons import ICONS
+from medtech.gui._widgets import ConnectionDot
 from nicegui import app, ui
 
-from medtech.gui._colors import BRAND_COLORS
-from medtech.gui._widgets import ConnectionDot
-
-NICEGUI_QUASAR_CONFIG = {"iconSet": "material-symbols-outlined"}
+NICEGUI_QUASAR_CONFIG = {"iconSet": "material-icons-outlined"}
 NICEGUI_STORAGE_SECRET_ENV = "MEDTECH_NICEGUI_STORAGE_SECRET"
+NICEGUI_THEME_MODE_KEY = "theme_mode"
+NICEGUI_THEME_MODES = ("system", "light", "dark")
 
 
 def _resource_dir() -> Path:
@@ -52,19 +54,31 @@ def _font_css() -> str:
     lines = [
         _font_face_css("Roboto Condensed", "RobotoCondensed.ttf", weight=400),
         _font_face_css("Roboto Condensed", "RobotoCondensed-Italic.ttf", weight=400),
-        _font_face_css("Montserrat", "Montserrat.ttf", weight=400),
-        _font_face_css("Montserrat", "Montserrat-Italic.ttf", weight=400),
         _font_face_css("Roboto Mono", "RobotoMono.ttf", weight=400),
         _font_face_css("Roboto Mono", "RobotoMono-Italic.ttf", weight=400),
         "body { font-family: 'Roboto Condensed', sans-serif; }",
-        ".mono { font-family: 'Roboto Mono', monospace; }",
-        ".brand-heading { font-family: 'Montserrat', sans-serif; }",
+        ".mono { font-family: 'Roboto Mono', monospace; font-weight: 700; }",
+        ".brand-heading { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; }",
     ]
     return "<style>" + " ".join(lines) + "</style>"
 
 
-def init_theme(_app: Any | None = None) -> Any:
+def _theme_mode_value(mode: str | None) -> bool | None:
+    if mode == "light":
+        return False
+    if mode == "dark":
+        return True
+    return None
+
+
+def _theme_mode_label(mode: str | None) -> str:
+    normalized = mode if mode in NICEGUI_THEME_MODES else "system"
+    return normalized.capitalize()
+
+
+def init_theme(_app: Any | None = None, *, title: str = "Medtech Suite") -> Any:
     """Apply RTI branding and return the shared header shell."""
+    app.config.quasar_config.update(NICEGUI_QUASAR_CONFIG)
     app.colors(
         primary=BRAND_COLORS["blue"],
         secondary=BRAND_COLORS["gray"],
@@ -75,8 +89,19 @@ def init_theme(_app: Any | None = None) -> Any:
         warning=BRAND_COLORS["orange"],
     )
     app.add_static_files("/fonts", _fonts_dir())
+    app.add_static_files("/images", _resource_dir() / "images")
+    ui.add_head_html(
+        '<link rel="icon" type="image/png" href="/images/rti-logo-color.png">',
+        shared=True,
+    )
     ui.add_head_html(_font_css(), shared=True)
-    return create_header()
+    ui.add_head_html(
+        "<style>"
+        "body { transition: background-color 0.3s ease, color 0.3s ease; }"
+        "</style>",
+        shared=True,
+    )
+    return create_header(title=title)
 
 
 def create_header(
@@ -86,19 +111,49 @@ def create_header(
     show_toggle: bool = True,
 ) -> Any:
     """Create the reusable header shell with logo, title, toggle, and status dot."""
-    header = ui.header(elevated=True).classes(
-        "items-center gap-4 px-4 py-2 bg-primary text-white"
+    header = (
+        ui.header()
+        .classes("items-center gap-4 px-4 py-3 bg-primary text-white")
+        .style(f"box-shadow: 0 4px 12px rgba(0,0,0,{OPACITY['shadow']});")
     )
     with header:
-        ui.image(_logo_path()).classes("h-8 w-auto")
-        ui.label(title).classes("text-xl font-bold brand-heading")
+        logo = _logo_path()
+        ui.html(
+            f'<img src="/images/{logo.name}" style="height: 2rem; width: auto;" alt="RTI">'
+        )
+        ui.label(title).classes("text-2xl font-bold brand-heading")
         ui.space()
         if show_toggle:
-            dark_mode = ui.dark_mode()
+            stored_mode = app.storage.user.get(NICEGUI_THEME_MODE_KEY, "system")
+            dark_mode = ui.dark_mode(_theme_mode_value(stored_mode))
 
-            def _sync_theme(event: Any) -> None:
-                dark_mode.value = bool(event.value)
+            def _cycle_to(new_value: bool | None) -> None:
+                dark_mode.set_value(new_value)
+                if new_value is True:
+                    mode = "dark"
+                elif new_value is False:
+                    mode = "light"
+                else:
+                    mode = "system"
+                app.storage.user[NICEGUI_THEME_MODE_KEY] = mode
 
-            ui.switch("Dark", value=False, on_change=_sync_theme)
+            with ui.button(on_click=lambda: _cycle_to(None)).props(
+                "flat round"
+            ).classes("text-white").bind_visibility_from(
+                dark_mode, "value", value=True
+            ):
+                ui.icon(ICONS["dark_mode"]).classes("text-xl")
+            with ui.button(on_click=lambda: _cycle_to(True)).props(
+                "flat round"
+            ).classes("text-white").bind_visibility_from(
+                dark_mode, "value", value=False
+            ):
+                ui.icon(ICONS["light_mode"]).classes("text-xl")
+            with ui.button(on_click=lambda: _cycle_to(False)).props(
+                "flat round"
+            ).classes("text-white").bind_visibility_from(
+                dark_mode, "value", backward=lambda v: v is None
+            ):
+                ui.icon(ICONS["auto_mode"]).classes("text-xl")
         header.connection_dot = ConnectionDot(connected=connected)
     return header

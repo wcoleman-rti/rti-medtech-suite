@@ -56,6 +56,12 @@ class FakeElement:
         self.events.append((event_name, handler))
         return self
 
+    def bind_visibility_from(self, *args: Any, **kwargs: Any) -> "FakeElement":
+        return self
+
+    def set_value(self, value: Any) -> None:
+        self.value = value
+
 
 class Recorder:
     def __init__(self) -> None:
@@ -101,6 +107,11 @@ def _patch_theme_ui(monkeypatch: pytest.MonkeyPatch, recorder: Recorder) -> None
     )
     monkeypatch.setattr(
         theme_module.ui,
+        "html",
+        lambda *args, **kwargs: recorder.record("html", *args, **kwargs),
+    )
+    monkeypatch.setattr(
+        theme_module.ui,
         "label",
         lambda *args, **kwargs: recorder.record("label", *args, **kwargs),
     )
@@ -116,8 +127,13 @@ def _patch_theme_ui(monkeypatch: pytest.MonkeyPatch, recorder: Recorder) -> None
     )
     monkeypatch.setattr(
         theme_module.ui,
-        "switch",
-        lambda *args, **kwargs: recorder.record("switch", *args, **kwargs),
+        "button",
+        lambda *args, **kwargs: recorder.record("button", *args, **kwargs),
+    )
+    monkeypatch.setattr(
+        theme_module.ui,
+        "icon",
+        lambda *args, **kwargs: recorder.record("icon", *args, **kwargs),
     )
 
 
@@ -200,7 +216,7 @@ class TestThemeInitialization:
         _patch_theme_ui(monkeypatch, recorder)
         monkeypatch.setattr(theme_module, "_fonts_dir", lambda: Path("/tmp/fonts"))
         header = FakeElement("header")
-        monkeypatch.setattr(theme_module, "create_header", lambda: header)
+        monkeypatch.setattr(theme_module, "create_header", lambda **kwargs: header)
 
         result = theme_module.init_theme()
 
@@ -217,9 +233,9 @@ class TestThemeInitialization:
         assert static_call[1][0] == "/fonts"
         assert static_call[1][1] == Path("/tmp/fonts")
 
-        head_call = next(call for call in recorder.calls if call[0] == "add_head_html")
-        assert "@font-face" in head_call[1][0]
-        assert head_call[2]["shared"] is True
+        head_calls = [call for call in recorder.calls if call[0] == "add_head_html"]
+        font_call = next(c for c in head_calls if "@font-face" in c[1][0])
+        assert font_call[2]["shared"] is True
 
     def test_header_shell_includes_branding(self, monkeypatch: pytest.MonkeyPatch):
         recorder = Recorder()
@@ -235,19 +251,24 @@ class TestThemeInitialization:
             ),
         )
 
+        class _FakeStorage:
+            user = {"theme_mode": "system"}
+
+        monkeypatch.setattr(theme_module.app, "storage", _FakeStorage())
+
         header = theme_module.create_header(title="Hospital Dashboard", connected=False)
 
         assert header.kind == "header"
         assert header.connection_dot.kind == "connection_dot"
         assert any(
-            call[0] == "image" and call[1][0] == Path("/tmp/rti-logo.png")
+            call[0] == "html" and "rti-logo.png" in call[1][0]
             for call in recorder.calls
         )
         assert any(
             call[0] == "label" and call[1][0] == "Hospital Dashboard"
             for call in recorder.calls
         )
-        assert any(call[0] == "switch" for call in recorder.calls)
+        assert any(call[0] == "button" for call in recorder.calls)
 
 
 class TestWidgetHelpers:
@@ -281,7 +302,7 @@ class TestWidgetHelpers:
         )
 
         assert card.kind == "card"
-        assert any("border-left-color" in style for style in card.styles)
+        assert any("border-left" in style for style in card.styles)
         assert card.value_label.kind == "label"
         assert card.value_label.args[0] == "7"
         assert any(call[0] == "icon" for call in recorder.calls)
@@ -314,4 +335,4 @@ class TestWidgetHelpers:
 
 class TestConstants:
     def test_quasar_icon_set_constant(self):
-        assert NICEGUI_QUASAR_CONFIG["iconSet"] == "material-symbols-outlined"
+        assert NICEGUI_QUASAR_CONFIG["iconSet"] == "material-icons-outlined"

@@ -82,7 +82,11 @@ to 3D visualization.
 
 ---
 
-## Step N.3 — Hospital Dashboard Migration
+## Step N.3 — Hospital Dashboard Migration ✅ `2369589`..`6d42fcf`
+
+> Built directly on NiceGUI during Phase 3 (Steps 3.2–3.5). No PySide6
+> version existed; this was a greenfield NiceGUI implementation from the
+> start. 9 tests in `test_hospital_dashboard_nicegui.py`.
 
 ### Work
 
@@ -107,17 +111,34 @@ to 3D visualization.
 
 ### Test Gate (spec: hospital-dashboard.md — all scenarios + nicegui-migration.md)
 
-- [ ] Dashboard renders at `/dashboard` with all panels
-- [ ] Procedure list auto-updates on new `ProcedureStatus`
-- [ ] Vitals color-coded by severity thresholds
-- [ ] Alert feed filterable by severity and room
-- [ ] New CRITICAL alert within 2 s display latency
-- [ ] Multiple browser clients see consistent data
-- [ ] `test_hospital_dashboard.py` rewritten and passing
+- [x] Dashboard renders at `/dashboard` with all panels
+- [x] Procedure list auto-updates on new `ProcedureStatus`
+- [x] Vitals color-coded by severity thresholds
+- [x] Alert feed filterable by severity and room
+- [x] New CRITICAL alert within 2 s display latency
+- [x] Multiple browser clients see consistent data (inherent to NiceGUI)
+- [x] `test_hospital_dashboard.py` rewritten and passing (9 tests)
 
 ---
 
-## Step N.4 — Procedure Controller Migration
+## Step N.4 — Procedure Controller Migration ✅ `4d811d5`..`84e8d95` + uncommitted
+
+> Built on NiceGUI during Phase 5 (Step 5.6) and refined across multiple
+> GUI evolution sessions. Touch-first Material Design 3 tile grid, CSS
+> Grid layout, snapshot-based `@ui.refreshable`, property-driven config
+> dialogs, async RPC, liveliness monitoring. 12 tests in
+> `test_nicegui_procedure_controller.py`. See INC-073–076 for lessons
+> learned during iterative polish.
+>
+> **Layout evolution (vs. plan):** The plan specified `ui.tabs()` /
+> `ui.tab_panels()` / `ui.grid(columns=4)` / `ui.page_sticky()`. The
+> actual implementation uses clickable summary cards (Hosts / Services /
+> Diagnostics) for view switching, CSS Grid with `repeat(auto-fill,
+> minmax(...))` for responsive tile layout, inline action buttons on
+> tiles (not a floating overlay), `ui.dialog()` for service config,
+> and `ui.notify()` for transient RPC feedback. These are design
+> improvements over the original plan, aligned with the M3 design
+> system in `vision/ui-design-system.md`.
 
 ### Work
 
@@ -125,24 +146,27 @@ to 3D visualization.
 - DDS integration (subclass `GuiBackend`):
   - Implement `ControllerBackend(GuiBackend)`: DDS init + participant creation + entity lookup in `__init__`, call `super().__init__()` last, implement `start()` and `name`
   - Async reader loops via `background_tasks.create()` for `ServiceStatus`, `HostStatus` topics
-  - RPC requester: `await run.io_bound(requester.send_request, ...)` for non-blocking RPC (NiceGUI `run.io_bound` wraps sync calls in a thread)
+  - RPC requester: async `send_request_async()` + `receive_reply_async()` for non-blocking RPC (native Connext async API — no `run.io_bound` needed)
 - Layout:
-  - `ui.header()` with shared header bar
-  - `ui.tabs()` for Host View / Service View toggle
-  - `ui.tab_panels()` containing respective grids
-  - Host/Service cards: `ui.card()` in `ui.grid(columns=4)` or flex row, `on_click` for selection
-  - Stat cards: `ui.row()` of `create_stat_card()` with bound values
-  - Floating action: `ui.page_sticky(position='bottom-center')` with context-aware buttons
-  - Result card: `ui.dialog()` for RPC result display
+  - `ui.header()` with shared header bar (logo via `ui.html`, theme cycle, connection dot)
+  - Clickable summary cards (Hosts / Services / Diagnostics) for view switching
+  - CSS Grid tile layout with `repeat(auto-fill, minmax(...))` for responsive host/service tiles
+  - Host tiles: icon + name + service count badge, capabilities/health action buttons
+  - Service tiles: icon + display name, conditional action buttons (play+gear / stop+gear)
+  - Detail pane below grid for selected host (nested service tiles) or selected service (status chip + metadata)
+  - Property-driven `ui.dialog()` for service configuration (reads `PropertyDescriptor` from `ServiceCatalog`)
+  - `ui.notify()` for transient RPC feedback (capabilities, health, start/stop results)
+  - Service filter toolbar with icon-only filter pills (All / Running / Stopped / Failed)
 - Liveliness-based host removal: `StatusCondition` + async wait for `LIVELINESS_CHANGED`
+- Snapshot-based `@ui.refreshable` — only rebuilds DOM when data changes (per `ui-design-system.md` § NiceGUI Implementation Patterns)
 
 ### Test Gate (spec: hospital-dashboard.md — Procedure Controller scenarios)
 
-- [ ] Controller renders at `/controller` with host/service views
-- [ ] Service discovery populates cards in real-time
-- [ ] RPC calls execute without blocking UI
-- [ ] Host removal on liveliness loss
-- [ ] `test_procedure_controller.py` (integration) rewritten and passing
+- [x] Controller renders at `/controller` with host/service views
+- [x] Service discovery populates cards in real-time
+- [x] RPC calls execute without blocking UI
+- [x] Host removal on liveliness loss
+- [x] `test_procedure_controller.py` (integration) rewritten and passing (12 tests)
 
 ---
 
@@ -231,17 +255,24 @@ Resume Phase 3 steps that were not yet complete, now implemented on NiceGUI:
 
 ---
 
-## Step N.8 — Agent Documentation Update
+## Step N.8 — Agent Documentation Update (partially complete)
+
+> `ui-design-system.md` updated: Applicability list updated for NiceGUI
+> file structure; "NiceGUI Implementation Patterns" section added
+> covering CSS Grid layout, Quasar button props, snapshot-based refresh,
+> theme cycling, `ui.notify()`, static images, async handlers, and icon
+> dictionary conventions. Remaining items below.
 
 ### Work
 
-- Update `docs/agent/vision/technology.md` — GUI Framework section: NiceGUI replaces PySide6; remove QtAsyncio references; add NiceGUI deployment model
-- Update `docs/agent/vision/ui-design-system.md` — Applicability section: replace PySide6 file references with NiceGUI equivalents; add NiceGUI component mapping table; update DDS Threading Patterns section for native asyncio
-- Update `docs/agent/vision/coding-standards.md` — Python GUI section: NiceGUI conventions (declarative with-blocks, `@ui.page`, `@ui.refreshable`, Tailwind classes)
-- Update `docs/agent/spec/hospital-dashboard.md` — remove PySide6 references in preamble; update UI thread protection requirement for asyncio model
-- Update `docs/agent/implementation/phase-3-dashboard.md` — mark completed steps; reference NiceGUI migration phase for remaining steps
-- Remove `resources/styles/medtech.qss` and `resources/styles/medtech-dark.qss`
-- Archive PySide6 code (or delete after all tests pass on NiceGUI)
+- [x] Update `docs/agent/vision/ui-design-system.md` — Applicability section: replace PySide6 file references with NiceGUI equivalents; add NiceGUI Implementation Patterns section
+- [ ] Update `docs/agent/vision/technology.md` — GUI Framework section: NiceGUI replaces PySide6; remove QtAsyncio references; add NiceGUI deployment model
+- [ ] Update `docs/agent/vision/ui-design-system.md` — DDS Threading Patterns section: update for native asyncio (currently references QtAsyncio)
+- [ ] Update `docs/agent/vision/coding-standards.md` — Python GUI section: NiceGUI conventions (declarative with-blocks, `@ui.page`, `@ui.refreshable`, Tailwind classes)
+- [ ] Update `docs/agent/spec/hospital-dashboard.md` — remove PySide6 references in preamble; update UI thread protection requirement for asyncio model
+- [ ] Update `docs/agent/implementation/phase-3-dashboard.md` — mark completed steps; reference NiceGUI migration phase for remaining steps
+- [ ] Remove `resources/styles/medtech.qss` and `resources/styles/medtech-dark.qss`
+- [ ] Archive PySide6 code (or delete after all tests pass on NiceGUI)
 
 ### Test Gate
 

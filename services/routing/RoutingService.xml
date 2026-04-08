@@ -151,7 +151,10 @@
 
                 <topic_route name="ProcedureStatusRoute">
                     <publish_with_original_info>true</publish_with_original_info>
-                    <filter_propagation>true</filter_propagation>
+                    <publish_with_original_timestamp>true</publish_with_original_timestamp>
+                    <filter_propagation>
+                        <enabled>true</enabled>
+                    </filter_propagation>
                     <input participant="ProcedureOperational">
                         <topic_name>ProcedureStatus</topic_name>
                         <datareader_qos base_name="Topics::ProcedureTopics"/>
@@ -164,7 +167,10 @@
 
                 <topic_route name="ProcedureContextRoute">
                     <publish_with_original_info>true</publish_with_original_info>
-                    <filter_propagation>true</filter_propagation>
+                    <publish_with_original_timestamp>true</publish_with_original_timestamp>
+                    <filter_propagation>
+                        <enabled>true</enabled>
+                    </filter_propagation>
                     <input participant="ProcedureOperational">
                         <topic_name>ProcedureContext</topic_name>
                         <datareader_qos base_name="Topics::ProcedureTopics"/>
@@ -177,7 +183,10 @@
 
                 <topic_route name="AlarmMessagesRoute">
                     <publish_with_original_info>true</publish_with_original_info>
-                    <filter_propagation>true</filter_propagation>
+                    <publish_with_original_timestamp>true</publish_with_original_timestamp>
+                    <filter_propagation>
+                        <enabled>true</enabled>
+                    </filter_propagation>
                     <input participant="ProcedureClinical">
                         <topic_name>AlarmMessages</topic_name>
                         <datareader_qos base_name="Topics::ProcedureTopics"/>
@@ -197,7 +206,10 @@
 
                 <topic_route name="PatientVitalsRoute">
                     <publish_with_original_info>true</publish_with_original_info>
-                    <filter_propagation>true</filter_propagation>
+                    <publish_with_original_timestamp>true</publish_with_original_timestamp>
+                    <filter_propagation>
+                        <enabled>true</enabled>
+                    </filter_propagation>
                     <input participant="ProcedureClinical">
                         <topic_name>PatientVitals</topic_name>
                         <datareader_qos base_name="Topics::ProcedureTopics"/>
@@ -210,7 +222,10 @@
 
                 <topic_route name="DeviceTelemetryRoute">
                     <publish_with_original_info>true</publish_with_original_info>
-                    <filter_propagation>true</filter_propagation>
+                    <publish_with_original_timestamp>true</publish_with_original_timestamp>
+                    <filter_propagation>
+                        <enabled>true</enabled>
+                    </filter_propagation>
                     <input participant="ProcedureClinical">
                         <topic_name>DeviceTelemetry</topic_name>
                         <datareader_qos base_name="Topics::ProcedureTopics"/>
@@ -223,7 +238,10 @@
 
                 <topic_route name="RobotStateRoute">
                     <publish_with_original_info>true</publish_with_original_info>
-                    <filter_propagation>true</filter_propagation>
+                    <publish_with_original_timestamp>true</publish_with_original_timestamp>
+                    <filter_propagation>
+                        <enabled>true</enabled>
+                    </filter_propagation>
                     <input participant="ProcedureControl">
                         <topic_name>RobotState</topic_name>
                         <datareader_qos base_name="Topics::ProcedureTopics"/>

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from medtech.gui._colors import BRAND_COLORS, STATUS_COLORS, STATUS_COLORS_DARK
+from medtech.gui._colors import BRAND_COLORS, OPACITY, STATUS_COLORS, STATUS_COLORS_DARK
 from medtech.gui._icons import ICONS
 from nicegui import ui
 
@@ -29,8 +29,11 @@ def create_stat_card(
     color: str = BRAND_COLORS["blue"],
 ) -> Any:
     """Return a KPI card with a value label and optional icon."""
-    card = ui.card().classes("w-full border-l-4 p-4")
-    card.style(f"border-left-color: {color};")
+    card = ui.card().classes("w-full p-4 rounded-lg")
+    card.style(
+        f"border-left: 4px solid {color};"
+        f" box-shadow: 0 2px 8px rgba(0,0,0,{OPACITY['shadow']});"
+    )
     with card:
         with ui.row(align_items="center").classes("w-full gap-3"):
             if icon:
@@ -75,7 +78,7 @@ def ConnectionDot(connected: bool = True) -> Any:
                 f"color: {BRAND_COLORS['green']}; opacity: {opacity}; transform: scale({1.0 if state['pulse'] else 0.92});"
             )
         else:
-            dot.style(f"color: {BRAND_COLORS['red']}; opacity: 1.0;")
+            dot.style(f"color: {BRAND_COLORS['gray']}; opacity: 1.0;")
 
     _apply()
     ui.timer(0.6, _apply, active=True)

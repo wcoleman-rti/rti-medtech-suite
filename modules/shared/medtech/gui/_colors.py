@@ -1,4 +1,7 @@
-"""Brand and semantic color constants for medtech-suite GUI apps."""
+"""Brand and semantic color constants for medtech-suite GUI apps.
+
+Color palette and opacity tokens defined by docs/agent/vision/ui-design-system.md.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +15,35 @@ BRAND_COLORS = {
     "amber": "#FFA726",
     "light_gray": "#BBBCBC",
     "dark_gray": "#2D3139",
+}
+
+OPACITY = {
+    "overlay_bg": 0.85,
+    "shadow": 0.15,
+    "selection_glow": 0.18,
+    "disabled": 0.40,
+    "card_fill": 0.10,
+    "card_fill_active": 0.18,
+    "tile_fill": 0.16,
+}
+
+THEME_PALETTE = {
+    "dark": {
+        "bg_top": "#0D1B2A",
+        "bg_bottom": "#1B2838",
+        "grid": "rgba(255,255,255,0.05)",
+        "hud_bg": "rgba(13,27,42,0.85)",
+        "hud_label": "#BBBCBC",
+        "hud_value": "#00B5E2",
+    },
+    "light": {
+        "bg_top": "#E8EDF2",
+        "bg_bottom": "#F7F8FA",
+        "grid": "rgba(0,0,0,0.05)",
+        "hud_bg": "rgba(255,255,255,0.85)",
+        "hud_label": "#63666A",
+        "hud_value": "#004C97",
+    },
 }
 
 STATUS_COLORS = {

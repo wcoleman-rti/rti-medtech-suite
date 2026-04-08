@@ -7,23 +7,6 @@ Usage::
 
 from __future__ import annotations
 
-import sys
+from .nicegui_dashboard import main
 
-import rti.asyncio  # noqa: F401 — enables async DataReader methods
-from PySide6 import QtAsyncio
-from PySide6.QtWidgets import QApplication
-
-from .hospital_dashboard import HospitalDashboard
-
-
-def main() -> None:
-    app = QApplication(sys.argv)  # noqa: F841 — QApplication must exist before widgets
-    dashboard = HospitalDashboard()
-    dashboard.show()
-
-    QtAsyncio.run(dashboard.start(), handle_sigint=True)
-    dashboard.close_dds()
-
-
-if __name__ == "__main__":
-    main()
+main()

@@ -172,14 +172,205 @@ when numeric values change.
 
 ---
 
+## NiceGUI Implementation Patterns
+
+Hard-won patterns from building the Procedure Controller UI. All
+NiceGUI-based GUI modules must follow these conventions to maintain
+visual and behavioral consistency.
+
+### Shared Module Imports
+
+All apps **must** import colors, icons, theme, and widgets from the
+shared `medtech.gui` package. No inline hex colors, icon name strings,
+or one-off theme setup.
+
+```python
+from medtech.gui import (
+    BRAND_COLORS,       # color palette tokens
+    ICONS,              # icon name mapping
+    OPACITY,            # opacity tokens
+    init_theme,         # brand palette, fonts, static routes, favicon
+    create_header,      # header bar with logo, title, theme toggle, connection dot
+    create_status_chip, # colored chip for state labels
+    create_empty_state, # centered icon + message for empty views
+    create_stat_card,   # KPI card with value, label, icon
+)
+```
+
+### Tile Grid Layout
+
+Use CSS Grid — not flexbox `flex-wrap` — for uniform tile grids.
+This handles equal sizing and reflow automatically.
+
+```python
+with ui.element("div").classes("w-full").style(
+    "display: grid;"
+    " grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));"
+    " gap: 1rem;"
+    " align-content: start;"
+):
+    for item in items:
+        _render_tile(item)
+```
+
+- Host tiles: `minmax(21rem, 1fr)`.
+- Service tiles: `minmax(19rem, 1fr)`.
+- Nested/compact tiles: `minmax(16rem, 1fr)`.
+- Always include `align-content: start` to pin tiles top-left.
+
+### Tile Selection & Detail Panes
+
+Selected-item expansion renders a **detail card below the tile grid**,
+not inline within the tile (which disrupts grid flow) or as a full-row
+grid span.
+
+- Tiles remain uniform in size regardless of selection state.
+- Selected tile gets a glow ring (`box-shadow` with `selection_glow`
+  opacity) and a slightly higher fill alpha (`card_fill_active`).
+- Detail pane is a separate `ui.card()` rendered after the grid
+  `div`, containing expanded content (nested tiles, status chips,
+  metadata).
+
+### Quasar Button Props
+
+| Visual style | Quasar props | Use case |
+|--------------|-------------|----------|
+| Ghost / secondary | `flat round` | Icon-only action buttons |
+| Filled active | `unelevated color=primary` | Active filter pill, primary action |
+| Filled tonal (inactive) | `flat` | Inactive filter pill |
+| Destructive | `flat round color=negative` | Stop button |
+| Primary action | `flat round color=primary` | Start/play button |
+
+**Never use `outline`** — it produces an exaggerated border that
+violates Core Principle #3 (elevation via shadow, not borders).
+
+### Touch Target Constant
+
+All interactive icon buttons must enforce the 44 × 44 px minimum
+(Core Principle #6). Define a module-level constant and apply it
+to every action button:
+
+```python
+_ACTION_BTN_STYLE = "min-width: 44px; min-height: 44px;"
+```
+
+For toolbar buttons that also need elevation:
+
+```python
+_TOOLBAR_BTN_STYLE = (
+    f"box-shadow: 0 2px 8px rgba(0,0,0,{OPACITY['shadow']});"
+    " min-width: 44px; min-height: 44px;"
+)
+```
+
+### Snapshot-Based `@ui.refreshable`
+
+Never let `ui.timer()` call `.refresh()` unconditionally — this
+causes full DOM rebuilds and visible flicker on every tick.
+
+Instead, snapshot the relevant data on each timer tick, compare to
+the previous snapshot, and only call `.refresh()` when the data has
+actually changed:
+
+```python
+_last_snapshot = None
+
+def _check_and_refresh():
+    nonlocal _last_snapshot
+    snapshot = _build_snapshot(backend)
+    if snapshot != _last_snapshot:
+        _last_snapshot = snapshot
+        refreshable_section.refresh()
+
+ui.timer(0.5, _check_and_refresh)
+```
+
+### Theme Cycling
+
+Theme toggle is a **three-state cycle** (not a binary switch):
+system → light → dark → system. Rendered as a single icon button
+whose icon reflects the current mode (`contrast` / `light_mode` /
+`dark_mode`). Persisted in `app.storage.user[NICEGUI_THEME_MODE_KEY]`.
+
+### Transient Feedback via `ui.notify()`
+
+RPC results, action confirmations, and query results (capabilities,
+health) use `ui.notify()` — not persistent result cards or dialogs.
+
+```python
+ui.notify(
+    f"Capabilities — {host_id}\n{result}",
+    type="info",
+    position="top",
+    close_button="Dismiss",
+    timeout=8000,
+)
+```
+
+Reserve `ui.dialog()` for multi-field input (e.g., service
+configuration) and destructive confirmations.
+
+### Static Images in Constrained Containers
+
+Use `ui.html()` with a raw `<img>` tag for images in headers,
+toolbars, and other constrained containers. `ui.image()` applies
+responsive sizing that can interfere with inline layout. See INC-073.
+
+```python
+ui.html(
+    f'<img src="/images/{logo.name}" style="height: 2rem; width: auto;" alt="RTI">'
+)
+```
+
+Always register the static files route in `init_theme()`:
+
+```python
+app.add_static_files("/images", _resource_dir() / "images")
+```
+
+### Async Event Handlers
+
+Pass `async def` functions directly to `.on()` or `on_click`.
+**Never use `asyncio.create_task()`** for NiceGUI event handlers —
+it escapes NiceGUI's slot context tracking. See INC-074.
+
+```python
+# Correct
+async def _on_start(hid=host_id, sid=service_id):
+    await backend.start_service(hid, sid)
+    refresh_ui()
+
+ui.button(icon=ICONS["play"]).on("click.stop", _on_start)
+
+# WRONG — loses slot context
+ui.button(icon=ICONS["play"]).on(
+    "click", lambda: asyncio.create_task(backend.start_service(...))
+)
+```
+
+### Icon Dictionary Convention
+
+The `ICONS` dict in `medtech.gui._icons` is the single source of
+truth for icon name mappings. Rules:
+
+- Every Material Icon used in the UI must have an entry in `ICONS`.
+- Use semantic keys (`"play"`, `"health"`, `"host"`) not icon names.
+- Two concepts may map to the same glyph but must have distinct keys
+  (e.g., `"update": "settings"` and `"settings": "tune"`).
+- Ruff rule `F601` catches duplicate keys at lint time.
+
+---
+
 ## Applicability
 
 These conventions apply to:
 
-- `modules/surgical-procedure/digital_twin/_robot_widget.py`
-- `modules/hospital-dashboard/procedure_controller/procedure_controller.py`
 - `modules/shared/medtech/gui/_theme.py`
 - `modules/shared/medtech/gui/_widgets.py`
-- `resources/styles/medtech.qss`
-- `resources/styles/medtech-dark.qss`
-- All future GUI modules
+- `modules/shared/medtech/gui/_colors.py`
+- `modules/shared/medtech/gui/_icons.py`
+- `modules/shared/medtech/gui/_backend.py`
+- `modules/hospital-dashboard/procedure_controller/nicegui_controller.py`
+- `modules/hospital-dashboard/dashboard/nicegui_dashboard.py`
+- `modules/surgical-procedure/digital_twin/_robot_widget.py`
+- All future NiceGUI GUI modules

@@ -304,19 +304,32 @@ class TestRoutingServiceConfig:
             ), f"Route {route.get('name')}: input/output topic names must match"
 
     def test_publish_with_original_info_enabled(self):
-        """All topic routes propagate original endpoint info and timestamps."""
+        """All topic routes propagate original endpoint info."""
         for route in self._get_all_topic_routes():
             info = route.find("publish_with_original_info")
             assert info is not None and info.text.strip() == "true", (
                 f"Route {route.get('name')} must set " "publish_with_original_info=true"
             )
 
+    def test_publish_with_original_timestamp_enabled(self):
+        """All topic routes preserve original source timestamps."""
+        for route in self._get_all_topic_routes():
+            ts = route.find("publish_with_original_timestamp")
+            assert ts is not None and ts.text.strip() == "true", (
+                f"Route {route.get('name')} must set "
+                "publish_with_original_timestamp=true"
+            )
+
     def test_filter_propagation_enabled(self):
         """All topic routes enable filter propagation."""
         for route in self._get_all_topic_routes():
             fp = route.find("filter_propagation")
-            assert fp is not None and fp.text.strip() == "true", (
-                f"Route {route.get('name')} must set " "filter_propagation=true"
+            assert (
+                fp is not None
+            ), f"Route {route.get('name')} missing filter_propagation"
+            enabled = fp.find("enabled")
+            assert enabled is not None and enabled.text.strip() == "true", (
+                f"Route {route.get('name')} must set " "filter_propagation/enabled=true"
             )
 
 

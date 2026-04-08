@@ -24,5 +24,5 @@ class GuiBackend(ABC):
         """Launch background tasks once the NiceGUI event loop is active."""
 
     @abstractmethod
-    def close(self) -> None:
+    async def close(self) -> None:
         """Release DDS resources and stop any background work."""

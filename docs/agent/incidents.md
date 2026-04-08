@@ -2257,3 +2257,162 @@ after closure. They form the project's decision log.
   conftest fixture when possible; when creating participants inline,
   always set the property explicitly.
 - **Date closed:** 2026-03-31
+
+---
+
+## INC-073: NiceGUI `ui.image()` unreliable for static-served images
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-08
+- **Phase/Step:** NiceGUI Migration / UI Polish
+- **Documents involved:** `modules/shared/medtech/gui/_theme.py`,
+  `tests/gui/test_init_theme.py`
+- **Description:** `ui.image("/images/rti-logo-color.png")` with a
+  static files route registered via `app.add_static_files("/images", ...)`
+  did not render the logo in the header bar. The element was present in
+  the DOM but the image did not display. Replacing `ui.image(...)` with
+  `ui.html('<img src="/images/rti-logo-color.png" ...>')` rendered
+  correctly and consistently. Root cause appears to be NiceGUI's
+  `ui.image()` applying additional wrapper styling or sizing constraints
+  that interfere with inline header layout.
+- **Resolution:** Use `ui.html()` with a raw `<img>` tag for images
+  that must render inline at a fixed size (e.g., logos in headers).
+  Reserve `ui.image()` for standalone content images where NiceGUI's
+  responsive sizing behavior is desirable.
+- **Guideline:** When embedding images inline in constrained containers
+  (headers, toolbars, badges), prefer `ui.html('<img src="..." style="...">')`.
+  Use `ui.image()` only for content images in cards or full-width sections
+  where default responsive behavior is acceptable. Always register the
+  static files route via `app.add_static_files()` in `init_theme()`.
+- **Date closed:** 2026-04-08
+
+---
+
+## INC-074: NiceGUI `asyncio.create_task()` loses slot context
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-08
+- **Phase/Step:** NiceGUI Migration / UI Polish
+- **Documents involved:**
+  `modules/hospital-dashboard/procedure_controller/nicegui_controller.py`
+- **Description:** Event handlers defined as
+  `lambda: asyncio.create_task(some_async_func())` caused
+  `RuntimeError: slot stack for this task is empty` when the async
+  function attempted to create or modify NiceGUI UI elements. The root
+  cause is that `asyncio.create_task()` spawns a new asyncio Task that
+  inherits no NiceGUI slot context. NiceGUI internally tracks which UI
+  container (slot) the current code is executing within; tasks spawned
+  via `asyncio.create_task()` escape this tracking.
+- **Resolution:** Replace all `lambda: asyncio.create_task(coro())`
+  patterns with proper `async def` handlers passed directly to
+  `.on("event", handler)` or `on_click=handler`. NiceGUI automatically
+  awaits async handlers within the correct slot context. For
+  button-specific handlers needing `click.stop` propagation, define the
+  `async def` at the correct scope and pass it to `.on("click.stop", fn)`.
+- **Guideline:** **Never use `asyncio.create_task()` for NiceGUI event
+  handlers.** Always define `async def` handler functions and pass them
+  directly to NiceGUI's `.on()` or `on_click` parameter. NiceGUI manages
+  the slot context automatically for directly-passed async callables.
+  The only safe use of `asyncio.create_task()` in NiceGUI code is in
+  `app.on_startup` or `background_tasks.create()` where no UI slot
+  context is needed.
+- **Date closed:** 2026-04-08
+
+---
+
+## INC-075: Multiple `add_head_html` calls break position-dependent test assertions
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-08
+- **Phase/Step:** NiceGUI Migration / UI Polish
+- **Documents involved:** `modules/shared/medtech/gui/_theme.py`,
+  `tests/gui/test_init_theme.py`
+- **Description:** `init_theme()` originally had a single
+  `ui.add_head_html()` call (for `@font-face` CSS). A test used
+  `next(call for call in recorder.calls if call[0] == "add_head_html")`
+  to find this call by position (first match). When a favicon
+  `<link>` was added as a second `add_head_html()` call *before* the
+  font CSS call, the test assertion failed because `next()` returned
+  the favicon call instead of the font CSS call.
+- **Resolution:** Changed the test to collect all `add_head_html`
+  calls and filter by content (`"@font-face" in call[1][0]`) instead
+  of relying on insertion order. Similarly, the header branding test
+  expected `call[0] == "image"` which was updated to
+  `call[0] == "html"` matching the new `ui.html('<img ...>')` pattern
+  (see INC-073).
+- **Guideline:** Test assertions for NiceGUI mock recorders must
+  filter by **content**, not by **call position**. Use list
+  comprehensions with content predicates
+  (`[c for c in calls if "keyword" in c[1][0]]`) rather than
+  `next(...)` which assumes a specific call order. This applies to
+  any mock recorder pattern where multiple calls to the same NiceGUI
+  function are recorded.
+- **Date closed:** 2026-04-08
+
+---
+
+## INC-076: Python duplicate dict keys silently shadow — enforce ruff F601
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-08
+- **Phase/Step:** NiceGUI Migration / UI Polish
+- **Documents involved:** `modules/shared/medtech/gui/_icons.py`
+- **Description:** The `ICONS` dictionary in `_icons.py` contained two
+  entries with the key `"settings"`: one mapping to `"tune"` (line 21)
+  and a later one mapping to `"settings"` (line 27, the Material Icon
+  name). Python silently keeps the last duplicate, meaning
+  `ICONS["settings"]` returned `"settings"` while the intended value
+  `"tune"` was silently lost. This was caught by ruff rule `F601`
+  ("Dictionary key literal repeated").
+- **Resolution:** Removed the duplicate `"settings": "settings"` entry.
+  Code referencing the gear/cog icon now uses `ICONS["update"]` (which
+  maps to the `"settings"` Material Icon). The original
+  `ICONS["settings"]` mapping (`"tune"`) is preserved for its intended
+  "tune/adjust" semantics.
+- **Guideline:** The `ICONS` dictionary is the **single source of truth**
+  for icon name mappings. When adding new icons, always check for
+  existing keys first. Ruff rule `F601` must remain enabled (it is
+  auto-fixable) to catch duplicate keys at lint time. If two logical
+  concepts need the same Material Icon glyph, give them distinct
+  semantic keys (e.g., `"update"` and `"settings"` can both map to
+  the `"settings"` glyph, but they must have different dict keys).
+- **Date closed:** 2026-04-08
+
+---
+
+## INC-077: conftest `participant_factory` missing message_size_max — root cause of persistent flaky test
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-08
+- **Phase/Step:** NiceGUI Migration / Pre-commit cleanup
+- **Documents involved:** `tests/conftest.py`,
+  `tests/integration/test_partition_isolation.py`, INC-051, INC-072
+- **Description:** `test_partition_isolation.py::TestWildcardPartition::
+  test_wildcard_receives_from_multiple` failed intermittently under
+  pytest-xdist with `message_size_max` mismatch errors. INC-051 and
+  INC-072 previously fixed individual inline participant creations but
+  never fixed the root cause: the shared `_make_participant()` helper in
+  `tests/conftest.py` (used by `participant_factory`) created
+  participants with `DomainParticipant.default_participant_qos`
+  (message_size_max=65507). Any test using `participant_factory`
+  discovered xdist-parallel participants with
+  AvoidIPFragmentation (1400), printing transport mismatch errors
+  and occasionally failing due to dropped discovery messages.
+- **Resolution:** Added
+  `qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"`
+  to `_make_participant()` in `conftest.py`, unconditionally. This
+  fixes the problem at the source — all future tests using
+  `participant_factory` automatically get consistent transport QoS.
+  Verified: 362/362 tests pass twice in a row under xdist.
+- **Guideline:** (Updated from INC-072) The `participant_factory`
+  conftest fixture now sets `message_size_max=1400` automatically.
+  Tests should always use `participant_factory` rather than creating
+  `DomainParticipant` instances directly. If a test must create a
+  participant inline, it must set the UDPv4 `message_size_max`
+  property to `"1400"` explicitly.
+- **Date closed:** 2026-04-08

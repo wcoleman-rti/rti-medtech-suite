@@ -40,3 +40,4 @@ generated/
 htmlcov/
 coverage.xml
 .coverage
+.nicegui/
