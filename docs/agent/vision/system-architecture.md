@@ -149,7 +149,7 @@ The Cloud domain aggregates across facilities the same way the Hospital domain a
 - **Facility-level partitions** isolate data by hospital: `facility/hospital-a`, `facility/hospital-b`
 - **Wildcard partition matching** (`facility/*`) enables enterprise-wide aggregation
 - Topics on the Cloud domain are facility-level summaries: `FacilityStatus`, `AggregatedAlerts`, `ResourceUtilization`, `OperationalKPIs`
-- A Command Center dashboard (PySide6 GUI, same design standard as Hospital Dashboard) subscribes to the Cloud domain
+- A Command Center dashboard (NiceGUI web application, same design standard as Hospital Dashboard) subscribes to the Cloud domain
 
 The WAN Routing Service bridge uses the **RTI Real-Time WAN Transport** (`UDPv4_WAN`) for NAT/firewall-traversal cross-site communication, with **Cloud Discovery Service** providing multicast-free discovery across WAN-connected sites. **Connext Security Plugins** are required on all WAN connections — mutual authentication, encrypted data, and governance enforcement. Each hospital runs its own WAN Routing Service instance that selectively forwards Hospital domain data to the Cloud domain.
 

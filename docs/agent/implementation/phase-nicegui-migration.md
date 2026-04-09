@@ -293,13 +293,13 @@ Resume Phase 3 steps that were not yet complete, now implemented on NiceGUI:
 ### Work
 
 - [x] Update `docs/agent/vision/ui-design-system.md` — Applicability section: replace PySide6 file references with NiceGUI equivalents; add NiceGUI Implementation Patterns section
-- [ ] Update `docs/agent/vision/technology.md` — GUI Framework section: NiceGUI replaces PySide6; remove QtAsyncio references; add NiceGUI deployment model
-- [ ] Update `docs/agent/vision/ui-design-system.md` — DDS Threading Patterns section: update for native asyncio (currently references QtAsyncio)
-- [ ] Update `docs/agent/vision/coding-standards.md` — Python GUI section: NiceGUI conventions (declarative with-blocks, `@ui.page`, `@ui.refreshable`, Tailwind classes)
-- [ ] Update `docs/agent/spec/hospital-dashboard.md` — remove PySide6 references in preamble; update UI thread protection requirement for asyncio model
-- [ ] Update `docs/agent/implementation/phase-3-dashboard.md` — mark completed steps; reference NiceGUI migration phase for remaining steps
-- [ ] Remove `resources/styles/medtech.qss` and `resources/styles/medtech-dark.qss`
-- [ ] Archive PySide6 code (or delete after all tests pass on NiceGUI)
+- [x] Update `docs/agent/vision/technology.md` — GUI Framework section: NiceGUI replaces PySide6; remove QtAsyncio references; add NiceGUI deployment model
+- [x] Update `docs/agent/vision/ui-design-system.md` — DDS Threading Patterns section: update for native asyncio (currently references QtAsyncio)
+- [x] Update `docs/agent/vision/coding-standards.md` — Python GUI section: NiceGUI conventions (declarative with-blocks, `@ui.page`, `@ui.refreshable`, Tailwind classes)
+- [x] Update `docs/agent/spec/hospital-dashboard.md` — remove PySide6 references in preamble; update UI thread protection requirement for asyncio model
+- [x] Update `docs/agent/implementation/phase-3-dashboard.md` — mark completed steps; reference NiceGUI migration phase for remaining steps
+- [x] Remove `resources/styles/medtech.qss` and `resources/styles/medtech-dark.qss`
+- [x] Archive PySide6 code (or delete after all tests pass on NiceGUI)
 
 ### Test Gate
 
@@ -372,7 +372,7 @@ framework.
 
 ### Test Gate
 
-- [ ] `grep -rn "PySide6\|QtWidgets\|QApplication\|pytest-qt" --include="*.md" --include="*.py" --include="*.txt" --include="*.toml" --include="*.yml" docs/ modules/ scripts/ docker/ resources/` returns zero results
-- [ ] All doc references use NiceGUI terminology consistently
+- [x] `grep -rn "PySide6\|QtWidgets\|QApplication\|pytest-qt" --include="*.md" --include="*.py" --include="*.txt" --include="*.toml" --include="*.yml" docs/ modules/ scripts/ docker/ resources/` returns zero prescriptive results (only historical notes in `incidents.md` and `nicegui-migration.md`)
+- [x] All doc references use NiceGUI terminology consistently
 - [ ] `markdownlint` passes on all updated docs
-- [ ] No broken cross-references between agent docs
+- [x] No broken cross-references between agent docs

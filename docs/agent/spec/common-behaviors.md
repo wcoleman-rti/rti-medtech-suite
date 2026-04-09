@@ -22,7 +22,7 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 | Cross-domain data flow | Procedure domain data reaches Hospital domain only via Routing Service; no direct cross-domain discovery |
 | Monitoring Library 2.0 | Enabled on every DomainParticipant via XML — no code-level opt-in |
 | Observability stack independence | Removing the `observability` Docker Compose profile does not affect functional behavior |
-| GUI shared stylesheet | `resources/styles/medtech.qss` loaded at startup by all PySide6 applications |
+| GUI shared theme | `init_theme()` applies RTI brand palette via `ui.colors()` and serves bundled fonts via `app.add_static_files('/fonts', ...)` at startup |
 | GUI header bar | RTI Blue (`#004C97`) background, white text, RTI logo left-aligned |
 | GUI severity color — Critical | Red `#D32F2F` |
 | `@performance` test Docker tolerance multiplier | 10× (timing thresholds relaxed by factor of 10 in Docker simulation) |
@@ -366,30 +366,30 @@ Requirements **not** subject to the 10× multiplier:
 
 ## GUI Design Standard Compliance
 
-### Scenario: GUI application loads shared theme stylesheet `@gui`
+### Scenario: GUI application loads shared theme `@gui`
 
-**Given** a PySide6 GUI application (Hospital Dashboard or Digital Twin Display) is launched
-**When** the application initializes its main window
-**Then** the shared stylesheet `resources/styles/medtech.qss` is loaded and applied
-**And** the window header bar uses RTI Blue (`#004C97`) background with white text
+**Given** a NiceGUI GUI application (Hospital Dashboard, Procedure Controller, or Digital Twin) is launched
+**When** the application initializes
+**Then** `init_theme()` applies the RTI brand palette (`ui.colors(primary='#004C97', accent='#ED8B00', ...)`) without errors
+**And** the header bar uses RTI Blue (`#004C97`) background with white text
 
 ### Scenario: GUI application displays RTI logo in header `@gui`
 
-**Given** a PySide6 GUI application is launched
-**When** the main window is rendered
+**Given** a NiceGUI GUI application is launched
+**When** the main page is rendered
 **Then** the RTI logo is visible in the header bar, left-aligned
 **And** the logo asset is loaded from `resources/images/rti-logo.png` or `rti-logo.svg`
 
 ### Scenario: GUI application loads bundled fonts `@gui`
 
-**Given** a PySide6 GUI application is launched
-**When** the application registers fonts via `QFontDatabase`
-**Then** Roboto Condensed, Montserrat, and Roboto Mono are available for widget rendering
+**Given** a NiceGUI GUI application is launched
+**When** the application serves static assets
+**Then** Roboto Condensed, Montserrat, and Roboto Mono are available via `@font-face` CSS
 **And** no system font dependency is required
 
 ### Scenario: Severity colors follow the semantic mapping `@gui`
 
-**Given** a PySide6 GUI application displays a status indicator
+**Given** a NiceGUI GUI application displays a status indicator
 **When** the status changes to Normal, Warning, Critical, Info, or Disconnected
 **Then** the indicator uses the corresponding semantic color: Green (`#A4D65E`), Orange (`#ED8B00`), Red (`#D32F2F`), Light Blue (`#00B5E2`), or Light Gray (`#BBBCBC`) respectively
 

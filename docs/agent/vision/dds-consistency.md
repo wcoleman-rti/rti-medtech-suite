@@ -1649,7 +1649,7 @@ Quick lookup for where each DDS concern is authoritatively defined:
 | Routing Service topology, partition mapping | [system-architecture.md](system-architecture.md) | Routing Service Deployment |
 | Transport configuration (SHMEM, UDPv4) | [system-architecture.md](system-architecture.md) | Transport Configuration |
 | Cloud Discovery Service | [system-architecture.md](system-architecture.md) | Cloud Discovery Service |
-| Threading model (AsyncWaitSet, asyncio, QtAsyncio) | [technology.md](technology.md) | DDS I/O Threading |
+| Threading model (AsyncWaitSet, asyncio, NiceGUI event loop) | [technology.md](technology.md) | DDS I/O Threading |
 | Connext version management | [technology.md](technology.md) | Connext Version Management |
 | Build integration (rtiddsgen, CMake) | [technology.md](technology.md) | Build System |
 | Install tree, `setup.bash`, `NDDS_QOS_PROFILES` | [technology.md](technology.md) | Install Tree |

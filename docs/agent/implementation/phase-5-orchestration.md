@@ -216,7 +216,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Work
 
-- Author the Procedure Controller PySide6 application (`modules/hospital-dashboard/procedure_controller.py` or a new module directory):
+- Author the Procedure Controller NiceGUI application (`modules/hospital-dashboard/procedure_controller/nicegui_controller.py`):
   - Creates one participant on the Orchestration domain (`Participant::ProcedureController_Orchestration`)
   - Creates one participant on the Hospital domain (`Participant::ProcedureController_Hospital`, read-only)
   - Subscribes to `ServiceCatalog` and `ServiceStatus` on the Orchestration domain
@@ -224,9 +224,9 @@ framework, Procedure Controller GUI, and the Orchestration domain
   - Provides UI controls to: select a host, start a service, stop a service, view capabilities/health
   - Issues RPC commands via `ServiceHostControl` client stubs
   - Reads scheduling context from the Hospital domain (read-only)
-  - Uses polling reads or QtAsyncio for DDS data reception on the UI thread per [dds-consistency.md §5](../vision/dds-consistency.md)
-  - Writes (if any) on the UI thread use `NonBlockingWrite` QoS snippet per vision policy
-- Apply shared GUI design standard: RTI Blue header, Roboto fonts, `medtech.qss`
+  - Uses `background_tasks.create()` / asyncio for DDS data reception per [dds-consistency.md §5](../vision/dds-consistency.md)
+  - Writes on the asyncio event loop use `NonBlockingWrite` QoS snippet per vision policy
+- Apply shared GUI design standard: RTI Blue header, Roboto fonts, NiceGUI theme
 - Author entry point and Docker Compose service
 
 ### Test Gate

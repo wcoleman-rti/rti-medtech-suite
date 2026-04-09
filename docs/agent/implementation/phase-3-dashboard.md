@@ -68,11 +68,11 @@ tag.
 ### Work
 
 - Create NiceGUI application skeleton in `modules/hospital-dashboard/`
-- Load shared GUI theme: apply `resources/styles/medtech.qss`, register bundled fonts, display RTI logo in header bar (see `vision/technology.md` GUI Design Standard)
+- Load shared GUI theme: `init_theme()` applies RTI brand palette and serves bundled fonts (see `vision/technology.md` GUI Design Standard)
 - Implement DDS worker thread:
   - Creates DomainParticipant on the Hospital domain
   - QoS is loaded automatically via the default QosProvider (`NDDS_QOS_PROFILES`)
-  - Uses QtAsyncio for data reception (never block the main/UI thread)
+  - Uses `background_tasks.create()` / asyncio for data reception (never block the event loop)
   - Emits Qt signals with normalized data for UI consumption
 - Implement main window layout:
   - Procedure list panel (left)

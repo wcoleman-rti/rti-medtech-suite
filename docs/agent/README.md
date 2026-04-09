@@ -156,7 +156,7 @@ The medtech suite is a multi-domain RTI Connext Professional demonstration syste
 - Cross-domain bridging via RTI Routing Service
 - Facility-wide situational awareness without coupling modules to each other
 - Multicast-free participant discovery via RTI Cloud Discovery Service
-- A unified CMake build producing C++ services and Python/PySide6 GUIs from shared IDL and QoS
+- A unified CMake build producing C++ services and Python/NiceGUI web applications from shared IDL and QoS
 
 Every behavior is specified as a Given/When/Then scenario. Every scenario becomes an automated test. Tests are never deleted.
 

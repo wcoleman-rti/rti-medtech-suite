@@ -22,12 +22,11 @@
 - Create `resources/` directory with shared GUI assets (see `vision/technology.md` GUI Design Standard):
   - `resources/fonts/` — bundle Roboto Condensed, Montserrat, and Roboto Mono `.ttf` files
   - `resources/images/` — RTI logo (`rti-logo.png`, `rti-logo.svg`)
-  - `resources/styles/medtech.qss` — shared Qt stylesheet implementing the RTI color palette, typography, and layout conventions
+  - ~~`resources/styles/medtech.qss`~~ — removed in NiceGUI migration (Phase N Step N.9); theme is now applied via `ui.colors()` in `init_theme()`
 - Author `requirements.txt` at the project root with pinned versions for all Python dependencies:
   - `rti.connext` — pin to the version matching Connext 7.6.0 (e.g., `rti.connext==7.6.0`)
-  - `PySide6` — pin major.minor (e.g., `PySide6==6.7.*`)
+  - `nicegui` — pin major.minor (e.g., `nicegui==2.x.*`) — replaces PySide6 (NiceGUI migration, Phase N)
   - `pytest` — pin major.minor (e.g., `pytest==8.2.*`)
-  - `pytest-qt` — pin major.minor (e.g., `pytest-qt==4.4.*`)
   - `black` — pin major (e.g., `black==24.*`)
   - `isort` — pin major.minor (e.g., `isort==5.13.*`)
   - `ruff` — pin minor (e.g., `ruff==0.5.*`)
@@ -53,7 +52,7 @@
 - [x] `cmake --install build` populates `install/` with `setup.bash` and empty directory structure
 - [x] `source install/setup.bash` completes without errors and sets `NDDS_QOS_PROFILES`, `MEDTECH_CONFIG_DIR`, `PATH`, `LD_LIBRARY_PATH`, `PYTHONPATH`
 - [x] `.venv/bin/python -c "import rti.connext"` succeeds
-- [x] `.venv/bin/python -c "import PySide6"` succeeds
+- [x] ~~`.venv/bin/python -c "import PySide6"` succeeds~~ — removed in NiceGUI migration (Phase N Step N.1)
 
 ---
 
@@ -160,7 +159,7 @@
 - Define Docker base images (each with `ARG CONNEXT_VERSION=7.6.0` — all version-dependent paths derive from this ARG):
   - **Build base** (`docker/build-base.Dockerfile`): Ubuntu 22.04 LTS, GCC toolchain, CMake, Connext host libraries for the target architecture. Used for compiling C++ targets.
   - **C++ runtime base** (`docker/runtime-cpp.Dockerfile`): Ubuntu 22.04 LTS minimal, Connext shared libraries only. No compiler toolchain. Used for running compiled C++ applications.
-  - **Python runtime base** (`docker/runtime-python.Dockerfile`): Ubuntu 22.04 LTS + Python 3.10, project venv, `rti.connext` (version from ARG), PySide6. Used for running Python applications.
+  - **Python runtime base** (`docker/runtime-python.Dockerfile`): Ubuntu 22.04 LTS + Python 3.10, project venv, `rti.connext` (version from ARG), NiceGUI. Used for running Python applications.
 - All base images must pin their Ubuntu version (`FROM ubuntu:22.04`) — no `latest` tags
 - Create `docker-compose.yml` with network definitions:
   - `surgical-net` — surgical LAN simulation
@@ -226,23 +225,24 @@
 
 ---
 
-## Step 1.6 — Shared GUI Bootstrap (`medtech.gui`) ✅ `3908384`
+## Step 1.6 — Shared GUI Bootstrap (`medtech.gui`) ✅ `3908384` (rewritten in Phase N Step N.2)
 
 ### Work
 
+> **Note:** This step originally bootstrapped a PySide6 `init_theme(app: QApplication)` function.
+> In Phase N Step N.2, the `medtech.gui` subpackage was fully rewritten for NiceGUI.
+> The current implementation provides `init_theme()` (no argument), `GuiBackend` ABC,
+> `_colors.py`, `_icons.py`, and NiceGUI widget helpers.
+
 - Create the `medtech.gui` subpackage under `modules/shared/medtech/gui/`
-- Implement `init_theme(app: QApplication)` per [vision/technology.md](../vision/technology.md) GUI Design Standard:
-  - Loads `resources/styles/medtech.qss` and applies it to the QApplication
-  - Registers bundled fonts (Roboto Condensed, Montserrat, Roboto Mono) via `QFontDatabase`
-  - Creates and returns a header widget with RTI Blue (`#004C97`) background, white text, left-aligned RTI logo
 - Add CMake install rule to place the package in `lib/python/site-packages/medtech/gui/`
 - The package must be importable after `source install/setup.bash`
 
 ### Test Gate
 
 - [x] `python -c "from medtech.gui import init_theme"` succeeds after install
-- [x] `init_theme(app)` loads the stylesheet without errors (pytest-qt test)
-- [x] Fonts are registered and available after `init_theme()` call
+- [x] `init_theme()` applies brand palette without errors (NiceGUI test)
+- [x] Fonts are served via `app.add_static_files()` after `init_theme()` call
 - [x] Header widget renders with correct background color and logo
 
 ---

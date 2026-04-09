@@ -20,7 +20,7 @@ A multi-instance module — each running instance represents one operating room 
 | **Procedure Context** | Medical setting metadata: hospital, room, bed, assigned patient, procedure type, surgeon, anesthesiologist, start time. Published once at procedure start, updated on changes. Durable for late joiners. | Procedure (`operational`) |
 | **Procedure Status** | Running status of the procedure (in-progress, completing, alert). Published periodically and on state transitions. Durable for late joiners. Bridged to Hospital domain via Routing Service for dashboard consumption. | Procedure (`operational`) |
 | **Device Telemetry** | Simulated device status for ancillary devices (infusion pump, anesthesia machine). Read-only telemetry for dashboard consumption. | Procedure (`clinical`) |
-| **Digital Twin Display** | Per-OR PySide6 GUI rendering a schematic 2D visualization of the surgical robot arm — joint positions, tool tip, active command, operational mode, and safety interlock status. Read-only subscriber to `control`-tag topics (`RobotState`, `RobotCommand`, `SafetyInterlock`, `OperatorInput`). Uses time-based filter to downsample to the rendering frame rate. | Procedure (`control`) |
+| **Digital Twin Display** | Per-OR NiceGUI 3D web application rendering the surgical robot arm — joint positions (forward kinematics), tool tip, active command, operational mode, and safety interlock status. Read-only subscriber to `control`-tag topics (`RobotState`, `RobotCommand`, `SafetyInterlock`, `OperatorInput`). Uses time-based filter to downsample to the rendering frame rate. Accessible from any browser on the network at `/twin/{room_id}`. | Procedure (`control`) |
 
 #### Multi-Instance Behavior
 
@@ -36,7 +36,7 @@ A multi-instance module — each running instance represents one operating room 
 
 ### Module 2: Hospital Dashboard
 
-A single facility-wide PySide6 GUI application displaying real-time status across all active surgical procedures.
+A single facility-wide NiceGUI web application displaying real-time status across all active surgical procedures. Accessible from any browser on the hospital network at `http://medtech-gui:8080/dashboard`.
 
 #### Sub-capabilities
 
@@ -52,7 +52,7 @@ A single facility-wide PySide6 GUI application displaying real-time status acros
 - Subscribes to Hospital domain topics
 - Data arrives via Routing Service bridge from Procedure domain
 - Uses content-filtered topics to support per-room drill-down views
-- DDS reads occur off the main Qt thread via QtAsyncio; data is delivered to widgets via Qt signals or async coroutines
+- DDS reads run as asyncio coroutines via `background_tasks.create()` on the NiceGUI event loop; UI refreshes driven by `ui.timer()` and `@ui.refreshable`
 
 ### Module 3: Clinical Alerts & Decision Support
 
@@ -111,7 +111,7 @@ The full release version policy — including version increment rules, release c
 - **Reference-type lifecycle** — no `owns_participant` flag needed; DDS entities are reference types that self-clean when the last reference goes out of scope
 
 #### Procedure Controller
-- Surgeon-facing PySide6 GUI application for driving the procedure lifecycle: select patient, procedure type, equipment configuration, start procedure, monitor, stop
+- Surgeon-facing NiceGUI web application (`/controller`) for driving the procedure lifecycle: select patient, procedure type, equipment configuration, start procedure, monitor, stop
 - Subscribes to Hospital domain for scheduling context and patient information (read-only, via Routing Service bridge)
 - Issues service lifecycle commands via DDS RPC (`ServiceHostControl` interface) to targeted Service Hosts on the Orchestration domain
 - Subscribes to `ServiceCatalog` and `ServiceStatus` topics on the Orchestration domain for real-time visibility of host availability and service state
@@ -132,7 +132,7 @@ The full release version policy — including version increment rules, release c
 
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|
-| Procedure Controller (PySide6 GUI) | DDS RPC client (Modern C++ and Python), multi-domain participant (Hospital + Orchestration), QtAsyncio integration |
+| Procedure Controller (NiceGUI web app) | DDS RPC client (Modern C++ and Python), multi-domain participant (Hospital + Orchestration), asyncio integration |
 | Service Host framework | DDS RPC service, dual-mode service lifecycle, per-host unique service naming |
 | Orchestration domain | Dedicated domain for infrastructure control-plane, `Pattern.Status` for state topics, `Pattern.RPC` for command channel |
 | `ServiceCatalog` + `ServiceStatus` topics | TRANSIENT_LOCAL state reconstruction, write-on-change, liveliness-based host failure detection |
@@ -362,7 +362,7 @@ with DDS-enforced control authority arbitration.
 #### Cloud Command Center
 - **Cloud / Enterprise domain** — third layer of the layered databus, above the Hospital domain
 - **WAN Routing Service** — Real-Time WAN Transport (`UDPv4_WAN`) bridge from Hospital → Cloud domain; per-facility selective forwarding; Connext Security Plugins required on all WAN connections
-- **Command Center Dashboard** — PySide6 GUI (shared design standard) subscribing to the Cloud domain; displays facility status, aggregated alerts, resource utilization, and operational KPIs across multiple hospitals
+- **Command Center Dashboard** — NiceGUI web application (shared design standard) subscribing to the Cloud domain; displays facility status, aggregated alerts, resource utilization, and operational KPIs across multiple hospitals
 - **Facility-level partitions** — `facility/hospital-a`, `facility/hospital-b`; wildcard matching (`facility/*`) for enterprise-wide aggregation
 - **Cloud-domain topics** — `FacilityStatus`, `AggregatedAlerts`, `ResourceUtilization`, `OperationalKPIs`
 - **Cloud Discovery Service** — enterprise-level multicast-free discovery across WAN-connected sites

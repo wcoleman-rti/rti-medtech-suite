@@ -48,7 +48,7 @@ A version may only be cut when **all** of the following are true:
 |---------------------|-------------------------------|
 | Surgical Procedure (multi-instance) | Domain tags, domain partitions, `control`/`clinical`/`operational` QoS patterns, exclusive ownership failover |
 | Procedure Orchestration | DDS RPC, Orchestration domain, `medtech::Service` interface, dual-mode services, Service Host framework |
-| Hospital Dashboard (PySide6) | Hospital domain subscription, TRANSIENT_LOCAL late-join, content-filtered topics, QtAsyncio DDS integration |
+| Hospital Dashboard (NiceGUI) | Hospital domain subscription, TRANSIENT_LOCAL late-join, content-filtered topics, asyncio DDS integration |
 | Clinical Alerts & Decision Support | Risk scoring, alert generation, cross-domain subscription via Routing Service |
 | Routing Service | Selective Procedure → Hospital topic bridging, multiple sessions by traffic class |
 | Cloud Discovery Service | Multicast-free discovery on `hospital-net` and `orchestration-net` |

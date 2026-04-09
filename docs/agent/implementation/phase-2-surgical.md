@@ -153,26 +153,23 @@
 
 ---
 
-## Step 2.6 — Digital Twin Display ✅ `eb7f142`
+## Step 2.6 — Digital Twin Display ✅ `eb7f142` (rewritten as NiceGUI 3D in Phase N Steps N.5–N.6)
 
 ### Work
 
-- Create PySide6 application in `modules/surgical-procedure/digital_twin/`
-- Load shared GUI theme: apply `resources/styles/medtech.qss`, register bundled fonts, display RTI logo in header bar (see `vision/technology.md` GUI Design Standard)
+> **Note:** Originally implemented as a PySide6 2D visualization. Fully rewritten as a
+> NiceGUI 3D web application in Phase N Steps N.5–N.6. The current implementation serves
+> an interactive 3D scene at `/twin/{room_id}` with forward kinematics, heatmap coloring,
+> orbit controls, and safety interlock overlays.
+
 - Create DomainParticipant on the Procedure domain (`control` tag) with partition derived from `ROOM_ID` and `PROCEDURE_ID`
 - Subscribe to `RobotState`, `RobotCommand`, `SafetyInterlock`, and `OperatorInput`
   - QoS loaded automatically via the default QosProvider (`NDDS_QOS_PROFILES`)
   - Apply time-based filter (~16 ms minimum separation for 60 Hz rendering) on **high-rate streaming readers only**: `RobotState` and `OperatorInput`
   - Do **not** apply time-based filter to `SafetyInterlock` (safety-critical state — every sample matters) or `RobotCommand` (Command pattern, RELIABLE KEEP_LAST 1 — each command must be processed)
-- Implement 2D robot visualization widget:
-  - Schematic arm with joint angles from `RobotState`
-  - Tool-tip position indicator
-  - Active command annotation from `RobotCommand`
-  - Operational mode label (OPERATIONAL, PAUSED, EMERGENCY_STOP, IDLE)
-  - Safety interlock overlay (red, prominent) from `SafetyInterlock`
-  - Disconnected state (grayed out) on liveliness lost
-- Use QtAsyncio for DDS data reception — never block the main/UI thread
-- Add Docker container to `docker-compose.yml` on `surgical-net`
+- Implement 3D robot visualization (NiceGUI `ui.scene()`) with FK, heatmap coloring, orbit controls
+- Use asyncio DDS reception via `background_tasks.create()` — never block the event loop
+- Add Docker container to `docker-compose.yml` on `surgical-net` (now served as part of unified `medtech-gui` service)
 
 ### Test Gate (spec: surgical-procedure.md — Digital Twin Display)
 

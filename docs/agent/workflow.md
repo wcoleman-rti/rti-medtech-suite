@@ -413,7 +413,7 @@ rules exist to prevent drift between sessions.
 - **Record discoveries.** If a session discovers something useful
   about the environment, tooling, or RTI Connext behavior (e.g., a
   specific `rtiddsgen` flag behavior, a Docker networking quirk, a
-  PySide6 threading constraint), record it as a closed incident
+  NiceGUI asyncio integration detail), record it as a closed incident
   with category "Discovery" so future sessions benefit.
 
 ### Context Window Management
@@ -464,7 +464,7 @@ or at any point to catch compliance drift.
 | **Generated code** | No generated files committed to source tree. `rtiddsgen` output goes to build directory only. |
 | **QoS** | All QoS is in XML profiles. `grep` for QoS setter API calls in application code must return zero matches. All XML files validate against the RTI XSD for the current `CONNEXT_VERSION`. |
 | **Domain IDs** | `grep` for literal domain ID integers (10, 11) in application code must return zero matches (they belong in domain library XML only). |
-| **Thread safety** | No DDS read/write calls on the main/UI thread. Python uses `async`/`await` + QtAsyncio; C++ uses `AsyncWaitSet` or `SampleProcessor`. |
+| **Thread safety** | No blocking DDS waits on the asyncio event loop. Python uses `async`/`await` + `background_tasks.create()` (NiceGUI); C++ uses `AsyncWaitSet` or `SampleProcessor`. |
 | **Logging** | Every module configures the RTI Connext Logging API per `vision/technology.md`. No `print()`, `printf`, `std::cout`, or custom logging. Module name prefix matches module directory name. |
 | **Dependencies** | No new dependencies beyond those listed in `vision/technology.md` and `requirements.txt`. |
 | **Third-party notices** | Every third-party component — whether fetched during configure/build (FetchContent, `file(DOWNLOAD)`), installed via pip (`requirements.txt`), or pulled as a Docker image — is documented in `THIRD_PARTY_NOTICES.md` at the repository root. CMake/Docker components list: name, version/pin, SPDX license, source URL, fetching mechanism, and usage. Python pip packages list: name, SPDX license, and usage (version pins live in `requirements.txt`). When adding a new dependency of any kind, update `THIRD_PARTY_NOTICES.md` in the same commit. |

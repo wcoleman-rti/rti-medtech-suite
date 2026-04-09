@@ -174,7 +174,7 @@ the Procedure Controller and digital twin display.
 
 ### Work
 
-- Extend the digital twin PySide6 display to subscribe to
+- Extend the digital twin NiceGUI 3D scene to subscribe to
   `RobotArmAssignment` (it already subscribes to `RobotState` on the
   `control` tag — same participant):
   - Render a schematic surgical table with arm positions

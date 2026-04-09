@@ -37,7 +37,7 @@ Scenarios are tagged to enable selective test execution. Tags also communicate w
 | `@unit` | Can be tested with a single component in isolation | All |
 | `@integration` | Requires two or more DDS participants | All |
 | `@e2e` | Requires the full Docker Compose environment | All |
-| `@gui` | Involves PySide6 GUI verification | V1.0+ |
+| `@gui` | Involves NiceGUI web application verification | V1.0+ |
 | `@streaming` | Involves high-rate data paths | V1.0+ |
 | `@command` | Involves command/response patterns | V1.0+ |
 | `@partition` | Tests partition-based isolation | V1.0+ |
