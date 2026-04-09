@@ -83,34 +83,34 @@ _ARM_BASE_Z = 0.78
 
 # Operating table dimensions and world position.
 # Table is 2.2 m long × 0.85 m wide — large relative to the arm.
-_TABLE_X      = 1.10   # half-length (2.2 m total)
-_TABLE_Y      = 0.425  # half-width  (0.85 m total)
-_TABLE_SLAB_H = 0.08   # top slab thickness
-_TABLE_TOP_Z  = 0.80   # table surface height (z)
+_TABLE_X = 1.10  # half-length (2.2 m total)
+_TABLE_Y = 0.425  # half-width  (0.85 m total)
+_TABLE_SLAB_H = 0.08  # top slab thickness
+_TABLE_TOP_Z = 0.80  # table surface height (z)
 # Pedestal column (narrow square section connecting foot platform to slab)
-_TABLE_COL_S  = 0.22   # column square side
+_TABLE_COL_S = 0.22  # column square side
 # Foot platform (wide low base with caster-style appearance)
-_TABLE_FOOT_W = 0.80   # foot platform full length (X)
-_TABLE_FOOT_D = 0.36   # foot platform full depth (Y)
-_TABLE_FOOT_H = 0.08   # foot platform height
+_TABLE_FOOT_W = 0.80  # foot platform full length (X)
+_TABLE_FOOT_D = 0.36  # foot platform full depth (Y)
+_TABLE_FOOT_H = 0.08  # foot platform height
 _TABLE_FOOT_R = 0.035  # foot platform corner radius
 # Surface Z above which arm segment knuckle centres must stay when over the
 # table footprint.  = mattress top (0.90) + max joint sphere radius (0.130)
 # + safety margin (0.02) ≈ 1.05 m.
 # Using a hard literal is intentional — this is a scene-layout constant.
 _TABLE_SURFACE_Z = 1.05
-_TABLE_CX     = 0.0    # table centred at world origin X
-_TABLE_CY     = 0.65   # table offset in Y
+_TABLE_CX = 0.0  # table centred at world origin X
+_TABLE_CY = 0.65  # table offset in Y
 
 # Pre-defined arm mount slots around the table.
 # Each slot has a stable (ox, oy) world position and a human-readable label.
 # _build_scene uses slot 0 for the single-arm case.  When multi-arm support
 # is added each slot maps to its own DigitalTwinBackend instance.
 _ARM_SLOTS: list[dict] = [
-    {"id": "arm-1", "ox":  0.30, "oy": -0.45, "label": "Near-right"},
+    {"id": "arm-1", "ox": 0.30, "oy": -0.45, "label": "Near-right"},
     {"id": "arm-2", "ox": -0.50, "oy": -0.45, "label": "Near-left"},
-    {"id": "arm-3", "ox":  0.30, "oy":  1.75, "label": "Far-right"},
-    {"id": "arm-4", "ox": -0.50, "oy":  1.75, "label": "Far-left"},
+    {"id": "arm-3", "ox": 0.30, "oy": 1.75, "label": "Far-right"},
+    {"id": "arm-4", "ox": -0.50, "oy": 1.75, "label": "Far-left"},
 ]
 # Backwards-compatible single-arm offset (slot 0)
 _ARM_OX = _ARM_SLOTS[0]["ox"]
@@ -124,13 +124,13 @@ _NO_SIGNAL_POSE = [-0.35, 1.10, 0.20, -0.20]
 # realistic joint ranges matching typical surgical robot kinematics.
 _JOINT_LIMITS = [
     (-1.20, 0.40),  # J0 shoulder pitch: -69° (toward table) to +23° (backward)
-    ( 0.20, 2.20),  # J1 elbow pitch:    +11° to +126° (keeps arm above table)
+    (0.20, 2.20),  # J1 elbow pitch:    +11° to +126° (keeps arm above table)
     (-1.50, 1.50),  # J2 wrist yaw:      ±86°
     (-1.00, 1.00),  # J3 tool pitch:     ±57°
 ]
 # Link and joint base colors are now resolved at runtime from THEME_PALETTE["arm"]
 # per ui-design-system.md.  The constants are kept as fallbacks for the no-DM case.
-_LINK_COLOR_DARK  = THEME_PALETTE["dark"]["arm"]   # #C8D2DC
+_LINK_COLOR_DARK = THEME_PALETTE["dark"]["arm"]  # #C8D2DC
 _LINK_COLOR_LIGHT = THEME_PALETTE["light"]["arm"]  # #505A64
 
 # Mode label map (matches RobotMode enum values)
@@ -304,9 +304,15 @@ def _compute_arm_geometry(
 
         result.append(
             {
-                "cx": cx, "cy": cy, "cz": cz,
-                "rx": rx_e, "ry": ry_e, "rz": rz_e,
-                "kx": kx, "ky": ky, "kz": kz,
+                "cx": cx,
+                "cy": cy,
+                "cz": cz,
+                "rx": rx_e,
+                "ry": ry_e,
+                "rz": rz_e,
+                "kx": kx,
+                "ky": ky,
+                "kz": kz,
                 "fwd": fwd,
                 "angle": angle_deg,
             }
@@ -442,6 +448,7 @@ class DigitalTwinBackend(GuiBackend):
             background_tasks.create(self._receive_operator_input()),
             background_tasks.create(self._monitor_liveliness()),
         ]
+        self._mark_ready()
         log.informational("DigitalTwinBackend: async DDS receive tasks started")
 
     async def close(self) -> None:
@@ -565,14 +572,19 @@ def _get_backend(room_id: str) -> DigitalTwinBackend:
 
 @ui.page("/twin/{room_id}")
 def twin_page(room_id: str) -> None:
-    """Render the digital twin 3D visualization page for *room_id*."""
-    current_backend = _get_backend(room_id)
+    """Render the digital twin 3D visualization page for *room_id* (full-page with header)."""
     init_theme()
     create_header(title=f"Digital Twin — {room_id}")
+    twin_content(room_id)
+
+
+def twin_content(room_id: str) -> None:
+    """Render digital twin content.  Call this from the SPA shell's sub_pages."""
+    current_backend = _get_backend(room_id)
 
     # Restore the user's stored theme preference
     stored_mode = app.storage.user.get(NICEGUI_THEME_MODE_KEY, "system")
-    dark_mode = ui.dark_mode(_theme_mode_value(stored_mode))
+    dark_mode = ui.dark_mode(_theme_mode_value(stored_mode))  # noqa: F841
 
     # ---- Mode badge at top of content area --------------------------------
     with ui.row().classes("w-full items-center gap-3 px-4 pt-2"):
@@ -610,17 +622,16 @@ def _build_arm(
     cart_w, cart_d, cart_h = 0.55, 0.45, 0.18
     _cart_color = "#546E7A"  # grey-scale
     _post_color = "#78909C"  # lighter for corner posts
-    scene.box(cart_w, cart_d, cart_h) \
-        .move(ox, oy, cart_h / 2) \
-        .material(color=_cart_color)
+    scene.box(cart_w, cart_d, cart_h).move(ox, oy, cart_h / 2).material(
+        color=_cart_color
+    )
     # Corner posts — cylinders at each vertical edge give a modern rounded-edge
     # appearance (industrial equipment / medical cart aesthetic).
     _post_r = 0.028
     for _csx, _csy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
-        scene.cylinder(_post_r, _post_r, cart_h, 16) \
-            .move(ox + _csx * (cart_w / 2), oy + _csy * (cart_d / 2), cart_h / 2) \
-            .rotate(math.pi / 2, 0, 0) \
-            .material(color=_post_color)
+        scene.cylinder(_post_r, _post_r, cart_h, 16).move(
+            ox + _csx * (cart_w / 2), oy + _csy * (cart_d / 2), cart_h / 2
+        ).rotate(math.pi / 2, 0, 0).material(color=_post_color)
     # Corner wheels
     for wx, wy in [
         (ox - cart_w / 2 + 0.07, oy - cart_d / 2 + 0.07),
@@ -631,10 +642,9 @@ def _build_arm(
         scene.sphere(0.055).move(wx, wy, 0.055).material(color="#263238")
     # Riser column — 24 segments for smoother silhouette
     col_h = B - cart_h
-    scene.cylinder(0.08, 0.08, col_h, 24) \
-        .move(ox, oy, cart_h + col_h / 2) \
-        .rotate(math.pi / 2, 0, 0) \
-        .material(color=_cart_color)
+    scene.cylinder(0.08, 0.08, col_h, 24).move(ox, oy, cart_h + col_h / 2).rotate(
+        math.pi / 2, 0, 0
+    ).material(color=_cart_color)
     # Shoulder actuator housing
     shoulder_sphere = scene.sphere(0.13).move(ox, oy, B).material(color=joint_color)
 
@@ -647,7 +657,7 @@ def _build_arm(
         g = geo[i]
         angle = init_joints[i] if i < len(init_joints) else 0.0
         r_base = cfg["link_r"]
-        r_tip  = r_base * 0.82
+        r_tip = r_base * 0.82
         seg = (
             scene.cylinder(r_tip, r_base, cfg["length"], 32)
             .move(g["cx"] + ox, g["cy"] + oy, g["cz"] + B)
@@ -767,8 +777,8 @@ def _build_scene(
     """
     init_joints = _NO_SIGNAL_POSE
     # Fixed dark scene palette — independent of the app light/dark toggle.
-    _SCENE_BG    = THEME_PALETTE["dark"]["bg_bottom"]  # #1B2838
-    _SCENE_JOINT = THEME_PALETTE["dark"]["arm"]         # #C8D2DC
+    _SCENE_BG = THEME_PALETTE["dark"]["bg_bottom"]  # #1B2838
+    _SCENE_JOINT = THEME_PALETTE["dark"]["arm"]  # #C8D2DC
     with ui.scene(
         width=860,
         height=580,
@@ -776,9 +786,15 @@ def _build_scene(
         background_color=_SCENE_BG,
     ).classes("w-full") as scene:
         scene.move_camera(
-            x=3.5, y=-2.8, z=2.8,
-            look_at_x=0.2, look_at_y=0.60, look_at_z=1.0,
-            up_x=0.0, up_y=0.0, up_z=1.0,
+            x=3.5,
+            y=-2.8,
+            z=2.8,
+            look_at_x=0.2,
+            look_at_y=0.60,
+            look_at_z=1.0,
+            up_x=0.0,
+            up_y=0.0,
+            up_z=1.0,
             duration=0,
         )
 
@@ -793,47 +809,59 @@ def _build_scene(
             (_TABLE_FOOT_W - 2 * _TABLE_FOOT_R, _TABLE_FOOT_D),
             (_TABLE_FOOT_W, _TABLE_FOOT_D - 2 * _TABLE_FOOT_R),
         ]:
-            scene.box(_bw, _bd, _TABLE_FOOT_H) \
-                .move(_TABLE_CX, _TABLE_CY, _TABLE_FOOT_H / 2) \
-                .material(color=_t_steel)
+            scene.box(_bw, _bd, _TABLE_FOOT_H).move(
+                _TABLE_CX, _TABLE_CY, _TABLE_FOOT_H / 2
+            ).material(color=_t_steel)
         for _tsx, _tsy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
-            scene.cylinder(_TABLE_FOOT_R, _TABLE_FOOT_R, _TABLE_FOOT_H, 16) \
-                .move(
-                    _TABLE_CX + _tsx * (_TABLE_FOOT_W / 2 - _TABLE_FOOT_R),
-                    _TABLE_CY + _tsy * (_TABLE_FOOT_D / 2 - _TABLE_FOOT_R),
-                    _TABLE_FOOT_H / 2,
-                ) \
-                .rotate(math.pi / 2, 0, 0) \
-                .material(color=_t_steel)
+            scene.cylinder(_TABLE_FOOT_R, _TABLE_FOOT_R, _TABLE_FOOT_H, 16).move(
+                _TABLE_CX + _tsx * (_TABLE_FOOT_W / 2 - _TABLE_FOOT_R),
+                _TABLE_CY + _tsy * (_TABLE_FOOT_D / 2 - _TABLE_FOOT_R),
+                _TABLE_FOOT_H / 2,
+            ).rotate(math.pi / 2, 0, 0).material(color=_t_steel)
 
         # Center pedestal column — narrow square section
-        scene.box(_TABLE_COL_S, _TABLE_COL_S, _t_col_h) \
-            .move(_TABLE_CX, _TABLE_CY, _TABLE_FOOT_H + _t_col_h / 2) \
-            .material(color=_t_steel)
+        scene.box(_TABLE_COL_S, _TABLE_COL_S, _t_col_h).move(
+            _TABLE_CX, _TABLE_CY, _TABLE_FOOT_H + _t_col_h / 2
+        ).material(color=_t_steel)
 
         # Table top slab
-        scene.box(_TABLE_X * 2, _TABLE_Y * 2, _TABLE_SLAB_H) \
-            .move(_TABLE_CX, _TABLE_CY, _TABLE_TOP_Z) \
-            .material(color="#ECEFF1", opacity=0.95)
+        scene.box(_TABLE_X * 2, _TABLE_Y * 2, _TABLE_SLAB_H).move(
+            _TABLE_CX, _TABLE_CY, _TABLE_TOP_Z
+        ).material(color="#ECEFF1", opacity=0.95)
         # Mattress
-        scene.box(_TABLE_X * 1.92, _TABLE_Y * 1.84, 0.06) \
-            .move(_TABLE_CX, _TABLE_CY, _TABLE_TOP_Z + _TABLE_SLAB_H / 2 + 0.03) \
-            .material(color="#B0BEC5", opacity=0.95)
+        scene.box(_TABLE_X * 1.92, _TABLE_Y * 1.84, 0.06).move(
+            _TABLE_CX, _TABLE_CY, _TABLE_TOP_Z + _TABLE_SLAB_H / 2 + 0.03
+        ).material(color="#B0BEC5", opacity=0.95)
         # Head-rest block
-        scene.box(0.28, _TABLE_Y * 1.7, 0.08) \
-            .move(_TABLE_CX - _TABLE_X + 0.14, _TABLE_CY,
-                  _TABLE_TOP_Z + _TABLE_SLAB_H / 2 + 0.04) \
-            .material(color="#90A4AE")
+        scene.box(0.28, _TABLE_Y * 1.7, 0.08).move(
+            _TABLE_CX - _TABLE_X + 0.14,
+            _TABLE_CY,
+            _TABLE_TOP_Z + _TABLE_SLAB_H / 2 + 0.04,
+        ).material(color="#90A4AE")
 
         # ── Arm (slot 0) ───────────────────────────────────────────────────
         slot = _ARM_SLOTS[0]
-        arm_segs, jnt_spheres, shoulder_sphere, tool_sphere, nib, instr_dot, nib_half = \
-            _build_arm(scene, slot["ox"], slot["oy"], init_joints,
-                       joint_color=_SCENE_JOINT)
+        (
+            arm_segs,
+            jnt_spheres,
+            shoulder_sphere,
+            tool_sphere,
+            nib,
+            instr_dot,
+            nib_half,
+        ) = _build_arm(
+            scene, slot["ox"], slot["oy"], init_joints, joint_color=_SCENE_JOINT
+        )
 
     arm_update = _make_arm_updater(
-        arm_segs, jnt_spheres, tool_sphere, nib, instr_dot, nib_half,
-        slot["ox"], slot["oy"],
+        arm_segs,
+        jnt_spheres,
+        tool_sphere,
+        nib,
+        instr_dot,
+        nib_half,
+        slot["ox"],
+        slot["oy"],
         lambda: current_backend.joint_positions,
     )
 
@@ -882,5 +910,6 @@ __all__ = [
     "DigitalTwinBackend",
     "heatmap_color",
     "main",
+    "twin_content",
     "twin_page",
 ]

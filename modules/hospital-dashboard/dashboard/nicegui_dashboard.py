@@ -211,6 +211,7 @@ class DashboardBackend(GuiBackend):
             background_tasks.create(self._receive_clinical_alerts()),
             background_tasks.create(self._receive_resource_availability()),
         ]
+        self._mark_ready()
 
     async def close(self) -> None:
         self._running = False
@@ -397,11 +398,16 @@ def _procedure_cards() -> list[ProcedureEntry]:
 
 @ui.page("/dashboard", dark=True)
 def dashboard_page() -> None:
-    """Render the hospital dashboard page."""
-
-    current_backend = _current_backend()
+    """Render the hospital dashboard page (full-page with header)."""
     init_theme()
     create_header(title="Hospital Dashboard")
+    dashboard_content()
+
+
+def dashboard_content() -> None:
+    """Render dashboard content.  Call this from the SPA shell's sub_pages."""
+
+    current_backend = _current_backend()
 
     with ui.column().classes("w-full gap-4 p-4"):
         with ui.splitter().classes("w-full h-[44rem]") as splitter:
@@ -525,6 +531,7 @@ __all__ = [
     "ProcedureEntry",
     "ResourceEntry",
     "backend",
+    "dashboard_content",
     "dashboard_page",
     "main",
 ]

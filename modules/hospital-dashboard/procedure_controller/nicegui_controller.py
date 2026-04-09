@@ -255,6 +255,7 @@ class ControllerBackend(GuiBackend):
             background_tasks.create(self._monitor_liveliness()),
             background_tasks.create(self._ui_consistency_sweep()),
         ]
+        self._mark_ready()
 
     async def close(self) -> None:
         self._running = False
@@ -566,8 +567,14 @@ def _current_backend() -> ControllerBackend:
 
 @ui.page("/controller")
 def controller_page() -> None:
-    current_backend = _current_backend()
+    """Render the controller page (full-page with header)."""
     init_theme(title="Procedure Controller")
+    controller_content()
+
+
+def controller_content() -> None:
+    """Render controller content.  Call this from the SPA shell's sub_pages."""
+    current_backend = _current_backend()
 
     def refresh_ui() -> None:
         render_summary_cards.refresh()
@@ -1223,6 +1230,7 @@ __all__ = [
     "ControllerBackend",
     "ProcedureController",
     "backend",
+    "controller_content",
     "controller_page",
     "main",
     "_make_get_capabilities_call",
