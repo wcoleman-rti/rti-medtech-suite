@@ -7,6 +7,6 @@ Usage::
 
 from __future__ import annotations
 
-from .nicegui_dashboard import main
+from .dashboard import main
 
 main()

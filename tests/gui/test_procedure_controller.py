@@ -13,9 +13,7 @@ from typing import Any
 import app_names
 import pytest
 import rti.connextdds as dds
-from hospital_dashboard.procedure_controller import (
-    nicegui_controller as controller_module,
-)
+from hospital_dashboard.procedure_controller import controller as controller_module
 from medtech.gui import BRAND_COLORS, ICONS
 from orchestration import Orchestration
 

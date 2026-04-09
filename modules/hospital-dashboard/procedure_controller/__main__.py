@@ -7,7 +7,7 @@ Usage::
 
 from __future__ import annotations
 
-from .nicegui_controller import main
+from .controller import main
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,6 @@
 """hospital_dashboard.dashboard — Hospital Dashboard GUI package."""
 
-from .nicegui_dashboard import (  # noqa: F401
+from .dashboard import (  # noqa: F401
     DashboardBackend,
     HospitalDashboard,
     backend,

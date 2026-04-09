@@ -5,6 +5,6 @@ Public API:
                          digital twin web page.
 """
 
-from .nicegui_digital_twin import DigitalTwinBackend
+from .digital_twin import DigitalTwinBackend
 
 __all__ = ["DigitalTwinBackend"]

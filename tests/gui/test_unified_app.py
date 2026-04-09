@@ -591,11 +591,11 @@ class TestShellPage:
     ) -> None:
         """sub_pages routes point to the content-only builder functions."""
         import medtech.gui.app as app_module
-        from hospital_dashboard.dashboard.nicegui_dashboard import dashboard_content
-        from hospital_dashboard.procedure_controller.nicegui_controller import (
+        from hospital_dashboard.dashboard.dashboard import dashboard_content
+        from hospital_dashboard.procedure_controller.controller import (
             controller_content,
         )
-        from surgical_procedure.digital_twin.nicegui_digital_twin import twin_content
+        from surgical_procedure.digital_twin.digital_twin import twin_content
 
         captured_routes: dict[str, Any] = {}
 

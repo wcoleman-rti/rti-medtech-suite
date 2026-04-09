@@ -28,7 +28,7 @@ import pytest
 import rti.connextdds as dds
 import surgery
 from conftest import wait_for_data, wait_for_discovery
-from surgical_procedure.digital_twin import nicegui_digital_twin as twin_module
+from surgical_procedure.digital_twin import digital_twin as twin_module
 
 pytestmark = [
     pytest.mark.gui,

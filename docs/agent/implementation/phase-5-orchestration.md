@@ -216,7 +216,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Work
 
-- Author the Procedure Controller NiceGUI application (`modules/hospital-dashboard/procedure_controller/nicegui_controller.py`):
+- Author the Procedure Controller NiceGUI application (`modules/hospital-dashboard/procedure_controller/controller.py`):
   - Creates one participant on the Orchestration domain (`Participant::ProcedureController_Orchestration`)
   - Creates one participant on the Hospital domain (`Participant::ProcedureController_Hospital`, read-only)
   - Subscribes to `ServiceCatalog` and `ServiceStatus` on the Orchestration domain

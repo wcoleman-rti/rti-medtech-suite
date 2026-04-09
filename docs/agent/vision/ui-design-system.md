@@ -368,7 +368,7 @@ These conventions apply to:
 - `modules/shared/medtech/gui/_colors.py`
 - `modules/shared/medtech/gui/_icons.py`
 - `modules/shared/medtech/gui/_backend.py`
-- `modules/hospital-dashboard/procedure_controller/nicegui_controller.py`
-- `modules/hospital-dashboard/dashboard/nicegui_dashboard.py`
+- `modules/hospital-dashboard/procedure_controller/controller.py`
+- `modules/hospital-dashboard/dashboard/dashboard.py`
 - `modules/surgical-procedure/digital_twin/_robot_widget.py`
 - All future NiceGUI GUI modules

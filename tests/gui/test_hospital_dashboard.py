@@ -17,7 +17,7 @@ import monitoring
 import pytest
 import rti.connextdds as dds
 import surgery
-from hospital_dashboard.dashboard import nicegui_dashboard as dashboard_module
+from hospital_dashboard.dashboard import dashboard as dashboard_module
 from medtech.gui import BRAND_COLORS, ICONS, NICEGUI_QUASAR_CONFIG
 
 pytestmark = [

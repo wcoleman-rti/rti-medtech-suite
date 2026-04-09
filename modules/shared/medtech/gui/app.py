@@ -5,9 +5,9 @@ Digital Twin — from a single process with a persistent SPA shell.
 
 Routes:
     /                  Landing page (redirects to /dashboard)
-    /dashboard         Hospital Dashboard  (nicegui_dashboard.dashboard_page)
-    /controller        Procedure Controller (nicegui_controller.controller_page)
-    /twin/{room_id}    Digital Twin 3D      (nicegui_digital_twin.twin_page)
+    /dashboard         Hospital Dashboard  (dashboard.dashboard_page)
+    /controller        Procedure Controller (controller.controller_page)
+    /twin/{room_id}    Digital Twin 3D      (digital_twin.twin_page)
 
 Health / Readiness probes:
     GET /health        Liveness probe — always 200 while process is running
@@ -32,10 +32,8 @@ from fastapi.responses import JSONResponse
 
 # Import page builder functions — module-level GuiBackend instantiation
 # happens inside these modules, self-registering lifecycle hooks.
-from hospital_dashboard.dashboard.nicegui_dashboard import (  # noqa: F401
-    dashboard_content,
-)
-from hospital_dashboard.procedure_controller.nicegui_controller import (  # noqa: F401
+from hospital_dashboard.dashboard.dashboard import dashboard_content  # noqa: F401
+from hospital_dashboard.procedure_controller.controller import (  # noqa: F401
     controller_content,
 )
 from medtech.gui._backend import GuiBackend
@@ -47,9 +45,7 @@ from medtech.gui._theme import (
     init_theme,
 )
 from nicegui import app, ui
-from surgical_procedure.digital_twin.nicegui_digital_twin import (  # noqa: F401
-    twin_content,
-)
+from surgical_procedure.digital_twin.digital_twin import twin_content  # noqa: F401
 
 # ---------------------------------------------------------------------------
 # Health / Readiness probes (FastAPI routes)
@@ -143,10 +139,8 @@ def main() -> None:
     # app is still in the pre-start state.  The digital twin backend is
     # room-scoped and created lazily on first page visit; GuiBackend.__init__
     # handles that case by scheduling the start coroutine as a background task.
-    from hospital_dashboard.dashboard.nicegui_dashboard import (
-        _current_backend as _dash_init,
-    )
-    from hospital_dashboard.procedure_controller.nicegui_controller import (
+    from hospital_dashboard.dashboard.dashboard import _current_backend as _dash_init
+    from hospital_dashboard.procedure_controller.controller import (
         _current_backend as _ctrl_init,
     )
 
