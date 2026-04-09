@@ -152,12 +152,13 @@ class OperatorConsoleService(Service):
         inp = OperatorInput(
             operator_id=self._operator_id,
             robot_id=self._robot_id,
-            x_axis=(math.sin(t * 0.3) - 0.3) * 1.8,  # shoulder pitch — biased toward table
-            y_axis=math.cos(t * 0.2) * 2.5,           # elbow pitch     → ±0.75 rad
-            z_axis=math.sin(t * 0.25) * 1.5,          # wrist yaw       → ±0.45 rad
-            roll=math.cos(t * 0.35) * 1.2,            # joint 3         → ±0.36 rad
-            pitch=math.sin(t * 0.15) * 0.8,           # joint 4         → ±0.24 rad
-            yaw=math.cos(t * 0.4) * 0.5,              # joint 5         → ±0.15 rad
+            x_axis=(math.sin(t * 0.3) - 0.3)
+            * 1.8,  # shoulder pitch — biased toward table
+            y_axis=math.cos(t * 0.2) * 2.5,  # elbow pitch     → ±0.75 rad
+            z_axis=math.sin(t * 0.25) * 1.5,  # wrist yaw       → ±0.45 rad
+            roll=math.cos(t * 0.35) * 1.2,  # joint 3         → ±0.36 rad
+            pitch=math.sin(t * 0.15) * 0.8,  # joint 4         → ±0.24 rad
+            yaw=math.cos(t * 0.4) * 0.5,  # joint 5         → ±0.15 rad
         )
         self._input_writer.write(inp)
         return inp

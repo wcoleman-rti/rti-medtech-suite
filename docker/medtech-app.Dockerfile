@@ -46,4 +46,11 @@ ENV PYTHONPATH="/opt/medtech/lib/python/site-packages"
 ENV NDDS_QOS_PROFILES="/opt/medtech/share/qos/Snippets.xml;/opt/medtech/share/qos/Patterns.xml;/opt/medtech/share/qos/Topics.xml;/opt/medtech/share/qos/Participants.xml;/opt/medtech/share/domains/Domains.xml;/opt/medtech/share/participants/SurgicalParticipants.xml"
 ENV MEDTECH_CONFIG_DIR="/opt/medtech/etc"
 
+# Health check: liveness probe via the FastAPI /health endpoint
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Default: launch the unified NiceGUI application (all GUI modules)
+CMD ["python", "-m", "medtech.gui.app"]
+
 WORKDIR /opt/medtech

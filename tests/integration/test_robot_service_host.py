@@ -22,7 +22,6 @@ from conftest import (
     make_start_call,
     make_stop_call,
     send_rpc,
-    test_participant_qos,
     wait_for_data,
     wait_for_replier,
     wait_for_status,
@@ -78,7 +77,8 @@ def robot_service_host():
         stderr=subprocess.STDOUT,
     )
     # Wait for ServiceCatalog publication instead of fixed sleep
-    qos = test_participant_qos()
+    qos = dds.DomainParticipantQos()
+    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
     probe_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     probe_dp.enable()
     topic = dds.Topic(probe_dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -119,7 +119,8 @@ def orch_participant():
     Transport QoS matches BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation
     used by the XML-configured Orchestration participant.
     """
-    qos = test_participant_qos()
+    qos = dds.DomainParticipantQos()
+    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     p.enable()
     yield p
