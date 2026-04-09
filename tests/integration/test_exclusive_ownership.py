@@ -94,11 +94,20 @@ class TestHigherStrengthPreferred:
         assert wait_for_discovery(w_a, r)
         assert wait_for_discovery(w_b, r)
 
-        # Both writers publish for the same device (same key)
+        # Prime w_a's exclusive ownership: write one sample and wait for the
+        # reader to actually receive it.  Only once the reader has confirmed
+        # a sample from w_a is ownership definitively established, eliminating
+        # the race window between discovery and arbitration.
         w_a.write(_make_telemetry("device-001", battery=90.0))
-        time.sleep(0.1)
+        assert wait_for_data(
+            r, timeout_sec=2.0
+        ), "Reader did not receive priming sample from w_a"
+        r.take()  # drain the priming sample
+
+        # Now write from both writers for the ownership-stability assertion
+        w_a.write(_make_telemetry("device-001", battery=90.0))
         w_b.write(_make_telemetry("device-001", battery=50.0))
-        time.sleep(0.5)
+        time.sleep(0.3)
 
         received = r.take_data()
         assert len(received) >= 1, "Should receive at least one sample"
