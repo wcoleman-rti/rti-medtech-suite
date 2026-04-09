@@ -61,8 +61,13 @@ class TestSamePartition:
         topic1 = dds.Topic(p1, "TestExchange", PatientVitals)
         topic2 = dds.Topic(p2, "TestExchange", PatientVitals)
 
-        w = writer_factory(p1, topic1)
-        r = reader_factory(p2, topic2)
+        wqos = dds.DataWriterQos()
+        wqos.reliability.kind = dds.ReliabilityKind.RELIABLE
+        rqos = dds.DataReaderQos()
+        rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
+
+        w = writer_factory(p1, topic1, qos=wqos)
+        r = reader_factory(p2, topic2, qos=rqos)
 
         assert wait_for_discovery(w, r)
 
@@ -159,18 +164,23 @@ class TestWildcardPartition:
         topic2 = dds.Topic(p2, "TestWildcard", PatientVitals)
         topic_agg = dds.Topic(p_agg, "TestWildcard", PatientVitals)
 
-        w1 = writer_factory(p1, topic1)
-        w2 = writer_factory(p2, topic2)
-        r = reader_factory(p_agg, topic_agg)
+        # Use RELIABLE QoS: this test validates partition *matching* semantics,
+        # not delivery probability.  RELIABLE guarantees that once discovery
+        # is confirmed, every written sample reaches the reader — eliminating
+        # the load-induced flakiness that plagued the BEST_EFFORT variant.
+        wqos = dds.DataWriterQos()
+        wqos.reliability.kind = dds.ReliabilityKind.RELIABLE
+        rqos = dds.DataReaderQos()
+        rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
+
+        w1 = writer_factory(p1, topic1, qos=wqos)
+        w2 = writer_factory(p2, topic2, qos=wqos)
+        r = reader_factory(p_agg, topic_agg, qos=rqos)
 
         assert wait_for_discovery(w1, r), "Wildcard should match OR-3"
         assert wait_for_discovery(w2, r), "Wildcard should match OR-5"
 
-        # Both sides have confirmed mutual discovery (publication_matched AND
-        # subscription_matched both > 0), so writes may proceed immediately.
-        # QueryConditions — one per expected source key.  Both must be
-        # satisfied for the test to pass.  BEST_EFFORT delivery may drop
-        # individual samples under CI load, so we write a burst per writer.
+        # QueryConditions — one per expected source key.
         cond_or3 = dds.QueryCondition(
             dds.Query(r, "patient_id = 'from-OR-3'"),
             dds.DataState.new_data,
@@ -180,11 +190,9 @@ class TestWildcardPartition:
             dds.DataState.new_data,
         )
 
-        burst = 20
-        for i in range(burst):
-            w1.write(_make_vitals("from-OR-3", i))
-            w2.write(_make_vitals("from-OR-5", i))
+        w1.write(_make_vitals("from-OR-3"))
+        w2.write(_make_vitals("from-OR-5"))
 
         assert wait_for_data(
-            r, timeout_sec=10, conditions=[(cond_or3, 1), (cond_or5, 1)]
+            r, timeout_sec=5, conditions=[(cond_or3, 1), (cond_or5, 1)]
         ), "Should receive from both OR-3 and OR-5"
