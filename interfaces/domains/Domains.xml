@@ -11,15 +11,17 @@
 
         <!-- control tag: Class C / Class III (safety-critical) -->
         <domain name="Procedure_control" domain_id="10">
-            <register_type name="Surgery::RobotCommand"      type_ref="Surgery::RobotCommand"/>
-            <register_type name="Surgery::RobotState"         type_ref="Surgery::RobotState"/>
-            <register_type name="Surgery::SafetyInterlock"    type_ref="Surgery::SafetyInterlock"/>
-            <register_type name="Surgery::OperatorInput"      type_ref="Surgery::OperatorInput"/>
+            <register_type name="Surgery::RobotCommand"         type_ref="Surgery::RobotCommand"/>
+            <register_type name="Surgery::RobotState"           type_ref="Surgery::RobotState"/>
+            <register_type name="Surgery::SafetyInterlock"      type_ref="Surgery::SafetyInterlock"/>
+            <register_type name="Surgery::OperatorInput"        type_ref="Surgery::OperatorInput"/>
+            <register_type name="Surgery::RobotArmAssignment"   type_ref="Surgery::RobotArmAssignment"/>
 
-            <topic name="RobotCommand"    register_type_ref="Surgery::RobotCommand"/>
-            <topic name="RobotState"      register_type_ref="Surgery::RobotState"/>
-            <topic name="SafetyInterlock" register_type_ref="Surgery::SafetyInterlock"/>
-            <topic name="OperatorInput"   register_type_ref="Surgery::OperatorInput"/>
+            <topic name="RobotCommand"          register_type_ref="Surgery::RobotCommand"/>
+            <topic name="RobotState"            register_type_ref="Surgery::RobotState"/>
+            <topic name="SafetyInterlock"       register_type_ref="Surgery::SafetyInterlock"/>
+            <topic name="OperatorInput"         register_type_ref="Surgery::OperatorInput"/>
+            <topic name="RobotArmAssignment"    register_type_ref="Surgery::RobotArmAssignment"/>
         </domain>
 
         <!-- clinical tag: Class B / Class II (clinical significance) -->

@@ -23,6 +23,7 @@ module MedtechEntityNames {
         const string CLINICAL_MONITOR     = "SurgicalParticipants::ClinicalMonitor";
         const string CLINICAL_DEVICE_GW   = "SurgicalParticipants::ClinicalDeviceGateway";
         const string CONTROL_DIGITAL_TWIN = "SurgicalParticipants::ControlDigitalTwin";
+        const string PROCEDURE_CONTROLLER_PROCEDURE_CONTROL = "SurgicalParticipants::ProcedureController_ProcedureControl";
 
         // Writer names — find_datawriter_by_name() / find_datawriter()
         const string PROCEDURE_CONTEXT_WRITER  = "OperationalPublisher::ProcedureContextWriter";
@@ -50,6 +51,7 @@ module MedtechEntityNames {
         const string TWIN_OPERATOR_INPUT_READER    = "TwinSubscriber::OperatorInputReader";
         const string TWIN_SAFETY_INTERLOCK_READER  = "TwinSubscriber::SafetyInterlockReader";
         const string TWIN_ROBOT_COMMAND_READER     = "TwinSubscriber::RobotCommandReader";
+        const string CTRL_ROBOT_ARM_ASSIGNMENT_READER = "ProcedureControlSubscriber::RobotArmAssignmentReader";
     };
 
     // --- OrchestrationParticipants library ---

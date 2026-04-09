@@ -287,6 +287,34 @@
             </subscriber>
         </domain_participant>
 
+        <!--
+            ProcedureController_ProcedureControl — Procedure Controller's
+            control-tag participant on the Procedure domain (Domain 10).
+            Subscribes: RobotArmAssignment
+            Used by: Procedure Controller (hospital-dashboard)
+        -->
+        <domain_participant name="ProcedureController_ProcedureControl"
+                            domain_ref="MedtechDomains::Procedure_control">
+            <domain_participant_qos base_name="Participants::Transport">
+                <property>
+                    <value>
+                        <element>
+                            <name>dds.domain_participant.domain_tag</name>
+                            <value>control</value>
+                        </element>
+                    </value>
+                </property>
+            </domain_participant_qos>
+
+            <subscriber name="ProcedureControlSubscriber">
+
+                <data_reader name="RobotArmAssignmentReader"
+                             topic_ref="RobotArmAssignment">
+                    <datareader_qos base_name="TopicProfiles::RobotArmAssignment"/>
+                </data_reader>
+            </subscriber>
+        </domain_participant>
+
     </domain_participant_library>
 
 </dds>

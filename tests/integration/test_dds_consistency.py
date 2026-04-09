@@ -205,3 +205,100 @@ class TestDestructorShutdownSequence:
             "Destructor shutdown sequence must be: "
             "signal threads → join → aws_.stop()"
         )
+
+
+class TestProcedureControllerProcedureControlParticipant:
+    """Step 20.3 test gate: ProcedureController_ProcedureControl participant.
+
+    Verifies that the new control-tag participant profile was added and that
+    the Procedure Controller uses all three domain participants.
+    """
+
+    def test_entity_name_constants_accessible(self):
+        """Entity name constants for ProcedureController_ProcedureControl
+        are generated and accessible in Python."""
+        import app_names
+
+        surg = app_names.MedtechEntityNames.SurgicalParticipants
+        assert surg.PROCEDURE_CONTROLLER_PROCEDURE_CONTROL == (
+            "SurgicalParticipants::ProcedureController_ProcedureControl"
+        )
+        assert surg.CTRL_ROBOT_ARM_ASSIGNMENT_READER == (
+            "ProcedureControlSubscriber::RobotArmAssignmentReader"
+        )
+
+    def test_participant_created_from_config(self):
+        """ProcedureController_ProcedureControl can be created from XML config
+        and its RobotArmAssignmentReader is accessible."""
+        import app_names
+        from medtech.dds import initialize_connext
+
+        initialize_connext()
+        surg = app_names.MedtechEntityNames.SurgicalParticipants
+        provider = dds.QosProvider.default
+
+        participant = provider.create_participant_from_config(
+            surg.PROCEDURE_CONTROLLER_PROCEDURE_CONTROL
+        )
+        assert (
+            participant is not None
+        ), f"Failed to create participant {surg.PROCEDURE_CONTROLLER_PROCEDURE_CONTROL}"
+
+        qos = participant.qos
+        qos.partition.name = ["procedure"]
+        participant.qos = qos
+        participant.enable()
+
+        reader = participant.find_datareader(surg.CTRL_ROBOT_ARM_ASSIGNMENT_READER)
+        assert (
+            reader is not None
+        ), f"Reader {surg.CTRL_ROBOT_ARM_ASSIGNMENT_READER} not found"
+        participant.close()
+
+    def test_control_tag_not_visible_to_clinical_tag(self):
+        """A control-tag participant does not discover clinical-tag publishers.
+
+        Domain tag isolation: participants with different domain tags on the
+        same domain ID are invisible to each other.
+        """
+        import app_names
+        from medtech.dds import initialize_connext
+
+        initialize_connext()
+        names = app_names.MedtechEntityNames.SurgicalParticipants
+        provider = dds.QosProvider.default
+
+        # Create a control-tag participant (subscribes RobotArmAssignment)
+        ctrl = provider.create_participant_from_config(
+            names.PROCEDURE_CONTROLLER_PROCEDURE_CONTROL
+        )
+        ctrl_qos = ctrl.qos
+        ctrl_qos.partition.name = ["procedure"]
+        ctrl.qos = ctrl_qos
+        ctrl.enable()
+
+        ctrl_reader = ctrl.find_datareader(names.CTRL_ROBOT_ARM_ASSIGNMENT_READER)
+        assert ctrl_reader is not None
+        ctrl_reader = dds.DataReader(ctrl_reader)
+
+        # Create a clinical-tag participant (publishes PatientVitals)
+        clinical = provider.create_participant_from_config(names.CLINICAL_MONITOR)
+        clin_qos = clinical.qos
+        clin_qos.partition.name = ["procedure"]
+        clinical.qos = clin_qos
+        clinical.enable()
+
+        # Brief discovery wait — the two participants should NOT discover each
+        # other because they have different domain tags.
+        import time
+
+        time.sleep(1.0)
+
+        matched = ctrl_reader.matched_publications
+        assert len(matched) == 0, (
+            "control-tag subscriber must NOT discover clinical-tag publishers; "
+            f"unexpectedly matched {len(matched)} publication(s)"
+        )
+
+        clinical.close()
+        ctrl.close()

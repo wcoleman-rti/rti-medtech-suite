@@ -33,6 +33,7 @@ from nicegui import background_tasks, run, ui
 from orchestration import Orchestration
 
 dash_names = app_names.MedtechEntityNames.OrchestrationParticipants
+surg_names = app_names.MedtechEntityNames.SurgicalParticipants
 
 log = init_logging(ModuleName.HOSPITAL_DASHBOARD)
 
@@ -83,6 +84,8 @@ class ControllerBackend(GuiBackend):
         self._requesters: dict[str, rti.rpc.Requester] = {}
         self._orch_participant: dds.DomainParticipant | None = None
         self._hosp_participant: dds.DomainParticipant | None = None
+        self._proc_control_participant: dds.DomainParticipant | None = None
+        self._arm_assignment_reader: dds.DataReader | None = None
         self._catalog_reader = catalog_reader
         self._status_reader = status_reader
         self._hospital_readers: list[dds.DataReader] = []
@@ -294,6 +297,25 @@ class ControllerBackend(GuiBackend):
             if reader is not None:
                 self._hospital_readers.append(dds.DataReader(reader))
 
+        self._proc_control_participant = provider.create_participant_from_config(
+            surg_names.PROCEDURE_CONTROLLER_PROCEDURE_CONTROL
+        )
+        if self._proc_control_participant is None:
+            raise RuntimeError(
+                "Failed to create Procedure Controller procedure-control participant"
+            )
+
+        proc_qos = self._proc_control_participant.qos
+        proc_qos.partition.name = ["procedure"]
+        self._proc_control_participant.qos = proc_qos
+        self._proc_control_participant.enable()
+
+        arm_reader = self._proc_control_participant.find_datareader(
+            surg_names.CTRL_ROBOT_ARM_ASSIGNMENT_READER
+        )
+        if arm_reader is not None:
+            self._arm_assignment_reader = dds.DataReader(arm_reader)
+
     async def start(self) -> None:
         self._running = True
         self._tasks = [
@@ -325,19 +347,26 @@ class ControllerBackend(GuiBackend):
         for reader in [
             self._catalog_reader,
             self._status_reader,
+            self._arm_assignment_reader,
             *self._hospital_readers,
         ]:
             if reader is not None:
                 with suppress(Exception):
                     reader.close()
 
-        for participant in (self._orch_participant, self._hosp_participant):
+        for participant in (
+            self._orch_participant,
+            self._hosp_participant,
+            self._proc_control_participant,
+        ):
             if participant is not None:
                 with suppress(Exception):
                     participant.close()
 
         self._orch_participant = None
         self._hosp_participant = None
+        self._proc_control_participant = None
+        self._arm_assignment_reader = None
 
         await rti.asyncio.close()
 
@@ -591,15 +620,25 @@ class ControllerBackend(GuiBackend):
     def hosp_participant(self) -> dds.DomainParticipant | None:
         return self._hosp_participant
 
+    @property
+    def proc_control_participant(self) -> dds.DomainParticipant | None:
+        return self._proc_control_participant
+
     def close_dds(self) -> None:
         self._running = False
         self._requesters.clear()
-        for participant in (self._orch_participant, self._hosp_participant):
+        for participant in (
+            self._orch_participant,
+            self._hosp_participant,
+            self._proc_control_participant,
+        ):
             if participant is not None:
                 with suppress(Exception):
                     participant.close()
         self._orch_participant = None
         self._hosp_participant = None
+        self._proc_control_participant = None
+        self._arm_assignment_reader = None
 
 
 backend: ControllerBackend | None = None
