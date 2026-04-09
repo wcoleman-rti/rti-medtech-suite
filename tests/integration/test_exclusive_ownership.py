@@ -152,9 +152,20 @@ class TestFailoverToBackup:
         assert wait_for_discovery(w_a, r)
         assert wait_for_discovery(w_b, r)
 
-        # Confirm primary is delivering
+        # Prime w_a's exclusive ownership: write one sample and confirm it
+        # arrives before testing ownership stability.  Matches the pattern in
+        # TestHigherStrengthPreferred — ownership arbitration only becomes
+        # deterministic once the reader has received at least one sample from
+        # the stronger writer (see commit 1ae79ed).
         w_a.write(_make_telemetry("device-001", battery=90.0))
-        time.sleep(0.1)
+        assert wait_for_data(
+            r, timeout_sec=2.0
+        ), "Priming sample from primary should arrive"
+        r.take()  # drain priming sample
+
+        # Confirm primary is still delivering and secondary is filtered
+        w_a.write(_make_telemetry("device-001", battery=90.0))
+        time.sleep(0.05)
         w_b.write(_make_telemetry("device-001", battery=50.0))
 
         received = wait_for_data(r, timeout_sec=5)

@@ -166,22 +166,23 @@ class TestWildcardPartition:
         assert wait_for_discovery(w1, r), "Wildcard should match OR-3"
         assert wait_for_discovery(w2, r), "Wildcard should match OR-5"
 
-        # Prime each connection: write one sample per writer and wait for it
-        # to arrive at the reader before the assertion burst.  Under parallel
-        # CI load best-effort packets can be dropped in the discovery window;
-        # confirming arrival ensures wildcard routing is fully settled.
+        # Prime each connection individually: write one sample per writer and
+        # confirm it arrives at the reader before the assertion burst.
+        # Priming serially (one at a time) avoids the race where both samples
+        # are written simultaneously and only one arrives before the condition
+        # count is satisfied — making the check deterministic under parallel CI
+        # load where best-effort UDP delivery can be reordered or delayed.
         w1.write(_make_vitals("prime-OR-3"))
-        w2.write(_make_vitals("prime-OR-5"))
-        cond_prime = dds.ReadCondition(
-            r,
-            dds.DataState(
-                dds.SampleState.NOT_READ, dds.ViewState.ANY, dds.InstanceState.ALIVE
-            ),
-        )
         assert wait_for_data(
-            r, timeout_sec=5, conditions=[(cond_prime, 2)]
+            r, timeout_sec=5
         ), "Priming samples from both writers should arrive"
-        r.take()  # drain priming samples
+        r.take()  # drain OR-3 priming sample
+
+        w2.write(_make_vitals("prime-OR-5"))
+        assert wait_for_data(
+            r, timeout_sec=5
+        ), "Priming samples from both writers should arrive"
+        r.take()  # drain OR-5 priming sample
 
         # QueryConditions — one per expected source key.  Both must be
         # satisfied for the test to pass.  Best-effort delivery may drop
