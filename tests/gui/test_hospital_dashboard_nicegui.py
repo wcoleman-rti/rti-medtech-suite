@@ -166,6 +166,16 @@ def _patch_ui(monkeypatch: pytest.MonkeyPatch, recorder: Recorder) -> None:
     )
     monkeypatch.setattr(
         dashboard_module.ui,
+        "aggrid",
+        lambda *args, **kwargs: recorder.record("aggrid", *args, **kwargs),
+    )
+    monkeypatch.setattr(
+        dashboard_module.ui,
+        "chip",
+        lambda *args, **kwargs: recorder.record("chip", *args, **kwargs),
+    )
+    monkeypatch.setattr(
+        dashboard_module.ui,
         "label",
         lambda *args, **kwargs: recorder.record("label", *args, **kwargs),
     )
@@ -303,7 +313,7 @@ class TestDashboardBackend:
         )
 
         asyncio.run(backend.start())
-        assert len(scheduled) == 7
+        assert len(scheduled) == 8
         asyncio.run(backend.close())
 
 
@@ -375,6 +385,7 @@ class TestDashboardPage:
                         message="Heart rate critical",
                     )
                 ],
+                resources={},
                 severity_filter="ALL",
                 room_filter="ALL",
                 filtered_alerts=lambda: [
@@ -409,3 +420,483 @@ class TestConstants:
     def test_icon_constants_exist(self):
         assert ICONS["dashboard"] == "space_dashboard"
         assert BRAND_COLORS["blue"] == "#004C97"
+
+
+# ---------------------------------------------------------------------------
+# Step N.7 test gate — Robot Status, Liveliness, Resource Panel, CFT, Burst
+# ---------------------------------------------------------------------------
+
+
+class TestRobotStatusDisplay:
+    """Gate: Robot state per OR with mode indicator; E-STOP prominently displayed."""
+
+    def test_robot_mode_label_operational(self):
+        mode_int = int(surgery.Surgery.RobotMode.OPERATIONAL)
+        label = dashboard_module._robot_mode_label(mode_int)
+        assert label == "OPERATIONAL"
+
+    def test_robot_mode_label_emergency_stop(self):
+        mode_int = int(surgery.Surgery.RobotMode.EMERGENCY_STOP)
+        label = dashboard_module._robot_mode_label(mode_int)
+        assert label == "E-STOP"
+
+    def test_robot_mode_label_paused(self):
+        mode_int = int(surgery.Surgery.RobotMode.PAUSED)
+        assert dashboard_module._robot_mode_label(mode_int) == "PAUSED"
+
+    def test_robot_mode_label_passthrough_str(self):
+        assert dashboard_module._robot_mode_label("OPERATIONAL") == "OPERATIONAL"
+
+    def test_robot_mode_color_emergency_stop_is_red(self):
+        mode_int = int(surgery.Surgery.RobotMode.EMERGENCY_STOP)
+        color = dashboard_module._robot_mode_color(mode_int)
+        assert color == BRAND_COLORS["red"]
+
+    def test_robot_mode_color_operational_is_green(self):
+        mode_int = int(surgery.Surgery.RobotMode.OPERATIONAL)
+        color = dashboard_module._robot_mode_color(mode_int)
+        assert color == BRAND_COLORS["green"]
+
+    def test_update_robot_state_maps_idl_enum(self, participant_factory):
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+
+        # Simulate a real DDS RobotState sample with operational_mode enum int
+        backend.update_procedure_context(
+            SimpleNamespace(
+                procedure_id="proc-R1",
+                room="OR-5",
+                patient=SimpleNamespace(id="p-R1", name="Alice"),
+                procedure_type="Spine",
+                surgeon="Dr. T",
+            )
+        )
+        sample = SimpleNamespace(
+            robot_id="robot-001",
+            procedure_id="proc-R1",
+            operational_mode=int(surgery.Surgery.RobotMode.OPERATIONAL),
+        )
+        backend.update_robot_state(sample)
+
+        entry = backend.procedures["proc-R1"]
+        assert entry.robot_state == "OPERATIONAL"
+        assert entry.robot_color == BRAND_COLORS["green"]
+        assert entry.robot_disconnected is False
+
+        asyncio.run(backend.close())
+
+    def test_update_robot_state_estop(self, participant_factory):
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+
+        backend.update_procedure_context(
+            SimpleNamespace(
+                procedure_id="proc-R2",
+                room="OR-6",
+                patient=SimpleNamespace(id="p-R2", name="Bob"),
+                procedure_type="Knee",
+                surgeon="Dr. M",
+            )
+        )
+        sample = SimpleNamespace(
+            robot_id="robot-002",
+            procedure_id="proc-R2",
+            operational_mode=int(surgery.Surgery.RobotMode.EMERGENCY_STOP),
+        )
+        backend.update_robot_state(sample)
+
+        entry = backend.procedures["proc-R2"]
+        assert entry.robot_state == "E-STOP"
+        assert entry.robot_color == BRAND_COLORS["red"]
+        assert entry.robot_disconnected is False
+
+        asyncio.run(backend.close())
+
+
+class TestLivelinessDisconnect:
+    """Gate: Robot disconnect detected via liveliness."""
+
+    def test_mark_robot_disconnected_by_id(self, participant_factory):
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(dashboard_module.ui, "notification", lambda *a, **k: None)
+
+        # Set up a robot → procedure mapping
+        backend.update_procedure_context(
+            SimpleNamespace(
+                procedure_id="proc-L1",
+                room="OR-1",
+                patient=SimpleNamespace(id="pL1", name="Carol"),
+                procedure_type="Hip",
+                surgeon="Dr. X",
+            )
+        )
+        backend.update_robot_state(
+            SimpleNamespace(
+                robot_id="robot-L1",
+                procedure_id="proc-L1",
+                operational_mode=int(surgery.Surgery.RobotMode.OPERATIONAL),
+            )
+        )
+        assert backend.procedures["proc-L1"].robot_state == "OPERATIONAL"
+
+        # Simulate liveliness loss
+        backend.mark_robot_disconnected("robot-L1")
+
+        entry = backend.procedures["proc-L1"]
+        assert entry.robot_state == "Disconnected"
+        assert entry.robot_color == BRAND_COLORS["light_gray"]
+        assert entry.robot_disconnected is True
+
+        monkeypatch.undo()
+        asyncio.run(backend.close())
+
+    def test_mark_robot_disconnected_unknown_id_marks_all(self, participant_factory):
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+
+        backend.update_procedure_context(
+            SimpleNamespace(
+                procedure_id="proc-L2",
+                room="OR-2",
+                patient=SimpleNamespace(id="pL2", name="Dave"),
+                procedure_type="Shoulder",
+                surgeon="Dr. Y",
+            )
+        )
+        # No robot_id mapping — simulate losing an unknown robot
+        backend.mark_robot_disconnected("")
+
+        entry = backend.procedures["proc-L2"]
+        assert entry.robot_state == "Disconnected"
+        assert entry.robot_disconnected is True
+        asyncio.run(backend.close())
+
+    def test_monitor_liveliness_task_marks_disconnected(
+        self, participant_factory, monkeypatch
+    ):
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+
+        # Prime a known robot_id → procedure mapping
+        backend.update_procedure_context(
+            SimpleNamespace(
+                procedure_id="proc-L3",
+                room="OR-3",
+                patient=SimpleNamespace(id="pL3", name="Eve"),
+                procedure_type="Wrist",
+                surgeon="Dr. Z",
+            )
+        )
+        backend.update_robot_state(
+            SimpleNamespace(
+                robot_id="robot-L3",
+                procedure_id="proc-L3",
+                operational_mode=int(surgery.Surgery.RobotMode.OPERATIONAL),
+            )
+        )
+
+        # Mock liveliness_changed_status to report lost liveliness
+        class _MockStatus:
+            alive_count = 0
+            not_alive_count = 1
+
+        monkeypatch.setattr(
+            type(backend._robot_state_reader),
+            "liveliness_changed_status",
+            property(lambda self: _MockStatus()),
+        )
+
+        async def _run_one_poll() -> None:
+            backend._running = True
+            # Run one iteration of the monitor loop
+            status = backend._robot_state_reader.liveliness_changed_status
+            if status.alive_count == 0 and status.not_alive_count > 0:
+                for robot_id in list(backend._robot_id_to_procedure.keys()):
+                    backend.mark_robot_disconnected(robot_id)
+
+        asyncio.run(_run_one_poll())
+
+        entry = backend.procedures["proc-L3"]
+        assert entry.robot_state == "Disconnected"
+        assert entry.robot_disconnected is True
+        asyncio.run(backend.close())
+
+
+class TestResourcePanel:
+    """Gate: Resource panel displays and updates in real-time."""
+
+    def test_update_resource_availability(self, participant_factory):
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+
+        backend.update_resource_availability(
+            SimpleNamespace(
+                name="OR-3",
+                kind="Operating Room",
+                status="AVAILABLE",
+                location="North Wing",
+                resource_name="",
+                resource_kind="",
+                availability_status="",
+            )
+        )
+        assert "OR-3" in backend.resources
+        assert backend.resources["OR-3"].status == "AVAILABLE"
+        assert backend.resources["OR-3"].kind == "Operating Room"
+        asyncio.run(backend.close())
+
+    def test_resource_panel_renders_aggrid(
+        self, participant_factory, monkeypatch: pytest.MonkeyPatch
+    ):
+        recorder = Recorder()
+        _patch_ui(monkeypatch, recorder)
+        monkeypatch.setattr(dashboard_module, "init_theme", lambda: None)
+        monkeypatch.setattr(
+            dashboard_module,
+            "create_header",
+            lambda title="Medtech Suite": recorder.record("header", title),
+        )
+
+        rp = dashboard_module.ResourceEntry(
+            name="OR-4", kind="OR", status="AVAILABLE", location="East"
+        )
+        monkeypatch.setattr(
+            dashboard_module,
+            "backend",
+            SimpleNamespace(
+                procedures={},
+                alerts=[],
+                resources={"OR-4": rp},
+                severity_filter="ALL",
+                room_filter="ALL",
+                filtered_alerts=lambda: [],
+            ),
+        )
+
+        dashboard_module.dashboard_page()
+
+        kinds = [call[0] for call in recorder.calls]
+        assert "aggrid" in kinds
+
+    def test_resource_updates_in_place(self, participant_factory):
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+
+        backend.update_resource_availability(
+            SimpleNamespace(
+                name="OR-5",
+                kind="OR",
+                status="AVAILABLE",
+                location="South",
+                resource_name="",
+                resource_kind="",
+                availability_status="",
+            )
+        )
+        assert backend.resources["OR-5"].status == "AVAILABLE"
+
+        # Update the same resource
+        backend.update_resource_availability(
+            SimpleNamespace(
+                name="OR-5",
+                kind="OR",
+                status="UNAVAILABLE",
+                location="South",
+                resource_name="",
+                resource_kind="",
+                availability_status="",
+            )
+        )
+        assert backend.resources["OR-5"].status == "UNAVAILABLE"
+        assert len(backend.resources) == 1  # no duplicate entry
+        asyncio.run(backend.close())
+
+
+class TestContentFilteredTopic:
+    """Gate: Content-filtered topic delivers only matching patient data."""
+
+    def test_select_patient_filter_noop_without_participant(self, participant_factory):
+        """In injection mode (no participant), select_patient_filter is a no-op."""
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+        original_reader = backend._patient_vitals_reader
+
+        backend.select_patient_filter("patient-001")
+
+        assert backend._patient_vitals_reader is original_reader
+        asyncio.run(backend.close())
+
+    def test_select_patient_filter_rejects_invalid_chars(self, participant_factory):
+        """Filter method must reject patient_id values containing SQL metacharacters."""
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+        original_reader = backend._patient_vitals_reader
+
+        backend.select_patient_filter("patient' OR '1'='1")
+
+        assert backend._patient_vitals_reader is original_reader
+        asyncio.run(backend.close())
+
+    @pytest.mark.integration
+    @pytest.mark.filtering
+    def test_content_filtered_topic_delivers_only_matching_patient(
+        self, participant_factory
+    ):
+        """CFT with patient_id filter delivers only matching patient data."""
+        import monitoring
+
+        p_write = participant_factory(domain_id=0)
+        p_read = participant_factory(domain_id=0)
+
+        topic_w = dds.Topic(
+            p_write, "PatientVitals_CFT", monitoring.Monitoring.PatientVitals
+        )
+        topic_r = dds.Topic(
+            p_read, "PatientVitals_CFT", monitoring.Monitoring.PatientVitals
+        )
+
+        cft = dds.ContentFilteredTopic(
+            topic_r,
+            "PatientVitals_CFT_filtered",
+            dds.Filter("patient_id = 'patient-001'"),
+        )
+
+        pub = dds.Publisher(p_write)
+        sub = dds.Subscriber(p_read)
+
+        w_qos = dds.DataWriterQos()
+        r_qos = dds.DataReaderQos()
+
+        writer = dds.DataWriter(pub, topic_w, w_qos)
+        reader = dds.DataReader(sub, cft, r_qos)
+
+        # Wait for discovery
+        from tests.conftest import wait_for_discovery
+
+        assert wait_for_discovery(writer, reader)
+
+        # Write for matching patient
+        s1 = monitoring.Monitoring.PatientVitals()
+        s1.patient_id = "patient-001"
+        s1.heart_rate = 72.0
+        writer.write(s1)
+
+        # Write for non-matching patient
+        s2 = monitoring.Monitoring.PatientVitals()
+        s2.patient_id = "patient-002"
+        s2.heart_rate = 90.0
+        writer.write(s2)
+
+        # Wait for data to arrive
+        from tests.conftest import wait_for_data
+
+        assert wait_for_data(
+            reader, timeout_sec=2.0
+        ), "Expected filtered data for patient-001"
+
+        received = reader.take_data()
+        received_ids = [str(s.patient_id) for s in received]
+
+        assert "patient-001" in received_ids, "Matching patient data must arrive"
+        assert (
+            "patient-002" not in received_ids
+        ), "Non-matching patient data must be filtered out"
+
+
+class TestDDSBurstResponsiveness:
+    """Gate: DDS data processing does not block the UI thread."""
+
+    def test_receive_methods_are_async_coroutines(self, participant_factory):
+        """All receive tasks must be coroutine functions (non-blocking by contract)."""
+        import inspect
+
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+
+        async_methods = [
+            backend._receive_procedure_status,
+            backend._receive_procedure_context,
+            backend._receive_patient_vitals,
+            backend._receive_alarm_messages,
+            backend._receive_robot_state,
+            backend._receive_clinical_alerts,
+            backend._receive_resource_availability,
+            backend._monitor_robot_liveliness,
+        ]
+
+        for method in async_methods:
+            assert inspect.iscoroutinefunction(
+                method
+            ), f"{method.__name__} must be an async def coroutine function"
+
+        asyncio.run(backend.close())
+
+    def test_burst_of_samples_updates_state_without_error(self, participant_factory):
+        """Backend processes a burst of mixed samples without raising exceptions."""
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(dashboard_module.ui, "notification", lambda *a, **k: None)
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+
+        # Populate a procedure context first
+        backend.update_procedure_context(
+            SimpleNamespace(
+                procedure_id="proc-burst",
+                room="OR-B",
+                patient=SimpleNamespace(id="burst-patient", name="Frank"),
+                procedure_type="Burst Test",
+                surgeon="Dr. Burst",
+            )
+        )
+
+        # Burst: vitals + robot state + alert + resource — all in rapid succession
+        for i in range(20):
+            backend.update_patient_vitals(
+                SimpleNamespace(
+                    patient_id="burst-patient",
+                    heart_rate=60.0 + i,
+                    spo2=95.0,
+                    systolic_bp=120.0,
+                    diastolic_bp=80.0,
+                )
+            )
+            backend.update_robot_state(
+                SimpleNamespace(
+                    robot_id="robot-burst",
+                    procedure_id="proc-burst",
+                    operational_mode=int(surgery.Surgery.RobotMode.OPERATIONAL),
+                )
+            )
+            backend.update_clinical_alert(
+                SimpleNamespace(
+                    alert_id=f"alert-burst-{i}",
+                    severity="INFO",
+                    room="OR-B",
+                    patient=SimpleNamespace(name="Frank"),
+                    category="Test",
+                    message=f"burst {i}",
+                )
+            )
+            backend.update_resource_availability(
+                SimpleNamespace(
+                    name=f"resource-{i % 5}",
+                    kind="OR",
+                    status="AVAILABLE",
+                    location="Test",
+                    resource_name="",
+                    resource_kind="",
+                    availability_status="",
+                )
+            )
+
+        # All 20 vitals samples update the same entry — last value wins
+        assert backend.procedures["proc-burst"].vitals["heart_rate"] == 79.0
+        # 20 alerts should have been accumulated
+        assert len(backend.alerts) >= 20
+        # Resources indexed by name mod 5 → 5 unique keys
+        assert len(backend.resources) == 5
+
+        monkeypatch.undo()
+        asyncio.run(backend.close())

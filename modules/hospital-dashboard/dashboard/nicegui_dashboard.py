@@ -36,6 +36,8 @@ dash_names = app_names.MedtechEntityNames.HospitalDashboard
 
 log = init_logging(ModuleName.HOSPITAL_DASHBOARD)
 
+_LIVELINESS_POLL_INTERVAL = 0.5  # seconds — same cadence as digital twin
+
 
 def _text(value: Any) -> str:
     return "" if value is None else str(value)
@@ -73,6 +75,41 @@ def _phase_color(phase_value: Any) -> str:
     return phase_map.get(int(phase_value), BRAND_COLORS["gray"])
 
 
+def _robot_mode_label(mode_value: Any) -> str:
+    """Map a ``Surgery.RobotMode`` enum integer to a STATUS_COLORS-compatible string."""
+    if isinstance(mode_value, str):
+        return mode_value
+    _map = {
+        int(surgery.Surgery.RobotMode.OPERATIONAL): "OPERATIONAL",
+        int(surgery.Surgery.RobotMode.EMERGENCY_STOP): "E-STOP",
+        int(surgery.Surgery.RobotMode.PAUSED): "PAUSED",
+        int(surgery.Surgery.RobotMode.IDLE): "IDLE",
+        int(surgery.Surgery.RobotMode.UNKNOWN): "UNKNOWN",
+    }
+    return _map.get(int(mode_value), "UNKNOWN")
+
+
+def _robot_mode_color(mode_value: Any) -> str:
+    """Map a ``Surgery.RobotMode`` value (int or str) to a brand color hex."""
+    if isinstance(mode_value, str):
+        return {
+            "OPERATIONAL": BRAND_COLORS["green"],
+            "E-STOP": BRAND_COLORS["red"],
+            "EMERGENCY_STOP": BRAND_COLORS["red"],
+            "PAUSED": BRAND_COLORS["amber"],
+            "IDLE": BRAND_COLORS["gray"],
+            "DISCONNECTED": BRAND_COLORS["light_gray"],
+        }.get(str(mode_value).upper(), BRAND_COLORS["gray"])
+    _map = {
+        int(surgery.Surgery.RobotMode.OPERATIONAL): BRAND_COLORS["green"],
+        int(surgery.Surgery.RobotMode.EMERGENCY_STOP): BRAND_COLORS["red"],
+        int(surgery.Surgery.RobotMode.PAUSED): BRAND_COLORS["amber"],
+        int(surgery.Surgery.RobotMode.IDLE): BRAND_COLORS["gray"],
+        int(surgery.Surgery.RobotMode.UNKNOWN): BRAND_COLORS["gray"],
+    }
+    return _map.get(int(mode_value), BRAND_COLORS["gray"])
+
+
 @dataclass
 class ProcedureEntry:
     procedure_id: str
@@ -86,6 +123,7 @@ class ProcedureEntry:
     vitals: dict[str, Any] = field(default_factory=dict)
     robot_state: str = "Unknown"
     robot_color: str = BRAND_COLORS["gray"]
+    robot_disconnected: bool = False
     resource_name: str = ""
     resource_kind: str = ""
     resource_status: str = ""
@@ -133,6 +171,7 @@ class DashboardBackend(GuiBackend):
         self.severity_filter: str = "ALL"
         self.room_filter: str = "ALL"
         self._patient_to_procedure: dict[str, str] = {}
+        self._robot_id_to_procedure: dict[str, str] = {}
         self._tasks: list[asyncio.Task[Any]] = []
         self._participant: dds.DomainParticipant | None = None
         self._running = False
@@ -210,6 +249,7 @@ class DashboardBackend(GuiBackend):
             background_tasks.create(self._receive_robot_state()),
             background_tasks.create(self._receive_clinical_alerts()),
             background_tasks.create(self._receive_resource_availability()),
+            background_tasks.create(self._monitor_robot_liveliness()),
         ]
         self._mark_ready()
 
@@ -298,18 +338,46 @@ class DashboardBackend(GuiBackend):
         entry.status_message = _text(getattr(sample, "message", ""))
 
     def update_robot_state(self, sample: Any) -> None:
+        # Support both real DDS RobotState samples (robot_id key, operational_mode field)
+        # and test SimpleNamespace shims (procedure_id, mode).
+        robot_id = _text(getattr(sample, "robot_id", ""))
         procedure_id = _text(getattr(sample, "procedure_id", ""))
+        if not procedure_id:
+            procedure_id = self._robot_id_to_procedure.get(robot_id, robot_id)
+        if robot_id and procedure_id:
+            self._robot_id_to_procedure[robot_id] = procedure_id
         entry = self._get_or_create_procedure(procedure_id)
-        mode = _text(getattr(sample, "mode", getattr(sample, "state", ""))) or "Unknown"
-        entry.robot_state = mode
-        entry.robot_color = {
-            "OPERATIONAL": BRAND_COLORS["green"],
-            "E-STOP": BRAND_COLORS["red"],
-            "EMERGENCY_STOP": BRAND_COLORS["red"],
-            "PAUSED": BRAND_COLORS["amber"],
-            "IDLE": BRAND_COLORS["gray"],
-            "DISCONNECTED": BRAND_COLORS["light_gray"],
-        }.get(mode.upper(), BRAND_COLORS["gray"])
+        entry.robot_disconnected = False
+        # Prefer operational_mode (real IDL field), fall back to mode / state (test shim)
+        raw_mode = getattr(
+            sample,
+            "operational_mode",
+            getattr(sample, "mode", getattr(sample, "state", "")),
+        )
+        if raw_mode is None:
+            raw_mode = ""
+        if isinstance(raw_mode, str):
+            entry.robot_state = raw_mode or "Unknown"
+            entry.robot_color = _robot_mode_color(raw_mode or "UNKNOWN")
+        else:
+            entry.robot_state = _robot_mode_label(raw_mode)
+            entry.robot_color = _robot_mode_color(raw_mode)
+
+    def mark_robot_disconnected(self, robot_id: str) -> None:
+        """Mark the robot associated with *robot_id* as disconnected (liveliness lost)."""
+        procedure_id = self._robot_id_to_procedure.get(robot_id)
+        targets: list[ProcedureEntry] = []
+        if procedure_id:
+            entry = self.procedures.get(procedure_id)
+            if entry is not None:
+                targets.append(entry)
+        else:
+            # robot_id unknown — mark all known procedures as disconnected
+            targets = list(self.procedures.values())
+        for entry in targets:
+            entry.robot_disconnected = True
+            entry.robot_state = "Disconnected"
+            entry.robot_color = BRAND_COLORS["light_gray"]
 
     def update_clinical_alert(self, sample: Any) -> None:
         severity = _text(getattr(sample, "severity", "UNKNOWN")) or "UNKNOWN"
@@ -364,6 +432,54 @@ class DashboardBackend(GuiBackend):
     async def _receive_resource_availability(self) -> None:
         async for sample in self._resource_reader.take_data_async():
             self.update_resource_availability(sample)
+
+    async def _monitor_robot_liveliness(self) -> None:
+        """Periodically check RobotState writer liveliness and mark robots disconnected."""
+        while self._running:
+            status = self._robot_state_reader.liveliness_changed_status
+            if status.alive_count == 0 and status.not_alive_count > 0:
+                for robot_id in list(self._robot_id_to_procedure.keys()):
+                    self.mark_robot_disconnected(robot_id)
+                if not self._robot_id_to_procedure:
+                    # No known robot_id yet — mark all existing procedures
+                    self.mark_robot_disconnected("")
+            await asyncio.sleep(_LIVELINESS_POLL_INTERVAL)
+
+    def select_patient_filter(self, patient_id: str) -> None:
+        """Activate a content-filtered topic on PatientVitals for *patient_id*.
+
+        Creates a ``ContentFilteredTopic`` with expression ``patient_id = %0``
+        and replaces the existing patient vitals reader so only data for the
+        selected patient reaches the reader cache.  No-op when operating with
+        injected readers (e.g., in unit tests).
+        """
+        if self._participant is None:
+            return
+        if "'" in patient_id or "\\" in patient_id:
+            log.warning(
+                "select_patient_filter: invalid patient_id characters — ignoring"
+            )
+            return
+        try:
+            old_reader = self._patient_vitals_reader
+            subscriber = old_reader.subscriber
+            topic = dds.Topic.find(self._participant, "PatientVitals")
+            if topic is None:
+                log.warning("PatientVitals topic not found — cannot activate filter")
+                return
+            cft_name = f"PatientVitals_filtered_{patient_id}"
+            cft = dds.ContentFilteredTopic(
+                topic,
+                cft_name,
+                dds.Filter(f"patient_id = '{patient_id}'"),
+            )
+            self._patient_vitals_reader = dds.DataReader(subscriber, cft)
+            old_reader.close()
+            log.info("Content filter activated for patient_id=%s", patient_id)
+        except Exception:
+            log.exception(
+                "Failed to activate content filter for patient %s", patient_id
+            )
 
     def filtered_alerts(self) -> list[AlertEntry]:
         alerts = list(self.alerts)
@@ -452,19 +568,74 @@ def dashboard_content() -> None:
                             )
                             ui.echart({"series": []}).classes("w-full h-48")
                         with ui.tab_panel("Robot"):
-                            create_stat_card(
-                                "Unknown",
-                                "Robot State",
-                                ICONS["robot"],
-                                BRAND_COLORS["green"],
-                            )
+
+                            @ui.refreshable
+                            def render_robot_status() -> None:
+                                procs = _procedure_cards()
+                                if not procs:
+                                    create_empty_state("No robot data")
+                                    return
+                                with ui.column().classes("w-full gap-2"):
+                                    for entry in procs:
+                                        is_estop = (
+                                            entry.robot_state
+                                            in ("E-STOP", "EMERGENCY_STOP")
+                                            and not entry.robot_disconnected
+                                        )
+                                        card_classes = "w-full p-3"
+                                        if is_estop:
+                                            card_classes += (
+                                                " animate-pulse border-2 border-red-600"
+                                            )
+                                        with ui.card().classes(card_classes):
+                                            with ui.row().classes(
+                                                "w-full items-center gap-2"
+                                            ):
+                                                ui.label(
+                                                    entry.room or entry.procedure_id
+                                                ).classes("font-bold")
+                                                create_status_chip(entry.robot_state)
+
+                            render_robot_status()
                         with ui.tab_panel("Resources"):
-                            create_stat_card(
-                                "0",
-                                "Resources",
-                                ICONS["dashboard"],
-                                BRAND_COLORS["orange"],
-                            )
+
+                            @ui.refreshable
+                            def render_resource_panel() -> None:
+                                resources = list(current_backend.resources.values())
+                                if not resources:
+                                    create_empty_state("No resource data")
+                                    return
+                                rows = [
+                                    {
+                                        "name": r.name,
+                                        "kind": r.kind,
+                                        "status": r.status,
+                                        "location": r.location,
+                                    }
+                                    for r in resources
+                                ]
+                                ui.aggrid(
+                                    {
+                                        "columnDefs": [
+                                            {
+                                                "field": "name",
+                                                "headerName": "Resource",
+                                            },
+                                            {"field": "kind", "headerName": "Kind"},
+                                            {
+                                                "field": "status",
+                                                "headerName": "Status",
+                                            },
+                                            {
+                                                "field": "location",
+                                                "headerName": "Location",
+                                            },
+                                        ],
+                                        "rowData": rows,
+                                    }
+                                ).classes("w-full h-64")
+
+                            render_resource_panel()
 
         with ui.row().classes("w-full items-center gap-3"):
             ui.select(
@@ -499,7 +670,13 @@ def dashboard_content() -> None:
         render_alert_feed()
 
         ui.timer(
-            0.5, lambda: (render_procedure_list.refresh(), render_alert_feed.refresh())
+            0.5,
+            lambda: (
+                render_procedure_list.refresh(),
+                render_alert_feed.refresh(),
+                render_robot_status.refresh(),
+                render_resource_panel.refresh(),
+            ),
         )
 
 

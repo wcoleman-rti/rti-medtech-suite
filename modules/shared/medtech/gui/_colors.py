@@ -32,7 +32,7 @@ THEME_PALETTE = {
         "bg_top": "#0D1B2A",
         "bg_bottom": "#1B2838",
         "grid": "rgba(255,255,255,0.05)",
-        "arm": "#C8D2DC",        # rgba(200,210,220,0.78) per ui-design-system.md
+        "arm": "#C8D2DC",  # rgba(200,210,220,0.78) per ui-design-system.md
         "hud_bg": "rgba(13,27,42,0.85)",
         "hud_label": "#BBBCBC",
         "hud_value": "#00B5E2",
@@ -41,7 +41,7 @@ THEME_PALETTE = {
         "bg_top": "#E8EDF2",
         "bg_bottom": "#F7F8FA",
         "grid": "rgba(0,0,0,0.05)",
-        "arm": "#505A64",        # rgba(80,90,100,0.78) per ui-design-system.md
+        "arm": "#505A64",  # rgba(80,90,100,0.78) per ui-design-system.md
         "hud_bg": "rgba(255,255,255,0.85)",
         "hud_label": "#63666A",
         "hud_value": "#004C97",
@@ -57,6 +57,7 @@ STATUS_COLORS = {
     "IDLE": ("#F5F5F5", BRAND_COLORS["gray"]),
     "STOPPED": ("#FFEBEE", "#C62828"),
     "ERROR": ("#FFEBEE", "#C62828"),
+    "E-STOP": ("#FFEBEE", "#C62828"),
     "EMERGENCY_STOP": ("#FFEBEE", "#C62828"),
     "PAUSED": ("#FFF3E0", "#E65100"),
     "WARNING": ("#FFF3E0", "#E65100"),
@@ -76,6 +77,7 @@ STATUS_COLORS_DARK = {
     "IDLE": ("#2D3139", "#BBBCBC"),
     "STOPPED": ("#3B1515", "#EF5350"),
     "ERROR": ("#3B1515", "#EF5350"),
+    "E-STOP": ("#3B1515", "#EF5350"),
     "EMERGENCY_STOP": ("#3B1515", "#EF5350"),
     "PAUSED": ("#3B2510", "#FFA726"),
     "WARNING": ("#3B2510", "#FFA726"),
