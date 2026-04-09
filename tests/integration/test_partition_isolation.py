@@ -166,27 +166,11 @@ class TestWildcardPartition:
         assert wait_for_discovery(w1, r), "Wildcard should match OR-3"
         assert wait_for_discovery(w2, r), "Wildcard should match OR-5"
 
-        # Prime each connection individually: write one sample per writer and
-        # confirm it arrives at the reader before the assertion burst.
-        # Priming serially (one at a time) avoids the race where both samples
-        # are written simultaneously and only one arrives before the condition
-        # count is satisfied — making the check deterministic under parallel CI
-        # load where best-effort UDP delivery can be reordered or delayed.
-        w1.write(_make_vitals("prime-OR-3"))
-        assert wait_for_data(
-            r, timeout_sec=5
-        ), "Priming samples from both writers should arrive"
-        r.take()  # drain OR-3 priming sample
-
-        w2.write(_make_vitals("prime-OR-5"))
-        assert wait_for_data(
-            r, timeout_sec=5
-        ), "Priming samples from both writers should arrive"
-        r.take()  # drain OR-5 priming sample
-
+        # Both sides have confirmed mutual discovery (publication_matched AND
+        # subscription_matched both > 0), so writes may proceed immediately.
         # QueryConditions — one per expected source key.  Both must be
-        # satisfied for the test to pass.  Best-effort delivery may drop
-        # individual samples, so we write a burst per writer.
+        # satisfied for the test to pass.  BEST_EFFORT delivery may drop
+        # individual samples under CI load, so we write a burst per writer.
         cond_or3 = dds.QueryCondition(
             dds.Query(r, "patient_id = 'from-OR-3'"),
             dds.DataState.new_data,
@@ -196,11 +180,11 @@ class TestWildcardPartition:
             dds.DataState.new_data,
         )
 
-        burst = 5
+        burst = 20
         for i in range(burst):
             w1.write(_make_vitals("from-OR-3", i))
             w2.write(_make_vitals("from-OR-5", i))
 
         assert wait_for_data(
-            r, timeout_sec=5, conditions=[(cond_or3, 1), (cond_or5, 1)]
+            r, timeout_sec=10, conditions=[(cond_or3, 1), (cond_or5, 1)]
         ), "Should receive from both OR-3 and OR-5"

@@ -62,6 +62,9 @@ def initialize_connext() -> None:
         surgery.Surgery.ProcedureStatus, "Surgery::ProcedureStatus"
     )
     dds.DomainParticipant.register_idl_type(
+        surgery.Surgery.RobotArmAssignment, "Surgery::RobotArmAssignment"
+    )
+    dds.DomainParticipant.register_idl_type(
         monitoring.Monitoring.PatientVitals, "Monitoring::PatientVitals"
     )
     dds.DomainParticipant.register_idl_type(

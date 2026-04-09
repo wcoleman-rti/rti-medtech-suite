@@ -39,6 +39,7 @@ inline void initialize_connext()
         rti::domain::register_type<Surgery::OperatorInput>("Surgery::OperatorInput");
         rti::domain::register_type<Surgery::ProcedureContext>("Surgery::ProcedureContext");
         rti::domain::register_type<Surgery::ProcedureStatus>("Surgery::ProcedureStatus");
+        rti::domain::register_type<Surgery::RobotArmAssignment>("Surgery::RobotArmAssignment");
 
         // Monitoring module
         rti::domain::register_type<Monitoring::PatientVitals>("Monitoring::PatientVitals");

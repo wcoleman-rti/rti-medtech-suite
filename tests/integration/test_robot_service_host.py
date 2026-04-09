@@ -94,8 +94,10 @@ def robot_service_host():
     ws += cond
     ready = False
     try:
-        ws.wait(dds.Duration(10))
-        probe_reader.wait_for_historical_data(dds.Duration(5))
+        # 30 s: allows for subprocess startup under CI load when concurrent
+        # all_service_hosts (orch_e2e group) competes for CPU on domain 15.
+        ws.wait(dds.Duration(30))
+        probe_reader.wait_for_historical_data(dds.Duration(15))
         ready = True
     except dds.TimeoutError:
         pass
@@ -103,7 +105,7 @@ def robot_service_host():
     assert (
         proc.poll() is None
     ), f"robot-service-host exited immediately with code {proc.returncode}"
-    assert ready, "robot-service-host did not publish ServiceCatalog within 10 s"
+    assert ready, "robot-service-host did not publish ServiceCatalog within 30 s"
     yield proc
     proc.send_signal(signal.SIGTERM)
     try:

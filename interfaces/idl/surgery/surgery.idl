@@ -31,6 +31,31 @@ module Surgery {
         ALERT
     };
 
+    @appendable
+    enum ArmAssignmentState {
+        UNKNOWN,
+        IDLE,
+        ASSIGNED,
+        POSITIONING,
+        OPERATIONAL,
+        FAILED
+    };
+
+    @appendable
+    enum TablePosition {
+        UNKNOWN,
+        HEAD,
+        FOOT,
+        LEFT,
+        RIGHT,
+        LEFT_HEAD,
+        RIGHT_HEAD,
+        LEFT_FOOT,
+        RIGHT_FOOT
+    };
+
+    const long MAX_ARM_COUNT = 8;
+
     // --- Helper Structs ---
 
     @final
@@ -104,6 +129,18 @@ module Surgery {
         @key Common::EntityId procedure_id;
         ProcedurePhase phase;
         string<Common::MAX_DESCRIPTION_LENGTH> status_message;
+    };
+
+    // Topic: RobotArmAssignment | Domain Tag: control | Pattern: State
+    // Published by the robot arm service; keyed by robot_id.
+    // Tracks arm assignment and positioning lifecycle for multi-arm procedures.
+    @appendable
+    struct RobotArmAssignment {
+        @key Common::EntityId robot_id;
+        Common::EntityId procedure_id;
+        TablePosition table_position;
+        ArmAssignmentState status;
+        string<Common::MAX_DESCRIPTION_LENGTH> capabilities;
     };
 
 };
