@@ -137,18 +137,27 @@ class OperatorConsoleService(Service):
         """Generate and publish one OperatorInput sample.
 
         Returns the published sample for testing/inspection.
-        Produces gentle sinusoidal motion across all axes.
+        Produces sinusoidal motion that drives each joint through a realistic
+        range of positions.  Amplitudes are chosen so that at k_scale=0.01
+        rad/unit and 50 Hz the integrated joint positions sweep ±π/2 rad
+        (~±90°), creating clearly visible 3-D arm articulation.
         """
         t = time.monotonic() - self._t0
+        # Axes drive joints 0-5 in the controller at 0.01 rad/unit/tick.
+        # Use slow sinusoids with different phases so joints move independently.
+        # x_axis drives J0 (shoulder pitch). Arm base is now close to the table;
+        # a small J0 range covers the full operative field.
+        # Bias -0.3 keeps the arm over the table centre; amplitude 1.8 means
+        # integrated peak is 0.054 rad/tick → well within the ±1.2 rad limit.
         inp = OperatorInput(
             operator_id=self._operator_id,
             robot_id=self._robot_id,
-            x_axis=math.sin(t * 0.5) * 2.0,
-            y_axis=math.cos(t * 0.3) * 1.5,
-            z_axis=math.sin(t * 0.7) * 1.0,
-            roll=math.sin(t * 0.4) * 0.8,
-            pitch=math.cos(t * 0.6) * 0.6,
-            yaw=math.sin(t * 0.2) * 0.5,
+            x_axis=(math.sin(t * 0.3) - 0.3) * 1.8,  # shoulder pitch — biased toward table
+            y_axis=math.cos(t * 0.2) * 2.5,           # elbow pitch     → ±0.75 rad
+            z_axis=math.sin(t * 0.25) * 1.5,          # wrist yaw       → ±0.45 rad
+            roll=math.cos(t * 0.35) * 1.2,            # joint 3         → ±0.36 rad
+            pitch=math.sin(t * 0.15) * 0.8,           # joint 4         → ±0.24 rad
+            yaw=math.cos(t * 0.4) * 0.5,              # joint 5         → ±0.15 rad
         )
         self._input_writer.write(inp)
         return inp

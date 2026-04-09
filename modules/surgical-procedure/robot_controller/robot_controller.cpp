@@ -12,8 +12,12 @@ RobotController::RobotController(const std::string& robot_id)
     state_.operational_mode = Surgery::RobotMode::IDLE;
     state_.error_state = 0;
 
-    // Initialize joint positions to zero (7-DOF arm)
+    // Initialize joint positions — J0 pre-angled toward the operating table
+    // (negative shoulder pitch = toward +Y where the table sits relative to
+    // the arm's slot-0 base position).
     state_.joint_positions.resize(7, 0.0);
+    state_.joint_positions[0] = -0.35;  // ~20° toward table — working posture
+    state_.joint_positions[1] =  1.10;  // elbow bent, tip over operative field
 
     state_.tool_tip_position.x = 0.0;
     state_.tool_tip_position.y = 0.0;
@@ -80,15 +84,42 @@ void RobotController::update_state_from_input()
     // Simple simulation: map operator input axes to joint increments
     const double k_scale = 0.01;  // radians per unit input
 
+    // Per-joint limits [min, max] in radians — matches _JOINT_LIMITS in
+    // nicegui_digital_twin.py so the visualiser never needs to clip.
+    static const std::array<std::pair<double, double>, 6> kJointLimits = {{
+        {-1.20,  0.40},  // J0 shoulder pitch: toward table (-) / backward (+)
+        { 0.20,  2.20},  // J1 elbow pitch (keeps arm above table surface)
+        {-1.50,  1.50},  // J2 wrist yaw
+        {-1.00,  1.00},  // J3 tool pitch
+        {-0.80,  0.80},  // J4
+        {-0.50,  0.50},  // J5
+    }};
+
+    auto clamp = [](double v, double lo, double hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
+    };
+
     if (state_.joint_positions.size() >= 3) {
-        state_.joint_positions[0] += last_input_.x_axis * k_scale;
-        state_.joint_positions[1] += last_input_.y_axis * k_scale;
-        state_.joint_positions[2] += last_input_.z_axis * k_scale;
+        state_.joint_positions[0] = clamp(
+            state_.joint_positions[0] + last_input_.x_axis * k_scale,
+            kJointLimits[0].first, kJointLimits[0].second);
+        state_.joint_positions[1] = clamp(
+            state_.joint_positions[1] + last_input_.y_axis * k_scale,
+            kJointLimits[1].first, kJointLimits[1].second);
+        state_.joint_positions[2] = clamp(
+            state_.joint_positions[2] + last_input_.z_axis * k_scale,
+            kJointLimits[2].first, kJointLimits[2].second);
     }
     if (state_.joint_positions.size() >= 6) {
-        state_.joint_positions[3] += last_input_.roll * k_scale;
-        state_.joint_positions[4] += last_input_.pitch * k_scale;
-        state_.joint_positions[5] += last_input_.yaw * k_scale;
+        state_.joint_positions[3] = clamp(
+            state_.joint_positions[3] + last_input_.roll * k_scale,
+            kJointLimits[3].first, kJointLimits[3].second);
+        state_.joint_positions[4] = clamp(
+            state_.joint_positions[4] + last_input_.pitch * k_scale,
+            kJointLimits[4].first, kJointLimits[4].second);
+        state_.joint_positions[5] = clamp(
+            state_.joint_positions[5] + last_input_.yaw * k_scale,
+            kJointLimits[5].first, kJointLimits[5].second);
     }
 
     // Update tool tip from axes (simplified forward kinematics)

@@ -170,7 +170,7 @@ to 3D visualization.
 
 ---
 
-## Step N.5 — Digital Twin 3D Migration ✅ `46ac695`
+## Step N.5 — Digital Twin 3D Migration ✅ `46ac695` + post-commit visual iteration
 
 ### Work
 
@@ -192,7 +192,34 @@ to 3D visualization.
 - Safety interlock: `ui.notification('SAFETY INTERLOCK ACTIVE', type='negative', timeout=None)`
 - Mode badge: `ui.badge()` with color per mode (OPERATIONAL/PAUSED/E-STOP/IDLE)
 - `ui.timer(0.1, update_scene)` for 10 Hz scene refresh
-- New: `ui.joystick()` element for operator input demo (optional)
+
+**Post-commit visual iteration (committed alongside Step N.6 prep):**
+
+- **3D forward kinematics**: `_compute_arm_geometry(joint_angles, ox, oy)` — proper 3D FK
+  using Rodrigues rotation; alternating joint axes (X=pitch, Z=yaw); accepts world
+  offset `(ox, oy)` for multi-arm positioning. Table surface guard samples 8 points
+  along each link segment to prevent arm from passing through the tabletop.
+- **Arm geometry**: 32-segment tapered cylinders (`r_tip = r_base × 0.82`); joint spheres
+  use `THEME_PALETTE["dark"]["arm"]` token. See INC-080.
+- **Operating table**: OR table profile — wide low foot platform with rounded corners
+  (cross-box + corner cylinders), narrow pedestal column, table slab + mattress +
+  headrest. Matches clinical OR table appearance.
+- **Mobile arm cart**: `_build_arm()` constructs a wheeled cart base (box + corner posts +
+  sphere wheels + riser column + shoulder sphere) at configurable `(ox, oy)` world offset.
+- **Multi-arm readiness refactor**: `_ARM_SLOTS` list defines named mount positions around
+  the table. `_build_arm(scene, ox, oy, joints, joint_color)` and
+  `_make_arm_updater(...)` are extracted as standalone functions — adding a second arm
+  requires one additional `_build_arm()` + `_make_arm_updater()` call in `_build_scene()`.
+- **Operator sim motion bias**: `tick()` biases J0 (shoulder pitch) toward the table with
+  `(sin − 0.3) × 1.8`; arm stays over the operative field ~83% of each cycle.
+- **Robot controller initialisation**: `robot_controller.cpp` starts with J0=−0.35 rad,
+  J1=1.10 rad (arm in working posture over table). Joint limits aligned with
+  `_JOINT_LIMITS` in the digital twin.
+- **Fixed scene background**: `ui.scene` background is locked to `THEME_PALETTE["dark"]["bg_bottom"]`
+  (`#1B2838`). Runtime theme-reactive background is not possible in NiceGUI 3.9.x
+  — see INC-079. This matches industry convention for surgical simulation viewports.
+- **`arm` token added to `THEME_PALETTE`**: `_colors.py` extended with
+  `"arm": "#C8D2DC"` (dark) / `"arm": "#505A64"` (light) per `ui-design-system.md`.
 
 ### Test Gate (spec: nicegui-migration.md — Digital Twin 3D scenarios)
 

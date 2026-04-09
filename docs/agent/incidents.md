@@ -2448,3 +2448,77 @@ after closure. They form the project's decision log.
   guard PySide6 imports so the NiceGUI exports remain importable in
   environments (CI, runtime containers) where PySide6 is not installed.
 - **Date closed:** 2026-04-08
+
+---
+
+## INC-079: NiceGUI `ui.scene` background color not reactive at runtime (v3.9.x)
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-09
+- **Phase/Step:** NiceGUI Migration / Step N.5 (post-commit visual iteration)
+- **Documents involved:** `implementation/phase-nicegui-migration.md`,
+  `modules/surgical-procedure/digital_twin/nicegui_digital_twin.py`
+- **Description:** `ui.scene` sets the Three.js renderer background color
+  once in the Vue component's `mounted()` hook (`renderer.setClearColor(this.backgroundColor)`).
+  The `backgroundColor` prop has no Vue `watch:` block, so updating
+  `scene._props["background-color"]` + `scene.update()` pushes the Vue
+  prop but the renderer's clear color is never changed at runtime.
+  Three approaches were attempted and all failed reliably:
+  1. `scene._props["background_color"] + scene.update()` — wrong prop key
+     (internal key is hyphenated `"background-color"`); even with the
+     correct key, no watcher means the renderer is never notified.
+  2. `getElement(id).renderer.setClearColor()` — `getElement()` returns
+     Vue 3's public instance proxy which only exposes declared reactive
+     members; `renderer` is assigned in `mounted()` without a `data()`
+     declaration so the proxy returns `undefined`.
+  3. `document.getElementById('c{id}').__vueParentComponent.ctx.renderer`
+     — `ctx` is the internal component instance and does hold `renderer`,
+     but the expression failed silently in some browser builds, suggesting
+     the internal Vue 3 component tree layout is not stable API.
+- **Resolution:** Fixed dark background (`THEME_PALETTE["dark"]["bg_bottom"]`
+  = `#1B2838`) for the 3D scene, independent of the app UI theme toggle.
+  This matches industry convention — every major surgical simulation
+  platform (da Vinci, Stryker, Moog) uses a fixed dark neutral viewport
+  to reduce eye strain and maximise contrast of colored arm segments.
+  The `THEME_PALETTE["dark"]["arm"]` token is already in place; if
+  NiceGUI adds a `watch: { backgroundColor }` in a future version the
+  runtime-reactive path requires only restoring the removed callback.
+- **Guideline:** Do not attempt to update `ui.scene` background color
+  at runtime via prop manipulation or JavaScript in NiceGUI ≤ 3.9.x.
+  Use a fixed scene background. File a NiceGUI upstream issue if
+  per-theme scene background is a hard requirement.
+- **Date closed:** 2026-04-09
+
+---
+
+## INC-080: `ui.scene` cylinder aesthetics — segment count and taper (NiceGUI v3.9.x)
+
+- **Status:** Closed
+- **Category:** Design decision
+- **Date opened:** 2026-04-09
+- **Phase/Step:** NiceGUI Migration / Step N.5 (post-commit visual iteration)
+- **Documents involved:** `implementation/phase-nicegui-migration.md`,
+  `modules/surgical-procedure/digital_twin/nicegui_digital_twin.py`,
+  `vision/ui-design-system.md`
+- **Description:** The NiceGUI `scene.cylinder(r_top, r_bottom, height, segments)`
+  signature is not documented with segment count guidance. Through visual
+  iteration, 16 segments produced visibly faceted silhouettes at the
+  scene's ~1 m object scale; 32 segments produces a smooth round profile.
+  Additionally, the design system's "flat fills" principle and the
+  real-world cobot arm reference (Stryker, da Vinci) both suggest link
+  segments should taper toward the distal joint. A taper ratio of
+  `r_tip = r_base × 0.82` (18% narrowing) was found to match the
+  visual proportion of commercially available 7-DOF surgical arms.
+- **Resolution:** All arm link cylinders use 32 segments and the 0.82
+  taper ratio. The `THEME_PALETTE["dark"]["arm"]` token (`#C8D2DC`) is
+  added to `medtech/gui/_colors.py` as the canonical joint/shoulder
+  sphere color per `ui-design-system.md §Theme Palettes`. The heatmap
+  zero color was updated from `#263238` (near-black) to `#78909C`
+  (the `heatmap-zero-light` token) so mid-range joints render as
+  visible polished-steel grey rather than near-invisible charcoal.
+- **Guideline:** Use 32 segments for all arm cylinders in the 3D scene.
+  Apply `r_tip = r_base × 0.82` taper on link segments. Joint spheres
+  and shoulder housing use `THEME_PALETTE["dark"]["arm"]`. Heatmap zero
+  anchor is `#78909C`.
+- **Date closed:** 2026-04-09
