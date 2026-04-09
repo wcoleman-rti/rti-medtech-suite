@@ -127,7 +127,7 @@ complete before Step 20.4.
 
 ---
 
-## Step 20.1 — Multi-Arm IDL Types
+## Step 20.1 — Multi-Arm IDL Types ✅ 83cfcaf
 
 ### Work
 
@@ -152,11 +152,11 @@ complete before Step 20.4.
 
 ### Test Gate
 
-- [ ] `cmake --build build` succeeds with new IDL types generated
-- [ ] C++ can reference `Surgery::ArmAssignmentState`, `Surgery::TablePosition`,
+- [x] `cmake --build build` succeeds with new IDL types generated
+- [x] C++ can reference `Surgery::ArmAssignmentState`, `Surgery::TablePosition`,
       `Surgery::RobotArmAssignment`, and `Surgery::MAX_ARM_COUNT`
-- [ ] Python can import and reference all new enum values and the struct
-- [ ] `bash scripts/ci.sh --lint` passes
+- [x] Python can import and reference all new enum values and the struct
+- [x] `bash scripts/ci.sh --lint` passes
 
 ---
 
