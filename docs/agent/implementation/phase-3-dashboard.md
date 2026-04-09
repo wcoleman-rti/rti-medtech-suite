@@ -1,6 +1,6 @@
 # Phase 3: Hospital Dashboard
 
-**Goal:** Implement the PySide6 hospital dashboard GUI that displays real-time procedure status, patient vitals, alerts, and robot state across all active ORs. Configure Routing Service to bridge surgical domain data to the hospital domain.
+**Goal:** Implement the hospital dashboard GUI that displays real-time procedure status, patient vitals, alerts, and robot state across all active ORs. Configure Routing Service to bridge surgical domain data to the hospital domain. Steps 3.2–5 were implemented directly on NiceGUI; Steps 3.6–3.8 were completed in [phase-nicegui-migration.md](phase-nicegui-migration.md) Step N.7.
 
 **Depends on:** Phase 5 (Procedure Orchestration), [revision-dds-consistency.md](revision-dds-consistency.md)
 **Can parallel with:** Phase 4 (Clinical Alerts)
@@ -67,7 +67,7 @@ tag.
 
 ### Work
 
-- Create PySide6 application skeleton in `modules/hospital-dashboard/`
+- Create NiceGUI application skeleton in `modules/hospital-dashboard/`
 - Load shared GUI theme: apply `resources/styles/medtech.qss`, register bundled fonts, display RTI logo in header bar (see `vision/technology.md` GUI Design Standard)
 - Implement DDS worker thread:
   - Creates DomainParticipant on the Hospital domain
@@ -141,7 +141,9 @@ tag.
 
 ---
 
-## Step 3.6 — Robot Status Display
+## Step 3.6 — Robot Status Display ✅ (Phase N Step N.7)
+
+> Implemented in [phase-nicegui-migration.md](phase-nicegui-migration.md) Step N.7
 
 ### Work
 
@@ -151,13 +153,15 @@ tag.
 
 ### Test Gate (spec: hospital-dashboard.md — Robot Status)
 
-- [ ] Robot state displayed per OR with correct mode indicator
-- [ ] Emergency stop is prominently displayed (red, flashing)
-- [ ] Robot disconnect detected via liveliness (gray indicator)
+- [x] Robot state displayed per OR with correct mode indicator
+- [x] Emergency stop is prominently displayed (red, flashing)
+- [x] Robot disconnect detected via liveliness (gray indicator)
 
 ---
 
-## Step 3.6b — Resource Panel
+## Step 3.6b — Resource Panel ✅ (Phase N Step N.7)
+
+> Implemented in [phase-nicegui-migration.md](phase-nicegui-migration.md) Step N.7
 
 ### Work
 
@@ -169,13 +173,15 @@ tag.
 
 ### Test Gate (spec: hospital-dashboard.md — Resource Panel)
 
-- [ ] Dashboard displays current resource availability
-- [ ] Resource availability updates in real-time when simulator publishes changes
-- [ ] Dashboard receives resource state on startup via durability
+- [x] Dashboard displays current resource availability
+- [x] Resource availability updates in real-time when simulator publishes changes
+- [x] Dashboard receives resource state on startup via durability
 
 ---
 
-## Step 3.7 — Content Filtering & Detail View
+## Step 3.7 — Content Filtering & Detail View ✅ (Phase N Step N.7)
+
+> Implemented in [phase-nicegui-migration.md](phase-nicegui-migration.md) Step N.7
 
 ### Work
 
@@ -185,8 +191,8 @@ tag.
 
 ### Test Gate (spec: hospital-dashboard.md — GUI Threading)
 
-- [ ] DDS data processing does not block UI (burst test)
-- [ ] Content-filtered topic delivers only matching patient data
+- [x] DDS data processing does not block UI (burst test)
+- [x] Content-filtered topic delivers only matching patient data
 
 ---
 

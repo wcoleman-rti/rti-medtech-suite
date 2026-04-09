@@ -146,7 +146,7 @@ Use one of these patterns instead:
 |---------|----------|-------------|
 | `AsyncWaitSet` + `ReadCondition` | C++ | **Preferred.** When multiple conditions (data available, status changes, guards) must be dispatched together, or when custom read logic (filtering, batching) is needed. Supports `GuardCondition` for application-driven events (e.g., periodic publish ticks). |
 | `rti::sub::SampleProcessor` | C++ only | Convenience wrapper for per-sample callbacks on an internal `AsyncWaitSet`. Suitable only for simple, independent-per-reader processing where samples do not share mutable state. **Experimental in Connext 7.6.0** — do not use for safety-critical or latency-sensitive paths. |
-| `async`/`await` with `rti.connext` async APIs | Python | All Python data processing — integrates with asyncio and QtAsyncio. |
+| `async`/`await` with `rti.connext` async APIs | Python | All Python data processing — integrates with asyncio and NiceGUI event loop. |
 | Polling `read()`/`take()` | Both | When data should be processed at a fixed frequency or on specific application events rather than on arrival. |
 
 #### `AsyncWaitSet` Isolation Principle
@@ -337,7 +337,7 @@ Separated by blank lines, sorted alphabetically within each group:
 
 1. `from __future__ import annotations`
 2. Standard library (`import asyncio`, `from pathlib import Path`)
-3. Third-party (`import rti.connext as dds`, `from PySide6.QtWidgets import ...`)
+3. Third-party (`import rti.connext as dds`, `import nicegui`)
 4. Project (`from medtech.gui import init_theme`)
 
 ### Shared Package Structure (`medtech` Namespace)
@@ -354,7 +354,7 @@ imports a consistent prefix.
 | `medtech.service_host` | `modules/shared/medtech/service_host.py` | `from medtech.service_host import ServiceHost` | Generic Service Host |
 | `medtech.dds` | `modules/shared/medtech/dds.py` | `from medtech.dds import initialize_connext` | Pre-participant DDS init |
 | `medtech.log` | `modules/shared/medtech/log.py` | `from medtech.log import init_logging` | RTI Connext Logging wrapper |
-| `medtech.gui` | `modules/shared/medtech/gui/` | `from medtech.gui import init_theme` | PySide6 theme + widgets |
+| `medtech.gui` | `modules/shared/medtech/gui/` | `from medtech.gui import init_theme` | NiceGUI theme + widgets |
 
 **C++ alignment:** All shared C++ headers already live under
 `include/medtech/` and use the `medtech::` namespace. The Python

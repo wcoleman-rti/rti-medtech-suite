@@ -1,6 +1,6 @@
 # Spec: Hospital Dashboard Module
 
-Behavioral specifications for the facility-wide PySide6 dashboard that displays real-time procedure status, patient vitals, alerts, and robot state across all active surgical rooms.
+Behavioral specifications for the facility-wide NiceGUI web dashboard that displays real-time procedure status, patient vitals, alerts, and robot state across all active surgical rooms.
 
 The dashboard subscribes to the Hospital domain. All data arrives via Routing Service from the Procedure domain.
 
@@ -15,7 +15,7 @@ The dashboard subscribes to the Hospital domain. All data arrives via Routing Se
 | Vitals HR critical color threshold | HR > 120 bpm (red) |
 | Robot state liveliness lease (disconnect detection) | 2 s |
 | Procedure list update | Automatic on new `ProcedureStatus` sample — no manual refresh required |
-| UI thread protection | Polling reads (`take()`/`read()`) allowed on Qt UI thread; writes allowed only with `NonBlockingWrite` snippet; blocking waits prohibited; widget updates via signals, QtAsyncio, or polling timer |
+| UI thread protection | DDS reads and writes run as asyncio coroutines on the NiceGUI event loop via `background_tasks.create()`; blocking waits (`WaitSet.wait()`, synchronous `take()`) are prohibited; UI updates are driven by `ui.timer()` or `@ui.refreshable` on the asyncio event loop thread |
 | Dashboard initialization — participants matched and initial state displayed | ≤ 15 s from process start on `hospital-net` |
 | Dashboard restart re-integration | ≤ 15 s from restart to displaying current state for all active procedures |
 | Routing Service unavailability | Dashboard continues displaying last known values; stale indicator shown; no crash |
@@ -160,9 +160,9 @@ The dashboard subscribes to the Hospital domain. All data arrives via Routing Se
 **Given** the dashboard is running with active data subscriptions
 **When** a burst of data arrives simultaneously (vitals + alerts + robot state)
 **Then** the UI remains responsive (no freeze or stutter)
-**And** DDS reads use polling (`take()`/`read()`) on the UI thread, worker-thread dispatch, or QtAsyncio
-**And** DDS writes on the UI thread use only DataWriters configured with the `NonBlockingWrite` QoS snippet
-**And** no blocking waits (`WaitSet.wait()`, `take_data_async()`) occur on the UI thread
+**And** DDS reads run as asyncio coroutines via `take_data_async()` / `background_tasks.create()` (never blocking waits on the event loop)
+**And** DDS writes use DataWriters configured with the `NonBlockingWrite` QoS snippet on the asyncio event loop
+**And** no blocking waits (`WaitSet.wait()`, synchronous tight-loop `take()`) occur on the event loop thread
 
 ### Scenario: Content-filtered topics reduce unnecessary processing `@integration` `@filtering`
 

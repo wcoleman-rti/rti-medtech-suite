@@ -10,7 +10,7 @@ Covers all test gate items from phase-nicegui-migration.md Step N.5:
 - QoS verification: time-based filter presence on GuiRobotState /
   GuiOperatorInput readers; absence on SafetyInterlock / RobotCommand
 - Durability late-join: late-joining RobotState reader receives TRANSIENT_LOCAL
-  data (migrated from the PySide6-guarded test_digital_twin.py)
+  data
 
 Spec coverage: nicegui-migration.md — Digital Twin 3D Upgrade
 Tags: @gui @integration

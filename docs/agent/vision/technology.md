@@ -72,9 +72,10 @@ Additional Foxglove schemas (`CameraCalibration`, `ImageAnnotations`, `Compresse
 
 ## GUI Framework
 
-- **PySide6** — Qt 6 bindings for Python
-- **QtAsyncio** — used for integrating async DDS reads with the Qt event loop
-- DDS polling reads (`take()`/`read()`) are safe on the Qt UI thread; writes require `NonBlockingWrite` QoS snippet (see DDS I/O Threading below)
+- **NiceGUI** — Python web-based UI framework, built on FastAPI and Quasar/Vue3
+- GUI applications run in the browser; the NiceGUI server uses a single asyncio event loop shared with `rti.asyncio` for DDS I/O — no separate Qt event loop or thread bridge required
+- All GUI modules are served from a single process (`medtech.gui.app`) at `http://localhost:8080`; clients connect via any modern browser
+- `GuiBackend` ABC (see `modules/shared/medtech/gui/_backend.py`) is the standardized lifecycle pattern: subclasses register `app.on_startup` / `app.on_shutdown` hooks automatically, ensuring clean DDS participant lifecycle management
 
 ### GUI Design Standard
 
@@ -141,20 +142,28 @@ Fonts are bundled as application resources (`.ttf` files under `resources/fonts/
 
 #### Stylesheets
 
-A shared Qt stylesheet (`resources/styles/medtech.qss`) defines the common theme. All GUI applications load this stylesheet at startup. Module-specific overrides are permitted but must not conflict with the base theme colors or typography.
+All GUI applications use Tailwind CSS utility classes (provided by Quasar/NiceGUI) for layout and spacing. The brand palette is applied via `ui.colors(primary='#004C97', accent='#ED8B00', ...)` in `init_theme()`. No `.qss` stylesheet files are used.
 
 #### Shared GUI Bootstrap
 
-All PySide6 applications share a common initialization sequence: load the `.qss` stylesheet, register bundled fonts via `QFontDatabase`, and place the RTI logo in the header bar. To avoid duplicating this boilerplate, a shared Python subpackage (`medtech.gui`) is installed to `lib/python/site-packages/medtech/gui/`. It exposes a single entry point:
+All NiceGUI applications share a common initialization sequence via the `medtech.gui` shared subpackage:
 
 ```python
 from medtech.gui import init_theme
+from medtech.gui._backend import GuiBackend
 
-app = QApplication(sys.argv)
-init_theme(app)  # loads medtech.qss, registers fonts, returns header widget
+# Apply brand palette + load local fonts (called once per app)
+init_theme()  # calls ui.colors(), app.add_static_files('/fonts', ...)
+
+# Per-module backend: subclass GuiBackend, call super().__init__() last
+class MyBackend(GuiBackend):
+    # DDS setup in __init__; super().__init__() registers on_startup/on_shutdown
+    ...
+
+backend = MyBackend()  # registers hooks automatically at module import time
 ```
 
-Each GUI module calls `init_theme(app)` once at startup. Module-specific styling is applied afterward.
+The unified app entry point (`medtech.gui.app`) imports all page modules at startup. Each page module instantiates its `GuiBackend` subclass at module level — no manual lifecycle orchestration is needed in the main entry point.
 
 ## Build System
 
@@ -367,7 +376,7 @@ Python package dependencies are tracked in a `requirements.txt` file at the proj
 pip install -r requirements.txt
 ```
 
-The `requirements.txt` pins exact versions for all runtime and development dependencies (e.g., `rti.connext==7.6.0`, `PySide6==...`, `pytest==...`, `pytest-qt==...`, `black==...`, `isort==...`, `ruff==...`). See [vision/coding-standards.md](coding-standards.md) for the formatting and linting tools that these packages provide.
+The `requirements.txt` pins exact versions for all runtime and development dependencies (e.g., `rti.connext==7.6.0`, `nicegui==...`, `pytest==...`, `black==...`, `isort==...`, `ruff==...`). See [vision/coding-standards.md](coding-standards.md) for the formatting and linting tools that these packages provide.
 
 ## DDS I/O Threading
 
@@ -375,18 +384,12 @@ Connext 7.6.0 DDS API calls (`write()`, `take()`, etc.) are safe from
 **any application thread**. There is no restriction tied to the process
 main thread.
 
-For **GUI host applications** where a Qt event loop drives the UI:
+For **GUI host applications** (NiceGUI — asyncio-based):
 
-- **Polling reads** (`reader.take()`, `reader.read()`) are **allowed**
-  on the Qt UI thread — they are non-blocking and return immediately
-  with available samples.
-- **Writes** are **allowed** on the Qt UI thread **only** for DataWriters
-  configured with the `Snippets::NonBlockingWrite` QoS snippet, which
-  sets asynchronous publish mode, zero `max_blocking_time`, and
-  unlimited send window to eliminate all blocking paths.
-- **Writes without `NonBlockingWrite`** and **blocking waits**
-  (`WaitSet.wait()`, `take_data_async()`) are **prohibited** on the
-  Qt UI thread.
+- DDS `async for sample in reader.take_async()` and `reader.take_data_async()` run as asyncio coroutines on the NiceGUI event loop — they are the **only approved** data-reception patterns for GUI modules.
+- **Writes** are **allowed** from any asyncio coroutine. For DataWriters on the asyncio event loop, configure the `Snippets::NonBlockingWrite` QoS snippet (asynchronous publish mode, zero `max_blocking_time`) to eliminate any blocking path.
+- **Blocking waits** (`WaitSet.wait()`, synchronous `take()` in a tight loop) are **prohibited** in asyncio coroutines — they stall the event loop and freeze all connected browser clients.
+- Use `background_tasks.create(coroutine)` (NiceGUI API) to launch long-running reader loops so they run concurrently without blocking page rendering.
 
 See [dds-consistency.md §5 — GUI Host Applications](dds-consistency.md)
 for the complete policy, architecture diagram, and per-operation
@@ -400,7 +403,7 @@ contract.
 
 ### Python
 - Use `async`/`await` with `rti.connext` async APIs
-- Integrate with the Qt event loop via **QtAsyncio** for GUI host applications
+- GUI host applications use the **NiceGUI asyncio event loop** directly — `rti.asyncio` DDS coroutines and `background_tasks.create()` are the approved patterns; no QtAsyncio or separate thread bridge is needed
 - Non-GUI services use an asyncio event loop (the `run()` coroutine is
   gathered by the Service Host or driven by `asyncio.run()` in standalone mode)
 
@@ -437,7 +440,7 @@ remain XML-only.
 
 All applications — including GUI applications — must be unit-testable in isolation.
 
-- **GUI testability:** PySide6 widgets must be designed with a clear separation between DDS data handling (view-model / signal layer) and widget rendering. UI logic is tested via **pytest-qt**; DDS behavior is tested by injecting data through the signal/model layer without requiring a live DDS participant.
+- **GUI testability:** NiceGUI page functions and `GuiBackend` subclasses are designed with a clear separation between DDS data handling (`GuiBackend` state dicts) and page rendering (`@ui.page` functions). UI logic is tested by instantiating the backend in test mode with injected DDS participants and verifying state dict updates; rendering logic is tested via `nicegui.testing.User`. DDS behavior is tested by injecting data through live test participants.
 - **DDS testability:** Applications accept injected DomainParticipants or readers/writers via dependency injection or configuration, enabling tests to substitute real DDS with controlled test participants.
 - **C++ testability:** Business logic is separated from DDS entity creation so that unit tests can exercise logic without requiring a Connext license or runtime.
 
@@ -486,7 +489,7 @@ CMake generates and installs `setup.bash` at the install tree root. Sourcing it 
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _ROOT="$(dirname "$_DIR")"
 
-# Activate Python venv (pip-installed: rti.connext, PySide6, pytest)
+# Activate Python venv (pip-installed: rti.connext, nicegui, pytest)
 if [[ -f "$_ROOT/.venv/bin/activate" ]]; then
     source "$_ROOT/.venv/bin/activate"
 fi
@@ -622,7 +625,7 @@ All Dockerfiles use pinned Ubuntu 24.04 LTS as the base (`FROM ubuntu:24.04`). N
 |-------|---------|----------|
 | `build-base` | Compile C++ targets | Ubuntu 24.04, GCC toolchain, CMake, Connext 7.6.0 host libraries (`x64Linux4gcc8.5.0`) |
 | `runtime-cpp` | Run compiled C++ apps | Ubuntu 24.04 minimal, Connext 7.6.0 shared libraries only — no compiler |
-| `runtime-python` | Run Python apps | Ubuntu 24.04, Python 3.12, project venv, `rti.connext==7.6.0`, PySide6 |
+| `runtime-python` | Run Python apps | Ubuntu 24.04, Python 3.12, project venv, `rti.connext==7.6.0`, NiceGUI |
 
 ## Testing
 
@@ -631,7 +634,7 @@ All Dockerfiles use pinned Ubuntu 24.04 LTS as the base (`FROM ubuntu:24.04`). N
 | C++ unit/integration | Google Test | Linked via CMake `FetchContent` |
 | Python unit/integration | pytest | Run from venv |
 | DDS integration | pytest + rti.connext | Verifies pub/sub, QoS, partition, filtering behaviors |
-| GUI | pytest-qt | PySide6 widget and signal tests |
+| GUI | pytest + nicegui.testing | NiceGUI page and GuiBackend unit tests |
 | System/E2E | Docker Compose + pytest | Full multi-container scenario tests |
 
 ## Logging Standard
@@ -877,9 +880,9 @@ medtech-suite/
 │       └── governance/
 ├── modules/
 │   ├── surgical-procedure/         # C++ and Python components
-│   │   ├── digital_twin/           # PySide6 robot visualization GUI
+│   │   ├── digital_twin/           # NiceGUI 3D robot visualization (browser-based)
 │   │   └── README.md               # Module purpose, usage, Connext features used
-│   ├── hospital-dashboard/         # PySide6 GUI
+│   ├── hospital-dashboard/         # NiceGUI web application
 │   │   └── README.md
 │   └── clinical-alerts/            # Clinical Decision Support (ClinicalAlerts module) engine
 │       └── README.md
@@ -894,10 +897,9 @@ medtech-suite/
 │   │   └── README.md
 │   └── observability/              # Collector Service config, Prometheus scrape config, Grafana dashboards
 │       └── README.md
-├── resources/                      # Shared GUI assets (loaded by all PySide6 apps)
+├── resources/                      # Shared GUI assets (served via NiceGUI static file routes)
 │   ├── fonts/                      # Roboto Condensed, Montserrat, Roboto Mono (.ttf)
-│   ├── images/                     # RTI logo (rti-logo.png, rti-logo.svg)
-│   └── styles/                     # Shared Qt stylesheet (medtech.qss)
+│   └── images/                     # RTI logo (rti-logo.png, rti-logo.svg)
 ├── simulation/
 │   ├── docker/                     # Dockerfiles per component
 │   └── scenarios/                  # Scenario launchers and configs

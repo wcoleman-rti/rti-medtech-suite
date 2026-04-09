@@ -123,35 +123,33 @@ when numeric values change.
 
 ### Procedure Controller (Card-Based Orchestration UI)
 
-- **Tile grid**: Fixed-size tappable tiles (200 × 160 px) in a
-  FlowLayout that wraps to the next row. No tables.
-- **Host cards / Service cards**: QSS-styled `QFrame` with `hostCard`
-  or `serviceCard` object name. Touch target ≥ 48 × 48 px.
-- **Selection**: Single-selection tracking. Selected tile highlighted
-  via QSS dynamic property `selected`. Floating action overlay appears
-  at bottom center with context-appropriate buttons.
+- **Tile grid**: CSS Grid with `repeat(auto-fill, minmax(200px, 1fr))` —
+  responsive, wraps automatically. No tables.
+- **Host cards / Service cards**: `ui.card()` with Tailwind utility classes
+  (`bg-white`, `shadow-md`, `rounded-lg`). Touch target ≥ 48 × 48 px via
+  `min-h-12 min-w-12`.
+- **Selection**: Single-selection tracking via reactive state variable.
+  Selected tile highlighted by conditional Tailwind class binding.
 - **Stat cards**: KPI summary row (Hosts Online, Services Running,
-  Warnings). Tappable to switch between Host View and Service View.
-- **View toggle**: Stacked widget with two views. Active toggle button
-  uses `viewToggleActive` object name; inactive uses `viewToggle`.
-- **Floating overlays**: Action overlay (bottom-center) and result card
-  (centered) use QSS `actionOverlay` / `resultCard` object names.
-  Repositioned on window resize.
+  Warnings). Clickable to switch between Host View and Service View.
+- **View toggle**: Reactive state variable controls which grid is visible.
+- **Floating overlays**: `ui.dialog()` for config dialogs;
+  `ui.notify()` for transient RPC feedback.
 
 ### DDS Threading Patterns (Python GUI)
 
 - **Data reception**: `async for sample in reader.take_async()` or
   `reader.take_data_async()` — runs as asyncio coroutine on the
-  QtAsyncio event loop thread.
+  NiceGUI event loop; launched via `background_tasks.create(coroutine)`.
 - **Status monitoring**: `StatusCondition` + `WaitSet.wait_async()`.
   **Do not use `dispatch_async()` + `set_handler()`** — the handler
-  runs on a DDS internal thread, which is unsafe for Qt widget
+  runs on a DDS internal thread, which is unsafe for NiceGUI UI
   operations. `wait_async()` resumes on the event loop thread.
 - **RPC calls**: Use native async `Requester` API —
   `send_request()` (non-blocking write) + `await wait_for_replies_async()`
   \+ `take_replies()`. No `ThreadPoolExecutor` needed.
-- **UI consistency sweep**: Periodic asyncio task (~2 Hz) rebuilding
-  views from in-memory state dicts. Does not re-read from DDS (avoids
+- **UI consistency sweep**: `ui.timer(0.5, callback)` — periodic rebuild
+  of views from in-memory state dicts. Does not re-read from DDS (avoids
   sample-stealing race with `take_data_async`).
 - **Host removal on liveliness loss**: Cache `publication_handle →
   host_id` mapping from `SampleInfo`. On `LIVELINESS_CHANGED` with

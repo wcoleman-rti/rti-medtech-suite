@@ -303,10 +303,10 @@ Resume Phase 3 steps that were not yet complete, now implemented on NiceGUI:
 
 ### Test Gate
 
-- [ ] All `@gui` tests pass
-- [ ] Full test suite passes (`pytest --tb=short`)
-- [ ] No PySide6 imports remain in application code
-- [ ] No Qt platform dependencies in Docker images
+- [x] All `@gui` tests pass
+- [x] Full test suite passes (`pytest --tb=short`)
+- [x] No PySide6 imports remain in application code
+- [x] No Qt platform dependencies in Docker images
 - [ ] `markdownlint` passes on all updated docs
 
 ---
@@ -327,10 +327,10 @@ Resume Phase 3 steps that were not yet complete, now implemented on NiceGUI:
 
 ### Test Gate
 
-- [ ] Zero PySide6/Qt references in codebase (verified by grep)
-- [ ] Full test suite passes
-- [ ] Docker image builds and runs successfully
-- [ ] All GUI applications accessible via browser
+- [x] Zero PySide6/Qt references in codebase (verified by grep)
+- [x] Full test suite passes
+- [x] Docker image builds and runs successfully
+- [x] All GUI applications accessible via browser
 
 ---
 

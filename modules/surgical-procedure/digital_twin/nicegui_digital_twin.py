@@ -153,10 +153,7 @@ _MODE_COLORS: dict[str, str] = {
 
 
 def heatmap_color(angle: float) -> str:
-    """Map a joint angle to a diverging blue→neutral→orange hex color.
-
-    Mirrors the heatmap in the legacy PySide6 RobotWidget.
-    """
+    """Map a joint angle to a diverging blue→neutral→orange hex color."""
     t = max(-1.0, min(1.0, angle / _HEATMAP_ANGLE_MAX))
     # cold=blue (#1565C0), zero=#78909C (lightened for sleeker arm), hot=orange
     cold = (21, 101, 192)

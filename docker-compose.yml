@@ -368,38 +368,29 @@ services:
       cloud-discovery-service:
         condition: service_healthy
 
-  digital-twin-or1:
+  medtech-gui:
     image: medtech/app-python
-    container_name: digital-twin-or1
-    command: ["python", "-m", "surgical_procedure.digital_twin"]
+    container_name: medtech-gui
+    # CMD default in Dockerfile: python -m medtech.gui.app
     environment:
       <<: *medtech-env
-      ROOM_ID: "OR-1"
-      PROCEDURE_ID: "OR1-001"
-      QT_QPA_PLATFORM: offscreen
-      MEDTECH_APP_NAME: "digital-twin-or1"
+      MEDTECH_NICEGUI_STORAGE_SECRET: "${MEDTECH_NICEGUI_STORAGE_SECRET:-changeme-set-in-env}"
+      MEDTECH_APP_NAME: "medtech-gui"
+    ports:
+      - "8080:8080"
     volumes: *config-volumes
     networks:
       - surgical-net
+      - hospital-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
-
-  procedure-controller-or1:
-    image: medtech/app-python
-    container_name: procedure-controller-or1
-    command: ["python", "-m", "hospital_dashboard.procedure_controller"]
-    environment:
-      <<: *medtech-env
-      ROOM_ID: "OR-1"
-      QT_QPA_PLATFORM: offscreen
-      MEDTECH_APP_NAME: "procedure-controller-or1"
-    volumes: *config-volumes
-    networks:
-      - surgical-net
-    depends_on:
-      cloud-discovery-service:
-        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
 
   # ── OR-3 Instance ───────────────────────────────────────────────
 
@@ -567,22 +558,7 @@ services:
       cloud-discovery-service:
         condition: service_healthy
 
-  digital-twin-or3:
-    image: medtech/app-python
-    container_name: digital-twin-or3
-    command: ["python", "-m", "surgical_procedure.digital_twin"]
-    environment:
-      <<: *medtech-env
-      ROOM_ID: "OR-3"
-      PROCEDURE_ID: "OR3-001"
-      QT_QPA_PLATFORM: offscreen
-      MEDTECH_APP_NAME: "digital-twin-or3"
-    volumes: *config-volumes
-    networks:
-      - surgical-net
-    depends_on:
-      cloud-discovery-service:
-        condition: service_healthy
+  # digital-twin-or3 removed: replaced by unified medtech-gui service above
 
   # ─── Routing Service (Procedure → Hospital bridge) ───────────────
 
