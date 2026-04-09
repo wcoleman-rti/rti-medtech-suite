@@ -22,7 +22,7 @@ the Procedure Controller and digital twin display.
 
 ---
 
-## Step 20.0 — Orchestration Context & Tier Partitions
+## Step 20.0 — Orchestration Context & Tier Partitions ✅ `566d237`
 
 **Why here:** The deploy-to-procedure workflow (filter by room → select
 services → assign to procedure) is the operator precondition for the
@@ -103,27 +103,27 @@ complete before Step 20.4.
 
 ### Test Gate
 
-- [ ] All service host Orchestration domain participants start with
+- [x] All service host Orchestration domain participants start with
       DomainParticipant partition `procedure`
-- [ ] Procedure Controller Orchestration domain participant starts with
+- [x] Procedure Controller Orchestration domain participant starts with
       DomainParticipant partition `procedure`
-- [ ] A participant with DomainParticipant partition `facility` does NOT
+- [x] A participant with DomainParticipant partition `facility` does NOT
       discover any `procedure`-tier service host or the Procedure Controller
-- [ ] `ServiceCatalog` instances include `room_id` property matching the
+- [x] `ServiceCatalog` instances include `room_id` property matching the
       host's `ROOM_ID` at startup
-- [ ] `start_service` RPC with `procedure_id` property → `ServiceCatalog`
+- [x] `start_service` RPC with `procedure_id` property → `ServiceCatalog`
       re-published with `procedure_id` set
-- [ ] `stop_service` → `ServiceCatalog` re-published with `procedure_id`
+- [x] `stop_service` → `ServiceCatalog` re-published with `procedure_id`
       cleared
-- [ ] GUI service that overrides `gui_urls()` → `gui_url` property appears
+- [x] GUI service that overrides `gui_urls()` → `gui_url` property appears
       in `ServiceCatalog` after `RUNNING`; cleared on stop
-- [ ] Non-GUI service → no `gui_url` property ever appears in catalog
-- [ ] Room filter in Procedure Controller shows only services from selected
+- [x] Non-GUI service → no `gui_url` property ever appears in catalog
+- [x] Room filter in Procedure Controller shows only services from selected
       room; filter change does not trigger DDS re-discovery
-- [ ] Procedure filter shows only services deployed in a procedure
-- [ ] "Open" button appears only for RUNNING services with a `gui_url`;
+- [x] Procedure filter shows only services deployed in a procedure
+- [x] "Open" button appears only for RUNNING services with a `gui_url`;
       absent for stopped services or non-GUI services
-- [ ] `bash scripts/ci.sh` passes
+- [x] `bash scripts/ci.sh` passes
 
 ---
 
