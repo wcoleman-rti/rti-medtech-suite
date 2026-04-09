@@ -155,6 +155,24 @@ class TestTopicFilters:
         assert qos.reliability.kind == dds.ReliabilityKind.BEST_EFFORT
         assert qos.deadline.period.nanosec == 40000000
 
+    def test_robot_arm_assignment_writer(self, provider):
+        """RobotArmAssignment: State base → RELIABLE + TRANSIENT_LOCAL + KEEP_LAST 1."""
+        qos = provider.set_topic_datawriter_qos(
+            "Topics::ProcedureTopics", "RobotArmAssignment"
+        )
+        assert qos.reliability.kind == dds.ReliabilityKind.RELIABLE
+        assert qos.durability.kind == dds.DurabilityKind.TRANSIENT_LOCAL
+        assert qos.history.depth == 1
+
+    def test_robot_arm_assignment_reader(self, provider):
+        """RobotArmAssignment: State base → RELIABLE + TRANSIENT_LOCAL + KEEP_LAST 1."""
+        qos = provider.set_topic_datareader_qos(
+            "Topics::ProcedureTopics", "RobotArmAssignment"
+        )
+        assert qos.reliability.kind == dds.ReliabilityKind.RELIABLE
+        assert qos.durability.kind == dds.DurabilityKind.TRANSIENT_LOCAL
+        assert qos.history.depth == 1
+
 
 # --- Participant profiles ---
 

@@ -30,6 +30,9 @@
 
         <qos_profile name="ServiceStatus" base_name="Patterns::State"/>
 
+        <!-- Multi-arm Procedure domain topics -->
+        <qos_profile name="RobotArmAssignment" base_name="Patterns::State"/>
+
         <!-- Topics with additional tuning (deadline, lifespan, liveliness) -->
         <qos_profile name="OperatorInput" base_name="Patterns::Stream">
             <base_name>
@@ -203,6 +206,8 @@
             <datareader_qos topic_filter="ProcedureContext" base_name="TopicProfiles::ProcedureContext"/>
             <datawriter_qos topic_filter="ProcedureStatus" base_name="TopicProfiles::ProcedureStatus"/>
             <datareader_qos topic_filter="ProcedureStatus" base_name="TopicProfiles::ProcedureStatus"/>
+            <datawriter_qos topic_filter="RobotArmAssignment" base_name="TopicProfiles::RobotArmAssignment"/>
+            <datareader_qos topic_filter="RobotArmAssignment" base_name="TopicProfiles::RobotArmAssignment"/>
         </qos_profile>
 
         <!--
