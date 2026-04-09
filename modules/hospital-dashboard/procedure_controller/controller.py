@@ -63,6 +63,8 @@ class _ViewState:
     service_filter: str = "ALL"
     selected_host_id: str | None = None
     selected_service_key: tuple[str, str] | None = None
+    room_filter: str | None = None  # None = "All rooms"
+    procedure_filter: str | None = None  # None = "All procedures"
 
 
 class ControllerBackend(GuiBackend):
@@ -158,8 +160,17 @@ class ControllerBackend(GuiBackend):
         items: list[tuple[tuple[str, str], Orchestration.ServiceCatalog]] = []
         for key, catalog in self._catalogs.items():
             status = self._service_states.get(key)
-            if self._service_matches_filter(status):
-                items.append((key, catalog))
+            if not self._service_matches_filter(status):
+                continue
+            if self._view.room_filter is not None:
+                room_id = _catalog_property(catalog, "room_id")
+                if room_id != self._view.room_filter:
+                    continue
+            if self._view.procedure_filter is not None:
+                proc_id = _catalog_property(catalog, "procedure_id")
+                if proc_id != self._view.procedure_filter:
+                    continue
+            items.append((key, catalog))
         return items
 
     def running_service_count(self) -> int:
@@ -168,6 +179,36 @@ class ControllerBackend(GuiBackend):
             for status in self._service_states.values()
             if _state_name(status.state).upper() in ("RUNNING", "STARTED", "ACTIVE")
         )
+
+    def known_room_ids(self) -> list[str]:
+        """Sorted list of distinct room_id values seen in ServiceCatalog."""
+        rooms: set[str] = set()
+        for catalog in self._catalogs.values():
+            rid = _catalog_property(catalog, "room_id")
+            if rid:
+                rooms.add(rid)
+        return sorted(rooms)
+
+    def known_procedure_ids(self) -> list[str]:
+        """Sorted list of distinct procedure_id values seen in ServiceCatalog.
+
+        Only includes services that are currently deployed in a procedure
+        (non-empty procedure_id property).
+        """
+        procs: set[str] = set()
+        for catalog in self._catalogs.values():
+            pid = _catalog_property(catalog, "procedure_id")
+            if pid:
+                procs.add(pid)
+        return sorted(procs)
+
+    def set_room_filter(self, room_id: str | None) -> None:
+        """Set the room filter (None = all rooms)."""
+        self._view.room_filter = room_id
+
+    def set_procedure_filter(self, procedure_id: str | None) -> None:
+        """Set the procedure filter (None = all procedures)."""
+        self._view.procedure_filter = procedure_id
 
     async def start_service(self, host_id: str, service_id: str) -> None:
         await self._do_rpc(host_id, _make_start_call(service_id), "start_service")
@@ -214,6 +255,12 @@ class ControllerBackend(GuiBackend):
             raise RuntimeError(
                 "Failed to create Procedure Controller orchestration participant"
             )
+
+        # Set tier partition BEFORE enable() — static deployment-time property
+        orch_qos = self._orch_participant.qos
+        orch_qos.partition.name = ["procedure"]
+        self._orch_participant.qos = orch_qos
+
         self._orch_participant.enable()
 
         def _find_orch_reader(entity_name: str) -> dds.DataReader:
@@ -653,6 +700,8 @@ def controller_content() -> None:
                 "running": current_backend.running_service_count(),
                 "view_mode": current_backend.view_mode,
                 "filter": current_backend._view.service_filter,
+                "room_filter": current_backend._view.room_filter,
+                "proc_filter": current_backend._view.procedure_filter,
                 "selected_host": current_backend._view.selected_host_id,
                 "selected_svc": current_backend._view.selected_service_key,
                 "status_msg": current_backend.status_message,
@@ -750,6 +799,43 @@ def _render_service_grid(current_backend: ControllerBackend, refresh_ui: Any) ->
                 ).props(
                     "round unelevated color=negative"
                 ).classes("text-xl").style(_TOOLBAR_BTN_STYLE).tooltip("Stop All")
+            with ui.row().classes("gap-2 items-center flex-wrap"):
+                # Room filter chips
+                known_rooms = current_backend.known_room_ids()
+                if known_rooms:
+                    ui.label("Room:").classes("text-xs text-gray-400")
+                    for rid in [None] + known_rooms:  # type: ignore[list-item]
+                        label = "All" if rid is None else rid
+                        active_room = current_backend._view.room_filter == rid
+                        ui.button(
+                            label,
+                            on_click=lambda r=rid: (
+                                current_backend.set_room_filter(r),
+                                refresh_ui(),
+                            ),
+                        ).props(
+                            f"{'unelevated color=primary' if active_room else 'flat'} dense"
+                        ).classes(
+                            "text-xs"
+                        )
+                # Procedure filter chips
+                known_procs = current_backend.known_procedure_ids()
+                if known_procs:
+                    ui.label("Procedure:").classes("text-xs text-gray-400")
+                    for pid in [None] + known_procs:  # type: ignore[list-item]
+                        label = "All" if pid is None else pid
+                        active_proc = current_backend._view.procedure_filter == pid
+                        ui.button(
+                            label,
+                            on_click=lambda p=pid: (
+                                current_backend.set_procedure_filter(p),
+                                refresh_ui(),
+                            ),
+                        ).props(
+                            f"{'unelevated color=secondary' if active_proc else 'flat'} dense"
+                        ).classes(
+                            "text-xs"
+                        )
             with ui.row().classes("gap-2"):
                 for fval, ficon, ftip in [
                     ("ALL", ICONS["filter"], "All"),
@@ -949,6 +1035,14 @@ def _render_service_tile(
                         "click.stop",
                         _stop_click,
                     )
+                    gui_url = _catalog_property(catalog, "gui_url")
+                    if gui_url:
+                        ui.button("Open").props(
+                            "unelevated color=positive dense"
+                        ).classes("text-xs").tooltip(gui_url).on(
+                            "click.stop",
+                            lambda u=gui_url: ui.navigate.to(u, new_tab=True),
+                        )
                 ui.button(icon=ICONS["update"]).props("flat round").classes(
                     "text-xl"
                 ).style(_ACTION_BTN_STYLE).tooltip("Configure").on(
@@ -1212,6 +1306,14 @@ def _extract_rpc_result(reply: object, op_name: str) -> str:
         return str(result)
     except Exception as exc:
         return f"parse error: {exc}"
+
+
+def _catalog_property(catalog: Orchestration.ServiceCatalog, name: str) -> str:
+    """Return the current_value of a named PropertyDescriptor, or '' if absent."""
+    for prop in getattr(catalog, "properties", None) or []:
+        if getattr(prop, "name", None) == name:
+            return getattr(prop, "current_value", "") or ""
+    return ""
 
 
 def _state_name(state: Orchestration.ServiceState) -> str:

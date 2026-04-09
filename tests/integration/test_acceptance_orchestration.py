@@ -104,6 +104,7 @@ def _terminate_proc(proc, timeout=3):
 
 def _wait_for_catalog(host_ids, timeout=5):
     qos = test_participant_qos()
+    qos.partition.name = ["procedure"]
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     dp.enable()
     topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -172,6 +173,7 @@ def all_hosts():
 def orch_dp():
     """Orchestration domain participant."""
     qos = test_participant_qos()
+    qos.partition.name = ["procedure"]
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     dp.enable()
     yield dp

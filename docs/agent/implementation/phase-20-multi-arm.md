@@ -13,8 +13,117 @@ the Procedure Controller and digital twin display.
 - [vision/capabilities.md — V1.2.0](../vision/capabilities.md)
 - [vision/data-model.md — `Surgery::RobotArmAssignment`](../vision/data-model.md)
 - [vision/data-model.md — `ArmAssignmentState`, `TablePosition`, `MAX_ARM_COUNT`](../vision/data-model.md)
+- [vision/data-model.md — Domain 15 DomainParticipant partition scheme](../vision/data-model.md)
+- [vision/data-model.md — Well-known `ServiceCatalog` property keys](../vision/data-model.md)
 - [vision/system-architecture.md — Procedure Controller participant model](../vision/system-architecture.md)
+- [vision/system-architecture.md — Orchestration Partition Strategy](../vision/system-architecture.md)
 - [vision/dds-consistency.md — New Module Checklist](../vision/dds-consistency.md)
+- [spec/procedure-orchestration.md — Orchestration Context scenarios](../spec/procedure-orchestration.md)
+
+---
+
+## Step 20.0 — Orchestration Context & Tier Partitions
+
+**Why here:** The deploy-to-procedure workflow (filter by room → select
+services → assign to procedure) is the operator precondition for the
+multi-arm flow in Steps 20.4–20.7. Without room/procedure context in
+`ServiceCatalog`, the controller has no basis for selecting which hosts and
+services to target when issuing arm `start_service` RPCs. This step must
+complete before Step 20.4.
+
+### Work
+
+#### Tier partitions (all service hosts + Procedure Controller)
+
+- Set DomainParticipant partition `procedure` on the Orchestration domain
+  participant for **all** service hosts at startup, immediately after
+  `create_participant_from_config()` and before `enable()`:
+  - `RobotServiceHost` (C++)
+  - `ClinicalServiceHost`, `OperationalServiceHost`, `OperatorServiceHost`
+    (Python)
+- Set DomainParticipant partition `procedure` on the Procedure Controller's
+  Orchestration domain participant at startup
+- No partition changes at runtime — tier is a static deployment-time property
+- Remove any existing test assertions that check for `room/OR-1` or
+  `room/OR-3` partition isolation on the Orchestration domain; replace with
+  the tier-level isolation check (see Test Gate below)
+
+#### `room_id` in ServiceCatalog (static host context)
+
+- Each service host reads its `ROOM_ID` environment variable (already
+  available — used today for the Hospital domain participant) and, for
+  each `ServiceCatalog` instance it publishes, includes a `PropertyDescriptor`
+  with `name = "room_id"` and `current_value = <room_id>`
+- The property is published with the initial `ServiceCatalog` write at
+  startup and is stable for the host's lifetime (never changes)
+
+#### `procedure_id` in ServiceCatalog (situational service context)
+
+- When a service host receives a `start_service` RPC and the `ServiceRequest`
+  includes a property `procedure_id`, the host re-publishes the service's
+  `ServiceCatalog` instance (same TRANSIENT_LOCAL key) with
+  `procedure_id = <value>` added to the properties sequence
+- When the service is stopped (via `stop_service` RPC or graceful shutdown),
+  the host re-publishes the `ServiceCatalog` instance with `procedure_id`
+  removed or set to empty string
+- Services that are started without a `procedure_id` property in the request
+  do not have this property set in their catalog entry
+
+#### `gui_url` in ServiceCatalog (GUI service context)
+
+- Add an optional `gui_urls() -> list[str]` method to the Python `Service`
+  base class (returns `[]` by default; GUI services override to return their
+  active endpoint URLs)
+- Add the equivalent optional virtual `gui_urls() -> std::vector<std::string>`
+  to the C++ `medtech::Service` interface (default: returns empty vector)
+- After a service transitions to `RUNNING`, the service host calls
+  `service.gui_urls()`. If non-empty, the host re-publishes the service's
+  `ServiceCatalog` instance with a `PropertyDescriptor` `name = "gui_url"`
+  populated with the first URL (or a comma-separated list for multi-endpoint
+  services)
+- On service stop, `gui_url` is cleared from the catalog entry (same
+  re-publish pattern as `procedure_id`)
+
+#### Procedure Controller: room and procedure filter UI
+
+- Add a **Room Filter** dropdown/chip-select to the Procedure Controller GUI
+  populated from the distinct `room_id` property values seen in received
+  `ServiceCatalog` samples
+- When a room is selected, the hosts/services view filters to show only
+  entries whose `room_id` matches — this is a purely application-layer
+  filter; no DDS partition change occurs
+- Add a **Procedure Filter** chip-select populated from distinct
+  `procedure_id` values present across all received `ServiceCatalog` entries
+  (shows only entries for services currently deployed in a procedure)
+- Both filters are additive (room AND procedure); "All" / no selection
+  shows all entries
+- For any service whose `ServiceCatalog` entry contains a non-empty
+  `gui_url` property AND whose `ServiceStatus.state == RUNNING`, render
+  an **"Open"** action button that opens the URL in a new browser tab
+
+### Test Gate
+
+- [ ] All service host Orchestration domain participants start with
+      DomainParticipant partition `procedure`
+- [ ] Procedure Controller Orchestration domain participant starts with
+      DomainParticipant partition `procedure`
+- [ ] A participant with DomainParticipant partition `facility` does NOT
+      discover any `procedure`-tier service host or the Procedure Controller
+- [ ] `ServiceCatalog` instances include `room_id` property matching the
+      host's `ROOM_ID` at startup
+- [ ] `start_service` RPC with `procedure_id` property → `ServiceCatalog`
+      re-published with `procedure_id` set
+- [ ] `stop_service` → `ServiceCatalog` re-published with `procedure_id`
+      cleared
+- [ ] GUI service that overrides `gui_urls()` → `gui_url` property appears
+      in `ServiceCatalog` after `RUNNING`; cleared on stop
+- [ ] Non-GUI service → no `gui_url` property ever appears in catalog
+- [ ] Room filter in Procedure Controller shows only services from selected
+      room; filter change does not trigger DDS re-discovery
+- [ ] Procedure filter shows only services deployed in a procedure
+- [ ] "Open" button appears only for RUNNING services with a `gui_url`;
+      absent for stopped services or non-GUI services
+- [ ] `bash scripts/ci.sh` passes
 
 ---
 

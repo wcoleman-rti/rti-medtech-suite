@@ -8,7 +8,7 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 
 | Requirement | Value |
 |-------------|-------|
-| Domain partition format | `room/<room_id>/procedure/<procedure_id>` |
+| DomainParticipant partition format (Procedure domain) | `room/<room_id>/procedure/<procedure_id>` |
 | `OperatorInput` deadline (DDS Deadline QoS) | 4 ms — enforced on both writer and reader; detects stream interruption per instance |
 | `RobotState` deadline (DDS Deadline QoS) | 20 ms — enforced on both writer and reader; detects stream interruption per instance |
 | `RobotFrameTransform` deadline (DDS Deadline QoS) | 20 ms — enforced on both writer and reader; detects stream interruption per instance |
@@ -38,33 +38,33 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 
 ## Discovery & Partition Isolation
 
-### Scenario: Participants in the same partition discover each other `@integration` `@partition`
+### Scenario: Participants in the same DomainParticipant partition discover each other `@integration` `@partition`
 
-**Given** participant A and participant B are both on the Procedure domain with domain partition `room/OR-3/procedure/proc-001`
+**Given** participant A and participant B are both on the Procedure domain with DomainParticipant partition `room/OR-3/procedure/proc-001`
 **When** both participants create publishers/subscribers for the same topic
 **Then** their DataWriters and DataReaders match and can exchange data
 
-### Scenario: Participants in different partitions do NOT discover each other `@integration` `@partition`
+### Scenario: Participants in different DomainParticipant partitions do NOT discover each other `@integration` `@partition`
 
-**Given** participant A is on the Procedure domain with partition `room/OR-3/procedure/proc-001`
-**And** participant B is on the Procedure domain with partition `room/OR-5/procedure/proc-002`
+**Given** participant A is on the Procedure domain with DomainParticipant partition `room/OR-3/procedure/proc-001`
+**And** participant B is on the Procedure domain with DomainParticipant partition `room/OR-5/procedure/proc-002`
 **When** both create DataWriters/DataReaders for the same topic (e.g., `PatientVitals`)
 **Then** their endpoints do not match
 **And** no data is exchanged between them
 
-### Scenario: Wildcard partition receives from all matching partitions `@integration` `@partition`
+### Scenario: Wildcard DomainParticipant partition receives from all matching partitions `@integration` `@partition`
 
-**Given** participant A is publishing on the Procedure domain with partition `room/OR-3/procedure/proc-001`
-**And** participant B is publishing on the Procedure domain with partition `room/OR-5/procedure/proc-002`
-**And** an aggregator participant uses partition `room/*`
+**Given** participant A is publishing on the Procedure domain with DomainParticipant partition `room/OR-3/procedure/proc-001`
+**And** participant B is publishing on the Procedure domain with DomainParticipant partition `room/OR-5/procedure/proc-002`
+**And** an aggregator participant uses DomainParticipant partition `room/*`
 **When** both participants publish `PatientVitals`
 **Then** the aggregator receives vitals from both OR-3 and OR-5
 
-### Scenario: Domain partition is assigned at startup from configuration `@integration` `@partition`
+### Scenario: DomainParticipant partition is assigned at startup from configuration `@integration` `@partition`
 
 **Given** a surgical application is launched with `ROOM_ID=OR-7` and `PROCEDURE_ID=proc-099`
 **When** the application creates its DomainParticipant
-**Then** the participant's domain partition is set to `room/OR-7/procedure/proc-099`
+**Then** the participant's DomainParticipant partition is set to `room/OR-7/procedure/proc-099`
 **And** the application operates identically to any other instance in any other room
 
 ---

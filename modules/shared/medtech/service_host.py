@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
+import os
 import time
 from typing import Callable
 
@@ -76,6 +77,10 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
         self._registry = registry
         self._slots: dict[str, _ServiceSlot] = {}
         self._log = logging.getLogger(f"medtech.service_host.{host_id}")
+        # procedure_id injected via start_service properties; cleared on stop
+        self._procedure_ids: dict[str, str] = {}  # svc_id → procedure_id
+        # pending catalog re-publish flag — set by start/stop, consumed by host
+        self._catalog_dirty: set[str] = set()  # svc_ids needing re-publish
 
     def start_service(
         self, req: Orchestration.ServiceRequest
@@ -105,6 +110,17 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
             task = asyncio.ensure_future(service.run())
             self._slots[svc_id] = _ServiceSlot(service=service, task=task)
 
+            # cache procedure_id from request properties (may be absent)
+            procedure_id = next(
+                (p.value for p in req.properties if p.name == "procedure_id"),
+                "",
+            )
+            if procedure_id:
+                self._procedure_ids[svc_id] = procedure_id
+            elif svc_id in self._procedure_ids:
+                del self._procedure_ids[svc_id]
+            self._catalog_dirty.add(svc_id)
+
             result.code = Orchestration.OperationResultCode.OK
             result.message = "Service started"
             self._log.info("start_service: OK (service_id=%s)", svc_id)
@@ -126,6 +142,10 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
             return result
 
         slot.service.stop()
+        # Clear procedure_id — service is no longer deployed in a procedure
+        if svc_id in self._procedure_ids:
+            del self._procedure_ids[svc_id]
+        self._catalog_dirty.add(svc_id)
         # Keep slot so the status polling loop can detect the STOPPED
         # transition and publish ServiceStatus.  start_service clears
         # stale STOPPED/FAILED slots before creating a new service.
@@ -173,6 +193,16 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
     def registered_service_ids(self) -> list[str]:
         """Return registry-registered service IDs."""
         return list(self._registry.keys())
+
+    def pop_catalog_dirty(self) -> set[str]:
+        """Return and clear the set of service IDs needing catalog re-publish."""
+        dirty = self._catalog_dirty.copy()
+        self._catalog_dirty.clear()
+        return dirty
+
+    def procedure_id(self, svc_id: str) -> str:
+        """Return cached procedure_id for a service, or empty string."""
+        return self._procedure_ids.get(svc_id, "")
 
     @property
     def registry(self) -> ServiceRegistryMap:
@@ -230,6 +260,10 @@ class ServiceHost(Service):
         self._state_val = ServiceState.STOPPED
         self._stop_event: asyncio.Event | None = None
         self._log = logging.getLogger(f"medtech.service_host.{host_id}")
+        self._room_id: str = os.environ.get("ROOM_ID", "")
+
+        # gui_url cache: svc_id → url string (empty if not a GUI service)
+        self._gui_urls: dict[str, str] = {}
 
         # -- Create Orchestration domain participant from XML --
         initialize_connext()
@@ -237,6 +271,11 @@ class ServiceHost(Service):
         self._participant = provider.create_participant_from_config(
             orch_names.ORCHESTRATION
         )
+
+        # Set tier partition BEFORE enable() — static deployment-time property
+        qos = self._participant.qos
+        qos.partition.name = ["procedure"]
+        self._participant.qos = qos
 
         self._log.info("Orchestration participant created")
 
@@ -293,6 +332,27 @@ class ServiceHost(Service):
                     if last_published_states.get(svc_id) != state:
                         self._publish_service_status(svc_id, state)
                         last_published_states[svc_id] = state
+
+                        # On transition to RUNNING: capture gui_url
+                        if state == ServiceState.RUNNING:
+                            slot = self._rpc_impl._slots.get(svc_id)
+                            if slot is not None:
+                                urls = slot.service.gui_urls()
+                                self._gui_urls[svc_id] = urls[0] if urls else ""
+                            else:
+                                self._gui_urls[svc_id] = ""
+                            self._rpc_impl._catalog_dirty.add(svc_id)
+                        elif state in (ServiceState.STOPPED, ServiceState.FAILED):
+                            # Clear gui_url on stop/fail
+                            if svc_id in self._gui_urls:
+                                del self._gui_urls[svc_id]
+                            self._rpc_impl._catalog_dirty.add(svc_id)
+
+                # Re-publish catalog for any services with pending changes
+                dirty = self._rpc_impl.pop_catalog_dirty()
+                for svc_id in dirty:
+                    if svc_id in self._rpc_impl.registry:
+                        self._publish_service_catalog_for(svc_id)
         finally:
             # -- Shutdown --
             self._state_val = ServiceState.STOPPING
@@ -326,16 +386,52 @@ class ServiceHost(Service):
     # -- Private helpers --
 
     def _publish_service_catalog(self) -> None:
-        for svc_id, reg in self._rpc_impl.registry.items():
-            catalog = Orchestration.ServiceCatalog(
-                host_id=self._host_id,
-                service_id=svc_id,
-                display_name=reg.display_name,
-                properties=list(reg.properties),
-                health_summary="OK",
-            )
-            self._catalog_writer.write(catalog)
-            self._log.info("Published ServiceCatalog for %s/%s", self._host_id, svc_id)
+        for svc_id in self._rpc_impl.registry:
+            self._publish_service_catalog_for(svc_id)
+
+    def _publish_service_catalog_for(self, svc_id: str) -> None:
+        """Publish (or re-publish) the ServiceCatalog instance for one service."""
+        reg = self._rpc_impl.registry[svc_id]
+        properties: list = list(reg.properties)
+
+        # room_id — static host context, always present if ROOM_ID is set
+        if self._room_id:
+            room_prop = Orchestration.PropertyDescriptor()
+            room_prop.name = "room_id"
+            room_prop.current_value = self._room_id
+            room_prop.description = "Operating room identifier"
+            room_prop.required = False
+            properties.append(room_prop)
+
+        # procedure_id — set when service is deployed in a procedure
+        procedure_id = self._rpc_impl.procedure_id(svc_id)
+        if procedure_id:
+            proc_prop = Orchestration.PropertyDescriptor()
+            proc_prop.name = "procedure_id"
+            proc_prop.current_value = procedure_id
+            proc_prop.description = "Procedure this service is deployed in"
+            proc_prop.required = False
+            properties.append(proc_prop)
+
+        # gui_url — non-empty only for RUNNING GUI services
+        gui_url = self._gui_urls.get(svc_id, "")
+        if gui_url:
+            gui_prop = Orchestration.PropertyDescriptor()
+            gui_prop.name = "gui_url"
+            gui_prop.current_value = gui_url
+            gui_prop.description = "GUI endpoint URL"
+            gui_prop.required = False
+            properties.append(gui_prop)
+
+        catalog = Orchestration.ServiceCatalog(
+            host_id=self._host_id,
+            service_id=svc_id,
+            display_name=reg.display_name,
+            properties=properties,
+            health_summary="OK",
+        )
+        self._catalog_writer.write(catalog)
+        self._log.info("Published ServiceCatalog for %s/%s", self._host_id, svc_id)
 
     def _publish_service_status(self, service_id: str, svc_state: ServiceState) -> None:
         now = time.time()

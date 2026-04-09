@@ -207,7 +207,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - [x] `ServiceStatus` reflects hosted service state transitions
 - [x] `stop_service` cancels service coroutines; state transitions to `STOPPED`
 - [x] Operational Service Host same test coverage
-- [x] Partition isolation: `room/OR-1` host not discoverable by `room/OR-3` controller
+- [x] Tier partition isolation: `procedure`-tier Service Host not discoverable by a participant using only the `facility` DomainParticipant partition (and vice versa)
 - [x] `bash scripts/ci.sh` passes
 
 ---

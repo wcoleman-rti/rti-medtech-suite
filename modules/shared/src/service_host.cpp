@@ -11,11 +11,14 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <future>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 #include <dds/dds.hpp>
 #include <dds/rpc/Server.hpp>
@@ -151,6 +154,21 @@ public:
 
             slots_.emplace(svc_id, std::move(slot));
 
+            // Extract procedure_id from request properties and mark dirty
+            std::string procedure_id;
+            for (const auto& prop : req.properties) {
+                if (std::string(prop.name) == "procedure_id") {
+                    procedure_id = std::string(prop.value);
+                    break;
+                }
+            }
+            if (!procedure_id.empty()) {
+                procedure_ids_[svc_id] = procedure_id;
+            } else {
+                procedure_ids_.erase(svc_id);
+            }
+            catalog_dirty_.insert(svc_id);
+
             result.code = Orchestration::OperationResultCode::OK;
             result.message = "Service started";
             log_.notice("start_service: OK (service_id=" + svc_id + ")");
@@ -203,6 +221,10 @@ public:
         result.code = Orchestration::OperationResultCode::OK;
         result.message = "Service stopped";
         log_.notice("stop_service: OK (service_id=" + svc_id + ")");
+
+        procedure_ids_.erase(svc_id);
+        catalog_dirty_.insert(svc_id);
+
         return result;
     }
 
@@ -291,6 +313,34 @@ public:
         slots_.clear();
     }
 
+    /// Atomically return and clear the set of services needing catalog re-publish.
+    std::set<Common::EntityId> pop_catalog_dirty()
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        std::set<Common::EntityId> result;
+        result.swap(catalog_dirty_);
+        return result;
+    }
+
+    /// Return the current procedure_id for a service (empty if none).
+    std::string procedure_id(const Common::EntityId& svc_id) const
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        auto it = procedure_ids_.find(svc_id);
+        return (it != procedure_ids_.end()) ? it->second : "";
+    }
+
+    /// Return gui_urls for a running service (empty vector if not found/stopped).
+    std::vector<std::string> gui_urls_for(const Common::EntityId& svc_id) const
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        auto it = slots_.find(svc_id);
+        if (it == slots_.end() || it->second.service == nullptr) {
+            return {};
+        }
+        return it->second.service->gui_urls();
+    }
+
 private:
     std::string host_id_;
     int32_t capacity_;
@@ -299,6 +349,8 @@ private:
 
     mutable std::mutex mu_;
     ServiceSlotMap slots_;
+    std::unordered_map<Common::EntityId, std::string> procedure_ids_;
+    std::set<Common::EntityId> catalog_dirty_;
 };
 
 
@@ -330,6 +382,17 @@ public:
         orch_participant_ = provider.extensions()
             .create_participant_from_config(
                 std::string(orch_names::ORCHESTRATION));
+
+        // Set tier partition BEFORE enable() — static deployment-time property
+        {
+            auto dp_qos = orch_participant_.qos();
+            dp_qos << dds::core::policy::Partition(std::string("procedure"));
+            orch_participant_.qos(dp_qos);
+        }
+
+        // Read room context from environment
+        const char* room_env = std::getenv("ROOM_ID");
+        room_id_ = (room_env != nullptr) ? room_env : "";
 
         log_.notice("Orchestration participant created");
 
@@ -408,7 +471,24 @@ public:
                     || it->second != state) {
                     publish_service_status(svc_id, state);
                     last_published_states[svc_id] = state;
+
+                    // On RUNNING: capture gui_url and mark catalog dirty
+                    if (state == Orchestration::ServiceState::RUNNING) {
+                        auto urls = rpc_impl_->gui_urls_for(svc_id);
+                        gui_urls_[svc_id] = urls.empty() ? "" : urls[0];
+                        rpc_impl_->pop_catalog_dirty();  // discard stale dirty entry
+                        publish_service_catalog_for(svc_id);
+                    } else if (state == Orchestration::ServiceState::STOPPED
+                               || state == Orchestration::ServiceState::FAILED) {
+                        gui_urls_.erase(svc_id);
+                    }
                 }
+            }
+
+            // Re-publish catalog for start/stop property changes
+            auto dirty = rpc_impl_->pop_catalog_dirty();
+            for (const auto& svc_id : dirty) {
+                publish_service_catalog_for(svc_id);
             }
         }
 
@@ -447,18 +527,63 @@ private:
     void publish_service_catalog()
     {
         for (const auto& [svc_id, reg] : rpc_impl_->registry()) {
-            Orchestration::ServiceCatalog catalog;
-            catalog.host_id = host_id_;
-            catalog.service_id = svc_id;
-            catalog.display_name = reg.display_name;
-            for (const auto& pd : reg.properties) {
-                catalog.properties.push_back(pd);
-            }
-            catalog.health_summary = "OK";
-            catalog_writer_.write(catalog);
-            log_.notice("Published ServiceCatalog for "
-                + host_id_ + "/" + svc_id);
+            publish_service_catalog_for(svc_id);
         }
+    }
+
+    void publish_service_catalog_for(const Common::EntityId& svc_id)
+    {
+        const auto& registry = rpc_impl_->registry();
+        auto reg_it = registry.find(svc_id);
+        if (reg_it == registry.end()) return;
+        const auto& reg = reg_it->second;
+
+        Orchestration::ServiceCatalog catalog;
+        catalog.host_id = host_id_;
+        catalog.service_id = svc_id;
+        catalog.display_name = reg.display_name;
+
+        // Start with registered static properties
+        for (const auto& pd : reg.properties) {
+            catalog.properties.push_back(pd);
+        }
+
+        // room_id — static host context
+        if (!room_id_.empty()) {
+            Orchestration::PropertyDescriptor room_prop;
+            room_prop.name = "room_id";
+            room_prop.current_value = room_id_;
+            room_prop.description = "Operating room identifier";
+            room_prop.required = false;
+            catalog.properties.push_back(room_prop);
+        }
+
+        // procedure_id — set when service is deployed in a procedure
+        std::string procedure_id = rpc_impl_->procedure_id(svc_id);
+        if (!procedure_id.empty()) {
+            Orchestration::PropertyDescriptor proc_prop;
+            proc_prop.name = "procedure_id";
+            proc_prop.current_value = procedure_id;
+            proc_prop.description = "Procedure this service is deployed in";
+            proc_prop.required = false;
+            catalog.properties.push_back(proc_prop);
+        }
+
+        // gui_url — non-empty only for RUNNING GUI services
+        auto gui_it = gui_urls_.find(svc_id);
+        if (gui_it != gui_urls_.end() && !gui_it->second.empty()) {
+            Orchestration::PropertyDescriptor gui_prop;
+            gui_prop.name = "gui_url";
+            gui_prop.current_value = gui_it->second;
+            gui_prop.description = "GUI endpoint URL";
+            gui_prop.required = false;
+            catalog.properties.push_back(gui_prop);
+        }
+
+        catalog.health_summary = "OK";
+        catalog_writer_.write(catalog);
+        log_.notice("Published ServiceCatalog for "
+            + host_id_ + "/" + svc_id);
     }
 
     void publish_service_status(
@@ -490,8 +615,12 @@ private:
     // Configuration
     std::string host_id_;
     std::string host_name_;
+    std::string room_id_;
     int32_t capacity_;
     ModuleLogger& log_;
+
+    // Runtime service URL cache (svc_id -> first gui_url, empty if none)
+    std::unordered_map<Common::EntityId, std::string> gui_urls_;
 
     // Lifecycle
     std::atomic<bool> running_{true};

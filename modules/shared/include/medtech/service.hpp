@@ -10,7 +10,9 @@
 #ifndef MEDTECH_SERVICE_HPP
 #define MEDTECH_SERVICE_HPP
 
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include "orchestration/orchestration.hpp"
 
@@ -36,6 +38,19 @@ public:
     /// Current lifecycle state. Polled by the Service Host for status
     /// reporting. Returns the IDL-generated Orchestration::ServiceState.
     virtual Orchestration::ServiceState state() const = 0;
+
+    /// Return active GUI endpoint URLs for this service.
+    ///
+    /// GUI services override this to return the URL(s) served after the
+    /// service transitions to RUNNING.  The Service Host publishes these
+    /// in the ``gui_url`` ServiceCatalog property so the Procedure
+    /// Controller can render an "Open" action button.
+    ///
+    /// Returns an empty vector for non-GUI services (default behavior).
+    virtual std::vector<std::string> gui_urls() const
+    {
+        return {};
+    }
 };
 
 }  // namespace medtech

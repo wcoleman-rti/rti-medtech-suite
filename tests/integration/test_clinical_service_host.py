@@ -61,6 +61,7 @@ def clinical_service_host():
     )
     # Wait for ServiceCatalog publication instead of fixed sleep
     qos = test_participant_qos()
+    qos.partition.name = ["procedure"]
     probe_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     probe_dp.enable()
     topic = dds.Topic(probe_dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -102,6 +103,7 @@ def orch_participant():
     used by the XML-configured Orchestration participant.
     """
     qos = test_participant_qos()
+    qos.partition.name = ["procedure"]
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     p.enable()
     yield p

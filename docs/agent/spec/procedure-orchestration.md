@@ -5,9 +5,12 @@ the `medtech::Service` interface, dual-mode participant pattern, Service
 Host framework, Procedure Controller GUI, Orchestration domain (Domain 15)
 communication, and DDS RPC lifecycle management.
 
-All scenarios assume the Orchestration domain uses partition `room/<room_id>`
-(e.g., `room/OR-1`) unless stated otherwise. Service Hosts not yet assigned
-to an OR use the `unassigned` partition.
+The Orchestration domain uses **no Publisher/Subscriber partitions** and no
+domain tags. Tier-level visibility isolation is achieved via static
+**DomainParticipant-level partitions** set once at startup and never changed
+during a host or controller's lifetime. Room and procedure context is
+propagated as data — as well-known property keys in `ServiceCatalog` — not
+as partition strings.
 
 ---
 
@@ -27,8 +30,13 @@ to an OR use the `unassigned` partition.
 | `ServiceStatus` durability | TRANSIENT_LOCAL (late-joining controllers receive current state) |
 | `ServiceHostControl` RPC QoS | `Pattern.RPC` (RELIABLE, KEEP_ALL) |
 | Orchestration domain ID | 15 |
-| Orchestration partition format | `room/<room_id>` |
-| Unassigned Service Host partition | `unassigned` |
+| Orchestration tier partition — procedure hosts | `procedure` |
+| Orchestration tier partition — facility hosts (future) | `facility` |
+| Orchestration cross-tier observer partition | `*` (wildcard, set at startup) |
+| Unassigned / untiered host partition | `unassigned` |
+| Well-known property key — room context | `room_id` |
+| Well-known property key — procedure context | `procedure_id` |
+| Well-known property key — GUI endpoint URL | `gui_url` |
 | Service Host liveliness lease | 2 s (host failure detection via liveliness) |
 | Procedure Controller domains | Orchestration + Hospital |
 | Orchestration → Procedure domain isolation | Complete — orchestration failure must not disrupt surgical data |
@@ -271,28 +279,63 @@ is added or changed.*
 **Then** all surgical data continues flowing on the Procedure domain without interruption
 **And** no deadline violations or liveliness losses occur on Procedure domain topics as a result of the Orchestration domain failure
 
-### Scenario: Orchestration domain has no domain tags `@integration` `@orchestration`
+### Scenario: Orchestration domain has no domain tags and no Publisher/Subscriber partitions `@integration` `@orchestration`
 
 **Given** a Procedure Controller participant on the Orchestration domain
 **And** a Service Host participant on the Orchestration domain
-**When** both are active in the same partition
+**When** both are active with matching DomainParticipant-level tier partitions
 **Then** they discover each other directly — no domain tag is required or set
-**And** all orchestration participants share a single tag-free domain space
+**And** no Publisher/Subscriber partition QoS is applied to any DataWriter or DataReader on this domain
 
-### Scenario: Orchestration partition scopes communication to an OR `@integration` `@orchestration` `@partition`
+### Scenario: Tier isolation via static DomainParticipant partition `@integration` `@orchestration` `@partition`
 
-**Given** Service Host A is on the Orchestration domain with partition `room/OR-1`
-**And** Service Host B is on the Orchestration domain with partition `room/OR-3`
-**When** both publish `ServiceCatalog` and `ServiceStatus`
-**Then** a Procedure Controller with partition `room/OR-1` receives data only from Service Host A
-**And** a Procedure Controller with partition `room/OR-3` receives data only from Service Host B
+**Given** a procedure-tier Service Host starts with DomainParticipant partition `procedure`
+**And** a facility-tier Service Host starts with DomainParticipant partition `facility`
+**And** a Procedure Controller starts with DomainParticipant partition `procedure`
+**When** all participants are active on the Orchestration domain
+**Then** the Procedure Controller discovers procedure-tier hosts and receives their `ServiceCatalog` and `ServiceStatus`
+**And** the Procedure Controller does not discover facility-tier hosts
+**And** no partition change occurs at runtime — all tier partitions are set once at startup and never modified
 
-### Scenario: Unassigned Service Host uses the unassigned partition `@integration` `@orchestration` `@partition`
+### Scenario: Cross-tier observer uses wildcard partition `@integration` `@orchestration` `@partition`
 
-**Given** a Service Host has not been assigned to an OR
+**Given** a hospital admin controller starts with DomainParticipant partition `*`
+**When** the controller is active on the Orchestration domain
+**Then** it discovers both procedure-tier and facility-tier Service Hosts
+**And** no partition-change churn occurs because the wildcard is set at startup and never changed
+
+### Scenario: Untiered Service Host uses the unassigned partition `@integration` `@orchestration` `@partition`
+
+**Given** a Service Host has not been configured with an orchestration tier
 **When** the Service Host starts on the Orchestration domain
-**Then** the Service Host uses partition `unassigned`
-**And** it is not discoverable by a Procedure Controller scoped to a specific room partition
+**Then** the Service Host uses DomainParticipant partition `unassigned`
+**And** it is not discoverable by a Procedure Controller or facility controller unless they also use `unassigned` or a wildcard
+
+### Scenario: Room context is carried as a ServiceCatalog property `@integration` `@orchestration`
+
+**Given** a Service Host is configured for operating room `OR-1`
+**When** the Service Host publishes `ServiceCatalog` instances on startup
+**Then** each `ServiceCatalog` instance includes a property with key `room_id` and value `OR-1`
+**And** the Procedure Controller reads `room_id` from the catalog to filter or label hosts by room in the UI
+**And** no DDS partition change is required for the controller to switch its room filter view
+
+### Scenario: Procedure context is reflected in ServiceCatalog after service start `@integration` `@orchestration`
+
+**Given** the Procedure Controller sends a `start_service` RPC request carrying a property `procedure_id = "proc-001"`
+**And** the Service Host starts the service successfully
+**When** the service enters `RUNNING` state
+**Then** the Service Host re-publishes the service's `ServiceCatalog` instance with a property `procedure_id = "proc-001"`
+**And** the property is cleared (removed or set to empty string) when the service is stopped
+
+### Scenario: GUI service URL is reflected in ServiceCatalog after service start `@integration` `@orchestration`
+
+**Given** the Procedure Controller sends a `start_service` RPC request for a GUI-capable service
+**And** the service binds to a network port after starting
+**When** the service enters `RUNNING` state
+**Then** the Service Host re-publishes the service's `ServiceCatalog` instance with a property `gui_url` containing the active endpoint URL (e.g., `http://host-or1:8081`)
+**And** the Procedure Controller detects the non-empty `gui_url` property and renders an "Open" action button for that service
+**And** the `gui_url` property is cleared when the service is stopped
+**And** services without a GUI do not publish a `gui_url` property
 
 ---
 

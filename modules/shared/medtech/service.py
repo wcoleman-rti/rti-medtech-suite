@@ -54,3 +54,15 @@ class Service(ABC):
         Orchestration domain.
         """
         ...
+
+    def gui_urls(self) -> list[str]:
+        """Return active GUI endpoint URLs for this service.
+
+        GUI services override this to return the URL(s) served after the
+        service transitions to RUNNING.  The Service Host publishes these
+        in the ``gui_url`` ServiceCatalog property so the Procedure
+        Controller can render an "Open" action button.
+
+        Returns an empty list for non-GUI services (default behavior).
+        """
+        return []

@@ -284,8 +284,19 @@ auto-enabled, set the partition immediately after
 partition is applied is acceptable for startup but should be minimized.
 
 Partition can also be **updated at runtime** if the application's context
-changes (e.g., moving to a different procedure). Updating the partition on a
-live participant triggers re-discovery with the new partition value.
+changes (e.g., moving a running service from one procedure to another on the
+Procedure domain). Updating the partition on a live participant triggers
+re-discovery with the new partition value — matched endpoints are torn down and
+must rediscover, so this should only be done when the operational context
+genuinely changes and the re-discovery overhead is acceptable.
+
+> **Orchestration domain exception:** DomainParticipant partitions on the
+> Orchestration domain (Domain 15) are **static** — they encode orchestration
+> tier membership (`procedure`, `facility`, etc.) and must **never** be changed
+> at runtime. Tier membership is a deployment-time property; changing it on a
+> live participant would cause unnecessary re-discovery churn across all
+> orchestration participants. If a service must move between tiers, stop the
+> participant and restart it with the new tier partition.
 
 **C++ (Modern C++ API):**
 

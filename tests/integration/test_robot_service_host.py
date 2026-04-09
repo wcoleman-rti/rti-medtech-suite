@@ -79,6 +79,7 @@ def robot_service_host():
     # Wait for ServiceCatalog publication instead of fixed sleep
     qos = dds.DomainParticipantQos()
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+    qos.partition.name = ["procedure"]
     probe_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     probe_dp.enable()
     topic = dds.Topic(probe_dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -121,6 +122,7 @@ def orch_participant():
     """
     qos = dds.DomainParticipantQos()
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+    qos.partition.name = ["procedure"]
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     p.enable()
     yield p

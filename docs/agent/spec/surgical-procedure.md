@@ -2,7 +2,7 @@
 
 Behavioral specifications for a single surgical procedure instance covering robot teleop, patient vitals, camera feed, procedure context, and device telemetry.
 
-All scenarios assume the participant operates within a room partition (e.g., `room/OR-3/procedure/proc-001`) unless stated otherwise.
+All scenarios assume the participant operates within a DomainParticipant partition (e.g., `room/OR-3/procedure/proc-001`) unless stated otherwise.
 
 ---
 

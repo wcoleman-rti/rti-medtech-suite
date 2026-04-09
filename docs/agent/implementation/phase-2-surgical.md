@@ -281,8 +281,9 @@
   - Supports `--domain`, `--check`, and `--format json` options
   - Exits cleanly and destroys temporary participants on completion
 - Implement `tools/partition-inspector.py`:
-  - Joins Procedure domain with `room/*` wildcard partition
-  - Enumerates all active partitions and lists entities per partition
+  - Joins Procedure domain with `room/*` wildcard DomainParticipant partition
+  - Enumerates active participants and attempts to list entities per partition
+  - Note: subject to INC-041 — RTI Connext Python 7.6.0 does not expose DomainParticipant partition in builtin discovery data; tool reports participants but cannot currently enumerate partition values
   - Supports `--watch` (continuous) and `--filter` options
 - Update `tools/README.md` to document all implemented tools
 - Update `tools/admin-console.md` with concrete connection instructions now that Docker networking is fully configured
@@ -292,5 +293,5 @@
 
 - [ ] `python tools/medtech-diag/diag.py` runs against the Phase 2 Docker Compose environment and reports all checks PASS
 - [ ] `python tools/medtech-diag/diag.py --format json` produces valid JSON output
-- [ ] `python tools/partition-inspector.py` correctly lists OR-1 and OR-3 partitions when 2 surgical instances are running
+- [ ] `python tools/partition-inspector.py` runs without error against two live surgical instances (note: partition enumeration limited by INC-041 — tool reports participants but cannot read DomainParticipant partition values from builtin discovery data in Connext Python 7.6.0)
 - [ ] `tools/README.md` indexes all tools with scenario-to-tool mapping

@@ -49,22 +49,30 @@ samples to stdout. Lightweight alternative to Admin Console for quick checks.
 
 - "Is this topic publishing?" — quick verification without a GUI
 - "What does the data look like?" — inspect sample contents
-- "Are partitions working?" — run spy with a specific partition and verify isolation
+- "Are partitions working?" — run spy without a partition filter (see note below) and verify isolation
+
+> **Note — rtiddsspy and DomainParticipant partitions:** rtiddsspy's `-partition` flag
+> sets the spy's **Publisher/Subscriber** partition QoS, which is **not** the same as the
+> **DomainParticipant**-level partition this project uses. Since application DataWriters
+> in this project do not set Pub/Sub partitions, the spy's `-partition` flag will not
+> filter data by room — the spy either sees all data (if its DomainParticipant partition
+> matches) or none. Room-level partition filtering via rtiddsspy is not supported for this
+> project's partition scheme. Use `partition-inspector.py` and `medtech-diag` for
+> partition diagnostics (noting their known limitations in `incidents.md` INC-041).
 
 **How to run in this project:**
 
 ```bash
-# Source the project environment first
-source install/setup.bash
-
-# Spy on the Procedure domain (all topics, all partitions)
+# Spy on the Procedure domain (all topics, all DomainParticipant partitions visible)
 rtiddsspy -domainId 10 -printSample
 
 # Spy on the Hospital domain
 rtiddsspy -domainId 11 -printSample
 
-# Spy with a specific partition
-rtiddsspy -domainId 10 -partition "room/OR-3/*" -printSample
+# NOTE: The -partition flag sets Pub/Sub partition QoS on the spy, NOT DomainParticipant
+# partition. Since this project uses DomainParticipant partitions only, -partition
+# does NOT filter by room and may prevent the spy from receiving data at all.
+# Omit -partition and use content filtering or medtech-diag for targeted inspection.
 ```
 
 Usage documentation: `tools/dds-spy.md`
@@ -150,8 +158,16 @@ application data.
 ### `partition-inspector` — Active Partition Scanner
 
 **What:** A lightweight subscriber that joins the Procedure domain with a `room/*`
-wildcard partition, discovers all active partitions, and reports which instances
-are publishing on each.
+wildcard DomainParticipant partition, discovers all active partitions from endpoint
+builtin topics, and reports which instances are publishing on each.
+
+> **Known limitation (INC-041):** RTI Connext Python 7.6.0 does not expose
+> `DomainParticipant` partition in `ParticipantBuiltinTopicData`. The `partition`
+> field on `PublicationBuiltinTopicData` / `SubscriptionBuiltinTopicData` reflects
+> **Publisher/Subscriber** partition QoS, which application code does not set.
+> As a result, `partition-inspector.py` currently reports no active partitions.
+> This tool is retained for future use when the API limitation is resolved or a
+> `user_data`-based propagation alternative is implemented.
 
 **When to use:**
 

@@ -28,7 +28,7 @@ Each topic represents a **data pattern** — a semantic class of data defined by
 When multiple variations or iterations of a data stream exist, they share a single topic and are distinguished by:
 - **Key fields** — serve a role analogous to indexes in a SQL database; they enable semantic pivoting on the data within a topic (e.g., `patient.id`, `device_id`, `robot_id`)
 - **Content-filtered topics** — subscriber-side narrowing when only a subset of instances is needed
-- **Domain partitions** — room/procedure/context isolation
+- **DomainParticipant partitions** — room/procedure/context isolation
 
 **Bad:** `PatientVitals_OR3`, `PatientVitals_OR4` (per-instance topics)
 **Good:** `PatientVitals` with `@key patient.id`, partitioned by room, filtered by subscriber
@@ -288,7 +288,7 @@ The multi-facility command center layer. Aggregated operational data bridged fro
 | `ResourceUtilization` | `Cloud::ResourceUtilization` | `facility_id` | Equipment, staffing, and capacity metrics per facility. |
 | `OperationalKPIs` | `Cloud::OperationalKPIs` | `facility_id` | Procedure throughput, turnaround time, quality indicators. |
 
-Partition format: `facility/<hospital_id>` (e.g., `facility/HOSP-NYC-01`).
+DomainParticipant partition format: `facility/<hospital_id>` (e.g., `facility/HOSP-NYC-01`).
 
 ### Domain 15 — Orchestration
 
@@ -346,7 +346,35 @@ Types defined in `module Orchestration`:
 > monitoring, inter-service status queries, and future health-check RPC
 > extensions.
 
-Partition format: `room/<room_id>` (e.g., `room/OR-1`). Service Hosts not yet assigned to an OR use the `unassigned` partition.
+**DomainParticipant partition scheme (Domain 15 only):** The Orchestration domain uses
+no Publisher/Subscriber partition QoS. Tier-level visibility isolation is achieved
+via **DomainParticipant-level partitions**, set once at startup and never changed
+during a participant's lifetime:
+
+| Role | DomainParticipant partition |
+|------|------------------------------|
+| Procedure-tier Service Host (manages Domain 10 services) | `procedure` |
+| Facility-tier Service Host (manages Domain 11 services) — future | `facility` |
+| Procedure Controller GUI | `procedure` |
+| Hospital Admin / cross-tier observer | `*` (wildcard) |
+| Unconfigured / untiered host | `unassigned` |
+
+Because partitions are **static** (set at startup, never re-assigned at runtime),
+there is no participant re-discovery churn when operators switch room or procedure
+filter views. Room and procedure context is propagated as **data** in
+`ServiceCatalog` via well-known property keys — not as partition strings.
+
+**Well-known `ServiceCatalog` property keys:**
+
+| Key | Set by | Value | Lifecycle |
+|-----|--------|-------|-----------|
+| `room_id` | Service Host at startup | Physical room identifier (e.g., `OR-1`) | Static for the host's lifetime |
+| `procedure_id` | Service Host after `start_service` RPC | Active procedure identifier (e.g., `proc-001`) | Set when service starts; cleared when service stops |
+| `gui_url` | Service Host after service enters `RUNNING` | HTTP endpoint URL for GUI services | Set when service starts; cleared when service stops |
+
+The Procedure Controller filters hosts and services by `room_id` and `procedure_id`
+in the application layer. The presence of a non-empty `gui_url` property signals that
+an "Open" action button should be rendered for that service instance.
 
 ### Domain 20 — Observability
 
@@ -1123,7 +1151,7 @@ calls `dispose()` to notify subscribers the instance no longer exists.
 | Member | Type | Key | Notes |
 |--------|------|-----|-------|
 | `robot_id` | `Common::EntityId` | @key | Identifies the arm instance. Correlates with `RobotState.robot_id`, `RobotCommand.robot_id`. |
-| `procedure_id` | `Common::EntityId` | — | Associated procedure (correlates with `ProcedureContext.procedure_id`). Non-key: the domain partition already provides procedure scope. |
+| `procedure_id` | `Common::EntityId` | — | Associated procedure (correlates with `ProcedureContext.procedure_id`). Non-key: the DomainParticipant partition already provides procedure scope. |
 | `table_position` | `TablePosition` | — | Assigned position around the surgical table |
 | `status` | `ArmAssignmentState` | — | Current arm assignment lifecycle state |
 | `capabilities` | `string<Common::MAX_DESCRIPTION_LENGTH>` | — | Free-text arm capabilities summary (tool type, degrees of freedom, attached instrument) |
@@ -1468,7 +1496,7 @@ When security implementation begins, this section will define:
   - Discovery protection (encrypt/sign discovery traffic)
   - RTPS protection level (encrypt, sign, or none)
   - Topic-level security rules: which topics require encryption, signing, or both
-- **Partition-aware rules** — how domain partitions (room/procedure contexts) interact with access control; whether partition membership is constrained by permissions
+- **Partition-aware rules** — how DomainParticipant partitions (room/procedure contexts) interact with access control; whether partition membership is constrained by permissions
 - **Topic security classification** — mapping topics to protection levels aligned with the risk-class domain tags:
   - `control` tag topics (Class C/III) → encrypt + sign
   - `clinical` tag topics (Class B/II) → encrypt

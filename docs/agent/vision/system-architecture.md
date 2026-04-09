@@ -206,15 +206,20 @@ All orchestration participants — the Procedure Controller and all Service Host
 
 #### Orchestration Partition Strategy
 
-Orchestration partitions scope communication to an OR context:
+The Orchestration domain uses **static DomainParticipant-level partitions** for tier isolation.
+Partitions are set once at startup and never changed during a participant's lifetime —
+avoiding the re-discovery churn that runtime partition changes would cause.
+Room and procedure context is carried as data in `ServiceCatalog` property fields, not as
+partition strings (see [data-model.md — Domain 15](data-model.md)).
 
-| Partition Pattern | Who Uses It | Meaning |
-|-------------------|-------------|---------|
-| `room/OR-1` | Procedure Controller for OR-1, Service Hosts assigned to OR-1 | All orchestration for one OR |
-| `room/*` | Facility-level orchestration monitor (future) | All ORs |
-| `unassigned` | Service Hosts not yet assigned to an OR | Available host pool |
+| DomainParticipant Partition | Who Uses It | Meaning |
+|-----------------------------|-------------|-------|
+| `procedure` | Procedure-tier Service Hosts (managing Domain 10 services), Procedure Controller | All procedure-level orchestration participants |
+| `facility` | Facility-tier Service Hosts (managing Domain 11 services) — future | Hospital-level service orchestration |
+| `*` | Cross-tier observer (e.g., hospital admin dashboard) — set at startup, never changed | All orchestration tiers |
+| `unassigned` | Service Hosts not yet configured with an orchestration tier | Unconfigured host pool |
 
-A Service Host transitions from `unassigned` to `room/OR-n` when the Procedure Controller assigns it via RPC.
+Publisher/Subscriber Partition QoS is **not used** on the Orchestration domain.
 
 #### Communication Model
 
@@ -309,12 +314,14 @@ Procedure Domain (clinical tag)              Hospital Domain
 
 ## Partition Strategy
 
-### Domain Partitions
+### DomainParticipant Partitions
 
-Domain partitions provide **context-based isolation**. They isolate at the participant level
-when the isolation factor lives outside of the data being delivered — i.e., the operational context (which room, which procedure) rather than the data content itself.
+DomainParticipant partitions provide **context-based isolation**. They isolate at the
+participant level when the isolation factor lives outside of the data being delivered —
+i.e., the operational context (which room, which procedure) rather than the data content itself.
 
-Each surgical procedure instance is launched with a partition derived from its context:
+Each surgical procedure instance is launched with a DomainParticipant partition derived
+from its context:
 
 ```
 Format:  room/<room_id>/procedure/<procedure_id>
@@ -331,21 +338,21 @@ Wildcard matching enables aggregation without special application logic:
 | `room/OR-*` | Subset monitoring | All rooms matching a name pattern |
 
 - Adding a new OR requires zero code or configuration changes beyond a different partition value at startup
-- Partition is always assigned from context (environment variable or startup config) — never hardcoded
+- Partition is always assigned from startup configuration (constructor parameters or configuration objects) — never hardcoded and never read from environment variables
 
 ### Publisher/Subscriber Partitions
 
-Publisher/Subscriber Partition QoS is **not used** in this system. All context-based isolation is handled by domain partitions. All data-content-based isolation is handled by content-filtered topics.
+Publisher/Subscriber Partition QoS is **not used** in this system. All context-based isolation is handled by DomainParticipant partitions. All data-content-based isolation is handled by content-filtered topics.
 
 If an application must operate across multiple contexts simultaneously, it should either:
-- Create multiple DomainParticipant entities (each with its own partition), or
-- Associate a single participant with multiple partitions explicitly
+- Create multiple DomainParticipant entities (each with its own DomainParticipant partition), or
+- Associate a single participant with multiple partition values in its `DomainParticipantQos.partition.name` list
 
 ### Content vs. Partition — Choosing the Right Tool
 
 | Isolation need | Tool |
 |----------------|------|
-| Which room/procedure a participant belongs to | Domain partition |
+| Which room/procedure a participant belongs to | DomainParticipant partition |
 | Filtering data by a field value (patient ID, device ID) | Content-filtered topic |
 | Separating criticality/risk class | Domain tag |
 | Separating data layers | Domain ID |
@@ -530,24 +537,21 @@ Only explicitly configured topics cross this boundary. Routing Service uses sepa
 
 ### Routing Service Partition Mapping
 
-On the **Procedure domain input side**, Routing Service joins with the wildcard partition
-`room/*/procedure/*` so it receives data from all rooms and procedures. This is the same
-mechanism used by any aggregating subscriber.
+On the **Procedure domain input side**, the Routing Service participant uses the wildcard
+DomainParticipant partition `room/*/procedure/*` so it discovers all procedure instances
+and receives data from all rooms.
 
-On the **Hospital domain output side**, Routing Service **preserves the source partition**.
-Data bridged from `room/OR-3/procedure/proc-001` is published on the Hospital domain with
-the same partition string. This enables:
+On the **Hospital domain output side**, the Routing Service output participant also uses
+DomainParticipant partition `room/*/procedure/*`. RTI Routing Service 7.6.0 does **not**
+automatically propagate participant-level partitions from the input participant to the output
+participant — see `incidents.md` INC-070. There is no `<propagation_qos>` element for
+participant-level partitions in RS 7.6.0. Both RS participants must be configured
+explicitly with matching wildcard partitions.
 
-- Hospital dashboard to use wildcard `room/*/procedure/*` for facility-wide aggregation
-- Content-filtered drill-down by room (filtering on the `ProcedureContext` room field) or
-  per-room partition narrowing if the dashboard creates multiple participants
-- Consistent partition semantics across both domains — the partition format
-  `room/<room_id>/procedure/<procedure_id>` is universal
-
-The Routing Service configuration specifies partition propagation via the
-`<propagation_qos>` element or by configuring the output DataWriter with
-the same partition expression as the matched input DataReader. No partition
-transformation or stripping is performed.
+Hospital domain consumers (e.g., the dashboard) subscribe with wildcard partition
+`room/*/procedure/*` and use content-based filtering on data fields (e.g.,
+`ProcedureContext.room_id`) to narrow to a specific room — room narrowing is an
+application-layer filter, not a partition change.
 
 Hospital-only topics (e.g., `ClinicalAlert`, `RiskScore`) that originate on the Hospital
 domain and are published directly by hospital-domain applications (ClinicalAlerts engine) do **not**

@@ -125,6 +125,7 @@ def _terminate_proc(proc, timeout=3):
 def _wait_for_catalog(host_ids, timeout=5):
     """Wait until ServiceCatalog samples from all host_ids appear."""
     qos = test_participant_qos()
+    qos.partition.name = ["procedure"]
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     dp.enable()
     topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -199,6 +200,7 @@ def all_service_hosts():
 def orch_participant():
     """Orchestration domain participant for E2E tests."""
     qos = test_participant_qos()
+    qos.partition.name = ["procedure"]
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     p.enable()
     yield p
@@ -373,6 +375,7 @@ class TestLivelinessDetection:
         # Create the monitoring reader FIRST, before starting the host,
         # so we are guaranteed to discover and match the host's writer.
         qos = test_participant_qos()
+        qos.partition.name = ["procedure"]
         dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
         dp.enable()
         topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -450,6 +453,7 @@ class TestOrchestrationFailureIsolation:
         """
         # Create a mock controller participant on the Orchestration domain
         ctrl_qos = test_participant_qos()
+        ctrl_qos.partition.name = ["procedure"]
         ctrl_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, ctrl_qos)
         ctrl_dp.enable()
 
@@ -504,53 +508,34 @@ class TestOrchestrationFailureIsolation:
 # ---------------------------------------------------------------------------
 
 
-class TestPartitionIsolation:
-    """Scenario: Orchestration partition scopes communication to an OR."""
+class TestTierPartitionIsolation:
+    """Scenario: Tier partition scopes Orchestration to the procedure tier."""
 
-    def test_or1_not_visible_to_or3_controller(self):
-        """A controller with partition room/OR-3 does not receive
-        ServiceCatalog from a host with partition room/OR-1."""
-        # Start a host on OR-1 partition
-        env = os.environ.copy()
-        env["HOST_ID"] = "partition-test-host"
-        env["ROOM_ID"] = "OR-1"
-        env["PROCEDURE_ID"] = "proc-part"
+    def test_facility_cannot_discover_procedure_tier(self, all_service_hosts):
+        """A participant on the 'facility' partition does NOT receive
+        ServiceCatalog from service hosts that publish on 'procedure'.
 
-        proc = subprocess.Popen(
-            ["python", "-m", "surgical_procedure.operator_service_host"],
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-        )
+        This verifies the static 'procedure' tier partition is enforced:
+        facility-tier observers cannot eavesdrop on procedure-tier data.
+        """
+        qos = test_participant_qos()
+        qos.partition.name = ["facility"]
+        dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
+        dp.enable()
         try:
-            assert _wait_for_catalog(
-                ["partition-test-host"], timeout=15
-            ), "Partition test host did not publish catalog"
-
-            # Create a reader on OR-3 partition
-            qos = test_participant_qos()
-            qos.partition.name = ["room/OR-3"]
-            dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
-            dp.enable()
             topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
             rqos = dds.DataReaderQos()
             rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
             rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
             reader = dds.DataReader(dds.Subscriber(dp), topic, rqos)
 
-            # Verify no data from OR-1 using negative wait
-            cond = dds.QueryCondition(
-                dds.Query(reader, "host_id = 'partition-test-host'"),
-                dds.DataState.any_data,
+            # A facility-tier participant must not receive any procedure-tier data
+            assert not wait_for_data(reader, timeout_sec=3, count=1), (
+                "facility partition participant received ServiceCatalog from "
+                "procedure-tier host — tier partition isolation is broken"
             )
-            assert not wait_for_data(reader, timeout_sec=1, conditions=[(cond, 1)]), (
-                "OR-3 controller received ServiceCatalog from OR-1 host — "
-                "partition isolation is broken"
-            )
-
-            dp.close()
         finally:
-            _terminate_proc(proc)
+            dp.close()
 
 
 # ---------------------------------------------------------------------------
@@ -566,6 +551,7 @@ class TestStateReconstruction:
         """A new Orchestration domain reader receives TRANSIENT_LOCAL
         ServiceCatalog and ServiceStatus from running hosts."""
         qos = test_participant_qos()
+        qos.partition.name = ["procedure"]
         dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
         dp.enable()
 

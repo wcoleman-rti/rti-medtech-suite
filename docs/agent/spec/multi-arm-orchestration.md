@@ -5,9 +5,10 @@ milestone: dynamic spawning, spatial assignment, and positioning of
 multiple robot arm services around a surgical table, with full lifecycle
 visibility from the Procedure Controller and digital twin display.
 
-All scenarios assume the Procedure domain `control` tag and partition
+All scenarios assume the Procedure domain `control` tag and DomainParticipant partition
 `room/<room_id>/procedure/<procedure_id>` unless stated otherwise.
-Orchestration domain scenarios use partition `room/<room_id>`.
+Orchestration domain scenarios use DomainParticipant partition `procedure` (tier partition,
+set statically at startup — see [spec/procedure-orchestration.md](procedure-orchestration.md)).
 
 ---
 
