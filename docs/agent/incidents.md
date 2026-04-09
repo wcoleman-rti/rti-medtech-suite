@@ -2522,3 +2522,71 @@ after closure. They form the project's decision log.
   and shoulder housing use `THEME_PALETTE["dark"]["arm"]`. Heatmap zero
   anchor is `#78909C`.
 - **Date closed:** 2026-04-09
+
+---
+
+## INC-081: `orch` / `orch_e2e` xdist groups run concurrently on domain 15 — CPU contention causes subprocess timeout
+
+- **Status:** Closed (mitigated; structural fix deferred)
+- **Category:** Test infrastructure / CI flakiness
+- **Date opened:** 2026-04-09
+- **Phase/Step:** Phase 20, Step 20.1 CI
+- **Documents involved:** `tests/integration/test_robot_service_host.py`,
+  `tests/integration/test_orchestration_e2e.py`
+- **Description:** `test_robot_service_host.py` uses `xdist_group("orch")` and
+  `test_orchestration_e2e.py` uses `xdist_group("orch_e2e")`. Because they are
+  *different* groups, pytest-xdist assigns them to different workers and runs
+  them simultaneously — both on domain 15 with the `procedure` partition. The
+  `orch_e2e` group launches the `all_service_hosts` module fixture (3–4 C++
+  processes), creating peak CPU/network load precisely when `test_robot_service_host.py`
+  (last alphabetically in the `orch` group) starts a `robot-service-host`
+  subprocess. The subprocess could not complete DDS participant initialization
+  and write its first ServiceCatalog sample within the 10 s fixture timeout.
+- **Root cause:** The `orch`/`orch_e2e` split was introduced in Step 20.0 to
+  prevent double-instantiation of the `all_service_hosts` module fixture
+  (putting both files in `orch` caused two fixture instances in different workers).
+  The side effect — concurrent domain-15 load — was not anticipated.
+- **Resolution (immediate):** Increased `robot_service_host` fixture timeout
+  from 10 s to 30 s (commit `83cfcaf`). This tolerates the contention without
+  eliminating it.
+- **Structural fix (deferred):** Merge `orch` and `orch_e2e` into a single
+  group and prevent double-fixture instantiation via a session-scoped sentinel
+  or `pytest-xdist` `--dist worksteal` with explicit fixture scoping. Requires
+  spec-level planning; file as future implementation step.
+- **Guideline:** Never create two xdist groups that share a DDS domain and
+  where one group's module fixture launches external processes. Either use the
+  same group (serialized) or use different domain IDs.
+- **Date closed:** 2026-04-09
+
+---
+
+## INC-082: Partition isolation tests using BEST_EFFORT QoS — wrong abstraction, load-induced flakiness
+
+- **Status:** Closed
+- **Category:** Test design / CI flakiness
+- **Date opened:** 2026-04-09
+- **Phase/Step:** Phase 20, Step 20.1 CI
+- **Documents involved:** `tests/integration/test_partition_isolation.py`
+- **Description:** `TestWildcardPartition::test_wildcard_receives_from_multiple`
+  and `TestSamePartition::test_same_partition_exchanges_data` used default
+  `DataWriterQos()` / `DataReaderQos()`, which is BEST_EFFORT VOLATILE. Under
+  full CI load (8 parallel workers), single BEST_EFFORT UDP samples written
+  immediately after `wait_for_discovery()` were dropped by the OS socket
+  buffer before the reader thread was scheduled. The test then failed with
+  "Priming samples should arrive" or "Should receive from both OR-3 and OR-5".
+  Multiple workaround attempts (burst write, extended timeouts, priming step)
+  were applied before identifying the root cause.
+- **Root cause:** These tests validate DDS *partition matching* semantics
+  (does wildcard `room/*` match `room/OR-3/...`?), not delivery probability.
+  BEST_EFFORT is the wrong QoS for any test with a delivery assertion —
+  it introduces non-determinism that has nothing to do with the behavior
+  under test.
+- **Resolution:** Both tests now use `ReliabilityKind.RELIABLE` on writer and
+  reader. RELIABLE on loopback guarantees delivery once matching is confirmed,
+  making the test deterministic regardless of CPU load (commit `13ff4a4`).
+  A single write per source is sufficient; burst size reduced back to 1.
+- **Guideline:** Any test that makes a `wait_for_data` assertion MUST use
+  RELIABLE QoS (or document explicitly why BEST_EFFORT is acceptable for the
+  specific behavior under test). BEST_EFFORT is appropriate only for tests
+  that explicitly test best-effort drop/loss behavior.
+- **Date closed:** 2026-04-09
