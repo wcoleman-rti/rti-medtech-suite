@@ -31,6 +31,7 @@ from medtech.gui._colors import OPACITY
 from medtech.log import ModuleName, init_logging
 from nicegui import background_tasks, run, ui
 from orchestration import Orchestration
+from surgery import Surgery
 
 dash_names = app_names.MedtechEntityNames.OrchestrationParticipants
 surg_names = app_names.MedtechEntityNames.SurgicalParticipants
@@ -93,6 +94,7 @@ class ControllerBackend(GuiBackend):
         self._catalogs: dict[tuple[str, str], Orchestration.ServiceCatalog] = {}
         self._service_states: dict[tuple[str, str], Orchestration.ServiceStatus] = {}
         self._pub_handle_to_host: dict[dds.InstanceHandle, str] = {}
+        self._arm_states: dict[str, Surgery.RobotArmAssignment] = {}
         self._view = _ViewState()
         self._diag_log: list[str] = []
         self._max_log_entries = 200
@@ -213,7 +215,40 @@ class ControllerBackend(GuiBackend):
         """Set the procedure filter (None = all procedures)."""
         self._view.procedure_filter = procedure_id
 
+    @property
+    def arm_states(self) -> dict[str, Surgery.RobotArmAssignment]:
+        """Current arm assignment states keyed by robot_id."""
+        return dict(self._arm_states)
+
+    @property
+    def active_arm_count(self) -> int:
+        """Number of currently tracked (non-disposed) arms."""
+        return len(self._arm_states)
+
+    @property
+    def procedure_ready(self) -> bool:
+        """True when at least one arm is tracked and all are OPERATIONAL."""
+        if not self._arm_states:
+            return False
+        return all(
+            arm.status == Surgery.ArmAssignmentState.OPERATIONAL
+            for arm in self._arm_states.values()
+        )
+
+    def non_ready_arms(self) -> dict[str, str]:
+        """Return {robot_id: state_name} for tracked arms not yet OPERATIONAL."""
+        result: dict[str, str] = {}
+        for robot_id, arm in self._arm_states.items():
+            if arm.status != Surgery.ArmAssignmentState.OPERATIONAL:
+                result[robot_id] = str(arm.status).rsplit(".", 1)[-1]
+        return result
+
     async def start_service(self, host_id: str, service_id: str) -> None:
+        if self.active_arm_count >= Surgery.MAX_ARM_COUNT:
+            self._log_diag(
+                f"start_service rejected: MAX_ARM_COUNT ({Surgery.MAX_ARM_COUNT}) exceeded"
+            )
+            return
         await self._do_rpc(host_id, _make_start_call(service_id), "start_service")
 
     async def stop_service(self, host_id: str, service_id: str) -> None:
@@ -306,7 +341,7 @@ class ControllerBackend(GuiBackend):
             )
 
         proc_qos = self._proc_control_participant.qos
-        proc_qos.partition.name = ["procedure"]
+        proc_qos.partition.name = [f"room/{self._room_id}/procedure/*"]
         self._proc_control_participant.qos = proc_qos
         self._proc_control_participant.enable()
 
@@ -324,6 +359,8 @@ class ControllerBackend(GuiBackend):
             background_tasks.create(self._monitor_liveliness()),
             background_tasks.create(self._ui_consistency_sweep()),
         ]
+        if self._arm_assignment_reader is not None:
+            self._tasks.append(background_tasks.create(self._receive_arm_assignments()))
         self._mark_ready()
 
     async def close(self) -> None:
@@ -436,6 +473,40 @@ class ControllerBackend(GuiBackend):
         async for sample in self._status_reader.take_data_async():
             self._update_service_status(sample)
 
+    async def _receive_arm_assignments(self) -> None:
+        async for sample in self._arm_assignment_reader.take_async():
+            if sample.info.valid:
+                self._update_arm_assignment(sample.data)
+            elif sample.info.state.instance_state in (
+                dds.InstanceState.NOT_ALIVE_DISPOSED,
+                dds.InstanceState.NOT_ALIVE_NO_WRITERS,
+            ):
+                key_holder = self._arm_assignment_reader.key_value(
+                    sample.info.instance_handle
+                )
+                rid = key_holder.robot_id
+                if rid in self._arm_states:
+                    del self._arm_states[rid]
+                    reason = (
+                        "disposed"
+                        if sample.info.state.instance_state
+                        == dds.InstanceState.NOT_ALIVE_DISPOSED
+                        else "no writers"
+                    )
+                    self._log_diag(f"Arm {rid} removed ({reason})")
+
+    def _update_arm_assignment(self, data: Surgery.RobotArmAssignment) -> None:
+        prev = self._arm_states.get(data.robot_id)
+        self._arm_states[data.robot_id] = data
+        status_name = str(data.status).rsplit(".", 1)[-1]
+        if prev is None:
+            self._log_diag(
+                f"Arm {data.robot_id} tracked: {status_name} "
+                f"at {str(data.table_position).rsplit('.', 1)[-1]}"
+            )
+        elif prev.status != data.status:
+            self._log_diag(f"Arm {data.robot_id} → {status_name}")
+
     async def _monitor_liveliness(self) -> None:
         status_condition = dds.StatusCondition(self._catalog_reader)
         status_condition.enabled_statuses = dds.StatusMask.LIVELINESS_CHANGED
@@ -483,6 +554,22 @@ class ControllerBackend(GuiBackend):
                     self._update_service_status(sample.data)
         except dds.AlreadyClosedError:
             pass
+
+        if self._arm_assignment_reader is not None:
+            try:
+                for sample in self._arm_assignment_reader.take():
+                    if sample.info.valid:
+                        self._update_arm_assignment(sample.data)
+                    elif sample.info.state.instance_state in (
+                        dds.InstanceState.NOT_ALIVE_DISPOSED,
+                        dds.InstanceState.NOT_ALIVE_NO_WRITERS,
+                    ):
+                        key_holder = self._arm_assignment_reader.key_value(
+                            sample.info.instance_handle
+                        )
+                        self._arm_states.pop(key_holder.robot_id, None)
+            except dds.AlreadyClosedError:
+                pass
 
     async def _do_rpc(self, host_id: str, call: object, op_name: str) -> None:
         try:
