@@ -29,5 +29,6 @@ markers = [
     "routing: tests for Routing Service configuration and bridging",
     "filtering: tests for content-filtered topics",
     "dashboard: tests for the Hospital Dashboard GUI module",
+    "multi_arm: multi-arm orchestration and rendering tests (Phase 20)",
     "unit: tests runnable with a single component in isolation",
 ]

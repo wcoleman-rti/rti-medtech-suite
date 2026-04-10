@@ -227,9 +227,28 @@ services:
     environment:
       <<: *medtech-env
       HOST_ID: "robot-host-or1"
+      ROBOT_ID: "arm-or1-a"
       ROOM_ID: "OR-1"
       PROCEDURE_ID: "OR1-001"
       MEDTECH_APP_NAME: "robot-service-host-or1"
+    volumes: *config-volumes
+    networks:
+      - surgical-net
+    depends_on:
+      cloud-discovery-service:
+        condition: service_healthy
+
+  robot-service-host-or1-b:
+    image: medtech/app-cpp
+    container_name: robot-service-host-or1-b
+    command: ["/opt/medtech/bin/robot-service-host"]
+    environment:
+      <<: *medtech-env
+      HOST_ID: "robot-host-or1-b"
+      ROBOT_ID: "arm-or1-b"
+      ROOM_ID: "OR-1"
+      PROCEDURE_ID: "OR1-001"
+      MEDTECH_APP_NAME: "robot-service-host-or1-b"
     volumes: *config-volumes
     networks:
       - surgical-net
