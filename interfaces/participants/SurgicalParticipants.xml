@@ -83,7 +83,7 @@
 
         <!--
             ControlRobot — control tag (robot controller)
-            Publishes: RobotState
+            Publishes: RobotState, RobotArmAssignment
             Subscribes: OperatorInput, RobotCommand, SafetyInterlock
             Used by: robot controller (C++)
         -->
@@ -105,6 +105,11 @@
                 <data_writer name="RobotStateWriter"
                              topic_ref="RobotState">
                     <datawriter_qos base_name="TopicProfiles::RobotState"/>
+                </data_writer>
+
+                <data_writer name="RobotArmAssignmentWriter"
+                             topic_ref="RobotArmAssignment">
+                    <datawriter_qos base_name="TopicProfiles::RobotArmAssignment"/>
                 </data_writer>
             </publisher>
 

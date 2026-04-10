@@ -16,10 +16,13 @@
 namespace medtech::surgical {
 
 /// Create a RobotControllerService.  Returns a medtech::Service pointer.
+/// @param table_position  Table position string (e.g. "LEFT", "RIGHT").
+///                        Empty string defaults to UNKNOWN.
 std::unique_ptr<medtech::Service> make_robot_controller_service(
     const std::string& robot_id,
     const std::string& room_id,
     const std::string& procedure_id,
+    const std::string& table_position,
     medtech::ModuleLogger& log);
 
 }  // namespace medtech::surgical

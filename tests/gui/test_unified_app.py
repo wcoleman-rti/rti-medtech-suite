@@ -310,7 +310,7 @@ class TestHealthProbe:
         """health() returns HTTP 200."""
         from medtech.gui.app import health
 
-        response = asyncio.get_event_loop().run_until_complete(health())
+        response = asyncio.run(health())
         assert response.status_code == 200
 
     def test_health_returns_ok_body(self) -> None:
@@ -319,7 +319,7 @@ class TestHealthProbe:
 
         from medtech.gui.app import health
 
-        response = asyncio.get_event_loop().run_until_complete(health())
+        response = asyncio.run(health())
         body = json.loads(response.body)
         assert body == {"status": "ok"}
 
@@ -337,7 +337,7 @@ class TestReadinessProbe:
         """Returns 200 when no backends are registered (vacuously ready)."""
         from medtech.gui.app import ready
 
-        response = asyncio.get_event_loop().run_until_complete(ready())
+        response = asyncio.run(ready())
         assert response.status_code == 200
 
     def test_ready_503_when_backend_not_ready(
@@ -360,7 +360,7 @@ class TestReadinessProbe:
                 pass
 
         SlowBackend()
-        response = asyncio.get_event_loop().run_until_complete(ready())
+        response = asyncio.run(ready())
         assert response.status_code == 503
 
     def test_ready_503_body_contains_not_ready(
@@ -385,7 +385,7 @@ class TestReadinessProbe:
                 pass
 
         UnreadyBackend()
-        response = asyncio.get_event_loop().run_until_complete(ready())
+        response = asyncio.run(ready())
         body = json.loads(response.body)
         assert body == {"status": "not ready"}
 
@@ -412,7 +412,7 @@ class TestReadinessProbe:
 
         b = InstantBackend()
         b._mark_ready()
-        response = asyncio.get_event_loop().run_until_complete(ready())
+        response = asyncio.run(ready())
         assert response.status_code == 200
         body = json.loads(response.body)
         assert body == {"status": "ready"}

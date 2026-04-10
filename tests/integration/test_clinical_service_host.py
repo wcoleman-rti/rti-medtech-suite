@@ -19,6 +19,7 @@ import time
 import pytest
 import rti.connextdds as dds
 from conftest import (
+    make_get_capabilities_call,
     make_start_call,
     make_stop_call,
     send_rpc,
@@ -220,10 +221,7 @@ class TestClinicalRpcControl:
     def test_get_capabilities(self, clinical_service_host, rpc_requester):
         """get_capabilities returns both clinical services."""
         wait_for_replier(rpc_requester, timeout_sec=10)
-        call = Orchestration.ServiceHostControl.call_type()
-        call.get_capabilities = Orchestration.ServiceHostControl.call_type.in_structs[
-            -385927898
-        ][1]()
+        call = make_get_capabilities_call()
         reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for get_capabilities"
         result = reply.get_capabilities.result.return_

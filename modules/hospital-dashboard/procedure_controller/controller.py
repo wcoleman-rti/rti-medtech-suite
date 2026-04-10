@@ -1289,10 +1289,19 @@ def main() -> None:
 ProcedureController = ControllerBackend
 
 
+def _rpc_in_type(op_name: str):
+    """Look up the In struct type for an RPC operation by name."""
+    ct = Orchestration.ServiceHostControl.call_type
+    for _hash, (name, cls) in ct.in_structs.items():
+        if name == op_name:
+            return cls
+    raise ValueError(f"Unknown RPC operation: {op_name}")
+
+
 def _make_start_call(service_id: str) -> object:
     call_type = Orchestration.ServiceHostControl.call_type
     call = call_type()
-    _in = call_type.in_structs[-522153841][1]()
+    _in = _rpc_in_type("start_service")()
     _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=[])
     call.start_service = _in
     return call
@@ -1301,7 +1310,7 @@ def _make_start_call(service_id: str) -> object:
 def _make_stop_call(service_id: str) -> object:
     call_type = Orchestration.ServiceHostControl.call_type
     call = call_type()
-    _in = call_type.in_structs[123337698][1]()
+    _in = _rpc_in_type("stop_service")()
     _in.service_id = service_id
     call.stop_service = _in
     return call
@@ -1310,21 +1319,21 @@ def _make_stop_call(service_id: str) -> object:
 def _make_get_capabilities_call() -> object:
     call_type = Orchestration.ServiceHostControl.call_type
     call = call_type()
-    call.get_capabilities = call_type.in_structs[-385927898][1]()
+    call.get_capabilities = _rpc_in_type("get_capabilities")()
     return call
 
 
 def _make_get_health_call() -> object:
     call_type = Orchestration.ServiceHostControl.call_type
     call = call_type()
-    call.get_health = call_type.in_structs[-1076937166][1]()
+    call.get_health = _rpc_in_type("get_health")()
     return call
 
 
 def _make_update_call(service_id: str, properties: list | None = None) -> object:
     call_type = Orchestration.ServiceHostControl.call_type
     call = call_type()
-    _in = call_type.in_structs[312505061][1]()
+    _in = _rpc_in_type("update_service")()
     _in.req = Orchestration.ServiceRequest(
         service_id=service_id, properties=properties or []
     )

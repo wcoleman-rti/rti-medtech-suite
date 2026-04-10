@@ -31,6 +31,7 @@ module MedtechEntityNames {
         const string CAMERA_FRAME_WRITER       = "OperationalPublisher::CameraFrameWriter";
         const string CAMERA_CONFIG_WRITER      = "OperationalPublisher::CameraConfigWriter";
         const string ROBOT_STATE_WRITER        = "RobotPublisher::RobotStateWriter";
+        const string ROBOT_ARM_ASSIGNMENT_WRITER = "RobotPublisher::RobotArmAssignmentWriter";
         const string OPERATOR_INPUT_WRITER     = "OperatorPublisher::OperatorInputWriter";
         const string ROBOT_COMMAND_WRITER      = "OperatorPublisher::RobotCommandWriter";
         const string SAFETY_INTERLOCK_WRITER   = "OperatorPublisher::SafetyInterlockWriter";

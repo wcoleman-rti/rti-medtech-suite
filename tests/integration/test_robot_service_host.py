@@ -19,6 +19,8 @@ import subprocess
 import pytest
 import rti.connextdds as dds
 from conftest import (
+    make_get_capabilities_call,
+    make_get_health_call,
     make_start_call,
     make_stop_call,
     send_rpc,
@@ -258,12 +260,7 @@ class TestRpcServiceControl:
     def test_get_capabilities(self, robot_service_host, rpc_requester):
         """get_capabilities returns supported services."""
         wait_for_replier(rpc_requester, timeout_sec=10)
-        call = Orchestration.ServiceHostControl.call_type()
-        # get_capabilities takes no parameters — use the In struct directly
-        # The union discriminator selects get_capabilities when set
-        call.get_capabilities = Orchestration.ServiceHostControl.call_type.in_structs[
-            -385927898
-        ][1]()
+        call = make_get_capabilities_call()
         reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for get_capabilities"
         result = reply.get_capabilities.result.return_
@@ -272,10 +269,7 @@ class TestRpcServiceControl:
     def test_get_health(self, robot_service_host, rpc_requester):
         """get_health returns alive=True."""
         wait_for_replier(rpc_requester, timeout_sec=10)
-        call = Orchestration.ServiceHostControl.call_type()
-        call.get_health = Orchestration.ServiceHostControl.call_type.in_structs[
-            -1076937166
-        ][1]()
+        call = make_get_health_call()
         reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for get_health"
         result = reply.get_health.result.return_
@@ -327,19 +321,18 @@ class TestRpcServiceControl:
     def test_stop_service_ok(self, robot_service_host, rpc_requester, status_reader):
         """stop_service stops the running service and publishes STOPPED."""
         wait_for_replier(rpc_requester, timeout_sec=10)
+
         call = make_stop_call("RobotControllerService")
         reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for stop_service"
         result = reply.stop_service.result.return_
         assert result.code == Orchestration.OperationResultCode.OK
 
-        # Verify STOPPED state published
         assert wait_for_status(
             status_reader,
             HOST_ID,
             "RobotControllerService",
             Orchestration.ServiceState.STOPPED,
-            timeout_sec=10.0,
         ), "ServiceStatus never reached STOPPED after stop"
 
 

@@ -334,30 +334,31 @@ def wait_for_data(reader, timeout_sec=1.0, count=1, conditions=None):
 def wait_for_status(reader, host_id, service_id, target_state, timeout_sec=5.0):
     """Wait for a ServiceStatus sample matching host/service/state.
 
-    Uses a ReadCondition(NOT_READ, ANY, ALIVE) + WaitSet to avoid
-    wakeups from already-consumed transitions.  Samples are taken
-    (consumed) so repeated calls see only new transitions.
+    Uses a QueryCondition with a content filter so only matching samples
+    are taken — non-matching samples remain in the reader cache for
+    other callers.
     """
-    condition = dds.ReadCondition(
-        reader,
+    qc = dds.QueryCondition(
+        dds.Query(
+            reader,
+            f"host_id = '{host_id}'"
+            f" AND service_id = '{service_id}'"
+            f" AND state = {int(target_state)}",
+        ),
         dds.DataState(
-            dds.SampleState.NOT_READ,
+            dds.SampleState.ANY,
             dds.ViewState.ANY,
             dds.InstanceState.ALIVE,
         ),
     )
     waitset = dds.WaitSet()
-    waitset += condition
+    waitset += qc
 
     deadline = time.monotonic() + timeout_sec
     while True:
-        for sample in reader.select().condition(condition).take_data():
-            if (
-                sample.host_id == host_id
-                and sample.service_id == service_id
-                and sample.state == target_state
-            ):
-                return True
+        samples = reader.select().condition(qc).take_data()
+        if len(samples) > 0:
+            return True
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             return False
@@ -375,8 +376,8 @@ def wait_for_all_states(reader, expected, timeout_sec=5.0):
     pairs that did **not** reach the target state before the deadline.
     An empty set means all succeeded.
 
-    Unlike sequential ``wait_for_status`` calls, this function processes
-    all targets in a single take loop so no samples are silently discarded.
+    Uses a ReadCondition for wakeup but checks each target individually
+    so non-matching samples are not consumed.
     """
     remaining = dict(expected)
     condition = dds.ReadCondition(
@@ -439,13 +440,28 @@ def send_rpc(requester, call, timeout_sec=10):
 # -------------------------------------------------------------------
 
 
+def _rpc_in_type(op_name: str):
+    """Look up the In struct type for an RPC operation by name.
+
+    Avoids hard-coding IDL-generated hash discriminators which change
+    when the IDL is regenerated.
+    """
+    from orchestration import Orchestration
+
+    ct = Orchestration.ServiceHostControl.call_type
+    for _hash, (name, cls) in ct.in_structs.items():
+        if name == op_name:
+            return cls
+    raise ValueError(f"Unknown RPC operation: {op_name}")
+
+
 def make_start_call(service_id: str):
     """Build an RPC call to start_service."""
     from orchestration import Orchestration
 
     ct = Orchestration.ServiceHostControl.call_type
     call = ct()
-    _in = ct.in_structs[-522153841][1]()
+    _in = _rpc_in_type("start_service")()
     _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=[])
     call.start_service = _in
     return call
@@ -457,7 +473,27 @@ def make_stop_call(service_id: str):
 
     ct = Orchestration.ServiceHostControl.call_type
     call = ct()
-    _in = ct.in_structs[123337698][1]()
+    _in = _rpc_in_type("stop_service")()
     _in.service_id = service_id
     call.stop_service = _in
+    return call
+
+
+def make_get_capabilities_call():
+    """Build an RPC call to get_capabilities."""
+    from orchestration import Orchestration
+
+    ct = Orchestration.ServiceHostControl.call_type
+    call = ct()
+    call.get_capabilities = _rpc_in_type("get_capabilities")()
+    return call
+
+
+def make_get_health_call():
+    """Build an RPC call to get_health."""
+    from orchestration import Orchestration
+
+    ct = Orchestration.ServiceHostControl.call_type
+    call = ct()
+    call.get_health = _rpc_in_type("get_health")()
     return call

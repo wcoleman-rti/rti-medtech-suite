@@ -25,6 +25,19 @@ namespace medtech::surgical {
 
 namespace {
 
+// Parse a string to Surgery::TablePosition (case-insensitive).
+Surgery::TablePosition parse_table_position(const std::string& s) {
+    if (s == "HEAD")       return Surgery::TablePosition::HEAD;
+    if (s == "FOOT")       return Surgery::TablePosition::FOOT;
+    if (s == "LEFT")       return Surgery::TablePosition::LEFT;
+    if (s == "RIGHT")      return Surgery::TablePosition::RIGHT;
+    if (s == "LEFT_HEAD")  return Surgery::TablePosition::LEFT_HEAD;
+    if (s == "RIGHT_HEAD") return Surgery::TablePosition::RIGHT_HEAD;
+    if (s == "LEFT_FOOT")  return Surgery::TablePosition::LEFT_FOOT;
+    if (s == "RIGHT_FOOT") return Surgery::TablePosition::RIGHT_FOOT;
+    return Surgery::TablePosition::UNKNOWN;
+}
+
 // ---------------------------------------------------------------------------
 // RobotControllerService — canonical C++ service per dds-consistency.md §3.
 //
@@ -37,9 +50,12 @@ public:
     RobotControllerService(const std::string& robot_id,
                            const std::string& room_id,
                            const std::string& procedure_id,
+                           const std::string& table_position_str,
                            medtech::ModuleLogger& log)
         : controller_("robot-" + robot_id), log_(log),
-          svc_state_(Orchestration::ServiceState::STOPPED)
+          svc_state_(Orchestration::ServiceState::STOPPED),
+          robot_id_(robot_id), procedure_id_(procedure_id),
+          table_position_(parse_table_position(table_position_str))
     {
         const std::string partition =
             "room/" + room_id + "/procedure/" + procedure_id;
@@ -74,10 +90,16 @@ public:
                 dds::sub::DataReader<Surgery::OperatorInput>>(
                 participant_, std::string(names::OPERATOR_INPUT_READER));
 
+        assignment_writer_ =
+            rti::pub::find_datawriter_by_name<
+                dds::pub::DataWriter<Surgery::RobotArmAssignment>>(
+                participant_, std::string(names::ROBOT_ARM_ASSIGNMENT_WRITER));
+
         if (state_writer_ == dds::core::null
             || interlock_reader_ == dds::core::null
             || command_reader_ == dds::core::null
-            || input_reader_ == dds::core::null) {
+            || input_reader_ == dds::core::null
+            || assignment_writer_ == dds::core::null) {
             throw std::runtime_error(
                 "Failed to find one or more named DDS entities");
         }
@@ -149,9 +171,35 @@ public:
         start();
         svc_state_.store(Orchestration::ServiceState::RUNNING,
                          std::memory_order_release);
+
+        // Publish arm assignment lifecycle: ASSIGNED → POSITIONING → OPERATIONAL
+        // Each phase checks running_ so stop() is handled promptly.
+        publish_assignment(Surgery::ArmAssignmentState::ASSIGNED);
+
+        // Brief pause for ASSIGNED to propagate before transitioning
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        if (running_.load(std::memory_order_relaxed)) {
+            publish_assignment(Surgery::ArmAssignmentState::POSITIONING);
+
+            // Simulate positioning delay (2 seconds)
+            for (int i = 0; i < 20 && running_.load(std::memory_order_relaxed); ++i) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        }
+
+        if (running_.load(std::memory_order_relaxed)) {
+            publish_assignment(Surgery::ArmAssignmentState::OPERATIONAL);
+        }
+
         wait_for_shutdown();
+
         svc_state_.store(Orchestration::ServiceState::STOPPING,
                          std::memory_order_release);
+
+        // Dispose the assignment instance on shutdown
+        dispose_assignment();
+
         svc_state_.store(Orchestration::ServiceState::STOPPED,
                          std::memory_order_release);
     }
@@ -209,6 +257,26 @@ private:
         log_.notice("Shutting down robot controller");
     }
 
+    void publish_assignment(Surgery::ArmAssignmentState new_status)
+    {
+        assignment_status_ = new_status;
+        Surgery::RobotArmAssignment sample(
+            robot_id_, procedure_id_, table_position_,
+            assignment_status_, "robot-controller");
+        assignment_writer_.write(sample);
+        log_.notice("Arm assignment: " + robot_id_ + " -> "
+                    + std::to_string(static_cast<int>(new_status)));
+    }
+
+    void dispose_assignment()
+    {
+        Surgery::RobotArmAssignment key;
+        key.robot_id = robot_id_;
+        auto handle = assignment_writer_.register_instance(key);
+        assignment_writer_.dispose_instance(handle);
+        log_.notice("Arm assignment disposed: " + robot_id_);
+    }
+
     // Members declared in construction order; destroyed in reverse.
     RobotController controller_;
     medtech::ModuleLogger& log_;
@@ -218,6 +286,7 @@ private:
 
     dds::domain::DomainParticipant participant_{nullptr};
     dds::pub::DataWriter<Surgery::RobotState> state_writer_{nullptr};
+    dds::pub::DataWriter<Surgery::RobotArmAssignment> assignment_writer_{nullptr};
     dds::sub::DataReader<Surgery::SafetyInterlock> interlock_reader_{nullptr};
     dds::sub::DataReader<Surgery::RobotCommand> command_reader_{nullptr};
     dds::sub::DataReader<Surgery::OperatorInput> input_reader_{nullptr};
@@ -228,6 +297,13 @@ private:
 
     rti::core::cond::AsyncWaitSet sub_aws_;
     std::thread timer_thread_;
+
+    // Arm assignment state
+    std::string robot_id_;
+    std::string procedure_id_;
+    Surgery::TablePosition table_position_;
+    Surgery::ArmAssignmentState assignment_status_{
+        Surgery::ArmAssignmentState::UNKNOWN};
 };
 
 }  // anonymous namespace
@@ -236,10 +312,11 @@ std::unique_ptr<medtech::Service> make_robot_controller_service(
     const std::string& robot_id,
     const std::string& room_id,
     const std::string& procedure_id,
+    const std::string& table_position,
     medtech::ModuleLogger& log)
 {
     return std::make_unique<RobotControllerService>(
-        robot_id, room_id, procedure_id, log);
+        robot_id, room_id, procedure_id, table_position, log);
 }
 
 }  // namespace medtech::surgical

@@ -201,21 +201,23 @@ public:
             return result;
         }
 
-        slot_it->second.service->stop();
-
-        // Join the service's run thread and destroy the service off the
-        // RPC handler's AsyncWaitSet thread (avoids level-nesting deadlock).
-        // Keep the slot so the status polling loop can detect the STOPPED
-        // transition and publish ServiceStatus. start_service clears
-        // stale STOPPED/FAILED slots before creating a new service.
         {
-            auto& slot_ref = slot_it->second;
-            std::thread joiner([&slot_ref]() {
-                if (slot_ref.thread.joinable()) {
-                    slot_ref.thread.join();
-                }
-            });
-            joiner.join();
+            slot_it->second.service->stop();
+
+            // Join the service's run thread and destroy the service off the
+            // RPC handler's AsyncWaitSet thread (avoids level-nesting deadlock).
+            // Keep the slot so the status polling loop can detect the STOPPED
+            // transition and publish ServiceStatus. start_service clears
+            // stale STOPPED/FAILED slots before creating a new service.
+            {
+                auto& slot_ref = slot_it->second;
+                std::thread joiner([&slot_ref]() {
+                    if (slot_ref.thread.joinable()) {
+                        slot_ref.thread.join();
+                    }
+                });
+                joiner.join();
+            }
         }
 
         result.code = Orchestration::OperationResultCode::OK;
