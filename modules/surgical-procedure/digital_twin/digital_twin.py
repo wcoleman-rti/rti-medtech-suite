@@ -5,10 +5,11 @@ robot visualization in the browser.  Data reception uses rti.asyncio async
 generators so DDS reads never block the NiceGUI event loop.
 
 Subscriptions:
-  - RobotState        (GuiRobotState QoS — TBF 100 ms)
-  - OperatorInput     (GuiOperatorInput QoS — TBF 100 ms)
-  - SafetyInterlock   (SafetyInterlock QoS — no TBF, safety-critical)
-  - RobotCommand      (RobotCommand QoS — no TBF, command delivery)
+  - RobotState              (GuiRobotState QoS — TBF 100 ms)
+  - OperatorInput           (GuiOperatorInput QoS — TBF 100 ms)
+  - SafetyInterlock         (SafetyInterlock QoS — no TBF, safety-critical)
+  - RobotCommand            (RobotCommand QoS — no TBF, command delivery)
+  - RobotArmAssignment      (RobotArmAssignment QoS — state-based, every sample)
 
 Connectivity monitoring: a liveliness coroutine polls
 ``reader.liveliness_changed_status`` and updates ``connected`` state.
@@ -54,6 +55,9 @@ RobotState = surgery.Surgery.RobotState
 RobotCommand = surgery.Surgery.RobotCommand
 SafetyInterlock = surgery.Surgery.SafetyInterlock
 OperatorInput = surgery.Surgery.OperatorInput
+RobotArmAssignment = surgery.Surgery.RobotArmAssignment
+ArmAssignmentState = surgery.Surgery.ArmAssignmentState
+TablePosition = surgery.Surgery.TablePosition
 
 # Heatmap angle range (degrees → full color saturation)
 _HEATMAP_ANGLE_MAX = 180.0
@@ -149,6 +153,50 @@ _MODE_COLORS: dict[str, str] = {
     "E-STOP": BRAND_COLORS["red"],
     "IDLE": BRAND_COLORS["gray"],
     "UNKNOWN": BRAND_COLORS["light_gray"],
+}
+
+# Color mapping for ArmAssignmentState lifecycle indicators
+_ARM_STATE_COLORS: dict[int, str] = {
+    int(ArmAssignmentState.OPERATIONAL): BRAND_COLORS["green"],
+    int(ArmAssignmentState.POSITIONING): BRAND_COLORS["amber"],
+    int(ArmAssignmentState.FAILED): BRAND_COLORS["red"],
+    int(ArmAssignmentState.IDLE): BRAND_COLORS["gray"],
+    int(ArmAssignmentState.ASSIGNED): BRAND_COLORS["gray"],
+    int(ArmAssignmentState.UNKNOWN): BRAND_COLORS["gray"],
+}
+
+_ARM_STATE_LABELS: dict[int, str] = {
+    int(ArmAssignmentState.UNKNOWN): "UNKNOWN",
+    int(ArmAssignmentState.IDLE): "IDLE",
+    int(ArmAssignmentState.ASSIGNED): "ASSIGNED",
+    int(ArmAssignmentState.POSITIONING): "POSITIONING",
+    int(ArmAssignmentState.OPERATIONAL): "OPERATIONAL",
+    int(ArmAssignmentState.FAILED): "FAILED",
+}
+
+_TABLE_POSITION_LABELS: dict[int, str] = {
+    int(TablePosition.UNKNOWN): "Unknown",
+    int(TablePosition.HEAD): "Head",
+    int(TablePosition.FOOT): "Foot",
+    int(TablePosition.LEFT): "Left",
+    int(TablePosition.RIGHT): "Right",
+    int(TablePosition.LEFT_HEAD): "Left-Head",
+    int(TablePosition.RIGHT_HEAD): "Right-Head",
+    int(TablePosition.LEFT_FOOT): "Left-Foot",
+    int(TablePosition.RIGHT_FOOT): "Right-Foot",
+}
+
+# Map TablePosition enum values to _ARM_SLOTS indices for scene placement.
+# Positions not listed fall back to round-robin slot allocation.
+_TABLE_POSITION_SLOT: dict[int, int] = {
+    int(TablePosition.RIGHT): 0,  # Near-right
+    int(TablePosition.LEFT): 1,  # Near-left
+    int(TablePosition.RIGHT_HEAD): 0,
+    int(TablePosition.RIGHT_FOOT): 2,
+    int(TablePosition.LEFT_HEAD): 1,
+    int(TablePosition.LEFT_FOOT): 3,
+    int(TablePosition.HEAD): 1,
+    int(TablePosition.FOOT): 2,
 }
 
 
@@ -349,6 +397,7 @@ class DigitalTwinBackend(GuiBackend):
         robot_command_reader: dds.DataReader | None = None,
         safety_interlock_reader: dds.DataReader | None = None,
         operator_input_reader: dds.DataReader | None = None,
+        arm_assignment_reader: dds.DataReader | None = None,
     ) -> None:
         self.room_id = room_id
         self.procedure_id = procedure_id
@@ -363,6 +412,9 @@ class DigitalTwinBackend(GuiBackend):
         self.interlock_reason: str = ""
         self.has_command: bool = False
 
+        # ---- Multi-arm tracking ------------------------------------------
+        self.arm_assignments: dict[str, RobotArmAssignment] = {}
+
         # ---- Internal -------------------------------------------------------
         self._running: bool = False
         self._tasks: list[asyncio.Task[Any]] = []
@@ -373,6 +425,7 @@ class DigitalTwinBackend(GuiBackend):
         self._robot_command_reader = robot_command_reader
         self._safety_interlock_reader = safety_interlock_reader
         self._operator_input_reader = operator_input_reader
+        self._arm_assignment_reader = arm_assignment_reader
 
         if not self._all_readers_injected:
             self._init_dds(room_id, procedure_id)
@@ -400,6 +453,7 @@ class DigitalTwinBackend(GuiBackend):
                 self._robot_command_reader,
                 self._safety_interlock_reader,
                 self._operator_input_reader,
+                self._arm_assignment_reader,
             )
         )
 
@@ -430,6 +484,9 @@ class DigitalTwinBackend(GuiBackend):
         self._robot_command_reader = _find_reader(names.TWIN_ROBOT_COMMAND_READER)
         self._safety_interlock_reader = _find_reader(names.TWIN_SAFETY_INTERLOCK_READER)
         self._operator_input_reader = _find_reader(names.TWIN_OPERATOR_INPUT_READER)
+        self._arm_assignment_reader = _find_reader(
+            names.TWIN_ROBOT_ARM_ASSIGNMENT_READER
+        )
 
     # ---------------------------------------------------------------------- #
     # Async lifecycle                                                         #
@@ -443,6 +500,7 @@ class DigitalTwinBackend(GuiBackend):
             background_tasks.create(self._receive_robot_command()),
             background_tasks.create(self._receive_safety_interlock()),
             background_tasks.create(self._receive_operator_input()),
+            background_tasks.create(self._receive_arm_assignments()),
             background_tasks.create(self._monitor_liveliness()),
         ]
         self._mark_ready()
@@ -465,6 +523,7 @@ class DigitalTwinBackend(GuiBackend):
             "_robot_command_reader",
             "_safety_interlock_reader",
             "_operator_input_reader",
+            "_arm_assignment_reader",
         ):
             reader = getattr(self, reader_attr, None)
             if reader is not None:
@@ -510,6 +569,21 @@ class DigitalTwinBackend(GuiBackend):
         """Set writer liveliness state; triggers no repaint here (UI timer handles it)."""
         self.connected = connected
 
+    def update_arm_assignment(self, sample: Any) -> None:
+        """Track an arm assignment sample by robot_id."""
+        robot_id = str(getattr(sample, "robot_id", ""))
+        if not robot_id:
+            return
+        self.arm_assignments[robot_id] = sample
+        state_label = _ARM_STATE_LABELS.get(int(getattr(sample, "status", 0)), "?")
+        log.informational(f"DigitalTwin: arm {robot_id} → {state_label}")
+
+    def remove_arm(self, robot_id: str) -> None:
+        """Remove an arm from tracking (disposed or liveliness lost)."""
+        if robot_id in self.arm_assignments:
+            del self.arm_assignments[robot_id]
+            log.informational(f"DigitalTwin: arm {robot_id} removed")
+
     # ---------------------------------------------------------------------- #
     # Async DDS receive loops                                                #
     # ---------------------------------------------------------------------- #
@@ -535,6 +609,20 @@ class DigitalTwinBackend(GuiBackend):
     async def _receive_operator_input(self) -> None:
         async for _data in self._operator_input_reader.take_data_async():
             pass
+
+    async def _receive_arm_assignments(self) -> None:
+        """Receive RobotArmAssignment samples, tracking arrivals and disposals."""
+        async for data, info in self._arm_assignment_reader.take_async():
+            if info.valid:
+                self.update_arm_assignment(data)
+            elif info.state.instance_state in (
+                dds.InstanceState.NOT_ALIVE_DISPOSED,
+                dds.InstanceState.NOT_ALIVE_NO_WRITERS,
+            ):
+                key_holder = self._arm_assignment_reader.key_value(info.instance_handle)
+                robot_id = str(getattr(key_holder, "robot_id", ""))
+                if robot_id:
+                    self.remove_arm(robot_id)
 
     async def _monitor_liveliness(self) -> None:
         """Periodically check RobotState writer liveliness."""
@@ -836,35 +924,130 @@ def _build_scene(
             _TABLE_TOP_Z + _TABLE_SLAB_H / 2 + 0.04,
         ).material(color="#90A4AE")
 
-        # ── Arm (slot 0) ───────────────────────────────────────────────────
-        slot = _ARM_SLOTS[0]
-        (
-            arm_segs,
-            jnt_spheres,
-            shoulder_sphere,
-            tool_sphere,
-            nib,
-            instr_dot,
-            nib_half,
-        ) = _build_arm(
-            scene, slot["ox"], slot["oy"], init_joints, joint_color=_SCENE_JOINT
-        )
+        # ── Arms (one per slot, slot 0 is primary telemetry arm) ────────
+        arm_objects: list[dict[str, Any]] = []
+        for slot_idx, slot in enumerate(_ARM_SLOTS):
+            (
+                arm_segs,
+                jnt_spheres,
+                shoulder_sphere,
+                tool_sphere,
+                nib,
+                instr_dot,
+                nib_half,
+            ) = _build_arm(
+                scene, slot["ox"], slot["oy"], init_joints, joint_color=_SCENE_JOINT
+            )
+            arm_objects.append(
+                {
+                    "slot_idx": slot_idx,
+                    "slot": slot,
+                    "arm_segs": arm_segs,
+                    "jnt_spheres": jnt_spheres,
+                    "shoulder_sphere": shoulder_sphere,
+                    "tool_sphere": tool_sphere,
+                    "nib": nib,
+                    "instr_dot": instr_dot,
+                    "nib_half": nib_half,
+                }
+            )
 
-    arm_update = _make_arm_updater(
-        arm_segs,
-        jnt_spheres,
-        tool_sphere,
-        nib,
-        instr_dot,
-        nib_half,
-        slot["ox"],
-        slot["oy"],
-        lambda: current_backend.joint_positions,
-    )
+    # Build updaters for each arm slot
+    arm_updaters: list[Any] = []
+    for arm_obj in arm_objects:
+        s = arm_obj["slot"]
+        updater = _make_arm_updater(
+            arm_obj["arm_segs"],
+            arm_obj["jnt_spheres"],
+            arm_obj["tool_sphere"],
+            arm_obj["nib"],
+            arm_obj["instr_dot"],
+            arm_obj["nib_half"],
+            s["ox"],
+            s["oy"],
+            # Slot 0 uses primary telemetry; other slots use fallback pose
+            (
+                (lambda: current_backend.joint_positions)
+                if arm_obj["slot_idx"] == 0
+                else (lambda: _NO_SIGNAL_POSE)
+            ),
+        )
+        arm_updaters.append(updater)
+
+    # ---- Arm assignment overlay (HTML below scene) -------------------------
+    arm_status_container = ui.column().classes("w-full px-4 gap-1")
+
+    def _slot_for_assignment(assignment: Any) -> int:
+        """Map a RobotArmAssignment's table_position to a slot index."""
+        tp = int(getattr(assignment, "table_position", 0))
+        return _TABLE_POSITION_SLOT.get(tp, 0)
+
+    def _build_arm_overlay() -> None:
+        """Rebuild the arm status overlay from current assignments."""
+        arm_status_container.clear()
+        assignments = current_backend.arm_assignments
+        if not assignments:
+            return
+        with arm_status_container:
+            ui.label("Arm Assignments").classes("text-sm font-bold mt-2")
+            for robot_id, assignment in sorted(assignments.items()):
+                status_val = int(getattr(assignment, "status", 0))
+                color = _ARM_STATE_COLORS.get(status_val, BRAND_COLORS["gray"])
+                state_label = _ARM_STATE_LABELS.get(status_val, "UNKNOWN")
+                tp_val = int(getattr(assignment, "table_position", 0))
+                tp_label = _TABLE_POSITION_LABELS.get(tp_val, "Unknown")
+                caps = str(getattr(assignment, "capabilities", ""))
+                with ui.expansion(
+                    f"{robot_id} — {state_label}",
+                    icon="precision_manufacturing",
+                ).classes("w-full").props(f'header-style="color: {color}"'):
+                    ui.label(f"Position: {tp_label}").classes("text-xs")
+                    ui.label(f"State: {state_label}").classes("text-xs")
+                    if caps:
+                        ui.label(f"Capabilities: {caps}").classes("text-xs")
+
+    def _set_arm_visibility(arm_obj: dict[str, Any], visible: bool) -> None:
+        """Set material opacity on arm parts to show/hide an arm slot."""
+        opacity = 1.0 if visible else 0.0
+        for seg in arm_obj["arm_segs"]:
+            seg.material(opacity=opacity)
+        for jsph in arm_obj["jnt_spheres"]:
+            jsph.material(opacity=opacity)
+        arm_obj["shoulder_sphere"].material(opacity=opacity)
+        arm_obj["tool_sphere"].material(opacity=opacity)
+        arm_obj["nib"].material(opacity=opacity)
+        arm_obj["instr_dot"].material(opacity=opacity)
+
+    # Track which slots have assignments for visibility updates
+    _prev_arm_count = [0]
 
     def update_scene() -> None:
-        arm_update()
+        # Always update slot 0 (primary arm with telemetry)
+        arm_updaters[0]()
         mode_badge.set_text(current_backend.operational_mode)
+
+        # Map assignments to slots
+        assignments = current_backend.arm_assignments
+        used_slots: set[int] = {0}  # slot 0 always visible (primary)
+        for assignment in assignments.values():
+            slot_idx = _slot_for_assignment(assignment)
+            if slot_idx < len(arm_objects):
+                used_slots.add(slot_idx)
+
+        # Show/hide arm slots
+        for i, arm_obj in enumerate(arm_objects):
+            _set_arm_visibility(arm_obj, i in used_slots)
+
+        # Update additional arm slot poses
+        for i in range(1, len(arm_updaters)):
+            if i in used_slots:
+                arm_updaters[i]()
+
+        # Rebuild overlay when arm count changes
+        arm_count = len(assignments)
+        if arm_count != _prev_arm_count[0]:
+            _prev_arm_count[0] = arm_count
+            _build_arm_overlay()
 
     ui.timer(0.1, update_scene)
 

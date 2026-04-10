@@ -52,6 +52,7 @@ module MedtechEntityNames {
         const string TWIN_OPERATOR_INPUT_READER    = "TwinSubscriber::OperatorInputReader";
         const string TWIN_SAFETY_INTERLOCK_READER  = "TwinSubscriber::SafetyInterlockReader";
         const string TWIN_ROBOT_COMMAND_READER     = "TwinSubscriber::RobotCommandReader";
+        const string TWIN_ROBOT_ARM_ASSIGNMENT_READER = "TwinSubscriber::RobotArmAssignmentReader";
         const string CTRL_ROBOT_ARM_ASSIGNMENT_READER = "ProcedureControlSubscriber::RobotArmAssignmentReader";
     };
 

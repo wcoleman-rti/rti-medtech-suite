@@ -249,8 +249,9 @@
 
         <!--
             ControlDigitalTwin — control tag (digital twin display, read-only)
-            Subscribes: RobotState, RobotCommand, SafetyInterlock, OperatorInput
-            Used by: digital twin PySide6 GUI
+            Subscribes: RobotState, RobotCommand, SafetyInterlock, OperatorInput,
+                         RobotArmAssignment
+            Used by: digital twin NiceGUI web application
         -->
         <domain_participant name="ControlDigitalTwin"
                             domain_ref="MedtechDomains::Procedure_control">
@@ -288,6 +289,12 @@
                 <data_reader name="RobotCommandReader"
                              topic_ref="RobotCommand">
                     <datareader_qos base_name="TopicProfiles::RobotCommand"/>
+                </data_reader>
+
+                <!-- Arm assignment: state-based, every transition matters -->
+                <data_reader name="RobotArmAssignmentReader"
+                             topic_ref="RobotArmAssignment">
+                    <datareader_qos base_name="TopicProfiles::RobotArmAssignment"/>
                 </data_reader>
             </subscriber>
         </domain_participant>

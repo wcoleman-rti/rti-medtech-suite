@@ -44,6 +44,9 @@ SafetyInterlock = surgery.Surgery.SafetyInterlock
 OperatorInput = surgery.Surgery.OperatorInput
 RobotMode = surgery.Surgery.RobotMode
 CartesianPosition = surgery.Surgery.CartesianPosition
+RobotArmAssignment = surgery.Surgery.RobotArmAssignment
+ArmAssignmentState = surgery.Surgery.ArmAssignmentState
+TablePosition = surgery.Surgery.TablePosition
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +55,7 @@ CartesianPosition = surgery.Surgery.CartesianPosition
 
 
 def _make_injected_readers(participant_factory: Any) -> dict[str, dds.DataReader]:
-    """Create four injected readers for DigitalTwinBackend tests."""
+    """Create five injected readers for DigitalTwinBackend tests."""
     p = participant_factory(domain_id=0, domain_tag="control")
     sub = dds.Subscriber(p)
 
@@ -65,6 +68,7 @@ def _make_injected_readers(participant_factory: Any) -> dict[str, dds.DataReader
         "robot_command_reader": _reader(RobotCommand, "RobotCommand"),
         "safety_interlock_reader": _reader(SafetyInterlock, "SafetyInterlock"),
         "operator_input_reader": _reader(OperatorInput, "OperatorInput"),
+        "arm_assignment_reader": _reader(RobotArmAssignment, "RobotArmAssignment"),
     }
 
 
@@ -238,7 +242,7 @@ class TestDigitalTwinBackend:
     def test_start_schedules_background_tasks(
         self, participant_factory: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """start() creates exactly 5 background tasks (4 readers + liveliness)."""
+        """start() creates exactly 6 background tasks (5 readers + liveliness)."""
         readers = _make_injected_readers(participant_factory)
         backend = twin_module.DigitalTwinBackend(**readers)
         scheduled: list[str] = []
@@ -250,7 +254,7 @@ class TestDigitalTwinBackend:
 
         monkeypatch.setattr(twin_module.background_tasks, "create", _fake_create)
         asyncio.run(backend.start())
-        assert len(scheduled) == 5
+        assert len(scheduled) == 6
         asyncio.run(backend.close())
 
     def test_backend_close_cleans_up_rti_dispatcher(
@@ -447,3 +451,174 @@ class TestLivelinessDetection:
             time.sleep(0.1)
 
         assert connected is False, "Should detect liveliness loss after writer closes"
+
+
+# ---------------------------------------------------------------------------
+# TestArmAssignmentTracking — multi-arm state model
+# ---------------------------------------------------------------------------
+
+
+def _make_assignment(
+    robot_id: str = "arm-1",
+    status: Any = None,
+    table_position: Any = None,
+    capabilities: str = "",
+) -> SimpleNamespace:
+    """Create a fake RobotArmAssignment-like object for unit tests."""
+    return SimpleNamespace(
+        robot_id=robot_id,
+        status=status if status is not None else ArmAssignmentState.ASSIGNED,
+        table_position=(
+            table_position if table_position is not None else TablePosition.RIGHT
+        ),
+        capabilities=capabilities,
+    )
+
+
+class TestArmAssignmentTracking:
+    """DigitalTwinBackend tracks arm assignments by robot_id."""
+
+    def test_initial_arm_assignments_empty(self, participant_factory: Any) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        assert backend.arm_assignments == {}
+        asyncio.run(backend.close())
+
+    def test_update_arm_assignment_adds_entry(self, participant_factory: Any) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        sample = _make_assignment("arm-1", ArmAssignmentState.OPERATIONAL)
+        backend.update_arm_assignment(sample)
+        assert "arm-1" in backend.arm_assignments
+        assert backend.arm_assignments["arm-1"] is sample
+        asyncio.run(backend.close())
+
+    def test_update_arm_assignment_overwrites(self, participant_factory: Any) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        backend.update_arm_assignment(
+            _make_assignment("arm-1", ArmAssignmentState.ASSIGNED)
+        )
+        backend.update_arm_assignment(
+            _make_assignment("arm-1", ArmAssignmentState.OPERATIONAL)
+        )
+        assert len(backend.arm_assignments) == 1
+        assert int(backend.arm_assignments["arm-1"].status) == int(
+            ArmAssignmentState.OPERATIONAL
+        )
+        asyncio.run(backend.close())
+
+    def test_multiple_arms_tracked(self, participant_factory: Any) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        backend.update_arm_assignment(
+            _make_assignment("arm-1", ArmAssignmentState.OPERATIONAL)
+        )
+        backend.update_arm_assignment(
+            _make_assignment("arm-2", ArmAssignmentState.POSITIONING)
+        )
+        assert len(backend.arm_assignments) == 2
+        asyncio.run(backend.close())
+
+    def test_remove_arm(self, participant_factory: Any) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        backend.update_arm_assignment(
+            _make_assignment("arm-1", ArmAssignmentState.OPERATIONAL)
+        )
+        backend.remove_arm("arm-1")
+        assert "arm-1" not in backend.arm_assignments
+        asyncio.run(backend.close())
+
+    def test_remove_nonexistent_arm_is_safe(self, participant_factory: Any) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        backend.remove_arm("no-such-arm")  # should not raise
+        asyncio.run(backend.close())
+
+    def test_ignore_empty_robot_id(self, participant_factory: Any) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        backend.update_arm_assignment(_make_assignment("", ArmAssignmentState.ASSIGNED))
+        assert len(backend.arm_assignments) == 0
+        asyncio.run(backend.close())
+
+
+# ---------------------------------------------------------------------------
+# TestArmStateColors — color mapping correctness
+# ---------------------------------------------------------------------------
+
+
+class TestArmStateColors:
+    """Arm assignment state → color mapping matches spec."""
+
+    def test_operational_green(self) -> None:
+        color = twin_module._ARM_STATE_COLORS[int(ArmAssignmentState.OPERATIONAL)]
+        assert color == twin_module.BRAND_COLORS["green"]
+
+    def test_positioning_amber(self) -> None:
+        color = twin_module._ARM_STATE_COLORS[int(ArmAssignmentState.POSITIONING)]
+        assert color == twin_module.BRAND_COLORS["amber"]
+
+    def test_failed_red(self) -> None:
+        color = twin_module._ARM_STATE_COLORS[int(ArmAssignmentState.FAILED)]
+        assert color == twin_module.BRAND_COLORS["red"]
+
+    def test_idle_grey(self) -> None:
+        color = twin_module._ARM_STATE_COLORS[int(ArmAssignmentState.IDLE)]
+        assert color == twin_module.BRAND_COLORS["gray"]
+
+    def test_assigned_grey(self) -> None:
+        color = twin_module._ARM_STATE_COLORS[int(ArmAssignmentState.ASSIGNED)]
+        assert color == twin_module.BRAND_COLORS["gray"]
+
+
+# ---------------------------------------------------------------------------
+# TestTablePositionSlotMapping — position to slot index
+# ---------------------------------------------------------------------------
+
+
+class TestTablePositionSlotMapping:
+    """TablePosition → _ARM_SLOTS index mapping."""
+
+    def test_right_maps_to_slot_0(self) -> None:
+        assert twin_module._TABLE_POSITION_SLOT[int(TablePosition.RIGHT)] == 0
+
+    def test_left_maps_to_slot_1(self) -> None:
+        assert twin_module._TABLE_POSITION_SLOT[int(TablePosition.LEFT)] == 1
+
+    def test_right_foot_maps_to_slot_2(self) -> None:
+        assert twin_module._TABLE_POSITION_SLOT[int(TablePosition.RIGHT_FOOT)] == 2
+
+    def test_left_foot_maps_to_slot_3(self) -> None:
+        assert twin_module._TABLE_POSITION_SLOT[int(TablePosition.LEFT_FOOT)] == 3
+
+
+# ---------------------------------------------------------------------------
+# TestQosConfigurationArmAssignment — new reader QoS
+# ---------------------------------------------------------------------------
+
+
+class TestQosConfigurationArmAssignment:
+    """Verify RobotArmAssignment reader exists and uses correct QoS."""
+
+    def test_arm_assignment_reader_exists_in_participant(self) -> None:
+        from medtech.dds import initialize_connext
+
+        initialize_connext()
+        provider = dds.QosProvider.default
+        p = provider.create_participant_from_config(names.CONTROL_DIGITAL_TWIN)
+        qos = p.qos
+        qos.partition.name = ["room/OR-1/procedure/proc-001"]
+        p.qos = qos
+        try:
+            r = p.find_datareader(names.TWIN_ROBOT_ARM_ASSIGNMENT_READER)
+            assert (
+                r is not None
+            ), f"Reader not found: {names.TWIN_ROBOT_ARM_ASSIGNMENT_READER}"
+            reader = dds.DataReader(r)
+            # Should be RELIABLE + TRANSIENT_LOCAL (state pattern)
+            assert reader.qos.reliability.kind == dds.ReliabilityKind.RELIABLE
+            assert reader.qos.durability.kind == dds.DurabilityKind.TRANSIENT_LOCAL
+        finally:
+            p.close()
