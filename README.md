@@ -3,9 +3,9 @@
 A multi-domain DDS simulation platform built on RTI Connext Professional
 7.6.0, demonstrating real-time surgical robotics, patient monitoring,
 clinical decision support, and hospital-wide coordination on a layered
-databus architecture. V1.0 includes full service orchestration with DDS
-RPC-based lifecycle management, multi-host discovery, and liveliness
-monitoring across four Service Host types.
+databus architecture. V1.2 adds dynamic multi-arm orchestration with
+spatial table-position assignment, write-on-change `RobotArmAssignment`
+lifecycle, and multi-arm 3D rendering in the digital twin display.
 
 ## Platform Support
 

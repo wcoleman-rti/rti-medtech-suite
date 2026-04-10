@@ -8,22 +8,24 @@ medtech suite. It discovers Service Hosts, displays their capabilities
 and service states, and issues start/stop commands via DDS RPC.
 
 The Procedure Controller does **not** host any surgical services — it is
-a pure consumer and orchestrator. It creates two DomainParticipants:
+a pure consumer and orchestrator. It creates three DomainParticipants:
 
-| Participant   | Domain              | Role                                                            |
-| ------------- | ------------------- | --------------------------------------------------------------- |
-| Orchestration | 15 (no domain tags) | Subscribe to ServiceCatalog + ServiceStatus; issue RPC commands |
-| Hospital      | Hospital domain     | Read-only subscriber for scheduling context                     |
+| Participant      | Domain              | Role                                                            |
+| ---------------- | ------------------- | --------------------------------------------------------------- |
+| Orchestration    | 15 (no domain tags) | Subscribe to ServiceCatalog + ServiceStatus; issue RPC commands |
+| ProcedureControl | 10 (`control` tag)  | Subscribe to RobotArmAssignment for arm tracking (V1.2)         |
+| Hospital         | Hospital domain     | Read-only subscriber for scheduling context                     |
 
 ### Connext Features Used
 
 | Feature                 | Where                                                                         |
 | ----------------------- | ----------------------------------------------------------------------------- |
-| XML App Creation        | Both participants created via `QosProvider.create_participant_from_config`    |
+| XML App Creation        | All participants created via `QosProvider.create_participant_from_config`     |
 | DDS RPC                 | `rti.rpc.Requester` for `ServiceHostControl` — start/stop/capabilities/health |
 | Content-Filtered Topics | —                                                                             |
-| Multiple Domains        | Orchestration (15) + Hospital                                                 |
-| Partition QoS           | Hospital participant: `room/<room_id>`                                        |
+| Multiple Domains        | Orchestration (15) + Procedure (10, control tag) + Hospital                   |
+| Partition QoS           | Hospital participant: `room/<room_id>`; ProcedureControl: room/procedure      |
+| `start_service` RPC     | Accepts `table_position` property for multi-arm placement (V1.2)              |
 
 ## Quick Start
 
@@ -70,6 +72,12 @@ modules/hospital-dashboard/
 | DataReader    | `ServiceCatalog`               | `Orchestration::ServiceCatalog` | RELIABLE / TRANSIENT_LOCAL |
 | DataReader    | `ServiceStatus`                | `Orchestration::ServiceStatus`  | RELIABLE / TRANSIENT_LOCAL |
 | RPC Requester | `ServiceHostControl/<host_id>` | Request/Reply                   | Created on-demand per host |
+
+**ProcedureControl Participant** — `ProcedureController::ProcedureControl`
+
+| Entity     | Topic                | Type                          | QoS                                             |
+| ---------- | -------------------- | ----------------------------- | ----------------------------------------------- |
+| DataReader | `RobotArmAssignment` | `Surgery::RobotArmAssignment` | RELIABLE / TRANSIENT_LOCAL; arm tracking (V1.2) |
 
 **Hospital Participant** — `ProcedureController::Hospital`
 

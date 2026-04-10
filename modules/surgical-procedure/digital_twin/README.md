@@ -12,16 +12,16 @@ The display is a read-only DDS subscriber — it publishes no data.
 Connectivity monitoring detects robot disconnection via liveliness
 and grays out the visualization.
 
-| Connext Feature | How It Is Used |
-|-----------------|----------------|
-| DDS topics (subscribe) | `RobotState`, `OperatorInput`, `SafetyInterlock`, `RobotCommand` |
-| QoS profiles | `TopicProfiles::GuiRobotState`, `TopicProfiles::GuiOperatorInput` (time-based filter), `TopicProfiles::SafetyInterlock`, `TopicProfiles::RobotCommand` |
-| Domain tag | `control` |
-| Partition | `room/<ROOM_ID>/procedure/<PROCEDURE_ID>` |
-| Time-based filter | 100 ms minimum separation on `RobotState` and `OperatorInput` readers for 60 Hz rendering |
-| TRANSIENT_LOCAL | Late-joining display receives current robot state |
-| Liveliness | Detects robot disconnection (grayed-out state) |
-| `rti.asyncio` | Async data generators for non-blocking DDS reads |
+| Connext Feature        | How It Is Used                                                                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DDS topics (subscribe) | `RobotState`, `OperatorInput`, `SafetyInterlock`, `RobotCommand`, `RobotArmAssignment`                                                                                                      |
+| QoS profiles           | `TopicProfiles::GuiRobotState`, `TopicProfiles::GuiOperatorInput` (time-based filter), `TopicProfiles::SafetyInterlock`, `TopicProfiles::RobotCommand`, `TopicProfiles::RobotArmAssignment` |
+| Domain tag             | `control`                                                                                                                                                                                   |
+| Partition              | `room/<ROOM_ID>/procedure/<PROCEDURE_ID>`                                                                                                                                                   |
+| Time-based filter      | 100 ms minimum separation on `RobotState` and `OperatorInput` readers for 60 Hz rendering                                                                                                   |
+| TRANSIENT_LOCAL        | Late-joining display receives current robot state                                                                                                                                           |
+| Liveliness             | Detects robot disconnection (grayed-out state)                                                                                                                                              |
+| `rti.asyncio`          | Async data generators for non-blocking DDS reads                                                                                                                                            |
 
 ## Quick Start
 
@@ -88,12 +88,13 @@ configuration `SurgicalParticipants::ControlDigitalTwin` with domain
 tag `control`. Entity names are generated constants from
 `app_names.idl`, looked up via `find_datareader()`.
 
-| Entity | Topic | QoS Profile | Notes |
-|--------|-------|-------------|-------|
-| DataReader | `RobotState` | `TopicProfiles::GuiRobotState` | Time-based filter ~100 ms for 60 Hz rendering |
-| DataReader | `OperatorInput` | `TopicProfiles::GuiOperatorInput` | Time-based filter ~100 ms for 60 Hz rendering |
-| DataReader | `SafetyInterlock` | `TopicProfiles::SafetyInterlock` | No time-based filter — every sample delivered (safety-critical) |
-| DataReader | `RobotCommand` | `TopicProfiles::RobotCommand` | No time-based filter — each command must be processed |
+| Entity     | Topic                | QoS Profile                         | Notes                                                           |
+| ---------- | -------------------- | ----------------------------------- | --------------------------------------------------------------- |
+| DataReader | `RobotState`         | `TopicProfiles::GuiRobotState`      | Time-based filter ~100 ms for 60 Hz rendering                   |
+| DataReader | `OperatorInput`      | `TopicProfiles::GuiOperatorInput`   | Time-based filter ~100 ms for 60 Hz rendering                   |
+| DataReader | `SafetyInterlock`    | `TopicProfiles::SafetyInterlock`    | No time-based filter — every sample delivered (safety-critical) |
+| DataReader | `RobotCommand`       | `TopicProfiles::RobotCommand`       | No time-based filter — each command must be processed           |
+| DataReader | `RobotArmAssignment` | `TopicProfiles::RobotArmAssignment` | Multi-arm spatial tracking; visibility per-slot (V1.2)          |
 
 ### Threading Model
 
@@ -127,18 +128,24 @@ participant creation.
 - Operational mode label (OPERATIONAL, PAUSED, EMERGENCY_STOP, IDLE)
 - Safety interlock overlay (red, prominent) from `SafetyInterlock`
 - Disconnected state (grayed out) on liveliness lost
+- Multi-arm rendering with 4 pre-defined table slots (V1.2):
+  - Color-coded arm status (green=OPERATIONAL, amber=POSITIONING,
+    red=FAILED, gray=IDLE/ASSIGNED)
+  - Per-arm status overlay panel with table position labels
+  - Visibility driven by `RobotArmAssignment` instance lifecycle
+  - `dispose()` hides the arm slot automatically
 
 ## Configuration Reference
 
 ### Environment Variables
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `ROOM_ID` | string | `"OR-1"` | Operating room identifier |
-| `PROCEDURE_ID` | string | `"proc-001"` | Procedure identifier |
-| `QT_QPA_PLATFORM` | string | (system default) | Qt platform plugin (`offscreen` for headless) |
-| `NDDS_QOS_PROFILES` | string | (set by `setup.bash`) | QoS XML file paths |
-| `NDDS_DISCOVERY_PEERS` | string | (set by `setup.bash`) | DDS discovery peer list |
+| Variable               | Type   | Default               | Description                                   |
+| ---------------------- | ------ | --------------------- | --------------------------------------------- |
+| `ROOM_ID`              | string | `"OR-1"`              | Operating room identifier                     |
+| `PROCEDURE_ID`         | string | `"proc-001"`          | Procedure identifier                          |
+| `QT_QPA_PLATFORM`      | string | (system default)      | Qt platform plugin (`offscreen` for headless) |
+| `NDDS_QOS_PROFILES`    | string | (set by `setup.bash`) | QoS XML file paths                            |
+| `NDDS_DISCOVERY_PEERS` | string | (set by `setup.bash`) | DDS discovery peer list                       |
 
 ### XML Configuration Files
 
@@ -148,11 +155,11 @@ Participant configuration:
 
 QoS profiles loaded via `NDDS_QOS_PROFILES`:
 
-| File | Content |
-|------|---------|
-| `share/qos/Topics.xml` | `TopicProfiles::GuiRobotState`, `TopicProfiles::GuiOperatorInput`, `TopicProfiles::SafetyInterlock`, `TopicProfiles::RobotCommand` |
-| `share/qos/Patterns.xml` | Base State, Stream, Command patterns |
-| `share/domains/Domains.xml` | Procedure domain definition |
+| File                        | Content                                                                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `share/qos/Topics.xml`      | `TopicProfiles::GuiRobotState`, `TopicProfiles::GuiOperatorInput`, `TopicProfiles::SafetyInterlock`, `TopicProfiles::RobotCommand` |
+| `share/qos/Patterns.xml`    | Base State, Stream, Command patterns                                                                                               |
+| `share/domains/Domains.xml` | Procedure domain definition                                                                                                        |
 
 ### Domain Partition
 
@@ -178,12 +185,12 @@ Run all GUI tests:
 python -m pytest tests/ -m gui -v
 ```
 
-| Marker | Tests |
-|--------|-------|
-| `gui` | All PySide6 widget and display tests |
-| `integration` | DDS reader/writer interaction tests |
-| `durability` | Late-joiner TRANSIENT_LOCAL verification |
-| `streaming` | Time-based filter and rendering rate tests |
+| Marker        | Tests                                      |
+| ------------- | ------------------------------------------ |
+| `gui`         | All PySide6 widget and display tests       |
+| `integration` | DDS reader/writer interaction tests        |
+| `durability`  | Late-joiner TRANSIENT_LOCAL verification   |
+| `streaming`   | Time-based filter and rendering rate tests |
 
 The tests use dependency injection — pre-created `DataReader` objects
 are passed to `DigitalTwinDisplay` for isolated unit testing without
