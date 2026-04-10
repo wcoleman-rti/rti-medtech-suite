@@ -160,7 +160,7 @@ complete before Step 20.4.
 
 ---
 
-## Step 20.2 — QoS Profile and Topic Binding
+## Step 20.2 — QoS Profile and Topic Binding ✅ `95f0c62`
 
 ### Work
 
@@ -184,7 +184,7 @@ complete before Step 20.4.
 
 ---
 
-## Step 20.3 — Participant Configuration for Procedure Controller
+## Step 20.3 — Participant Configuration for Procedure Controller ✅ `9959f88`
 
 ### Work
 
@@ -216,7 +216,7 @@ complete before Step 20.4.
 
 ---
 
-## Step 20.4 — Robot Arm Service: Assignment Publishing
+## Step 20.4 — Robot Arm Service: Assignment Publishing ✅ `2ae9968`
 
 ### Work
 
@@ -247,7 +247,7 @@ complete before Step 20.4.
 
 ---
 
-## Step 20.5 — Procedure Controller: Assignment Subscription
+## Step 20.5 — Procedure Controller: Assignment Subscription ✅ `6deb8c6`
 
 ### Work
 
@@ -279,7 +279,7 @@ complete before Step 20.4.
 
 ---
 
-## Step 20.6 — Digital Twin: Multi-Arm Rendering
+## Step 20.6 — Digital Twin: Multi-Arm Rendering ✅ `aa36b61`
 
 ### Work
 
@@ -313,7 +313,7 @@ complete before Step 20.4.
 
 ---
 
-## Step 20.7 — Multi-Arm Orchestration Flow Integration
+## Step 20.7 — Multi-Arm Orchestration Flow Integration ✅ `96a46c2`
 
 ### Work
 
@@ -345,7 +345,7 @@ complete before Step 20.4.
 
 ---
 
-## Step 20.8 — Isolation and Regression Tests
+## Step 20.8 — Isolation and Regression Tests ✅ `7bc4bca`
 
 ### Work
 
@@ -378,7 +378,7 @@ complete before Step 20.4.
 
 ---
 
-## Step 20.9 — Acceptance Test and Docker Integration
+## Step 20.9 — Acceptance Test and Docker Integration ✅ `261dd15`
 
 ### Work
 
@@ -403,7 +403,7 @@ complete before Step 20.4.
 
 ---
 
-## Step 20.10 — Documentation and Performance Baseline
+## Step 20.10 — Documentation and Performance Baseline ✅ `b1c0b68`
 
 ### Work
 

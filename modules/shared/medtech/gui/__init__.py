@@ -5,6 +5,7 @@ from medtech.gui._colors import BRAND_COLORS
 from medtech.gui._icons import ICONS
 from medtech.gui._theme import (
     NICEGUI_QUASAR_CONFIG,
+    NICEGUI_STORAGE_SECRET_DEFAULT,
     NICEGUI_STORAGE_SECRET_ENV,
     create_header,
     init_theme,
@@ -23,6 +24,7 @@ __all__ = [
     "GuiBackend",
     "ICONS",
     "NICEGUI_QUASAR_CONFIG",
+    "NICEGUI_STORAGE_SECRET_DEFAULT",
     "NICEGUI_STORAGE_SECRET_ENV",
     "create_empty_state",
     "create_header",

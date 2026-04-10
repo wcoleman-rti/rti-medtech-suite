@@ -38,6 +38,9 @@ public:
     // Take a snapshot of the current RobotState under a read-lock.
     ControllerSnapshot snapshot() const;
 
+    // Immutable robot identifier (set at construction, no lock needed).
+    const std::string& robot_id() const { return robot_id_; }
+
     // --- Thread safety ---
 
     // The subscriber side calls write-locked methods.
@@ -48,6 +51,7 @@ private:
 
     mutable std::shared_mutex mutex_;
 
+    std::string robot_id_;
     Surgery::RobotState state_{};
     bool interlock_active_ = false;
     Surgery::OperatorInput last_input_{};

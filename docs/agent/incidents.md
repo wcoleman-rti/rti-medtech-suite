@@ -2590,3 +2590,84 @@ after closure. They form the project's decision log.
   specific behavior under test). BEST_EFFORT is appropriate only for tests
   that explicitly test best-effort drop/loss behavior.
 - **Date closed:** 2026-04-09
+
+---
+
+## INC-083: CFT XML requires expression_parameters default — SQL compiler error
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-10
+- **Phase/Step:** Phase 20 / Post-step bug fix (multi-arm per-arm isolation)
+- **Documents involved:** `interfaces/participants/SurgicalParticipants.xml`,
+  `modules/surgical-procedure/robot_controller/robot_controller_service.cpp`
+- **Description:** Adding `<content_filter kind="builtin.sql">` to XML
+  Application Creation DataReaders with `<expression>robot_id = %0</expression>`
+  but without `<expression_parameters>` causes the DDS SQL filter compiler
+  to fail at participant creation time with "Unknown param used". The filter
+  expression references parameter `%0` but no default value is provided in
+  the XML, so the compiler cannot validate the expression.
+- **Root cause:** RTI Connext XML Application Creation requires that
+  parameterized CFT expressions include `<expression_parameters>` with a
+  default value for every referenced `%N` parameter. The parameters are
+  updated at runtime via `filter_parameters()` but must have initial
+  values in the XML.
+- **Resolution:** Added `<expression_parameters><element>'__unset__'</element></expression_parameters>`
+  to all 3 CFT definitions in ControlRobot participant. At runtime, the C++
+  service updates the parameter to the actual `robot_id` via
+  `dds::core::polymorphic_cast<ContentFilteredTopic<T>>()` and
+  `cft.filter_parameters()`. String parameters must include SQL single
+  quotes in the parameter value (e.g., `"'arm-or1-01'"`), NOT in the
+  expression — `'%0'` is parsed as literal string "%0" per RTI docs.
+- **Guideline:** All parameterized CFT expressions in XML MUST include
+  `<expression_parameters>` with placeholder defaults. String parameters
+  require SQL quotes in the value, not the expression.
+- **Date closed:** 2026-04-10
+
+---
+
+## INC-084: key_value() crash on NOT_ALIVE instance handles during shutdown
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-10
+- **Phase/Step:** Phase 20 / Post-step bug fix (multi-arm shutdown)
+- **Documents involved:** `modules/surgical-procedure/digital_twin/digital_twin.py`,
+  `modules/hospital-dashboard/procedure_controller/controller.py`
+- **Description:** When DDS services shut down, subscribers may receive
+  `NOT_ALIVE_DISPOSED` followed by `NOT_ALIVE_NO_WRITERS` for the same
+  instance. After the first disposal, the middleware may purge the instance
+  handle. Calling `key_value()` on the purged handle raises
+  `rti.connextdds.InvalidArgumentError: Invalid argument error: get key value`.
+  This manifested as runtime errors during service shutdown in both the
+  digital twin and procedure controller.
+- **Root cause:** Race between two not-alive notifications —
+  `NOT_ALIVE_DISPOSED` and `NOT_ALIVE_NO_WRITERS` — where the instance
+  handle is purged by the middleware between the two events.
+- **Resolution:** Wrapped `key_value()` calls in `try/except dds.InvalidArgumentError`
+  with `continue` to skip samples with purged instance handles. This is a
+  safe guard — the instance is already being removed from the tracking table.
+- **Guideline:** Always guard `key_value()` calls with
+  `try/except InvalidArgumentError` when processing not-alive samples,
+  as the instance handle may have been purged between notifications.
+- **Date closed:** 2026-04-10
+
+---
+
+## INC-085: Dead code — robot_controller_app.cpp not in any CMakeLists.txt
+
+- **Status:** Closed
+- **Category:** Housekeeping
+- **Date opened:** 2026-04-10
+- **Phase/Step:** Phase 20 / Post-step cleanup
+- **Documents involved:** `modules/surgical-procedure/robot_controller/robot_controller_app.cpp`
+- **Description:** `robot_controller_app.cpp` (306 lines) contained a
+  standalone DDS application with duplicated entity wiring logic that
+  paralleled `robot_controller_service.cpp`. The file was not referenced
+  in any `CMakeLists.txt` and was never compiled or linked. It originated
+  from an earlier iteration before the Service/ServiceHost architecture
+  was established.
+- **Resolution:** File deleted. The canonical pattern is:
+  Service (reusable logic) → standalone `main.cpp` → ServiceHost `main.cpp`
+  (with orchestration RPC). All DDS entity wiring lives in the service class.
+- **Date closed:** 2026-04-10

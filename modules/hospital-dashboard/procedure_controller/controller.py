@@ -21,6 +21,7 @@ from medtech.dds import initialize_connext
 from medtech.gui import (
     BRAND_COLORS,
     ICONS,
+    NICEGUI_STORAGE_SECRET_DEFAULT,
     NICEGUI_STORAGE_SECRET_ENV,
     GuiBackend,
     create_empty_state,
@@ -285,8 +286,25 @@ class ControllerBackend(GuiBackend):
         )
 
     async def start_all_services(self) -> None:
+        # Auto-assign table positions to robot arm hosts (round-robin).
+        _auto_positions = [
+            "RIGHT",
+            "LEFT",
+            "RIGHT_HEAD",
+            "LEFT_HEAD",
+            "RIGHT_FOOT",
+            "LEFT_FOOT",
+            "HEAD",
+            "FOOT",
+        ]
+        robot_idx = 0
         for host_id, service_id in sorted(self.catalogs):
-            await self.start_service(host_id, service_id)
+            if service_id == "RobotControllerService":
+                pos = _auto_positions[robot_idx % len(_auto_positions)]
+                await self.start_service(host_id, service_id, table_position=pos)
+                robot_idx += 1
+            else:
+                await self.start_service(host_id, service_id)
 
     async def stop_all_services(self) -> None:
         for host_id, service_id in sorted(self.catalogs):
@@ -491,9 +509,12 @@ class ControllerBackend(GuiBackend):
                 dds.InstanceState.NOT_ALIVE_DISPOSED,
                 dds.InstanceState.NOT_ALIVE_NO_WRITERS,
             ):
-                key_holder = self._arm_assignment_reader.key_value(
-                    sample.info.instance_handle
-                )
+                try:
+                    key_holder = self._arm_assignment_reader.key_value(
+                        sample.info.instance_handle
+                    )
+                except dds.InvalidArgumentError:
+                    continue  # instance already purged from reader cache
                 rid = key_holder.robot_id
                 if rid in self._arm_states:
                     del self._arm_states[rid]
@@ -748,7 +769,7 @@ def _current_backend() -> ControllerBackend:
     return backend
 
 
-@ui.page("/controller")
+@ui.page("/controller", title="Procedure Controller — Medtech Suite")
 def controller_page() -> None:
     """Render the controller page (full-page with header)."""
     init_theme(title="Procedure Controller")
@@ -1370,15 +1391,19 @@ async def _service_bulk_action(action: Any, refresh_ui: Any) -> None:
 
 
 def main() -> None:
-    storage_secret = os.environ.get(NICEGUI_STORAGE_SECRET_ENV)
-    if not storage_secret:
-        raise RuntimeError(
-            f"{NICEGUI_STORAGE_SECRET_ENV} must be set before starting the controller"
-        )
+    storage_secret = os.environ.get(
+        NICEGUI_STORAGE_SECRET_ENV, NICEGUI_STORAGE_SECRET_DEFAULT
+    )
 
     _current_backend()
     try:
-        ui.run(root=controller_page, storage_secret=storage_secret, reload=False)
+        ui.run(
+            root=controller_page,
+            storage_secret=storage_secret,
+            reload=False,
+            title="Procedure Controller — Medtech Suite",
+            favicon="/images/favicon.ico",
+        )
     except KeyboardInterrupt:
         pass
 

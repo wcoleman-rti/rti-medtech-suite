@@ -117,16 +117,37 @@
                 <data_reader name="OperatorInputReader"
                              topic_ref="OperatorInput">
                     <datareader_qos base_name="TopicProfiles::OperatorInput"/>
+                    <content_filter name="OperatorInputForThisRobot"
+                                    kind="builtin.sql">
+                        <expression>robot_id = %0</expression>
+                        <expression_parameters>
+                            <element>'__unset__'</element>
+                        </expression_parameters>
+                    </content_filter>
                 </data_reader>
 
                 <data_reader name="RobotCommandReader"
                              topic_ref="RobotCommand">
                     <datareader_qos base_name="TopicProfiles::RobotCommand"/>
+                    <content_filter name="RobotCommandForThisRobot"
+                                    kind="builtin.sql">
+                        <expression>robot_id = %0</expression>
+                        <expression_parameters>
+                            <element>'__unset__'</element>
+                        </expression_parameters>
+                    </content_filter>
                 </data_reader>
 
                 <data_reader name="SafetyInterlockReader"
                              topic_ref="SafetyInterlock">
                     <datareader_qos base_name="TopicProfiles::SafetyInterlock"/>
+                    <content_filter name="SafetyInterlockForThisRobot"
+                                    kind="builtin.sql">
+                        <expression>robot_id = %0</expression>
+                        <expression_parameters>
+                            <element>'__unset__'</element>
+                        </expression_parameters>
+                    </content_filter>
                 </data_reader>
             </subscriber>
         </domain_participant>

@@ -3,4 +3,4 @@
 add_subdirectory(fonts)
 
 install(DIRECTORY images/ DESTINATION share/resources/images
-    FILES_MATCHING PATTERN "*.png" PATTERN "*.svg")
+    FILES_MATCHING PATTERN "*.png" PATTERN "*.svg" PATTERN "*.ico")

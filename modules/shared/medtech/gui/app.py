@@ -39,6 +39,7 @@ from hospital_dashboard.procedure_controller.controller import (  # noqa: F401
 from medtech.gui._backend import GuiBackend
 from medtech.gui._icons import ICONS
 from medtech.gui._theme import (
+    NICEGUI_STORAGE_SECRET_DEFAULT,
     NICEGUI_STORAGE_SECRET_ENV,
     NICEGUI_THEME_MODE_KEY,
     _theme_mode_value,
@@ -90,7 +91,7 @@ _NAV_ITEMS = [
 ]
 
 
-@ui.page("/")
+@ui.page("/", title="Medtech Suite", favicon="/images/favicon.ico")
 def shell_page() -> None:
     """Root SPA shell: persistent header + left drawer + sub-pages content."""
     init_theme(title="Medtech Suite")
@@ -128,11 +129,9 @@ def shell_page() -> None:
 
 def main() -> None:
     """Launch the unified medtech-suite web application."""
-    storage_secret = os.environ.get(NICEGUI_STORAGE_SECRET_ENV)
-    if not storage_secret:
-        raise RuntimeError(
-            f"{NICEGUI_STORAGE_SECRET_ENV} must be set before starting the application"
-        )
+    storage_secret = os.environ.get(
+        NICEGUI_STORAGE_SECRET_ENV, NICEGUI_STORAGE_SECRET_DEFAULT
+    )
 
     # Eagerly instantiate stable backends (dashboard, controller) before
     # ui.run() so they register app.on_startup / on_shutdown hooks while the
@@ -154,6 +153,7 @@ def main() -> None:
             storage_secret=storage_secret,
             reload=False,
             title="Medtech Suite",
+            favicon="/images/favicon.ico",
         )
     except KeyboardInterrupt:
         pass

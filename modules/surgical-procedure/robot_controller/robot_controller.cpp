@@ -7,6 +7,7 @@
 namespace medtech::surgical {
 
 RobotController::RobotController(const std::string& robot_id)
+    : robot_id_(robot_id)
 {
     state_.robot_id = robot_id;
     state_.operational_mode = Surgery::RobotMode::IDLE;

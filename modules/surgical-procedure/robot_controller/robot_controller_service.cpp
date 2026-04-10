@@ -9,6 +9,7 @@
 #include <thread>
 
 #include <dds/dds.hpp>
+#include <dds/topic/ContentFilteredTopic.hpp>
 #include <rti/core/cond/AsyncWaitSet.hpp>
 #include <rti/domain/find.hpp>
 #include <rti/pub/findImpl.hpp>
@@ -24,6 +25,25 @@ namespace names = MedtechEntityNames::SurgicalParticipants;
 namespace medtech::surgical {
 
 namespace {
+
+// Set the %0 parameter on a reader's ContentFilteredTopic to a SQL string
+// literal.  No-op if the reader does not use a CFT.
+template <typename T>
+void set_cft_robot_id(
+    dds::sub::DataReader<T>& reader,
+    const std::string& robot_id,
+    medtech::ModuleLogger& log)
+{
+    try {
+        auto cft = dds::core::polymorphic_cast<
+            dds::topic::ContentFilteredTopic<T>>(reader.topic_description());
+        std::vector<std::string> params = { "'" + robot_id + "'" };
+        cft.filter_parameters(params.begin(), params.end());
+        log.informational("CFT parameter set: robot_id='" + robot_id + "'");
+    } catch (const dds::core::InvalidDowncastError&) {
+        // Reader was not created with a CFT (e.g. injected test reader)
+    }
+}
 
 // Parse a string to Surgery::TablePosition (case-insensitive).
 Surgery::TablePosition parse_table_position(const std::string& s) {
@@ -105,6 +125,12 @@ public:
         }
 
         log_.notice("All DDS entities found");
+
+        // Set CFT filter parameters so each reader delivers only
+        // samples addressed to this controller's robot_id.
+        set_cft_robot_id(input_reader_, controller_.robot_id(), log_);
+        set_cft_robot_id(command_reader_, controller_.robot_id(), log_);
+        set_cft_robot_id(interlock_reader_, controller_.robot_id(), log_);
 
         interlock_rc_ = dds::sub::cond::ReadCondition(
             interlock_reader_,

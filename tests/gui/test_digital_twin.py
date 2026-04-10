@@ -148,7 +148,7 @@ class TestDigitalTwinBackend:
         readers = _make_injected_readers(participant_factory)
         backend = twin_module.DigitalTwinBackend(**readers)
         assert backend.joint_positions == []
-        assert backend.operational_mode == "UNKNOWN"
+        assert backend.operational_mode == RobotMode.UNKNOWN
         assert backend.connected is True
         assert backend.interlock_active is False
         assert backend.has_command is False
@@ -165,7 +165,7 @@ class TestDigitalTwinBackend:
                 tool_tip_position=None,
             )
         )
-        assert backend.operational_mode == "OPERATIONAL"
+        assert backend.operational_mode == RobotMode.OPERATIONAL
         assert backend.joint_positions == [0.0, 30.0, 45.0, -20.0]
         assert backend.connected is True
         asyncio.run(backend.close())
@@ -181,7 +181,7 @@ class TestDigitalTwinBackend:
                 tool_tip_position=None,
             )
         )
-        assert backend.operational_mode == "EMERGENCY_STOP"
+        assert backend.operational_mode == RobotMode.EMERGENCY_STOP
         asyncio.run(backend.close())
 
     def test_update_robot_state_paused(self, participant_factory: Any) -> None:
@@ -194,7 +194,7 @@ class TestDigitalTwinBackend:
                 tool_tip_position=None,
             )
         )
-        assert backend.operational_mode == "PAUSED"
+        assert backend.operational_mode == RobotMode.PAUSED
         asyncio.run(backend.close())
 
     def test_update_command_sets_has_command(self, participant_factory: Any) -> None:
@@ -553,45 +553,91 @@ class TestArmStateColors:
     """Arm assignment state → color mapping matches spec."""
 
     def test_operational_green(self) -> None:
-        color = twin_module._ARM_STATE_COLORS[int(ArmAssignmentState.OPERATIONAL)]
-        assert color == twin_module.BRAND_COLORS["green"]
+        assert (
+            twin_module.ARM_STATE_COLORS[ArmAssignmentState.OPERATIONAL]
+            == twin_module.BRAND_COLORS["green"]
+        )
 
     def test_positioning_amber(self) -> None:
-        color = twin_module._ARM_STATE_COLORS[int(ArmAssignmentState.POSITIONING)]
-        assert color == twin_module.BRAND_COLORS["amber"]
+        assert (
+            twin_module.ARM_STATE_COLORS[ArmAssignmentState.POSITIONING]
+            == twin_module.BRAND_COLORS["amber"]
+        )
 
     def test_failed_red(self) -> None:
-        color = twin_module._ARM_STATE_COLORS[int(ArmAssignmentState.FAILED)]
-        assert color == twin_module.BRAND_COLORS["red"]
+        assert (
+            twin_module.ARM_STATE_COLORS[ArmAssignmentState.FAILED]
+            == twin_module.BRAND_COLORS["red"]
+        )
 
     def test_idle_grey(self) -> None:
-        color = twin_module._ARM_STATE_COLORS[int(ArmAssignmentState.IDLE)]
-        assert color == twin_module.BRAND_COLORS["gray"]
+        assert (
+            twin_module.ARM_STATE_COLORS[ArmAssignmentState.IDLE]
+            == twin_module.BRAND_COLORS["gray"]
+        )
 
     def test_assigned_grey(self) -> None:
-        color = twin_module._ARM_STATE_COLORS[int(ArmAssignmentState.ASSIGNED)]
-        assert color == twin_module.BRAND_COLORS["gray"]
+        assert (
+            twin_module.ARM_STATE_COLORS[ArmAssignmentState.ASSIGNED]
+            == twin_module.BRAND_COLORS["gray"]
+        )
 
 
 # ---------------------------------------------------------------------------
-# TestTablePositionSlotMapping — position to slot index
+# TestTablePositionWorldMapping — position to world coordinates
 # ---------------------------------------------------------------------------
 
 
-class TestTablePositionSlotMapping:
-    """TablePosition → _ARM_SLOTS index mapping."""
+class TestOperatingTable:
+    """OperatingTable derives arm positions from table geometry."""
 
-    def test_right_maps_to_slot_0(self) -> None:
-        assert twin_module._TABLE_POSITION_SLOT[int(TablePosition.RIGHT)] == 0
+    def test_all_named_positions_supported(self) -> None:
+        """Every TablePosition except UNKNOWN is supported by get_position."""
+        t = twin_module.DEFAULT_TABLE
+        for tp in [
+            TablePosition.RIGHT,
+            TablePosition.LEFT,
+            TablePosition.HEAD,
+            TablePosition.FOOT,
+            TablePosition.RIGHT_HEAD,
+            TablePosition.LEFT_HEAD,
+            TablePosition.RIGHT_FOOT,
+            TablePosition.LEFT_FOOT,
+        ]:
+            ox, oy = t.get_position(tp)
+            assert isinstance(ox, float)
+            assert isinstance(oy, float)
 
-    def test_left_maps_to_slot_1(self) -> None:
-        assert twin_module._TABLE_POSITION_SLOT[int(TablePosition.LEFT)] == 1
+    def test_positions_count_matches_max_arm_count(self) -> None:
+        t = twin_module.DEFAULT_TABLE
+        assert len(t.positions) == twin_module.MAX_ARM_COUNT
 
-    def test_right_foot_maps_to_slot_2(self) -> None:
-        assert twin_module._TABLE_POSITION_SLOT[int(TablePosition.RIGHT_FOOT)] == 2
+    def test_unknown_not_in_positions(self) -> None:
+        t = twin_module.DEFAULT_TABLE
+        assert TablePosition.UNKNOWN not in t.positions
 
-    def test_left_foot_maps_to_slot_3(self) -> None:
-        assert twin_module._TABLE_POSITION_SLOT[int(TablePosition.LEFT_FOOT)] == 3
+    def test_no_duplicate_positions(self) -> None:
+        """No two TablePositions share the same (ox, oy)."""
+        t = twin_module.DEFAULT_TABLE
+        coords = [t.get_position(p) for p in t.positions]
+        assert len(coords) == len(set(coords))
+
+    def test_positions_derived_from_geometry(self) -> None:
+        """Changing table dimensions changes arm positions."""
+        t1 = twin_module.OperatingTable(cx=0.0, cy=0.0, half_length=1.0, half_width=0.5)
+        t2 = twin_module.OperatingTable(cx=0.0, cy=0.0, half_length=2.0, half_width=1.0)
+        # Foot position should be further out for a larger table
+        _, _ = t1.get_position(TablePosition.FOOT)
+        x2, _ = t2.get_position(TablePosition.FOOT)
+        x1, _ = t1.get_position(TablePosition.FOOT)
+        assert x2 > x1
+
+    def test_bounds_match_dimensions(self) -> None:
+        t = twin_module.OperatingTable(cx=1.0, cy=2.0, half_length=0.5, half_width=0.3)
+        assert t.x_min == 0.5
+        assert t.x_max == 1.5
+        assert t.y_min == 1.7
+        assert t.y_max == 2.3
 
 
 # ---------------------------------------------------------------------------
@@ -622,3 +668,102 @@ class TestQosConfigurationArmAssignment:
             assert reader.qos.durability.kind == dds.DurabilityKind.TRANSIENT_LOCAL
         finally:
             p.close()
+
+
+# ---------------------------------------------------------------------------
+# TestPerRobotStateTracking — multi-robot joint state
+# ---------------------------------------------------------------------------
+
+
+class TestPerRobotStateTracking:
+    """DigitalTwinBackend tracks per-robot joint state."""
+
+    def test_robot_states_initially_empty(self, participant_factory: Any) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        assert backend.robot_states == {}
+        asyncio.run(backend.close())
+
+    def test_update_stores_per_robot(self, participant_factory: Any) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        backend.update_robot_state(
+            SimpleNamespace(
+                robot_id="arm-1",
+                joint_positions=[0.1, 0.2, 0.3, 0.4],
+                operational_mode=int(RobotMode.OPERATIONAL),
+                tool_tip_position=None,
+            )
+        )
+        assert "arm-1" in backend.robot_states
+        assert backend.robot_states["arm-1"]["joint_positions"] == [0.1, 0.2, 0.3, 0.4]
+        assert (
+            backend.robot_states["arm-1"]["operational_mode"] == RobotMode.OPERATIONAL
+        )
+        asyncio.run(backend.close())
+
+    def test_multiple_robots_tracked_independently(
+        self, participant_factory: Any
+    ) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        backend.update_robot_state(
+            SimpleNamespace(
+                robot_id="arm-1",
+                joint_positions=[0.1, 0.2, 0.3, 0.4],
+                operational_mode=int(RobotMode.OPERATIONAL),
+                tool_tip_position=None,
+            )
+        )
+        backend.update_robot_state(
+            SimpleNamespace(
+                robot_id="arm-2",
+                joint_positions=[1.0, 2.0, 3.0, 4.0],
+                operational_mode=int(RobotMode.IDLE),
+                tool_tip_position=None,
+            )
+        )
+        assert len(backend.robot_states) == 2
+        assert backend.robot_states["arm-1"]["joint_positions"] == [0.1, 0.2, 0.3, 0.4]
+        assert backend.robot_states["arm-2"]["joint_positions"] == [1.0, 2.0, 3.0, 4.0]
+        asyncio.run(backend.close())
+
+    def test_get_robot_joints_returns_data(self, participant_factory: Any) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        backend.update_robot_state(
+            SimpleNamespace(
+                robot_id="arm-1",
+                joint_positions=[0.5, 1.0, 1.5, 2.0],
+                operational_mode=int(RobotMode.OPERATIONAL),
+                tool_tip_position=None,
+            )
+        )
+        assert backend.get_robot_joints("arm-1") == [0.5, 1.0, 1.5, 2.0]
+        asyncio.run(backend.close())
+
+    def test_get_robot_joints_unknown_returns_empty(
+        self, participant_factory: Any
+    ) -> None:
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        assert backend.get_robot_joints("no-such-arm") == []
+        asyncio.run(backend.close())
+
+    def test_legacy_joint_positions_still_updated(
+        self, participant_factory: Any
+    ) -> None:
+        """Legacy single-robot fields are updated for backwards compatibility."""
+        readers = _make_injected_readers(participant_factory)
+        backend = twin_module.DigitalTwinBackend(**readers)
+        backend.update_robot_state(
+            SimpleNamespace(
+                robot_id="arm-1",
+                joint_positions=[0.1, 0.2, 0.3, 0.4],
+                operational_mode=int(RobotMode.OPERATIONAL),
+                tool_tip_position=None,
+            )
+        )
+        assert backend.joint_positions == [0.1, 0.2, 0.3, 0.4]
+        assert backend.operational_mode == RobotMode.OPERATIONAL
+        asyncio.run(backend.close())

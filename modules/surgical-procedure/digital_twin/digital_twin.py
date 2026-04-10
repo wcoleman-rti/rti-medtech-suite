@@ -37,6 +37,7 @@ from medtech.dds import initialize_connext
 from medtech.gui import (
     BRAND_COLORS,
     ICONS,
+    NICEGUI_STORAGE_SECRET_DEFAULT,
     NICEGUI_STORAGE_SECRET_ENV,
     GuiBackend,
     create_header,
@@ -58,6 +59,8 @@ OperatorInput = surgery.Surgery.OperatorInput
 RobotArmAssignment = surgery.Surgery.RobotArmAssignment
 ArmAssignmentState = surgery.Surgery.ArmAssignmentState
 TablePosition = surgery.Surgery.TablePosition
+RobotMode = surgery.Surgery.RobotMode
+MAX_ARM_COUNT: int = surgery.Surgery.MAX_ARM_COUNT
 
 # Heatmap angle range (degrees → full color saturation)
 _HEATMAP_ANGLE_MAX = 180.0
@@ -85,40 +88,115 @@ _NUM_JOINTS = len(_JOINT_CONFIGS)
 # rather than diagonally upward before even reaching the table.
 _ARM_BASE_Z = 0.78
 
-# Operating table dimensions and world position.
-# Table is 2.2 m long × 0.85 m wide — large relative to the arm.
-_TABLE_X = 1.10  # half-length (2.2 m total)
-_TABLE_Y = 0.425  # half-width  (0.85 m total)
-_TABLE_SLAB_H = 0.08  # top slab thickness
-_TABLE_TOP_Z = 0.80  # table surface height (z)
-# Pedestal column (narrow square section connecting foot platform to slab)
-_TABLE_COL_S = 0.22  # column square side
-# Foot platform (wide low base with caster-style appearance)
-_TABLE_FOOT_W = 0.80  # foot platform full length (X)
-_TABLE_FOOT_D = 0.36  # foot platform full depth (Y)
-_TABLE_FOOT_H = 0.08  # foot platform height
-_TABLE_FOOT_R = 0.035  # foot platform corner radius
-# Surface Z above which arm segment knuckle centres must stay when over the
-# table footprint.  = mattress top (0.90) + max joint sphere radius (0.130)
-# + safety margin (0.02) ≈ 1.05 m.
-# Using a hard literal is intentional — this is a scene-layout constant.
-_TABLE_SURFACE_Z = 1.05
-_TABLE_CX = 0.0  # table centred at world origin X
-_TABLE_CY = 0.65  # table offset in Y
+# ---------------------------------------------------------------------------
+# OperatingTable — encapsulates table geometry and arm position derivation
+# ---------------------------------------------------------------------------
 
-# Pre-defined arm mount slots around the table.
-# Each slot has a stable (ox, oy) world position and a human-readable label.
-# _build_scene uses slot 0 for the single-arm case.  When multi-arm support
-# is added each slot maps to its own DigitalTwinBackend instance.
-_ARM_SLOTS: list[dict] = [
-    {"id": "arm-1", "ox": 0.30, "oy": -0.45, "label": "Near-right"},
-    {"id": "arm-2", "ox": -0.50, "oy": -0.45, "label": "Near-left"},
-    {"id": "arm-3", "ox": 0.30, "oy": 1.75, "label": "Far-right"},
-    {"id": "arm-4", "ox": -0.50, "oy": 1.75, "label": "Far-left"},
+
+class OperatingTable:
+    """3D operating table model that derives arm mount positions.
+
+    All arm world-coordinates are computed from the table's center and
+    dimensions, so nothing about arm placement is hard-coded independently
+    of the table geometry.
+
+    Parameters match the physical OR table: 2.2 m × 0.85 m slab at 0.80 m
+    height, centered at ``(cx, cy)`` in world-space.
+    """
+
+    def __init__(
+        self,
+        cx: float = 0.0,
+        cy: float = 0.65,
+        half_length: float = 1.10,
+        half_width: float = 0.425,
+        surface_z: float = 0.80,
+        slab_h: float = 0.08,
+    ) -> None:
+        self.cx = cx
+        self.cy = cy
+        self.half_length = half_length
+        self.half_width = half_width
+        self.surface_z = surface_z
+        self.slab_h = slab_h
+
+        # Derived geometry
+        self.col_side = 0.22  # pedestal column square side
+        self.foot_w = 0.80  # foot platform full length (X)
+        self.foot_d = 0.36  # foot platform full depth (Y)
+        self.foot_h = 0.08  # foot platform height
+        self.foot_r = 0.035  # foot platform corner radius
+
+        # Arm standoff: distance from table edge to arm cart center.
+        # This single value controls how far the carts sit from the table.
+        self._arm_standoff = 0.90
+
+        # Z above which arm joints must stay when over the table footprint.
+        # mattress top (surface_z + slab_h/2 + 0.10) + max joint sphere
+        # radius (0.130) + safety margin (0.02)
+        self.clearance_z = surface_z + slab_h / 2 + 0.10 + 0.130 + 0.02
+
+    def get_position(self, pos: TablePosition) -> tuple[float, float]:
+        """Return (x, y) world-space mount coordinates for *pos*.
+
+        Positions are derived from the table center and dimensions:
+        - Cardinal (HEAD/FOOT/LEFT/RIGHT): centered on the respective edge
+        - Diagonal (RIGHT_HEAD etc.): at the table corner, offset outward
+        """
+        cx, cy = self.cx, self.cy
+        hx, hy = self.half_length, self.half_width
+        s = self._arm_standoff
+
+        return {
+            TablePosition.RIGHT: (cx, cy - hy - s),
+            TablePosition.LEFT: (cx, cy + hy + s),
+            TablePosition.HEAD: (cx - hx - s, cy),
+            TablePosition.FOOT: (cx + hx + s, cy),
+            TablePosition.RIGHT_HEAD: (cx - hx * 0.72, cy - hy - s),
+            TablePosition.LEFT_HEAD: (cx - hx * 0.72, cy + hy + s),
+            TablePosition.RIGHT_FOOT: (cx + hx * 0.72, cy - hy - s),
+            TablePosition.LEFT_FOOT: (cx + hx * 0.72, cy + hy + s),
+        }[pos]
+
+    @property
+    def positions(self) -> list[TablePosition]:
+        """All valid arm positions (every TablePosition except UNKNOWN)."""
+        return [p for p in TablePosition if p != TablePosition.UNKNOWN]
+
+    @property
+    def x_min(self) -> float:
+        return self.cx - self.half_length
+
+    @property
+    def x_max(self) -> float:
+        return self.cx + self.half_length
+
+    @property
+    def y_min(self) -> float:
+        return self.cy - self.half_width
+
+    @property
+    def y_max(self) -> float:
+        return self.cy + self.half_width
+
+
+# Default table used by the 3D scene
+DEFAULT_TABLE = OperatingTable()
+
+# Default position for single-arm / no-assignment fallback
+DEFAULT_POSITION = TablePosition.RIGHT
+
+# Round-robin order when an assignment has UNKNOWN position
+POSITION_ROUND_ROBIN: list[TablePosition] = [
+    TablePosition.RIGHT,
+    TablePosition.LEFT,
+    TablePosition.RIGHT_HEAD,
+    TablePosition.LEFT_HEAD,
+    TablePosition.RIGHT_FOOT,
+    TablePosition.LEFT_FOOT,
+    TablePosition.HEAD,
+    TablePosition.FOOT,
 ]
-# Backwards-compatible single-arm offset (slot 0)
-_ARM_OX = _ARM_SLOTS[0]["ox"]
-_ARM_OY = _ARM_SLOTS[0]["oy"]
 # Fallback display pose (radians) shown only when no DDS data has arrived yet.
 # Arm pitched ~20° toward table (J0 small negative), elbow bent — working posture.
 _NO_SIGNAL_POSE = [-0.35, 1.10, 0.20, -0.20]
@@ -137,66 +215,23 @@ _JOINT_LIMITS = [
 _LINK_COLOR_DARK = THEME_PALETTE["dark"]["arm"]  # #C8D2DC
 _LINK_COLOR_LIGHT = THEME_PALETTE["light"]["arm"]  # #505A64
 
-# Mode label map (matches RobotMode enum values)
-_MODE_LABELS: dict[int, str] = {
-    0: "UNKNOWN",
-    1: "IDLE",
-    2: "OPERATIONAL",
-    3: "PAUSED",
-    4: "EMERGENCY_STOP",
-}
-
-_MODE_COLORS: dict[str, str] = {
-    "OPERATIONAL": BRAND_COLORS["green"],
-    "PAUSED": BRAND_COLORS["amber"],
-    "EMERGENCY_STOP": BRAND_COLORS["red"],
-    "E-STOP": BRAND_COLORS["red"],
-    "IDLE": BRAND_COLORS["gray"],
-    "UNKNOWN": BRAND_COLORS["light_gray"],
+# Mode → color mapping (RobotMode enum keys)
+MODE_COLORS: dict[RobotMode, str] = {
+    RobotMode.OPERATIONAL: BRAND_COLORS["green"],
+    RobotMode.PAUSED: BRAND_COLORS["amber"],
+    RobotMode.EMERGENCY_STOP: BRAND_COLORS["red"],
+    RobotMode.IDLE: BRAND_COLORS["gray"],
+    RobotMode.UNKNOWN: BRAND_COLORS["light_gray"],
 }
 
 # Color mapping for ArmAssignmentState lifecycle indicators
-_ARM_STATE_COLORS: dict[int, str] = {
-    int(ArmAssignmentState.OPERATIONAL): BRAND_COLORS["green"],
-    int(ArmAssignmentState.POSITIONING): BRAND_COLORS["amber"],
-    int(ArmAssignmentState.FAILED): BRAND_COLORS["red"],
-    int(ArmAssignmentState.IDLE): BRAND_COLORS["gray"],
-    int(ArmAssignmentState.ASSIGNED): BRAND_COLORS["gray"],
-    int(ArmAssignmentState.UNKNOWN): BRAND_COLORS["gray"],
-}
-
-_ARM_STATE_LABELS: dict[int, str] = {
-    int(ArmAssignmentState.UNKNOWN): "UNKNOWN",
-    int(ArmAssignmentState.IDLE): "IDLE",
-    int(ArmAssignmentState.ASSIGNED): "ASSIGNED",
-    int(ArmAssignmentState.POSITIONING): "POSITIONING",
-    int(ArmAssignmentState.OPERATIONAL): "OPERATIONAL",
-    int(ArmAssignmentState.FAILED): "FAILED",
-}
-
-_TABLE_POSITION_LABELS: dict[int, str] = {
-    int(TablePosition.UNKNOWN): "Unknown",
-    int(TablePosition.HEAD): "Head",
-    int(TablePosition.FOOT): "Foot",
-    int(TablePosition.LEFT): "Left",
-    int(TablePosition.RIGHT): "Right",
-    int(TablePosition.LEFT_HEAD): "Left-Head",
-    int(TablePosition.RIGHT_HEAD): "Right-Head",
-    int(TablePosition.LEFT_FOOT): "Left-Foot",
-    int(TablePosition.RIGHT_FOOT): "Right-Foot",
-}
-
-# Map TablePosition enum values to _ARM_SLOTS indices for scene placement.
-# Positions not listed fall back to round-robin slot allocation.
-_TABLE_POSITION_SLOT: dict[int, int] = {
-    int(TablePosition.RIGHT): 0,  # Near-right
-    int(TablePosition.LEFT): 1,  # Near-left
-    int(TablePosition.RIGHT_HEAD): 0,
-    int(TablePosition.RIGHT_FOOT): 2,
-    int(TablePosition.LEFT_HEAD): 1,
-    int(TablePosition.LEFT_FOOT): 3,
-    int(TablePosition.HEAD): 1,
-    int(TablePosition.FOOT): 2,
+ARM_STATE_COLORS: dict[ArmAssignmentState, str] = {
+    ArmAssignmentState.OPERATIONAL: BRAND_COLORS["green"],
+    ArmAssignmentState.POSITIONING: BRAND_COLORS["amber"],
+    ArmAssignmentState.FAILED: BRAND_COLORS["red"],
+    ArmAssignmentState.IDLE: BRAND_COLORS["gray"],
+    ArmAssignmentState.ASSIGNED: BRAND_COLORS["gray"],
+    ArmAssignmentState.UNKNOWN: BRAND_COLORS["gray"],
 }
 
 
@@ -318,13 +353,13 @@ def _compute_arm_geometry(
         # (including both endpoints) so that an arm approaching from the side
         # is caught even when neither endpoint is inside the table footprint.
         # For each sample inside the footprint that is too low, compute the kz
-        # that would bring that sample up to _TABLE_SURFACE_Z (linear solve),
+        # that would bring that sample up to clearance_z (linear solve),
         # and take the strictest (highest) requirement across all samples.
-        _ty_min = _TABLE_CY - _TABLE_Y
-        _ty_max = _TABLE_CY + _TABLE_Y
-        _tx_min = _TABLE_CX - _TABLE_X
-        _tx_max = _TABLE_CX + _TABLE_X
-        _min_z_local = _TABLE_SURFACE_Z - _ARM_BASE_Z
+        _ty_min = DEFAULT_TABLE.y_min
+        _ty_max = DEFAULT_TABLE.y_max
+        _tx_min = DEFAULT_TABLE.x_min
+        _tx_max = DEFAULT_TABLE.x_max
+        _min_z_local = DEFAULT_TABLE.clearance_z - _ARM_BASE_Z
         for _si in range(8):
             _t = _si / 7.0
             _sx = pos[0] + _t * (kx - pos[0])
@@ -333,7 +368,7 @@ def _compute_arm_geometry(
             if (
                 _tx_min <= _sx + ox <= _tx_max
                 and _ty_min <= _sy + oy <= _ty_max
-                and _sz_world < _TABLE_SURFACE_Z
+                and _sz_world < DEFAULT_TABLE.clearance_z
             ):
                 if _t > 1e-6:
                     kz = max(kz, pos[2] + (_min_z_local - pos[2]) / _t)
@@ -404,13 +439,16 @@ class DigitalTwinBackend(GuiBackend):
 
         # ---- State model ------------------------------------------------
         self.joint_positions: list[float] = []
-        self.operational_mode: str = "UNKNOWN"
-        self.mode_color: str = _MODE_COLORS["UNKNOWN"]
+        self.operational_mode: RobotMode = RobotMode.UNKNOWN
+        self.mode_color: str = MODE_COLORS[RobotMode.UNKNOWN]
         self.tool_tip: Any | None = None
         self.connected: bool = True
         self.interlock_active: bool = False
         self.interlock_reason: str = ""
         self.has_command: bool = False
+
+        # ---- Per-robot state (keyed by robot_id) -------------------------
+        self.robot_states: dict[str, dict[str, Any]] = {}
 
         # ---- Multi-arm tracking ------------------------------------------
         self.arm_assignments: dict[str, RobotArmAssignment] = {}
@@ -547,12 +585,32 @@ class DigitalTwinBackend(GuiBackend):
     # ---------------------------------------------------------------------- #
 
     def update_robot_state(self, sample: Any) -> None:
-        """Store the latest RobotState sample and update derived fields."""
+        """Store the latest RobotState sample and update derived fields.
+
+        Per-robot joint data is stored in ``robot_states[robot_id]`` so
+        each arm in the scene can be wired to its own telemetry stream.
+        The legacy ``joint_positions`` / ``operational_mode`` fields are
+        kept pointing at the most-recently-received sample for backwards
+        compatibility with single-arm workflows.
+        """
+        robot_id = str(getattr(sample, "robot_id", ""))
         joints = getattr(sample, "joint_positions", None)
-        self.joint_positions = list(joints) if joints else []
-        mode_val = int(getattr(sample, "operational_mode", 0))
-        self.operational_mode = _MODE_LABELS.get(mode_val, "UNKNOWN")
-        self.mode_color = _MODE_COLORS.get(self.operational_mode, BRAND_COLORS["gray"])
+        joint_list = list(joints) if joints else []
+        mode = RobotMode(int(getattr(sample, "operational_mode", 0)))
+
+        # Per-robot tracking
+        if robot_id:
+            self.robot_states[robot_id] = {
+                "joint_positions": joint_list,
+                "operational_mode": mode,
+                "mode_color": MODE_COLORS.get(mode, BRAND_COLORS["gray"]),
+                "tool_tip": getattr(sample, "tool_tip_position", None),
+            }
+
+        # Legacy single-robot fields (latest wins)
+        self.joint_positions = joint_list
+        self.operational_mode = mode
+        self.mode_color = MODE_COLORS.get(mode, BRAND_COLORS["gray"])
         self.tool_tip = getattr(sample, "tool_tip_position", None)
         self.connected = True
 
@@ -569,14 +627,19 @@ class DigitalTwinBackend(GuiBackend):
         """Set writer liveliness state; triggers no repaint here (UI timer handles it)."""
         self.connected = connected
 
+    def get_robot_joints(self, robot_id: str) -> list[float]:
+        """Return the latest joint_positions for *robot_id*, or empty list."""
+        state = self.robot_states.get(robot_id)
+        return state["joint_positions"] if state else []
+
     def update_arm_assignment(self, sample: Any) -> None:
         """Track an arm assignment sample by robot_id."""
         robot_id = str(getattr(sample, "robot_id", ""))
         if not robot_id:
             return
         self.arm_assignments[robot_id] = sample
-        state_label = _ARM_STATE_LABELS.get(int(getattr(sample, "status", 0)), "?")
-        log.informational(f"DigitalTwin: arm {robot_id} → {state_label}")
+        status = ArmAssignmentState(int(getattr(sample, "status", 0)))
+        log.informational(f"DigitalTwin: arm {robot_id} → {status.name}")
 
     def remove_arm(self, robot_id: str) -> None:
         """Remove an arm from tracking (disposed or liveliness lost)."""
@@ -619,10 +682,15 @@ class DigitalTwinBackend(GuiBackend):
                 dds.InstanceState.NOT_ALIVE_DISPOSED,
                 dds.InstanceState.NOT_ALIVE_NO_WRITERS,
             ):
-                key_holder = self._arm_assignment_reader.key_value(info.instance_handle)
-                robot_id = str(getattr(key_holder, "robot_id", ""))
-                if robot_id:
-                    self.remove_arm(robot_id)
+                try:
+                    key_holder = self._arm_assignment_reader.key_value(
+                        info.instance_handle
+                    )
+                    robot_id = str(getattr(key_holder, "robot_id", ""))
+                    if robot_id:
+                        self.remove_arm(robot_id)
+                except dds.InvalidArgumentError:
+                    pass  # instance already purged from reader cache
 
     async def _monitor_liveliness(self) -> None:
         """Periodically check RobotState writer liveliness."""
@@ -655,7 +723,7 @@ def _get_backend(room_id: str) -> DigitalTwinBackend:
 # --------------------------------------------------------------------------- #
 
 
-@ui.page("/twin/{room_id}")
+@ui.page("/twin/{room_id}", title="Digital Twin — Medtech Suite")
 def twin_page(room_id: str) -> None:
     """Render the digital twin 3D visualization page for *room_id* (full-page with header)."""
     init_theme()
@@ -691,32 +759,38 @@ def _build_arm(
     oy: float,
     init_joints: list[float],
     joint_color: str = _LINK_COLOR_DARK,
-) -> tuple[list[Any], list[Any], Any, Any, Any, Any, float]:
+) -> tuple[list[Any], list[Any], Any, Any, Any, Any, float, list[Any]]:
     """Construct one arm instance in *scene* at world offset (ox, oy).
 
-    Returns (arm_segs, jnt_spheres, shoulder_sphere, tool_sphere, nib, instr_dot, nib_half).
-    shoulder_sphere is returned separately so the theme-change handler can
-    recolor it (along with jnt_spheres) without rebuilding the scene.
-    Extracting arm construction here means adding a second (or Nth) arm
-    later is a single extra ``_build_arm()`` call in ``_build_scene``.
+    Returns (arm_segs, jnt_spheres, shoulder_sphere, tool_sphere, nib,
+             instr_dot, nib_half, base_parts).
+    ``base_parts`` collects the cart/riser/wheels so callers can toggle
+    their visibility along with the arm segments.
     """
     B = _ARM_BASE_Z
     geo = _compute_arm_geometry(init_joints, ox, oy)
+
+    base_parts: list[Any] = []
 
     # ── Mobile cart base ───────────────────────────────────────────────────
     cart_w, cart_d, cart_h = 0.55, 0.45, 0.18
     _cart_color = "#546E7A"  # grey-scale
     _post_color = "#78909C"  # lighter for corner posts
-    scene.box(cart_w, cart_d, cart_h).move(ox, oy, cart_h / 2).material(
-        color=_cart_color
+    base_parts.append(
+        scene.box(cart_w, cart_d, cart_h)
+        .move(ox, oy, cart_h / 2)
+        .material(color=_cart_color)
     )
     # Corner posts — cylinders at each vertical edge give a modern rounded-edge
     # appearance (industrial equipment / medical cart aesthetic).
     _post_r = 0.028
     for _csx, _csy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
-        scene.cylinder(_post_r, _post_r, cart_h, 16).move(
-            ox + _csx * (cart_w / 2), oy + _csy * (cart_d / 2), cart_h / 2
-        ).rotate(math.pi / 2, 0, 0).material(color=_post_color)
+        base_parts.append(
+            scene.cylinder(_post_r, _post_r, cart_h, 16)
+            .move(ox + _csx * (cart_w / 2), oy + _csy * (cart_d / 2), cart_h / 2)
+            .rotate(math.pi / 2, 0, 0)
+            .material(color=_post_color)
+        )
     # Corner wheels
     for wx, wy in [
         (ox - cart_w / 2 + 0.07, oy - cart_d / 2 + 0.07),
@@ -724,12 +798,17 @@ def _build_arm(
         (ox - cart_w / 2 + 0.07, oy + cart_d / 2 - 0.07),
         (ox + cart_w / 2 - 0.07, oy + cart_d / 2 - 0.07),
     ]:
-        scene.sphere(0.055).move(wx, wy, 0.055).material(color="#263238")
+        base_parts.append(
+            scene.sphere(0.055).move(wx, wy, 0.055).material(color="#263238")
+        )
     # Riser column — 24 segments for smoother silhouette
     col_h = B - cart_h
-    scene.cylinder(0.08, 0.08, col_h, 24).move(ox, oy, cart_h + col_h / 2).rotate(
-        math.pi / 2, 0, 0
-    ).material(color=_cart_color)
+    base_parts.append(
+        scene.cylinder(0.08, 0.08, col_h, 24)
+        .move(ox, oy, cart_h + col_h / 2)
+        .rotate(math.pi / 2, 0, 0)
+        .material(color=_cart_color)
+    )
     # Shoulder actuator housing
     shoulder_sphere = scene.sphere(0.13).move(ox, oy, B).material(color=joint_color)
 
@@ -792,56 +871,60 @@ def _build_arm(
         )
         .material(color=BRAND_COLORS["orange"])
     )
-    return arm_segs, jnt_spheres, shoulder_sphere, tool_sphere, nib, instr_dot, nib_half
+    return (
+        arm_segs,
+        jnt_spheres,
+        shoulder_sphere,
+        tool_sphere,
+        nib,
+        instr_dot,
+        nib_half,
+        base_parts,
+    )
 
 
-def _make_arm_updater(
-    arm_segs: list[Any],
-    jnt_spheres: list[Any],
-    tool_sphere: Any,
-    nib: Any,
-    instr_dot: Any,
-    nib_half: float,
+def _update_arm_direct(
+    arm_obj: dict[str, Any],
     ox: float,
     oy: float,
-    get_joints: Any,
-) -> Any:
-    """Return an ``update()`` callable that repositions one arm's scene objects.
+    joints: list[float],
+) -> None:
+    """Reposition one arm's scene objects to reflect *joints*.
 
-    Each arm closure captures its own (ox, oy, get_joints) independently,
-    so N arms can each call their updater at 10 Hz without interfering.
-    ``get_joints`` is a zero-argument callable returning ``list[float]``.
+    Takes the joint list as an explicit argument so the caller can bind
+    per-robot telemetry each frame.
     """
     B = _ARM_BASE_Z
-
-    def update() -> None:
-        joints = get_joints() or _NO_SIGNAL_POSE
-        g = _compute_arm_geometry(joints, ox, oy)
-        for i, (seg, jsph, cfg) in enumerate(
-            zip(arm_segs, jnt_spheres, _JOINT_CONFIGS)
-        ):
-            angle = joints[i] if i < len(joints) else 0.0
-            gi = g[i]
-            seg.move(gi["cx"] + ox, gi["cy"] + oy, gi["cz"] + B).rotate(
-                gi["rx"], gi["ry"], gi["rz"]
-            ).material(color=heatmap_color(angle))
-            jsph.move(gi["kx"] + ox, gi["ky"] + oy, gi["kz"] + B)
-        tip = g[-1]
-        fwd = tip["fwd"]
-        rx, ry, rz = _euler_from_direction(*fwd)
-        tool_sphere.move(tip["tip_x"] + ox, tip["tip_y"] + oy, tip["tip_z"] + B)
-        nib.move(
-            tip["tip_x"] + fwd[0] * nib_half + ox,
-            tip["tip_y"] + fwd[1] * nib_half + oy,
-            tip["tip_z"] + fwd[2] * nib_half + B,
-        ).rotate(rx, ry, rz)
-        instr_dot.move(
-            tip["tip_x"] + fwd[0] * nib_half * 2 + ox,
-            tip["tip_y"] + fwd[1] * nib_half * 2 + oy,
-            tip["tip_z"] + fwd[2] * nib_half * 2 + B,
+    g = _compute_arm_geometry(joints, ox, oy)
+    seg_colors: list[str] = arm_obj.get("seg_colors", [""] * len(arm_obj["arm_segs"]))
+    for i, (seg, jsph, cfg) in enumerate(
+        zip(arm_obj["arm_segs"], arm_obj["jnt_spheres"], _JOINT_CONFIGS)
+    ):
+        angle = joints[i] if i < len(joints) else 0.0
+        gi = g[i]
+        seg.move(gi["cx"] + ox, gi["cy"] + oy, gi["cz"] + B).rotate(
+            gi["rx"], gi["ry"], gi["rz"]
         )
-
-    return update
+        new_color = heatmap_color(angle)
+        if new_color != seg_colors[i]:
+            seg.material(color=new_color)
+            seg_colors[i] = new_color
+        jsph.move(gi["kx"] + ox, gi["ky"] + oy, gi["kz"] + B)
+    tip = g[-1]
+    fwd = tip["fwd"]
+    rx, ry, rz = _euler_from_direction(*fwd)
+    nib_half = arm_obj["nib_half"]
+    arm_obj["tool_sphere"].move(tip["tip_x"] + ox, tip["tip_y"] + oy, tip["tip_z"] + B)
+    arm_obj["nib"].move(
+        tip["tip_x"] + fwd[0] * nib_half + ox,
+        tip["tip_y"] + fwd[1] * nib_half + oy,
+        tip["tip_z"] + fwd[2] * nib_half + B,
+    ).rotate(rx, ry, rz)
+    arm_obj["instr_dot"].move(
+        tip["tip_x"] + fwd[0] * nib_half * 2 + ox,
+        tip["tip_y"] + fwd[1] * nib_half * 2 + oy,
+        tip["tip_z"] + fwd[2] * nib_half * 2 + B,
+    )
 
 
 def _build_scene(
@@ -850,15 +933,15 @@ def _build_scene(
 ) -> None:
     """Build the 3D scene and attach the update timer.
 
-    The 3D scene uses a fixed dark background regardless of the app UI theme.
-    This is standard for surgical/simulation viewports (da Vinci, Stryker, etc.)
-    and avoids the NiceGUI v3 limitation where ui.scene's Three.js renderer
-    background is set once in mounted() and cannot be updated reactively.
+    One arm is pre-built per ``TablePosition`` from surgery.idl (8 total,
+    matching ``MAX_ARM_COUNT``).  All arms start hidden; visibility is
+    driven by the ``RobotArmAssignment`` samples the backend receives.
+    Each arm's updater reads per-robot joint data from
+    ``current_backend.robot_states[robot_id]``, so every arm gets live
+    heatmap-colored telemetry.
 
-    The arm is constructed via ``_build_arm()`` / ``_make_arm_updater()``.
-    To add more arms in a future step, add entries to ``_ARM_SLOTS`` and
-    call ``_build_arm()`` + ``_make_arm_updater()`` once per slot, passing
-    each slot's backend's ``joint_positions`` getter.
+    When no assignments exist, all arms remain hidden — the scene shows
+    only the operating table until robot services publish assignments.
     """
     init_joints = _NO_SIGNAL_POSE
     # Fixed dark scene palette — independent of the app light/dark toggle.
@@ -883,50 +966,51 @@ def _build_scene(
             duration=0,
         )
 
-        # ── Operating table ────────────────────────────────────────────────
-        # Shape: OR table profile from reference image — narrow center column
-        # rising from a wide low foot platform to support the table slab.
+        # ── Operating table (rendered from DEFAULT_TABLE geometry) ──────
+        t = DEFAULT_TABLE
         _t_steel = "#607D8B"
-        _t_col_h = _TABLE_TOP_Z - _TABLE_SLAB_H * 0.5 - _TABLE_FOOT_H
+        _t_col_h = t.surface_z - t.slab_h * 0.5 - t.foot_h
 
         # Foot platform with rounded corners (cross-box + 4 corner cylinders)
         for _bw, _bd in [
-            (_TABLE_FOOT_W - 2 * _TABLE_FOOT_R, _TABLE_FOOT_D),
-            (_TABLE_FOOT_W, _TABLE_FOOT_D - 2 * _TABLE_FOOT_R),
+            (t.foot_w - 2 * t.foot_r, t.foot_d),
+            (t.foot_w, t.foot_d - 2 * t.foot_r),
         ]:
-            scene.box(_bw, _bd, _TABLE_FOOT_H).move(
-                _TABLE_CX, _TABLE_CY, _TABLE_FOOT_H / 2
-            ).material(color=_t_steel)
+            scene.box(_bw, _bd, t.foot_h).move(t.cx, t.cy, t.foot_h / 2).material(
+                color=_t_steel
+            )
         for _tsx, _tsy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
-            scene.cylinder(_TABLE_FOOT_R, _TABLE_FOOT_R, _TABLE_FOOT_H, 16).move(
-                _TABLE_CX + _tsx * (_TABLE_FOOT_W / 2 - _TABLE_FOOT_R),
-                _TABLE_CY + _tsy * (_TABLE_FOOT_D / 2 - _TABLE_FOOT_R),
-                _TABLE_FOOT_H / 2,
+            scene.cylinder(t.foot_r, t.foot_r, t.foot_h, 16).move(
+                t.cx + _tsx * (t.foot_w / 2 - t.foot_r),
+                t.cy + _tsy * (t.foot_d / 2 - t.foot_r),
+                t.foot_h / 2,
             ).rotate(math.pi / 2, 0, 0).material(color=_t_steel)
 
         # Center pedestal column — narrow square section
-        scene.box(_TABLE_COL_S, _TABLE_COL_S, _t_col_h).move(
-            _TABLE_CX, _TABLE_CY, _TABLE_FOOT_H + _t_col_h / 2
+        scene.box(t.col_side, t.col_side, _t_col_h).move(
+            t.cx, t.cy, t.foot_h + _t_col_h / 2
         ).material(color=_t_steel)
 
         # Table top slab
-        scene.box(_TABLE_X * 2, _TABLE_Y * 2, _TABLE_SLAB_H).move(
-            _TABLE_CX, _TABLE_CY, _TABLE_TOP_Z
+        scene.box(t.half_length * 2, t.half_width * 2, t.slab_h).move(
+            t.cx, t.cy, t.surface_z
         ).material(color="#ECEFF1", opacity=0.95)
         # Mattress
-        scene.box(_TABLE_X * 1.92, _TABLE_Y * 1.84, 0.06).move(
-            _TABLE_CX, _TABLE_CY, _TABLE_TOP_Z + _TABLE_SLAB_H / 2 + 0.03
+        scene.box(t.half_length * 1.92, t.half_width * 1.84, 0.06).move(
+            t.cx, t.cy, t.surface_z + t.slab_h / 2 + 0.03
         ).material(color="#B0BEC5", opacity=0.95)
         # Head-rest block
-        scene.box(0.28, _TABLE_Y * 1.7, 0.08).move(
-            _TABLE_CX - _TABLE_X + 0.14,
-            _TABLE_CY,
-            _TABLE_TOP_Z + _TABLE_SLAB_H / 2 + 0.04,
+        scene.box(0.28, t.half_width * 1.7, 0.08).move(
+            t.cx - t.half_length + 0.14,
+            t.cy,
+            t.surface_z + t.slab_h / 2 + 0.04,
         ).material(color="#90A4AE")
 
-        # ── Arms (one per slot, slot 0 is primary telemetry arm) ────────
-        arm_objects: list[dict[str, Any]] = []
-        for slot_idx, slot in enumerate(_ARM_SLOTS):
+        # ── Arms — one per TablePosition from surgery.idl ──────────────
+        # Keyed by TablePosition enum so assignment mapping is direct.
+        arm_objects: dict[TablePosition, dict[str, Any]] = {}
+        for pos in t.positions:
+            ox, oy = t.get_position(pos)
             (
                 arm_segs,
                 jnt_spheres,
@@ -935,52 +1019,62 @@ def _build_scene(
                 nib,
                 instr_dot,
                 nib_half,
-            ) = _build_arm(
-                scene, slot["ox"], slot["oy"], init_joints, joint_color=_SCENE_JOINT
-            )
-            arm_objects.append(
-                {
-                    "slot_idx": slot_idx,
-                    "slot": slot,
-                    "arm_segs": arm_segs,
-                    "jnt_spheres": jnt_spheres,
-                    "shoulder_sphere": shoulder_sphere,
-                    "tool_sphere": tool_sphere,
-                    "nib": nib,
-                    "instr_dot": instr_dot,
-                    "nib_half": nib_half,
-                }
-            )
+                base_parts,
+            ) = _build_arm(scene, ox, oy, init_joints, joint_color=_SCENE_JOINT)
+            arm_objects[pos] = {
+                "position": pos,
+                "ox": ox,
+                "oy": oy,
+                "arm_segs": arm_segs,
+                "jnt_spheres": jnt_spheres,
+                "shoulder_sphere": shoulder_sphere,
+                "tool_sphere": tool_sphere,
+                "nib": nib,
+                "instr_dot": instr_dot,
+                "nib_half": nib_half,
+                "base_parts": base_parts,
+                "seg_colors": [""] * len(arm_segs),
+            }
 
-    # Build updaters for each arm slot
-    arm_updaters: list[Any] = []
-    for arm_obj in arm_objects:
-        s = arm_obj["slot"]
-        updater = _make_arm_updater(
-            arm_obj["arm_segs"],
-            arm_obj["jnt_spheres"],
-            arm_obj["tool_sphere"],
-            arm_obj["nib"],
-            arm_obj["instr_dot"],
-            arm_obj["nib_half"],
-            s["ox"],
-            s["oy"],
-            # Slot 0 uses primary telemetry; other slots use fallback pose
-            (
-                (lambda: current_backend.joint_positions)
-                if arm_obj["slot_idx"] == 0
-                else (lambda: _NO_SIGNAL_POSE)
-            ),
-        )
-        arm_updaters.append(updater)
+    # All arms start hidden; update_scene shows those with assignments.
 
     # ---- Arm assignment overlay (HTML below scene) -------------------------
     arm_status_container = ui.column().classes("w-full px-4 gap-1")
 
-    def _slot_for_assignment(assignment: Any) -> int:
-        """Map a RobotArmAssignment's table_position to a slot index."""
-        tp = int(getattr(assignment, "table_position", 0))
-        return _TABLE_POSITION_SLOT.get(tp, 0)
+    def _position_for_assignment(assignment: Any) -> TablePosition | None:
+        """Return the TablePosition for an assignment, or None if UNKNOWN."""
+        tp = TablePosition(int(getattr(assignment, "table_position", 0)))
+        return tp if tp != TablePosition.UNKNOWN else None
+
+    def _assign_positions(
+        assignments: dict[str, Any],
+    ) -> dict[str, TablePosition]:
+        """Map robot_ids to TablePosition enum values.
+
+        Arms with a known table_position use it directly.
+        Arms with UNKNOWN get the next free position via round-robin.
+        """
+        pos_map: dict[str, TablePosition] = {}
+        used: set[TablePosition] = set()
+        # First pass: arms with known positions
+        for robot_id in sorted(assignments):
+            tp = _position_for_assignment(assignments[robot_id])
+            if tp is not None and tp not in used:
+                pos_map[robot_id] = tp
+                used.add(tp)
+        # Second pass: round-robin for UNKNOWN positions
+        rr_idx = 0
+        for robot_id in sorted(assignments):
+            if robot_id in pos_map:
+                continue
+            while rr_idx < len(POSITION_ROUND_ROBIN):
+                candidate = POSITION_ROUND_ROBIN[rr_idx]
+                rr_idx += 1
+                if candidate not in used:
+                    pos_map[robot_id] = candidate
+                    used.add(candidate)
+                    break
+        return pos_map
 
     def _build_arm_overlay() -> None:
         """Rebuild the arm status overlay from current assignments."""
@@ -991,24 +1085,24 @@ def _build_scene(
         with arm_status_container:
             ui.label("Arm Assignments").classes("text-sm font-bold mt-2")
             for robot_id, assignment in sorted(assignments.items()):
-                status_val = int(getattr(assignment, "status", 0))
-                color = _ARM_STATE_COLORS.get(status_val, BRAND_COLORS["gray"])
-                state_label = _ARM_STATE_LABELS.get(status_val, "UNKNOWN")
-                tp_val = int(getattr(assignment, "table_position", 0))
-                tp_label = _TABLE_POSITION_LABELS.get(tp_val, "Unknown")
+                status = ArmAssignmentState(int(getattr(assignment, "status", 0)))
+                color = ARM_STATE_COLORS.get(status, BRAND_COLORS["gray"])
+                tp = TablePosition(int(getattr(assignment, "table_position", 0)))
                 caps = str(getattr(assignment, "capabilities", ""))
                 with ui.expansion(
-                    f"{robot_id} — {state_label}",
+                    f"{robot_id} — {status.name}",
                     icon="precision_manufacturing",
                 ).classes("w-full").props(f'header-style="color: {color}"'):
-                    ui.label(f"Position: {tp_label}").classes("text-xs")
-                    ui.label(f"State: {state_label}").classes("text-xs")
+                    ui.label(f"Position: {tp.name}").classes("text-xs")
+                    ui.label(f"State: {status.name}").classes("text-xs")
                     if caps:
                         ui.label(f"Capabilities: {caps}").classes("text-xs")
 
     def _set_arm_visibility(arm_obj: dict[str, Any], visible: bool) -> None:
-        """Set material opacity on arm parts to show/hide an arm slot."""
+        """Set material opacity on all arm parts (including base) to show/hide."""
         opacity = 1.0 if visible else 0.0
+        for part in arm_obj["base_parts"]:
+            part.material(opacity=opacity)
         for seg in arm_obj["arm_segs"]:
             seg.material(opacity=opacity)
         for jsph in arm_obj["jnt_spheres"]:
@@ -1018,30 +1112,31 @@ def _build_scene(
         arm_obj["nib"].material(opacity=opacity)
         arm_obj["instr_dot"].material(opacity=opacity)
 
-    # Track which slots have assignments for visibility updates
+    # Track previous assignment state for visibility delta
     _prev_arm_count = [0]
 
     def update_scene() -> None:
-        # Always update slot 0 (primary arm with telemetry)
-        arm_updaters[0]()
-        mode_badge.set_text(current_backend.operational_mode)
+        mode_badge.set_text(current_backend.operational_mode.name)
 
-        # Map assignments to slots
         assignments = current_backend.arm_assignments
-        used_slots: set[int] = {0}  # slot 0 always visible (primary)
-        for assignment in assignments.values():
-            slot_idx = _slot_for_assignment(assignment)
-            if slot_idx < len(arm_objects):
-                used_slots.add(slot_idx)
+        pos_map = _assign_positions(assignments)
+        active: set[TablePosition] = set(pos_map.values())
 
-        # Show/hide arm slots
-        for i, arm_obj in enumerate(arm_objects):
-            _set_arm_visibility(arm_obj, i in used_slots)
+        # Show/hide arms based on active positions
+        for pos in arm_objects:
+            _set_arm_visibility(arm_objects[pos], pos in active)
 
-        # Update additional arm slot poses
-        for i in range(1, len(arm_updaters)):
-            if i in used_slots:
-                arm_updaters[i]()
+        # Build reverse map: position → robot_id for joint lookup
+        pos_to_robot: dict[TablePosition, str] = {v: k for k, v in pos_map.items()}
+
+        # Update visible arms with per-robot telemetry
+        for pos in active:
+            robot_id = pos_to_robot.get(pos, "")
+            joints = current_backend.get_robot_joints(robot_id)
+            arm_obj = arm_objects[pos]
+            _update_arm_direct(
+                arm_obj, arm_obj["ox"], arm_obj["oy"], joints or _NO_SIGNAL_POSE
+            )
 
         # Rebuild overlay when arm count changes
         arm_count = len(assignments)
@@ -1059,11 +1154,9 @@ def _build_scene(
 
 def main() -> None:
     """Standalone launch entry point."""
-    storage_secret = os.environ.get(NICEGUI_STORAGE_SECRET_ENV)
-    if not storage_secret:
-        raise RuntimeError(
-            f"{NICEGUI_STORAGE_SECRET_ENV} must be set before starting the digital twin"
-        )
+    storage_secret = os.environ.get(
+        NICEGUI_STORAGE_SECRET_ENV, NICEGUI_STORAGE_SECRET_DEFAULT
+    )
 
     room_id = os.environ.get("ROOM_ID", "OR-1")
     _get_backend(room_id)
@@ -1077,6 +1170,8 @@ def main() -> None:
         ui.run(
             storage_secret=storage_secret,
             reload=False,
+            title="Digital Twin — Medtech Suite",
+            favicon="/images/favicon.ico",
         )
     except KeyboardInterrupt:
         pass
@@ -1087,7 +1182,11 @@ if __name__ in {"__main__", "__mp_main__"}:
 
 
 __all__ = [
+    "ARM_STATE_COLORS",
+    "DEFAULT_TABLE",
     "DigitalTwinBackend",
+    "MODE_COLORS",
+    "OperatingTable",
     "heatmap_color",
     "main",
     "twin_content",

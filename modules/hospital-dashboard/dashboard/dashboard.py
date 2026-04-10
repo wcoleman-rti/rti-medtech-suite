@@ -20,6 +20,7 @@ from medtech.dds import initialize_connext
 from medtech.gui import (
     BRAND_COLORS,
     ICONS,
+    NICEGUI_STORAGE_SECRET_DEFAULT,
     NICEGUI_STORAGE_SECRET_ENV,
     GuiBackend,
     create_empty_state,
@@ -512,7 +513,7 @@ def _procedure_cards() -> list[ProcedureEntry]:
     )
 
 
-@ui.page("/dashboard", dark=True)
+@ui.page("/dashboard", dark=True, title="Hospital Dashboard — Medtech Suite")
 def dashboard_page() -> None:
     """Render the hospital dashboard page (full-page with header)."""
     init_theme()
@@ -681,11 +682,9 @@ def dashboard_content() -> None:
 
 
 def main() -> None:
-    storage_secret = os.environ.get(NICEGUI_STORAGE_SECRET_ENV)
-    if not storage_secret:
-        raise RuntimeError(
-            f"{NICEGUI_STORAGE_SECRET_ENV} must be set before starting the dashboard"
-        )
+    storage_secret = os.environ.get(
+        NICEGUI_STORAGE_SECRET_ENV, NICEGUI_STORAGE_SECRET_DEFAULT
+    )
 
     _current_backend()
     try:
@@ -693,6 +692,8 @@ def main() -> None:
             root=dashboard_page,
             storage_secret=storage_secret,
             reload=False,
+            title="Hospital Dashboard — Medtech Suite",
+            favicon="/images/favicon.ico",
         )
     except KeyboardInterrupt:
         pass

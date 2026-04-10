@@ -13,6 +13,7 @@ from nicegui import app, ui
 
 NICEGUI_QUASAR_CONFIG = {"iconSet": "material-icons-outlined"}
 NICEGUI_STORAGE_SECRET_ENV = "MEDTECH_NICEGUI_STORAGE_SECRET"
+NICEGUI_STORAGE_SECRET_DEFAULT = "medtech-dev-not-for-production"
 NICEGUI_THEME_MODE_KEY = "theme_mode"
 NICEGUI_THEME_MODES = ("system", "light", "dark")
 
@@ -91,7 +92,7 @@ def init_theme(_app: Any | None = None, *, title: str = "Medtech Suite") -> Any:
     app.add_static_files("/fonts", _fonts_dir())
     app.add_static_files("/images", _resource_dir() / "images")
     ui.add_head_html(
-        '<link rel="icon" type="image/png" href="/images/rti-logo-color.png">',
+        '<link rel="icon" type="image/x-icon" href="/images/favicon.ico">',
         shared=True,
     )
     ui.add_head_html(_font_css(), shared=True)

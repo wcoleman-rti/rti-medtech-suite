@@ -61,6 +61,8 @@ class OperatorConsoleService(Service):
         self._input_rate_hz = input_rate_hz
         self._command_seq = 0
         self._t0 = 0.0
+        # Per-instance phase offset so multi-arm sims produce distinct motion.
+        self._phase = hash(robot_id) % 1000 / 1000.0 * math.tau
         self._svc_state = ServiceState.STOPPED
         self._stop_event: asyncio.Event | None = None
 
@@ -143,6 +145,7 @@ class OperatorConsoleService(Service):
         (~±90°), creating clearly visible 3-D arm articulation.
         """
         t = time.monotonic() - self._t0
+        p = self._phase
         # Axes drive joints 0-5 in the controller at 0.01 rad/unit/tick.
         # Use slow sinusoids with different phases so joints move independently.
         # x_axis drives J0 (shoulder pitch). Arm base is now close to the table;
@@ -152,13 +155,13 @@ class OperatorConsoleService(Service):
         inp = OperatorInput(
             operator_id=self._operator_id,
             robot_id=self._robot_id,
-            x_axis=(math.sin(t * 0.3) - 0.3)
+            x_axis=(math.sin(t * 0.3 + p) - 0.3)
             * 1.8,  # shoulder pitch — biased toward table
-            y_axis=math.cos(t * 0.2) * 2.5,  # elbow pitch     → ±0.75 rad
-            z_axis=math.sin(t * 0.25) * 1.5,  # wrist yaw       → ±0.45 rad
-            roll=math.cos(t * 0.35) * 1.2,  # joint 3         → ±0.36 rad
-            pitch=math.sin(t * 0.15) * 0.8,  # joint 4         → ±0.24 rad
-            yaw=math.cos(t * 0.4) * 0.5,  # joint 5         → ±0.15 rad
+            y_axis=math.cos(t * 0.2 + p) * 2.5,  # elbow pitch     → ±0.75 rad
+            z_axis=math.sin(t * 0.25 + p) * 1.5,  # wrist yaw       → ±0.45 rad
+            roll=math.cos(t * 0.35 + p) * 1.2,  # joint 3         → ±0.36 rad
+            pitch=math.sin(t * 0.15 + p) * 0.8,  # joint 4         → ±0.24 rad
+            yaw=math.cos(t * 0.4 + p) * 0.5,  # joint 5         → ±0.15 rad
         )
         self._input_writer.write(inp)
         return inp
