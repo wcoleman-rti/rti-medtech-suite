@@ -52,7 +52,7 @@ public:
                            const std::string& procedure_id,
                            const std::string& table_position_str,
                            medtech::ModuleLogger& log)
-        : controller_("robot-" + robot_id), log_(log),
+        : controller_(robot_id), log_(log),
           svc_state_(Orchestration::ServiceState::STOPPED),
           robot_id_(robot_id), procedure_id_(procedure_id),
           table_position_(parse_table_position(table_position_str))
