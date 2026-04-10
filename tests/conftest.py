@@ -455,14 +455,17 @@ def _rpc_in_type(op_name: str):
     raise ValueError(f"Unknown RPC operation: {op_name}")
 
 
-def make_start_call(service_id: str):
-    """Build an RPC call to start_service."""
+def make_start_call(service_id: str, properties: list[tuple[str, str]] | None = None):
+    """Build an RPC call to start_service with optional properties."""
     from orchestration import Orchestration
 
     ct = Orchestration.ServiceHostControl.call_type
     call = ct()
     _in = _rpc_in_type("start_service")()
-    _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=[])
+    svc_props = []
+    for name, value in properties or []:
+        svc_props.append(Orchestration.ServiceProperty(name=name, value=value))
+    _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=svc_props)
     call.start_service = _in
     return call
 

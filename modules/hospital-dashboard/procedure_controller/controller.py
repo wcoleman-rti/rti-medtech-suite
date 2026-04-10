@@ -243,13 +243,23 @@ class ControllerBackend(GuiBackend):
                 result[robot_id] = str(arm.status).rsplit(".", 1)[-1]
         return result
 
-    async def start_service(self, host_id: str, service_id: str) -> None:
+    async def start_service(
+        self,
+        host_id: str,
+        service_id: str,
+        table_position: str = "",
+    ) -> None:
         if self.active_arm_count >= Surgery.MAX_ARM_COUNT:
             self._log_diag(
                 f"start_service rejected: MAX_ARM_COUNT ({Surgery.MAX_ARM_COUNT}) exceeded"
             )
             return
-        await self._do_rpc(host_id, _make_start_call(service_id), "start_service")
+        props: list[tuple[str, str]] = []
+        if table_position:
+            props.append(("table_position", table_position))
+        await self._do_rpc(
+            host_id, _make_start_call(service_id, props), "start_service"
+        )
 
     async def stop_service(self, host_id: str, service_id: str) -> None:
         await self._do_rpc(host_id, _make_stop_call(service_id), "stop_service")
@@ -1385,11 +1395,16 @@ def _rpc_in_type(op_name: str):
     raise ValueError(f"Unknown RPC operation: {op_name}")
 
 
-def _make_start_call(service_id: str) -> object:
+def _make_start_call(
+    service_id: str, properties: list[tuple[str, str]] | None = None
+) -> object:
     call_type = Orchestration.ServiceHostControl.call_type
     call = call_type()
     _in = _rpc_in_type("start_service")()
-    _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=[])
+    svc_props = []
+    for name, value in properties or []:
+        svc_props.append(Orchestration.ServiceProperty(name=name, value=value))
+    _in.req = Orchestration.ServiceRequest(service_id=service_id, properties=svc_props)
     call.start_service = _in
     return call
 

@@ -26,11 +26,12 @@ inline std::unique_ptr<medtech::Service> make_robot_service_host(
     const std::string& host_id,
     const std::string& room_id,
     const std::string& procedure_id,
+    const std::string& robot_id,
     medtech::ModuleLogger& log)
 {
     medtech::ServiceRegistryMap registry;
     registry["RobotControllerService"] = medtech::ServiceRegistration{
-        .factory = [room_id, procedure_id, &log](
+        .factory = [robot_id, room_id, procedure_id, &log](
             const Orchestration::ServiceRequest& req) {
             // Extract table_position from service properties (default: "")
             std::string table_pos;
@@ -41,7 +42,7 @@ inline std::unique_ptr<medtech::Service> make_robot_service_host(
                 }
             }
             return make_robot_controller_service(
-                req.service_id, room_id, procedure_id, table_pos, log);
+                robot_id, room_id, procedure_id, table_pos, log);
         },
         .display_name = "Robot Controller",
         .properties = {},
