@@ -279,6 +279,11 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
     (`http://localhost:7800`)
   - `medtech stop` removes the DockGraph container along with all
     other medtech containers
+- Add DockGraph to `THIRD_PARTY_NOTICES.md`:
+  - Image: `dockgraph/dockgraph`
+  - License: BSL 1.1 (converts to Apache 2.0 after 4 years)
+  - Source: <https://github.com/dockgraph/dockgraph>
+  - Usage: Optional Docker topology visualization sidecar
 
 ### Test Gate
 
