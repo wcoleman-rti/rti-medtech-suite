@@ -100,20 +100,11 @@ def create_skeleton_card(*, height: str = "80px") -> Any:
 
 
 def ConnectionDot(connected: bool = True) -> Any:
-    """Return a pulsing connection indicator."""
-    dot = ui.icon(ICONS["connection"]).classes("text-lg transition-all")
-    state = {"pulse": True}
-
-    def _apply() -> None:
-        if connected:
-            state["pulse"] = not state["pulse"]
-            opacity = "1.0" if state["pulse"] else "0.55"
-            dot.style(
-                f"color: {BRAND_COLORS['green']}; opacity: {opacity}; transform: scale({1.0 if state['pulse'] else 0.92});"
-            )
-        else:
-            dot.style(f"color: {BRAND_COLORS['gray']}; opacity: 1.0;")
-
-    _apply()
-    ui.timer(0.6, _apply, active=True)
+    """Return a pulsing connection indicator using CSS animation."""
+    dot = ui.icon(ICONS["connection"]).classes("text-lg")
+    if connected:
+        dot.style(f"color: {BRAND_COLORS['green']};")
+        dot.classes("connection-dot-pulse")
+    else:
+        dot.style(f"color: {BRAND_COLORS['gray']}; opacity: 1.0;")
     return dot

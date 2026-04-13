@@ -323,14 +323,27 @@ class TestWidgetHelpers:
             call[0] == "label" and call[1][0] == "No data" for call in recorder.calls
         )
 
-    def test_connection_dot_uses_timer(self, monkeypatch: pytest.MonkeyPatch):
+    def test_connection_dot_uses_css_animation(self, monkeypatch: pytest.MonkeyPatch):
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        dot = widgets_module.ConnectionDot(True)
+
+        assert dot.kind == "icon"
+        class_str = " ".join(str(c) for c in dot.class_calls)
+        assert "connection-dot-pulse" in class_str
+
+    def test_connection_dot_disconnected_no_pulse(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
         recorder = Recorder()
         _patch_widget_ui(monkeypatch, recorder)
 
         dot = widgets_module.ConnectionDot(False)
 
         assert dot.kind == "icon"
-        assert any(call[0] == "timer" for call in recorder.calls)
+        class_str = " ".join(str(c) for c in dot.class_calls)
+        assert "connection-dot-pulse" not in class_str
 
 
 class TestConstants:
@@ -645,3 +658,79 @@ class TestModernStatusIndicators:
         ):
             icon = widgets_module._status_icon(status)
             assert icon != "", f"No icon for {status}"
+
+
+# ---------------------------------------------------------------------------
+# Animation & transition tests (@ui-modernization Step M.5)
+# ---------------------------------------------------------------------------
+
+
+class TestAnimationsAndTransitions:
+    """Transition utilities, hover-elevate, slide-in, focus ring, reduced-motion."""
+
+    def test_transition_fast(self):
+        """_transitions_css() defines .transition-fast."""
+        css = theme_module._transitions_css()
+        assert ".transition-fast" in css
+        assert "150ms" in css
+
+    def test_transition_default(self):
+        """_transitions_css() defines .transition-default with spring curve."""
+        css = theme_module._transitions_css()
+        assert ".transition-default" in css
+        assert "cubic-bezier(0.34, 1.56, 0.64, 1)" in css
+
+    def test_transition_slow(self):
+        """_transitions_css() defines .transition-slow."""
+        css = theme_module._transitions_css()
+        assert ".transition-slow" in css
+        assert "300ms" in css
+
+    def test_hover_elevate(self):
+        """.hover-elevate scales and adds shadow on hover."""
+        css = theme_module._transitions_css()
+        assert ".hover-elevate:hover" in css
+        assert "scale(1.02)" in css
+
+    def test_slide_in_animation(self):
+        """Slide-in animation defined for alert cards."""
+        css = theme_module._transitions_css()
+        assert "@keyframes slide-in-top" in css
+        assert ".animate-slide-in" in css
+
+    def test_focus_visible_ring(self):
+        """Focus-visible ring defined for keyboard navigation."""
+        css = theme_module._transitions_css()
+        assert ":focus-visible" in css
+        assert "outline: 2px solid #0284C7" in css
+        assert "outline-offset: 2px" in css
+
+    def test_connection_pulse_animation(self):
+        """Connection dot CSS pulse animation defined."""
+        css = theme_module._transitions_css()
+        assert "@keyframes connection-pulse" in css
+        assert ".connection-dot-pulse" in css
+
+    def test_reduced_motion(self):
+        """prefers-reduced-motion suppresses animations."""
+        css = theme_module._transitions_css()
+        assert "@media (prefers-reduced-motion: reduce)" in css
+        assert "animation-duration: 0.01ms" in css
+        assert "transition-duration: 0.01ms" in css
+
+    def test_init_theme_injects_transitions(self, monkeypatch: pytest.MonkeyPatch):
+        """init_theme() injects transitions CSS."""
+        recorder = Recorder()
+        _patch_theme_ui(monkeypatch, recorder)
+        monkeypatch.setattr(theme_module, "_fonts_dir", lambda: Path("/tmp/fonts"))
+        monkeypatch.setattr(
+            theme_module, "create_header", lambda **kw: FakeElement("header")
+        )
+
+        theme_module.init_theme()
+
+        head_calls = [call for call in recorder.calls if call[0] == "add_head_html"]
+        transition_injected = any(
+            ".transition-fast" in c[1][0] for c in head_calls if len(c[1]) > 0
+        )
+        assert transition_injected, "init_theme() must inject transitions CSS"

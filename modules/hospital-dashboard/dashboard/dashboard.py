@@ -544,7 +544,7 @@ def dashboard_content() -> None:
                             create_empty_state("Waiting for procedure data…")
                             return
                         for entry in _procedure_cards():
-                            with ui.card().classes("w-full gap-1 p-4"):
+                            with ui.card().classes("w-full gap-1 p-4 hover-elevate"):
                                 with ui.row().classes("w-full items-center gap-2"):
                                     create_status_chip(entry.phase)
                                     ui.label(entry.room or entry.procedure_id).classes(
@@ -666,7 +666,7 @@ def dashboard_content() -> None:
                 return
             with ui.scroll_area().classes("w-full h-72"):
                 for alert in alerts:
-                    card_classes = "w-full gap-1 p-3"
+                    card_classes = "w-full gap-1 p-3 animate-slide-in"
                     if alert.severity.upper() == "CRITICAL":
                         card_classes += " pulse-critical"
                     with ui.card().classes(card_classes):

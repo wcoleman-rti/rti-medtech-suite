@@ -162,6 +162,47 @@ def _status_animations_css() -> str:
     )
 
 
+def _transitions_css() -> str:
+    """Return CSS for transition utilities, hover, slide-in, focus, and reduced-motion."""
+    return (
+        "<style>"
+        # Transition speed utilities
+        ".transition-fast { transition: all 150ms ease-out; }"
+        ".transition-default { transition: all 200ms cubic-bezier(0.34, 1.56, 0.64, 1); }"
+        ".transition-slow { transition: all 300ms ease-out; }"
+        # Hover elevate for cards
+        ".hover-elevate { transition: transform 200ms ease-out, box-shadow 200ms ease-out; }"
+        ".hover-elevate:hover { transform: scale(1.02); box-shadow: 0 8px 32px rgba(0,0,0,0.12); }"
+        # Slide-in animation for new alerts
+        "@keyframes slide-in-top {"
+        "  from { opacity: 0; transform: translateY(-12px); }"
+        "  to { opacity: 1; transform: translateY(0); }"
+        "}"
+        ".animate-slide-in { animation: slide-in-top 300ms ease-out; }"
+        # Focus-visible ring for keyboard navigation
+        ":focus-visible {"
+        "  outline: 2px solid #0284C7;"
+        "  outline-offset: 2px;"
+        "  border-radius: inherit;"
+        "}"
+        # Connection dot CSS pulse
+        "@keyframes connection-pulse {"
+        "  0%, 100% { opacity: 1; transform: scale(1); }"
+        "  50% { opacity: 0.55; transform: scale(0.92); }"
+        "}"
+        ".connection-dot-pulse { animation: connection-pulse 1.2s ease-in-out infinite; }"
+        # Reduced-motion: suppress all animations
+        "@media (prefers-reduced-motion: reduce) {"
+        "  *, *::before, *::after {"
+        "    animation-duration: 0.01ms !important;"
+        "    animation-iteration-count: 1 !important;"
+        "    transition-duration: 0.01ms !important;"
+        "  }"
+        "}"
+        "</style>"
+    )
+
+
 def init_theme(_app: Any | None = None, *, title: str = "Medtech Suite") -> Any:
     """Apply RTI branding and return the shared header shell."""
     app.config.quasar_config.update(NICEGUI_QUASAR_CONFIG)
@@ -184,6 +225,7 @@ def init_theme(_app: Any | None = None, *, title: str = "Medtech Suite") -> Any:
     ui.add_head_html(_type_scale_css(), shared=True)
     ui.add_head_html(_glassmorphism_css(), shared=True)
     ui.add_head_html(_status_animations_css(), shared=True)
+    ui.add_head_html(_transitions_css(), shared=True)
     ui.add_head_html(
         "<style>"
         "body { transition: background-color 0.3s ease, color 0.3s ease; }"

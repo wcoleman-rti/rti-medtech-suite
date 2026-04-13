@@ -893,7 +893,7 @@ def _render_summary_card(
         else f"box-shadow: 0 2px 8px rgba(0,0,0,{OPACITY['shadow']});"
     )
     with ui.card().classes(
-        "min-h-32 cursor-pointer rounded-lg p-5 transition hover:shadow-lg"
+        "min-h-32 cursor-pointer rounded-lg p-5 transition hover:shadow-lg hover-elevate"
     ).style(f"background: {_hex_to_rgba(color, fill_alpha)}; {glow_style}").on(
         "click", on_click
     ):
@@ -1069,7 +1069,7 @@ def _render_host_tile(
         f"background: {_hex_to_rgba(BRAND_COLORS['blue'], fill_alpha)}; {glow_style}"
     )
     with ui.card().classes(
-        "w-full rounded-lg p-6 transition cursor-pointer hover:shadow-lg"
+        "w-full rounded-lg p-6 transition cursor-pointer hover:shadow-lg hover-elevate"
     ).style(card_style).on(
         "click", lambda hid=host_id: (current_backend.select_host(hid), refresh_ui())
     ):
@@ -1147,7 +1147,7 @@ def _render_service_tile(
     # When selected, span the full grid row so tiles reflow below
     card_style = f"border-left: 6px solid {border_color}; background: {background_color}; {glow_style}"
     with ui.card().classes(
-        "w-full rounded-lg p-5 transition cursor-pointer hover:shadow-lg"
+        "w-full rounded-lg p-5 transition cursor-pointer hover:shadow-lg hover-elevate"
     ).style(card_style).on("click", _on_tile_click):
         # --- Collapsed: centered icon + name, centered action row ---
         with ui.column().classes("w-full items-center gap-3"):
