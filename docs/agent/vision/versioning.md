@@ -155,6 +155,7 @@ A version may only be cut when **all** of the following are true:
 | Multi-Segment Deployment | Per-segment ClinicalAlerts engine deployment; Cloud Discovery Service multi-initial-peer HA |
 | Cross-Platform Support | Windows, macOS, QNX build/runtime; platform-specific setup scripts; parameterized Connext architecture |
 | Cloud Command Center | Cloud/Enterprise domain (3rd databus layer); WAN Routing Service (Real-Time WAN Transport — `UDPv4_WAN`); Cloud Discovery Service for cross-site discovery; Connext Security Plugins on all WAN connections; Command Center dashboard; facility-level partitions; enterprise-wide aggregation; central Collector Service aggregating per-hospital Collectors → Prometheus → Grafana Loki → Grafana |
+| Connext Runtime MCP Server | Cloud-deployed MCP server querying per-hospital Collector Service instances; AI-agent-powered frontend for natural-language DDS system health queries, participant topology, QoS compliance, and cross-hospital diagnostics |
 
 ---
 

@@ -314,7 +314,10 @@ single entry point for build, launch, and dynamic scaling.
 - Central GUI (dashboard + controller) deployed on `hospital-net`
 - RTI Collector Service (`rticom/collector-service`) deployed per hospital
   as base infrastructure — collects Monitoring Library 2.0 telemetry from
-  all local DDS participants; V3.0 forwards to central cloud aggregator
+  all local DDS participants. Serves a dual role: (1) telemetry pipeline
+  forwarding to central cloud aggregator in V3.0, and (2) runtime data
+  source for a V3.0 Connext Runtime MCP Server enabling AI-agent-powered
+  system health queries across hospitals
 - Origin-aware sidebar navigation opens cross-origin twins in new tabs
 - `MEDTECH_GUI_EXTERNAL_URL` env var ensures browser-reachable `gui_url`
 - Per-OR containers launched dynamically via `docker run --rm` — no
@@ -457,6 +460,29 @@ with DDS-enforced control authority arbitration.
 - **Cloud-domain topics** — `FacilityStatus`, `AggregatedAlerts`, `ResourceUtilization`, `OperationalKPIs`
 - **Cloud Discovery Service** — enterprise-level multicast-free discovery across WAN-connected sites
 - Demonstrates the layered databus model at full scale: Procedure → Hospital → Cloud, each boundary bridged by a Routing Service tier with zero changes to lower layers
+
+#### Centralized Observability & Agent-Powered Diagnostics
+- **Central Collector Service** — aggregates telemetry forwarded from
+  per-hospital Collector Service instances (deployed as base
+  infrastructure since V1.4); stores metrics in Prometheus and logs in
+  Grafana Loki for enterprise-wide dashboards and alerting
+- **Connext Runtime MCP Server** — a specialized MCP server deployed at
+  the cloud level that queries per-hospital Collector Service instances
+  reachable from the cloud network. It runs diagnostic tooling to
+  aggregate system health, participant topology, QoS compliance, and
+  behavioral characteristics across the enterprise. Serves as the
+  backend for a frontend/UI workflow where users ask an AI agent
+  natural-language questions about the state of their DDS deployment
+  (e.g., “What is the current p99 latency for RobotState in
+  hospital-a?”, “Are any participants in hospital-b missing
+  deadlines?”, “Compare endpoint matching health across all
+  hospitals.”)
+- **Agent-observer architecture** — the MCP server acts as a bridge
+  between the AI agent (LLM) and the Connext runtime. Per-hospital
+  Collector Service instances are the data source; the MCP server
+  provides structured tool interfaces that the agent invokes to query,
+  filter, and aggregate telemetry. The frontend presents results in
+  conversational form alongside charts and tables.
 
 #### Foxglove Visualization Bridge (Tier 3)
 - **Foxglove schema alignment (Tier 3)** — new IDL types for advanced spatial and sensor visualization: `foxglove::PointCloud` alignment (depth camera / 3D scanner for surgical navigation), `foxglove::Grid` alignment (2D heatmap overlays — radiation, thermal), `foxglove::LocationFix` alignment (facility-level indoor positioning / asset tracking), `foxglove::RawAudio` alignment (OR ambient audio monitoring)

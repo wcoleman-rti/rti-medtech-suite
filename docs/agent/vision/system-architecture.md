@@ -150,6 +150,8 @@ The Cloud domain aggregates across facilities the same way the Hospital domain a
 - **Wildcard partition matching** (`facility/*`) enables enterprise-wide aggregation
 - Topics on the Cloud domain are facility-level summaries: `FacilityStatus`, `AggregatedAlerts`, `ResourceUtilization`, `OperationalKPIs`
 - A Command Center dashboard (NiceGUI web application, same design standard as Hospital Dashboard) subscribes to the Cloud domain
+- A **central Collector Service** aggregates telemetry forwarded from per-hospital Collectors and stores it in Prometheus (metrics) and Grafana Loki (logs) for enterprise-wide observability
+- A **Connext Runtime MCP Server** is deployed at the cloud level alongside the central Collector Service. It queries per-hospital Collector Service instances reachable from the cloud network, runs specialized diagnostic tooling to aggregate system health data, and serves as the backend for an AI-agent-powered frontend where users can ask natural-language questions about hospital DDS system health, participant topology, QoS compliance, and operational characteristics across the enterprise
 
 The WAN Routing Service bridge uses the **RTI Real-Time WAN Transport** (`UDPv4_WAN`) for NAT/firewall-traversal cross-site communication, with **Cloud Discovery Service** providing multicast-free discovery across WAN-connected sites. **Connext Security Plugins** are required on all WAN connections — mutual authentication, encrypted data, and governance enforcement. Each hospital runs its own WAN Routing Service instance that selectively forwards Hospital domain data to the Cloud domain.
 
@@ -503,6 +505,38 @@ reach containers on another hospital's networks. Cross-hospital
 communication must traverse NAT, exactly as in a real multi-facility
 deployment. This infrastructure is reused by V3.0 WAN testing (Tier A
 and Tier B) without modification.
+
+##### Per-Hospital Collector Service
+
+Each hospital instance launches an RTI Collector Service container
+(`rticom/collector-service`) on `hospital-net` as base infrastructure.
+Monitoring Library 2.0, enabled on every DDS participant, automatically
+forwards metrics, logs, and security events to the local Collector
+Service via its dedicated participant on the Observability domain
+(Domain 20).
+
+The per-hospital Collector Service serves a **dual role**:
+
+1. **Telemetry pipeline** — aggregates Monitoring Library 2.0
+   telemetry from all local participants and forwards it to a central
+   Collector Service at the cloud level (V3.0). The central Collector
+   stores data in Prometheus (metrics) and Grafana Loki (logs) for
+   enterprise-wide dashboards and alerting.
+2. **Agent-observer data source** — serves as the runtime data
+   backend for a specialized **Connext Runtime MCP Server** deployed
+   at the cloud level (V3.0). The MCP server queries per-hospital
+   Collector Service instances visible to the cloud instance,
+   aggregates system health and behavioral data, and presents results
+   through a frontend/UI workflow where users ask an AI agent about
+   the health, characteristics, or diagnostics of a given hospital
+   or set of hospitals.
+
+This dual role is the architectural reason Collector Service is
+deployed as always-on base infrastructure in V1.4 rather than as an
+optional observability add-on. Even before V3.0 cloud infrastructure
+exists, the per-hospital Collector is collecting telemetry that can be
+inspected locally via `--observability` (Prometheus + Grafana) or via
+RTI Admin Console.
 
 Docker's built-in IPAM handles IP assignment within each network. No
 external DHCP is needed — Docker assigns IPs from the configured subnet
