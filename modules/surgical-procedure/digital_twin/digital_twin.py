@@ -725,9 +725,15 @@ def _get_backend(room_id: str) -> DigitalTwinBackend:
 
 @ui.page("/twin/{room_id}", title="Digital Twin — Medtech Suite")
 def twin_page(room_id: str) -> None:
-    """Render the digital twin 3D visualization page for *room_id* (full-page with header)."""
+    """Render the digital twin 3D visualization page for *room_id* (standalone with self-contained shell)."""
     init_theme()
     create_header(title=f"Digital Twin — {room_id}")
+    controller_url = os.environ.get("MEDTECH_CONTROLLER_URL", "")
+    if controller_url:
+        with ui.row().classes("w-full px-4 pt-2 items-center"):
+            ui.link("← Return to Controller", controller_url).classes(
+                "text-sm text-blue-400 hover:text-blue-300"
+            )
     twin_content(room_id)
 
 

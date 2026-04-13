@@ -771,7 +771,7 @@ def _current_backend() -> ControllerBackend:
 
 @ui.page("/controller", title="Procedure Controller — Medtech Suite")
 def controller_page() -> None:
-    """Render the controller page (full-page with header)."""
+    """Render the controller page (standalone with self-contained shell)."""
     init_theme(title="Procedure Controller")
     controller_content()
 

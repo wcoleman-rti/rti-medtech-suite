@@ -515,9 +515,15 @@ def _procedure_cards() -> list[ProcedureEntry]:
 
 @ui.page("/dashboard", dark=True, title="Hospital Dashboard — Medtech Suite")
 def dashboard_page() -> None:
-    """Render the hospital dashboard page (full-page with header)."""
+    """Render the hospital dashboard page (standalone with self-contained shell)."""
     init_theme()
     create_header(title="Hospital Dashboard")
+    controller_url = os.environ.get("MEDTECH_CONTROLLER_URL", "")
+    if controller_url:
+        with ui.row().classes("w-full px-4 pt-2 items-center"):
+            ui.link("← Return to Controller", controller_url).classes(
+                "text-sm text-blue-400 hover:text-blue-300"
+            )
     dashboard_content()
 
 
