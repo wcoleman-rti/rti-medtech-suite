@@ -14,7 +14,7 @@ the [Docker Images](#docker-images) section.
 
 | Field | Value |
 |-------|-------|
-| **Components** | Roboto Condensed, Montserrat, Roboto Mono (variable-weight TTF) |
+| **Components** | Inter, Roboto Condensed, Montserrat, Roboto Mono (variable-weight TTF) |
 | **License** | [SIL Open Font License 1.1 (OFL-1.1)](https://scripts.sil.org/OFL) |
 | **Source** | <https://github.com/google/fonts> |
 | **Pinned commit** | `3d6da8b416357e1f6a32fbff76b22d52ad1e9bc5` |

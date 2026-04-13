@@ -53,15 +53,34 @@ def _font_face_css(font_family: str, filename: str, *, weight: int = 400) -> str
 
 def _font_css() -> str:
     lines = [
+        _font_face_css("Inter", "Inter.ttf", weight=400),
+        _font_face_css("Inter", "Inter-Italic.ttf", weight=400),
         _font_face_css("Roboto Condensed", "RobotoCondensed.ttf", weight=400),
         _font_face_css("Roboto Condensed", "RobotoCondensed-Italic.ttf", weight=400),
         _font_face_css("Roboto Mono", "RobotoMono.ttf", weight=400),
         _font_face_css("Roboto Mono", "RobotoMono-Italic.ttf", weight=400),
-        "body { font-family: 'Roboto Condensed', sans-serif; }",
+        "body { font-family: 'Inter', sans-serif; }",
         ".mono { font-family: 'Roboto Mono', monospace; font-weight: 700; }",
-        ".brand-heading { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; }",
+        ".brand-heading { font-family: 'Inter', sans-serif; font-weight: 700; }",
     ]
     return "<style>" + " ".join(lines) + "</style>"
+
+
+def _type_scale_css() -> str:
+    """Return CSS classes for the semantic type scale."""
+    return (
+        "<style>"
+        ".type-h1 { font-size: 32px; font-weight: 700; line-height: 1.2; }"
+        ".type-h2 { font-size: 24px; font-weight: 700; line-height: 1.3; }"
+        ".type-h3 { font-size: 18px; font-weight: 600; line-height: 1.4; }"
+        ".type-body-lg { font-size: 16px; font-weight: 500; line-height: 1.5; }"
+        ".type-body { font-size: 14px; font-weight: 400; line-height: 1.6; }"
+        ".type-body-sm { font-size: 12px; font-weight: 400; line-height: 1.5; }"
+        ".type-label { font-size: 12px; font-weight: 600; line-height: 1.4; }"
+        ".type-mono { font-family: 'Roboto Mono', monospace; font-size: 13px; font-weight: 700; }"
+        ".type-mono-sm { font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 400; }"
+        "</style>"
+    )
 
 
 def _theme_mode_value(mode: str | None) -> bool | None:
@@ -96,6 +115,7 @@ def init_theme(_app: Any | None = None, *, title: str = "Medtech Suite") -> Any:
         shared=True,
     )
     ui.add_head_html(_font_css(), shared=True)
+    ui.add_head_html(_type_scale_css(), shared=True)
     ui.add_head_html(
         "<style>"
         "body { transition: background-color 0.3s ease, color 0.3s ease; }"

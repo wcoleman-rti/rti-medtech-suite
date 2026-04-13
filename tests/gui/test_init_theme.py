@@ -336,3 +336,82 @@ class TestWidgetHelpers:
 class TestConstants:
     def test_quasar_icon_set_constant(self):
         assert NICEGUI_QUASAR_CONFIG["iconSet"] == "material-icons-outlined"
+
+
+# ---------------------------------------------------------------------------
+# Inter font integration tests (@ui-modernization Step M.2)
+# ---------------------------------------------------------------------------
+
+
+class TestInterFont:
+    """Inter font loads from local static files; semantic type scale defined."""
+
+    def test_font_css_includes_inter(self):
+        """_font_css() includes @font-face declaration for Inter."""
+        css = theme_module._font_css()
+        assert "'Inter'" in css
+
+    def test_font_css_body_uses_inter(self):
+        """Body font-family is Inter, not Roboto Condensed."""
+        css = theme_module._font_css()
+        assert "body { font-family: 'Inter'" in css
+
+    def test_font_css_brand_heading_uses_inter(self):
+        """Brand heading uses Inter."""
+        css = theme_module._font_css()
+        assert ".brand-heading { font-family: 'Inter'" in css
+
+    def test_font_css_still_includes_roboto_mono(self):
+        """Roboto Mono is still available for .mono class."""
+        css = theme_module._font_css()
+        assert "'Roboto Mono'" in css
+        assert ".mono { font-family: 'Roboto Mono'" in css
+
+    def test_font_css_retains_roboto_condensed(self):
+        """Roboto Condensed font-face is retained for backward compatibility."""
+        css = theme_module._font_css()
+        assert "'Roboto Condensed'" in css
+
+    def test_type_scale_css_has_all_classes(self):
+        """_type_scale_css() defines all semantic type scale classes."""
+        css = theme_module._type_scale_css()
+        for cls in (
+            ".type-h1",
+            ".type-h2",
+            ".type-h3",
+            ".type-body-lg",
+            ".type-body",
+            ".type-body-sm",
+            ".type-label",
+            ".type-mono",
+            ".type-mono-sm",
+        ):
+            assert cls in css, f"Missing type scale class: {cls}"
+
+    def test_type_h1_specs(self):
+        """type-h1 is 32px bold."""
+        css = theme_module._type_scale_css()
+        assert "font-size: 32px" in css
+        assert "font-weight: 700" in css
+
+    def test_type_mono_uses_roboto_mono(self):
+        """type-mono uses Roboto Mono font family."""
+        css = theme_module._type_scale_css()
+        assert ".type-mono { font-family: 'Roboto Mono'" in css
+
+    def test_init_theme_injects_type_scale(self, monkeypatch: pytest.MonkeyPatch):
+        """init_theme() injects type scale CSS into head HTML."""
+        recorder = Recorder()
+        _patch_theme_ui(monkeypatch, recorder)
+        monkeypatch.setattr(theme_module, "_fonts_dir", lambda: Path("/tmp/fonts"))
+        monkeypatch.setattr(
+            theme_module, "create_header", lambda **kw: FakeElement("header")
+        )
+
+        theme_module.init_theme()
+
+        head_calls = [call for call in recorder.calls if call[0] == "add_head_html"]
+        type_scale_injected = any(
+            ".type-h1" in c[1][0] for c in head_calls if len(c[1]) > 0
+        )
+        assert type_scale_injected, "init_theme() must inject type scale CSS"

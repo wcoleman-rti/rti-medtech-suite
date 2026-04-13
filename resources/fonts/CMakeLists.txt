@@ -11,6 +11,14 @@ set(_FONTS_OUT "${CMAKE_CURRENT_BINARY_DIR}/downloaded")
 
 # Each entry: filename, url-path (percent-encoded brackets), sha256
 set(_FONT_SPECS
+    "Inter.ttf"
+    "ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf"
+    "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+
+    "Inter-Italic.ttf"
+    "ofl/inter/Inter-Italic%5Bopsz%2Cwght%5D.ttf"
+    "acd98e64795781b2058f07b18475e0ecee2a0fe2b42a49e2f9e37d0d6bf66ce6"
+
     "RobotoCondensed.ttf"
     "ofl/robotocondensed/RobotoCondensed%5Bwght%5D.ttf"
     "dace262afcee68a5276f200d8026c57221735c0118ab5fda8c2c0d3dc409a8d0"
