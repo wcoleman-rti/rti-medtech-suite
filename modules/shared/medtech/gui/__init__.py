@@ -15,6 +15,7 @@ from medtech.gui._widgets import (
     ConnectionDot,
     create_empty_state,
     create_section_header,
+    create_skeleton_card,
     create_stat_card,
     create_status_chip,
 )
@@ -31,6 +32,7 @@ __all__ = [
     "create_empty_state",
     "create_header",
     "create_section_header",
+    "create_skeleton_card",
     "create_stat_card",
     "create_status_chip",
     "init_theme",

@@ -507,3 +507,141 @@ class TestGlassmorphism:
         card_el = card_calls[0][3]
         class_str = " ".join(str(c) for c in card_el.class_calls)
         assert "glass-panel" in class_str
+
+
+# ---------------------------------------------------------------------------
+# Modern status indicator tests (@ui-modernization Step M.4)
+# ---------------------------------------------------------------------------
+
+
+class TestModernStatusIndicators:
+    """Status chips with icon prefix, skeleton loaders, pulse-critical."""
+
+    def test_status_chip_has_icon(self, monkeypatch: pytest.MonkeyPatch):
+        """create_status_chip() includes icon kwarg."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        chip = widgets_module.create_status_chip("OPERATIONAL")
+        assert chip.kwargs.get("icon") == "check_circle"
+
+    def test_status_chip_estop_icon(self, monkeypatch: pytest.MonkeyPatch):
+        """E-STOP status gets stop_circle icon."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        chip = widgets_module.create_status_chip("E-STOP")
+        assert chip.kwargs.get("icon") == "stop_circle"
+
+    def test_status_chip_idle_icon(self, monkeypatch: pytest.MonkeyPatch):
+        """IDLE status gets remove_circle_outline icon."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        chip = widgets_module.create_status_chip("IDLE")
+        assert chip.kwargs.get("icon") == "remove_circle_outline"
+
+    def test_status_chip_disconnected_icon(self, monkeypatch: pytest.MonkeyPatch):
+        """DISCONNECTED status gets wifi_off icon."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        chip = widgets_module.create_status_chip("DISCONNECTED")
+        assert chip.kwargs.get("icon") == "wifi_off"
+
+    def test_status_chip_unknown_icon(self, monkeypatch: pytest.MonkeyPatch):
+        """Unknown status gets help_outline icon."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        chip = widgets_module.create_status_chip("FOOBAR")
+        assert chip.kwargs.get("icon") == "help_outline"
+
+    def test_status_chip_border_radius(self, monkeypatch: pytest.MonkeyPatch):
+        """Status chips have 12px border radius."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        chip = widgets_module.create_status_chip("RUNNING")
+        assert any("border-radius: 12px" in s for s in chip.styles)
+
+    def test_skeleton_card_returns_card(self, monkeypatch: pytest.MonkeyPatch):
+        """create_skeleton_card() returns a card element."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        card = widgets_module.create_skeleton_card()
+        assert card.kind == "card"
+
+    def test_skeleton_card_shimmer_class(self, monkeypatch: pytest.MonkeyPatch):
+        """create_skeleton_card() has skeleton-shimmer class."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        card = widgets_module.create_skeleton_card()
+        class_str = " ".join(str(c) for c in card.class_calls)
+        assert "skeleton-shimmer" in class_str
+
+    def test_skeleton_card_height(self, monkeypatch: pytest.MonkeyPatch):
+        """create_skeleton_card(height=...) sets custom height."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        card = widgets_module.create_skeleton_card(height="120px")
+        assert any("120px" in s for s in card.styles)
+
+    def test_pulse_critical_css_defined(self):
+        """_status_animations_css() defines pulse-critical animation."""
+        css = theme_module._status_animations_css()
+        assert "@keyframes pulse-critical" in css
+        assert ".pulse-critical" in css
+
+    def test_skeleton_shimmer_css_defined(self):
+        """_status_animations_css() defines skeleton shimmer animation."""
+        css = theme_module._status_animations_css()
+        assert "@keyframes shimmer" in css
+        assert ".skeleton-shimmer" in css
+
+    def test_dark_skeleton_shimmer(self):
+        """Dark mode has its own shimmer gradient."""
+        css = theme_module._status_animations_css()
+        assert "body.dark .skeleton-shimmer" in css
+
+    def test_init_theme_injects_status_animations(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        """init_theme() injects status animations CSS."""
+        recorder = Recorder()
+        _patch_theme_ui(monkeypatch, recorder)
+        monkeypatch.setattr(theme_module, "_fonts_dir", lambda: Path("/tmp/fonts"))
+        monkeypatch.setattr(
+            theme_module, "create_header", lambda **kw: FakeElement("header")
+        )
+
+        theme_module.init_theme()
+
+        head_calls = [call for call in recorder.calls if call[0] == "add_head_html"]
+        anim_injected = any(
+            "pulse-critical" in c[1][0] for c in head_calls if len(c[1]) > 0
+        )
+        assert anim_injected, "init_theme() must inject status animation CSS"
+
+    def test_status_icon_mapping_complete(self):
+        """All documented statuses have icon mappings."""
+        for status in (
+            "OPERATIONAL",
+            "E-STOP",
+            "EMERGENCY_STOP",
+            "PAUSED",
+            "IDLE",
+            "DISCONNECTED",
+            "UNKNOWN",
+            "RUNNING",
+            "STARTED",
+            "ACTIVE",
+            "READY",
+            "STOPPED",
+            "ERROR",
+        ):
+            icon = widgets_module._status_icon(status)
+            assert icon != "", f"No icon for {status}"

@@ -135,6 +135,33 @@ def _theme_mode_label(mode: str | None) -> str:
     return normalized.capitalize()
 
 
+def _status_animations_css() -> str:
+    """Return CSS for pulse-critical and skeleton-shimmer animations."""
+    return (
+        "<style>"
+        "@keyframes pulse-critical {"
+        "  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6); }"
+        "  50% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }"
+        "}"
+        ".pulse-critical { animation: pulse-critical 1s infinite; }"
+        "@keyframes shimmer {"
+        "  0% { background-position: -200% 0; }"
+        "  100% { background-position: 200% 0; }"
+        "}"
+        ".skeleton-shimmer {"
+        "  background: linear-gradient(90deg, #D1D5DB 25%, #F3F4F6 50%, #D1D5DB 75%);"
+        "  background-size: 200% 100%;"
+        "  animation: shimmer 1.5s infinite;"
+        "  border-radius: 8px;"
+        "}"
+        "body.dark .skeleton-shimmer {"
+        "  background: linear-gradient(90deg, #374151 25%, #4B5563 50%, #374151 75%);"
+        "  background-size: 200% 100%;"
+        "}"
+        "</style>"
+    )
+
+
 def init_theme(_app: Any | None = None, *, title: str = "Medtech Suite") -> Any:
     """Apply RTI branding and return the shared header shell."""
     app.config.quasar_config.update(NICEGUI_QUASAR_CONFIG)
@@ -156,6 +183,7 @@ def init_theme(_app: Any | None = None, *, title: str = "Medtech Suite") -> Any:
     ui.add_head_html(_font_css(), shared=True)
     ui.add_head_html(_type_scale_css(), shared=True)
     ui.add_head_html(_glassmorphism_css(), shared=True)
+    ui.add_head_html(_status_animations_css(), shared=True)
     ui.add_head_html(
         "<style>"
         "body { transition: background-color 0.3s ease, color 0.3s ease; }"

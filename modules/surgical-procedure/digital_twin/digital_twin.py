@@ -1121,8 +1121,16 @@ def _build_scene(
     # Track previous assignment state for visibility delta
     _prev_arm_count = [0]
 
+    _prev_estop = [False]
+
     def update_scene() -> None:
         mode_badge.set_text(current_backend.operational_mode.name)
+        is_estop = current_backend.operational_mode == RobotMode.EMERGENCY_STOP
+        if is_estop and not _prev_estop[0]:
+            mode_badge.classes(add="pulse-critical")
+        elif not is_estop and _prev_estop[0]:
+            mode_badge.classes(remove="pulse-critical")
+        _prev_estop[0] = is_estop
 
         assignments = current_backend.arm_assignments
         pos_map = _assign_positions(assignments)

@@ -666,7 +666,10 @@ def dashboard_content() -> None:
                 return
             with ui.scroll_area().classes("w-full h-72"):
                 for alert in alerts:
-                    with ui.card().classes("w-full gap-1 p-3"):
+                    card_classes = "w-full gap-1 p-3"
+                    if alert.severity.upper() == "CRITICAL":
+                        card_classes += " pulse-critical"
+                    with ui.card().classes(card_classes):
                         ui.label(f"{alert.severity} · {alert.room or '—'}").classes(
                             "font-bold"
                         )
