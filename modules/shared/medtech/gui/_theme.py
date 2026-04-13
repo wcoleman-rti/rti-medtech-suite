@@ -83,6 +83,45 @@ def _type_scale_css() -> str:
     )
 
 
+def _glassmorphism_css() -> str:
+    """Return CSS custom properties and the ``.glass-panel`` utility class.
+
+    Dark and light mode each get their own ``--glass-bg``, ``--glass-border``,
+    and ``--glass-blur`` custom properties.  The ``.glass-panel`` class applies
+    the translucent backdrop-blur effect with a 16 px radius.
+    """
+    return (
+        "<style>"
+        # Dark-mode custom properties
+        "body.dark {"
+        "  --glass-bg: rgba(13,27,42,0.65);"
+        "  --glass-border: rgba(255,255,255,0.12);"
+        "  --glass-blur: 12px;"
+        "}"
+        # Light-mode custom properties (also default)
+        "body:not(.dark) {"
+        "  --glass-bg: rgba(255,255,255,0.65);"
+        "  --glass-border: rgba(0,0,0,0.06);"
+        "  --glass-blur: 10px;"
+        "}"
+        # Utility class
+        ".glass-panel {"
+        "  background: var(--glass-bg);"
+        "  backdrop-filter: blur(var(--glass-blur));"
+        "  -webkit-backdrop-filter: blur(var(--glass-blur));"
+        "  border: 1px solid var(--glass-border);"
+        "  border-radius: 16px;"
+        "  box-shadow: 0 8px 32px rgba(0,0,0,0.12);"
+        "}"
+        # Graceful degradation — no backdrop-filter → opaque fallback
+        "@supports not (backdrop-filter: blur(1px)) {"
+        "  body.dark .glass-panel { background: rgba(13,27,42,0.92); }"
+        "  body:not(.dark) .glass-panel { background: rgba(255,255,255,0.92); }"
+        "}"
+        "</style>"
+    )
+
+
 def _theme_mode_value(mode: str | None) -> bool | None:
     if mode == "light":
         return False
@@ -116,6 +155,7 @@ def init_theme(_app: Any | None = None, *, title: str = "Medtech Suite") -> Any:
     )
     ui.add_head_html(_font_css(), shared=True)
     ui.add_head_html(_type_scale_css(), shared=True)
+    ui.add_head_html(_glassmorphism_css(), shared=True)
     ui.add_head_html(
         "<style>"
         "body { transition: background-color 0.3s ease, color 0.3s ease; }"

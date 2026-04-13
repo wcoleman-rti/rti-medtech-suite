@@ -415,3 +415,95 @@ class TestInterFont:
             ".type-h1" in c[1][0] for c in head_calls if len(c[1]) > 0
         )
         assert type_scale_injected, "init_theme() must inject type scale CSS"
+
+
+# ---------------------------------------------------------------------------
+# Glassmorphism overlay tests (@ui-modernization Step M.3)
+# ---------------------------------------------------------------------------
+
+
+class TestGlassmorphism:
+    """Glassmorphism CSS custom properties and .glass-panel utility class."""
+
+    def test_glass_panel_class_defined(self):
+        """_glassmorphism_css() defines the .glass-panel class."""
+        css = theme_module._glassmorphism_css()
+        assert ".glass-panel" in css
+
+    def test_glass_panel_backdrop_filter(self):
+        """Glass panel uses backdrop-filter: blur()."""
+        css = theme_module._glassmorphism_css()
+        assert "backdrop-filter: blur(var(--glass-blur))" in css
+
+    def test_glass_panel_webkit_prefix(self):
+        """-webkit-backdrop-filter is included for Safari."""
+        css = theme_module._glassmorphism_css()
+        assert "-webkit-backdrop-filter: blur(var(--glass-blur))" in css
+
+    def test_glass_panel_border_radius_16(self):
+        """Glass panels have 16px border radius."""
+        css = theme_module._glassmorphism_css()
+        assert "border-radius: 16px" in css
+
+    def test_glass_panel_translucent_border(self):
+        """Glass panel border uses custom property."""
+        css = theme_module._glassmorphism_css()
+        assert "border: 1px solid var(--glass-border)" in css
+
+    def test_dark_mode_custom_properties(self):
+        """Dark mode sets --glass-bg with dark translucent color."""
+        css = theme_module._glassmorphism_css()
+        assert "--glass-bg: rgba(13,27,42,0.65)" in css
+
+    def test_light_mode_custom_properties(self):
+        """Light mode sets --glass-bg with white translucent color."""
+        css = theme_module._glassmorphism_css()
+        assert "--glass-bg: rgba(255,255,255,0.65)" in css
+
+    def test_dark_blur_12px(self):
+        """Dark mode glass blur is 12px."""
+        css = theme_module._glassmorphism_css()
+        assert "body.dark" in css
+        assert "--glass-blur: 12px" in css
+
+    def test_light_blur_10px(self):
+        """Light mode glass blur is 10px."""
+        css = theme_module._glassmorphism_css()
+        assert "--glass-blur: 10px" in css
+
+    def test_graceful_degradation(self):
+        """Fallback for browsers without backdrop-filter support."""
+        css = theme_module._glassmorphism_css()
+        assert "@supports not (backdrop-filter: blur(1px))" in css
+        assert "rgba(13,27,42,0.92)" in css
+        assert "rgba(255,255,255,0.92)" in css
+
+    def test_init_theme_injects_glassmorphism(self, monkeypatch: pytest.MonkeyPatch):
+        """init_theme() injects glassmorphism CSS into head HTML."""
+        recorder = Recorder()
+        _patch_theme_ui(monkeypatch, recorder)
+        monkeypatch.setattr(theme_module, "_fonts_dir", lambda: Path("/tmp/fonts"))
+        monkeypatch.setattr(
+            theme_module, "create_header", lambda **kw: FakeElement("header")
+        )
+
+        theme_module.init_theme()
+
+        head_calls = [call for call in recorder.calls if call[0] == "add_head_html"]
+        glass_injected = any(
+            ".glass-panel" in c[1][0] for c in head_calls if len(c[1]) > 0
+        )
+        assert glass_injected, "init_theme() must inject glassmorphism CSS"
+
+    def test_stat_card_glass_kwarg(self, monkeypatch: pytest.MonkeyPatch):
+        """create_stat_card(glass=True) adds .glass-panel class."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        widgets_module.create_stat_card(42, "Test", glass=True)
+
+        card_calls = [c for c in recorder.calls if c[0] == "card"]
+        assert len(card_calls) >= 1
+        card_el = card_calls[0][3]
+        class_str = " ".join(str(c) for c in card_el.class_calls)
+        assert "glass-panel" in class_str

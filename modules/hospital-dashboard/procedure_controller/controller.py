@@ -1336,9 +1336,9 @@ async def _open_service_config_dialog(
         refresh_ui()
 
     submit_label = "Update" if action_type == "update" else "Start"
-    with ui.dialog() as dlg, ui.card().classes("min-w-[28rem] rounded-lg p-6").style(
-        "box-shadow: 0 4px 24px rgba(0,0,0,0.25);"
-    ):
+    with ui.dialog() as dlg, ui.card().classes(
+        "min-w-[28rem] rounded-lg p-6 glass-panel"
+    ).style("box-shadow: 0 4px 24px rgba(0,0,0,0.25);"):
         ui.label("Configure Service").classes("text-xl font-bold brand-heading")
         ui.label(f"{service_id} on {host_id}").classes("text-sm text-gray-500")
         ui.separator()

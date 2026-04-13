@@ -1045,7 +1045,7 @@ def _build_scene(
     # All arms start hidden; update_scene shows those with assignments.
 
     # ---- Arm assignment overlay (HTML below scene) -------------------------
-    arm_status_container = ui.column().classes("w-full px-4 gap-1")
+    arm_status_container = ui.column().classes("w-full px-4 gap-1 glass-panel")
 
     def _position_for_assignment(assignment: Any) -> TablePosition | None:
         """Return the TablePosition for an assignment, or None if UNKNOWN."""

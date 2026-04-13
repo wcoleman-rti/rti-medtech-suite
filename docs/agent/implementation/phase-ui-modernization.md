@@ -203,7 +203,7 @@ client-side routing internally. But the current code uses `@ui.page("/")`
 
 ---
 
-## Step M.2 — Inter Font Integration
+## Step M.2 — Inter Font Integration ✅ `0493433`
 
 ### Work
 
@@ -233,11 +233,11 @@ client-side routing internally. But the current code uses `@ui.page("/")`
 
 ### Test Gate (spec: nicegui-migration.md — font scenario; hospital-dashboard.md — Inter font)
 
-- [ ] Inter font loads from local static files (no CDN requests)
-- [ ] Page headings render in Inter Bold (700)
-- [ ] Data values render in Roboto Mono Bold
-- [ ] All existing `@gui` tests pass
-- [ ] Docker image builds and serves fonts correctly
+- [x] Inter font loads from local static files (no CDN requests)
+- [x] Page headings render in Inter Bold (700)
+- [x] Data values render in Roboto Mono Bold
+- [x] All existing `@gui` tests pass
+- [x] Docker image builds and serves fonts correctly
 
 ---
 

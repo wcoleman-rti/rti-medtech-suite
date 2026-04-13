@@ -27,9 +27,13 @@ def create_stat_card(
     label: str,
     icon: str = "",
     color: str = BRAND_COLORS["blue"],
+    *,
+    glass: bool = False,
 ) -> Any:
     """Return a KPI card with a value label and optional icon."""
     card = ui.card().classes("w-full p-4 rounded-lg")
+    if glass:
+        card.classes("glass-panel")
     card.style(
         f"border-left: 4px solid {color};"
         f" box-shadow: 0 2px 8px rgba(0,0,0,{OPACITY['shadow']});"
