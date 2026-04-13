@@ -81,7 +81,9 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
        attached to `surgical-net`, `hospital-net`, `orchestration-net`)
     2. Routing Service (`routing-service` image, attached to
        `surgical-net`, `hospital-net`)
-    3. Central GUI (`medtech-gui` image, attached to `hospital-net`,
+    3. Collector Service (`rticom/collector-service` image, attached
+       to `hospital-net`) — always launched as base infrastructure
+    4. Central GUI (`medtech-gui` image, attached to `hospital-net`,
        `orchestration-net`, port 8080)
   - No NAT router is created
 
@@ -106,21 +108,24 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
     - The entrypoint enables IP forwarding and applies
       `iptables -t nat -A POSTROUTING -o $NAT_WAN_IFACE -j MASQUERADE`
       for each private subnet
-  - Run CDS, Routing Service, and GUI on the private networks
+  - Run CDS, Routing Service, Collector Service, and GUI on the
+    private networks
   - GUI host port allocated by hospital ordinal:
     1st hospital = 8080, 2nd = 9080, 3rd = 10080, etc.
 
   **Common behavior:**
   - Print each `docker run` command before execution
   - Print a URL summary (dashboard URL)
-  - Accept `--observability` flag to include the observability
-    containers (Collector Service, Prometheus, Grafana)
+  - Accept `--observability` flag to include the local visualization
+    containers (Prometheus, Grafana) for developer convenience.
+    Collector Service is always launched as base infrastructure
+    regardless of this flag.
   - Error if an unnamed hospital already exists and `--name` is
     not provided
 
 ### Test Gate
 
-- [ ] `medtech run hospital` starts CDS, Routing Service, and GUI containers (flat networks)
+- [ ] `medtech run hospital` starts CDS, Routing Service, Collector Service, and GUI containers (flat networks)
 - [ ] `medtech run hospital --name hospital-a` creates per-hospital networks with explicit subnets
 - [ ] NAT router container is created for named hospitals with `--privileged` and IP forwarding
 - [ ] `medtech_wan-net` is created exactly once across multiple named hospitals

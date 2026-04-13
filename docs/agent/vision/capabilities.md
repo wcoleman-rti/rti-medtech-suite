@@ -312,6 +312,9 @@ single entry point for build, launch, and dynamic scaling.
 #### Split-GUI Deployment
 - Per-OR digital twin containers deployed on `surgical-net` in standalone mode
 - Central GUI (dashboard + controller) deployed on `hospital-net`
+- RTI Collector Service (`rticom/collector-service`) deployed per hospital
+  as base infrastructure — collects Monitoring Library 2.0 telemetry from
+  all local DDS participants; V3.0 forwards to central cloud aggregator
 - Origin-aware sidebar navigation opens cross-origin twins in new tabs
 - `MEDTECH_GUI_EXTERNAL_URL` env var ensures browser-reachable `gui_url`
 - Per-OR containers launched dynamically via `docker run --rm` — no
@@ -358,7 +361,7 @@ single entry point for build, launch, and dynamic scaling.
 - `distributed` (default) — single unnamed hospital, split GUI, 2 ORs
 - `multi-site` — 2 named hospitals with NAT isolation, 2 ORs each
 - `unified` — monolithic GUI (pre-V1.4 behavior)
-- `minimal` — single OR, split GUI, no observability
+- `minimal` — single OR, split GUI, no local visualization (Collector Service still runs)
 
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|

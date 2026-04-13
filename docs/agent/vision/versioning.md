@@ -102,7 +102,7 @@ A version may only be cut when **all** of the following are true:
 
 | Module / Capability | Features |
 |---------------------|----------|
-| Split-GUI Docker deployment | Per-OR twin containers on `surgical-net`, central GUI on `hospital-net`, all containers via `docker run` |
+| Split-GUI Docker deployment | Per-OR twin containers on `surgical-net`, central GUI on `hospital-net`, per-hospital Collector Service (`rticom/collector-service`) as base infrastructure, all containers via `docker run` |
 | Multi-hospital simulation | Named hospitals with isolated private networks, NAT routers (`iptables MASQUERADE`), shared `wan-net`, per-hospital subnet/port allocation |
 | `medtech` CLI | `build`, `run hospital [--name]`, `run or [--name] [--hospital]`, `launch`, `status`, `status --topology`, `stop` — unified `--name` across all multi-instance commands |
 | Topology visualization | `medtech status --topology` (ASCII); optional [DockGraph](https://github.com/dockgraph/dockgraph) sidecar at `http://localhost:7800` |
@@ -154,7 +154,7 @@ A version may only be cut when **all** of the following are true:
 | ClinicalAlerts High Availability | Primary/backup ClinicalAlerts engine pair, automatic failover |
 | Multi-Segment Deployment | Per-segment ClinicalAlerts engine deployment; Cloud Discovery Service multi-initial-peer HA |
 | Cross-Platform Support | Windows, macOS, QNX build/runtime; platform-specific setup scripts; parameterized Connext architecture |
-| Cloud Command Center | Cloud/Enterprise domain (3rd databus layer); WAN Routing Service (Real-Time WAN Transport — `UDPv4_WAN`); Cloud Discovery Service for cross-site discovery; Connext Security Plugins on all WAN connections; Command Center dashboard; facility-level partitions; enterprise-wide aggregation |
+| Cloud Command Center | Cloud/Enterprise domain (3rd databus layer); WAN Routing Service (Real-Time WAN Transport — `UDPv4_WAN`); Cloud Discovery Service for cross-site discovery; Connext Security Plugins on all WAN connections; Command Center dashboard; facility-level partitions; enterprise-wide aggregation; central Collector Service aggregating per-hospital Collectors → Prometheus → Grafana Loki → Grafana |
 
 ---
 

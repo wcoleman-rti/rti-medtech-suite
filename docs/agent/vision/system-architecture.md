@@ -385,8 +385,8 @@ If an application must operate across multiple contexts simultaneously, it shoul
 │  RTI Cloud Discovery Service     │  on hospital networks. It enables
 │  (per segment or centralized)    │  multicast-free participant discovery.
 │                                  │
-│  RTI Collector Service           │  Telemetry aggregation (Observability
-│  Prometheus · Loki · Grafana     │  Framework — optional profile)
+│  RTI Collector Service           │  Per-hospital telemetry aggregation
+│                                  │  (always deployed; forwards to cloud)
 └────────────────┬─────────────────┘
                  │
         RTI Routing Service (WAN — UDPv4_WAN)     ← V3.0
@@ -397,6 +397,8 @@ If an application must operate across multiple contexts simultaneously, it shoul
 │  • Command Center dashboard     │  Cloud domain
 │  • Enterprise alerting          │  Domain partition: facility/hospital-a
 │  • Cloud Discovery Service      │
+│  • Central Collector Service    │  Aggregates from per-hospital Collectors
+│  • Prometheus · Loki · Grafana  │  Central telemetry visualization
 └──────────────────────────────────┘
 ```
 
@@ -547,8 +549,7 @@ hospital command center runs on the backbone.
 | Container | Launched By | Network | Serves | Host Port | Simulates |
 |-----------|-------------|---------|--------|-----------|-----------|
 | `cloud-discovery-service` | `docker run --rm` | `hospital-net`, `surgical-net`, `orchestration-net` | Multicast-free discovery | — | CDS appliance |
-| `routing-service` | `docker run --rm` | `hospital-net`, `surgical-net` | Procedure → Hospital bridge | — | Routing appliance |
-| `medtech-gui` | `docker run --rm` | `hospital-net`, `orchestration-net` | Dashboard + Procedure Controller (SPA shell) | 8080 | Hospital control room workstation |
+| `routing-service` | `docker run --rm` | `hospital-net`, `surgical-net` | Procedure → Hospital bridge | — | Routing appliance || `collector-service` | `docker run --rm` | `hospital-net` | Telemetry aggregation (Monitoring Library 2.0) | — | Per-facility Collector Service appliance || `medtech-gui` | `docker run --rm` | `hospital-net`, `orchestration-net` | Dashboard + Procedure Controller (SPA shell) | 8080 | Hospital control room workstation |
 | `medtech-twin-or1` | `docker run --rm` | `surgical-net` | Digital Twin (OR-1, standalone) | 8081 | In-OR display at OR-1 |
 
 **Named hospital (`--name hospital-a`):**
@@ -557,12 +558,12 @@ hospital command center runs on the backbone.
 |-----------|-------------|---------|-----------|
 | `hospital-a-nat` | `docker run --privileged` | private nets + `wan-net` | — |
 | `hospital-a-cds` | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_surgical-net`, `hospital-a_orchestration-net` | — |
-| `hospital-a-routing` | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_surgical-net` | — |
-| `hospital-a-gui` | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_orchestration-net` | 8080 |
+| `hospital-a-routing` | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_surgical-net` | — || `hospital-a-collector` | `docker run --rm` | `hospital-a_hospital-net` | — || `hospital-a-gui` | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_orchestration-net` | 8080 |
 | `hospital-a-twin-or1` | `docker run --rm` | `hospital-a_surgical-net` | 8081 |
 
-All containers — infrastructure (CDS, Routing Service), the central GUI,
-and per-OR service hosts and twins — are launched via `docker run --rm`.
+All containers — infrastructure (CDS, Routing Service, Collector Service),
+the central GUI, and per-OR service hosts and twins — are launched via
+`docker run --rm`.
 The `medtech` CLI wraps these calls (see [tooling.md](tooling.md) §
 `medtech` CLI). The `docker-compose.yml` is retained for image building
 (`docker compose build`) and as a legacy/reference path, but the
@@ -628,9 +629,12 @@ to prevent intermittent initialization failures:
    Hospital domain services.
 4. **Hospital domain applications** (dashboard, ClinicalAlerts engine) start after both Cloud
    Discovery Service and Routing Service are healthy.
-5. **Observability stack** (Collector Service, Prometheus, Grafana Loki, Grafana) has no
-   startup ordering dependency with application services — it is profile-gated and can
-   start in any order.
+5. **Collector Service** starts alongside other infrastructure services. It has no
+   strict ordering dependency but should be available before application participants
+   start so that Monitoring Library 2.0 telemetry is captured from the beginning.
+6. **Visualization stack** (Prometheus, Grafana Loki, Grafana) — when enabled via
+   `--observability` for local development, or as cloud infrastructure in V3.0 —
+   has no startup ordering dependency with application services.
 
 Health checks use the simplest reliable method per service:
 - Cloud Discovery Service: TCP port check on its configured listening port

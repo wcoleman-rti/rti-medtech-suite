@@ -26,7 +26,7 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 **Given** Docker images are built
 **When** the developer runs `medtech run hospital`
 **Then** the CLI creates flat Docker networks (`medtech_surgical-net`, `medtech_hospital-net`, `medtech_orchestration-net`) if they do not exist
-**And** the CLI runs sequential `docker run --rm -d` commands for Cloud Discovery Service, Routing Service, and the central GUI container
+**And** the CLI runs sequential `docker run --rm -d` commands for Cloud Discovery Service, Routing Service, Collector Service (`rticom/collector-service`), and the central GUI container
 **And** no NAT router container is created
 **And** each underlying command is printed to stdout
 **And** the output includes the dashboard URL (`http://localhost:8080`)
@@ -38,7 +38,7 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 **Then** the CLI creates per-hospital private networks (`medtech_hospital-a_surgical-net`, `medtech_hospital-a_hospital-net`, `medtech_hospital-a_orchestration-net`) with explicit subnets
 **And** the CLI creates the shared `medtech_wan-net` (172.30.0.0/24) if it does not exist
 **And** a privileged NAT router container (`hospital-a-nat`) is launched, dual-homed on the private networks and `wan-net`, with IP forwarding and `iptables MASQUERADE`
-**And** per-hospital CDS, Routing Service, and GUI containers are launched on the private networks
+**And** per-hospital CDS, Routing Service, Collector Service, and GUI containers are launched on the private networks
 **And** the GUI is mapped to a host port allocated by hospital ordinal (1st = 8080, 2nd = 9080, etc.)
 **And** each command is printed to stdout
 
@@ -46,8 +46,8 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 
 **Given** Docker images are built
 **When** the developer runs `medtech run hospital --observability`
-**Then** the usual infrastructure containers are started (CDS, Routing Service, GUI)
-**And** the Collector Service, Prometheus, and Grafana containers are also started
+**Then** the usual infrastructure containers are started (CDS, Routing Service, Collector Service, GUI)
+**And** Prometheus and Grafana containers are also started for local telemetry visualization
 **And** each container's `docker run` command is printed to stdout
 
 ---
