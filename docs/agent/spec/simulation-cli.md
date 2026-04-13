@@ -42,6 +42,16 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 **And** the GUI is mapped to a host port allocated by hospital ordinal (1st = 8080, 2nd = 9080, etc.)
 **And** each command is printed to stdout
 
+### @simulation @cli — `medtech run hospital --observability` includes the observability stack
+
+**Given** Docker images are built
+**When** the developer runs `medtech run hospital --observability`
+**Then** the usual infrastructure containers are started (CDS, Routing Service, GUI)
+**And** the Collector Service, Prometheus, and Grafana containers are also started
+**And** each container's `docker run` command is printed to stdout
+
+---
+
 ### @simulation @cli — second named hospital gets separate networks and NAT
 
 **Given** `hospital-a` is running

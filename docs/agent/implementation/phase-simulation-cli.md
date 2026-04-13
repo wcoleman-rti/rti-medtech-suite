@@ -96,9 +96,16 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
   - Launch a privileged NAT router container (`hospital-a-nat`):
     - Dual-homed on all three private networks **and** `wan-net`
     - `--privileged`, `sysctl net.ipv4.ip_forward=1`
-    - On startup, runs `iptables -t nat -A POSTROUTING -o eth3 -j MASQUERADE`
-      (where eth3 is the wan-net interface)
-    - Image: lightweight alpine with iptables
+    - Image: built from `docker/nat-router.Dockerfile` (Alpine +
+      iptables, installed at build time). The entrypoint script
+      reads environment variables to configure routing:
+      - `NAT_WAN_IFACE` — the interface connected to `wan-net`
+        (determined by the CLI from network attachment order)
+      - `NAT_PRIVATE_SUBNETS` — comma-separated list of private
+        subnets to MASQUERADE (e.g., `10.10.1.0/24,10.10.2.0/24,10.10.3.0/24`)
+    - The entrypoint enables IP forwarding and applies
+      `iptables -t nat -A POSTROUTING -o $NAT_WAN_IFACE -j MASQUERADE`
+      for each private subnet
   - Run CDS, Routing Service, and GUI on the private networks
   - GUI host port allocated by hospital ordinal:
     1st hospital = 8080, 2nd = 9080, 3rd = 10080, etc.
@@ -308,6 +315,10 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 - [ ] `medtech launch multi-site` → `medtech status` → `medtech stop`
       workflow completes without errors
 - [ ] `medtech launch unified` runs monolithic GUI end-to-end
+- [ ] `@acceptance @simulation` test passes: programmatically runs
+      `medtech launch` → `medtech run or --name OR-5` →
+      `medtech status` (asserts expected containers) → `medtech stop`
+      (asserts no orphan containers or networks)
 
 ---
 

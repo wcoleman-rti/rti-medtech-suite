@@ -205,7 +205,7 @@ commands directly.
 **When to use:**
 
 - "I just cloned the repo — how do I build and run it?" → `medtech build && medtech launch`
-- "I want to add another OR to the running simulation" → `medtech run or --room-id OR-5`
+- "I want to add another OR to the running simulation" → `medtech run or --name OR-5`
 - "What's running and where do I open it?" → `medtech status`
 - "I want to tear everything down" → `medtech stop`
 

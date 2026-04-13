@@ -676,6 +676,7 @@ All Dockerfiles use pinned Ubuntu 24.04 LTS as the base (`FROM ubuntu:24.04`). N
 | `build-base` | Compile C++ targets | Ubuntu 24.04, GCC toolchain, CMake, Connext 7.6.0 host libraries (`x64Linux4gcc8.5.0`) |
 | `runtime-cpp` | Run compiled C++ apps | Ubuntu 24.04 minimal, Connext 7.6.0 shared libraries only — no compiler |
 | `runtime-python` | Run Python apps | Ubuntu 24.04, Python 3.12, project venv, `rti.connext==7.6.0`, NiceGUI |
+| `nat-router` | NAT gateway for multi-hospital simulation (V1.4) | Alpine (pinned), iptables pre-installed; env-driven entrypoint configures IP forwarding and MASQUERADE rules via `NAT_WAN_IFACE` and `NAT_PRIVATE_SUBNETS`. No Connext dependency. |
 
 ## Testing
 

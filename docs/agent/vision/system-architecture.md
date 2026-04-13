@@ -485,8 +485,12 @@ Each named hospital launches a lightweight privileged container
 (`hospital-<name>-nat`) that bridges the hospital's private networks
 to `wan-net`. The NAT router:
 
+- Is built from `docker/nat-router.Dockerfile` (Alpine + iptables
+  installed at build time; env-driven entrypoint for routing rules)
+- Accepts `NAT_WAN_IFACE` and `NAT_PRIVATE_SUBNETS` environment
+  variables — the CLI passes the appropriate values at `docker run`
 - Enables IP forwarding (`net.ipv4.ip_forward=1`)
-- Applies `iptables -t nat -A POSTROUTING -o eth-wan -j MASQUERADE`
+- Applies `iptables -t nat -A POSTROUTING -o $NAT_WAN_IFACE -j MASQUERADE`
   (cone NAT — destination-independent mapping, compatible with RTI CDS
   NAT traversal per [wan-testing-strategy.md](wan-testing-strategy.md))
 - Is dual-homed on the hospital's private networks + `wan-net`

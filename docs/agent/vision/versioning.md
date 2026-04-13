@@ -30,7 +30,7 @@ A version may only be cut when **all** of the following are true:
 1. **All spec scenarios for the targeted milestone scope pass as automated tests.** No scenario may be pending, skipped, disabled, or marked expected-fail (`@skip`, `xfail`, `DISABLED_`, or equivalent).
 2. **No tests from any prior milestone are failing or disabled.** Regression is not permitted across versions.
 3. **All implementation phase test gates for the targeted milestone pass.** Each phase file defines explicit test gates; all must be green.
-4. **The Docker Compose demo runs end-to-end without errors.** `docker compose up` for the targeted milestone scope completes and all services reach healthy state.
+4. **The Docker simulation demo runs end-to-end without errors.** For milestones up to V1.3, `docker compose up` for the targeted scope completes and all services reach healthy state. For V1.4+, `medtech launch` (the CLI-driven demo path) completes and all services reach healthy state.
 5. **All IDL and QoS files are consistent with the data model.** Generated code is buildable from clean; no uncommitted generated files exist in the source tree.
 6. **No open spec change is pending operator approval.** All proposed vision/spec/implementation doc changes from the development cycle have been resolved.
 
