@@ -113,8 +113,6 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
     - Command: the module entry point for each service type
   - Print each `docker run` command before execution
   - Print summary: room ID, container names, twin URL
-- Update `medtech stop` to stop containers with
-  `--label medtech.dynamic=true` before running `docker compose down`
 
 ### Test Gate
 
