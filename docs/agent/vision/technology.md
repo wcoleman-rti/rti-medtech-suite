@@ -79,7 +79,7 @@ Additional Foxglove schemas (`CameraCalibration`, `ImageAnnotations`, `Compresse
 
 ### GUI Design Standard
 
-All GUI applications (Hospital Dashboard, Digital Twin Display, and any future GUIs) must share a consistent visual identity built on the RTI brand guidelines.
+All GUI applications (Hospital Dashboard, Digital Twin Display, and any future GUIs) must share a consistent visual identity. The authoritative design reference is [ui-design-system.md](ui-design-system.md). This section provides a summary.
 
 #### Color Palette
 
@@ -87,8 +87,8 @@ All GUI applications (Hospital Dashboard, Digital Twin Display, and any future G
 
 | Name | Hex | RGB | Usage |
 |------|-----|-----|-------|
-| RTI Blue | `#004C97` | 0 / 76 / 151 | Window title bars, primary action buttons, sidebar backgrounds, selected-row highlight |
-| RTI Orange | `#ED8B00` | 237 / 139 / 0 | Warning indicators, accent buttons, call-to-action elements |
+| RTI Blue | `#004A8A` | 0 / 74 / 138 | Window title bars, primary action buttons, sidebar backgrounds, selected-row highlight |
+| RTI Orange | `#E68A00` | 230 / 138 / 0 | Warning indicators, accent buttons, call-to-action elements |
 | RTI Gray | `#63666A` | 99 / 102 / 106 | Secondary text, borders, disabled controls, neutral status |
 
 **Secondary colors** — used in conjunction with primary colors, never as standalone dominant colors:
@@ -97,32 +97,31 @@ All GUI applications (Hospital Dashboard, Digital Twin Display, and any future G
 |------|-----|-----|-------|
 | RTI Light Blue | `#00B5E2` | 0 / 181 / 226 | Info badges, link text, hover highlights, streaming-data sparklines |
 | RTI Light Orange | `#FFA300` | 255 / 163 / 0 | Elevated-warning indicators, pending-state badges |
-| RTI Green | `#A4D65E` | 164 / 214 / 94 | Normal/healthy status, operational mode indicators, successful actions |
+| RTI Green | `#059669` | 5 / 150 / 105 | Normal/healthy status, operational mode indicators, successful actions |
 | RTI Light Gray | `#BBBCBC` | 187 / 188 / 188 | Panel backgrounds, dividers, placeholder text, disabled backgrounds |
 
 **Semantic mapping for clinical severity:**
 
 | Severity | Color | Hex |
 |----------|-------|-----|
-| Normal / Operational | RTI Green | `#A4D65E` |
-| Warning / Caution | RTI Orange | `#ED8B00` |
-| Critical / E-STOP / Alarm | Red (standard) | `#D32F2F` |
-| Info / Nominal | RTI Light Blue | `#00B5E2` |
-| Disconnected / Unknown | RTI Light Gray | `#BBBCBC` |
+| Normal / Operational | Success | `#059669` |
+| Warning / Caution | Warning | `#D97706` |
+| Critical / E-STOP / Alarm | Critical | `#DC2626` |
+| Info / Nominal | Info | `#0284C7` |
+| Disconnected / Unknown | Neutral-500 | `#6B7280` |
 
-A dedicated red (`#D32F2F`) is used for critical/alarm states — not part of the RTI palette, but required for immediate clinical visual distinction.
+See [ui-design-system.md](ui-design-system.md) § Design Token Architecture for the full token system.
 
 #### Typography
 
-All GUI applications use the RTI web typography stack:
+All GUI applications use the following web typography stack:
 
 | Role | Font Family | Fallback |
 |------|-------------|----------|
-| Headlines, panel titles, status labels | **Roboto Condensed** | sans-serif |
-| Body text, data values, table content | **Montserrat** | sans-serif |
-| Monospace (log output, raw DDS data) | **Roboto Mono** | monospace |
+| Headlines, panel titles, navigation, body text | **Inter** | sans-serif |
+| Monospace (data values, log output, raw DDS data) | **Roboto Mono** | monospace |
 
-Fonts are bundled as application resources (`.ttf` files under `resources/fonts/`) and loaded at startup via `QFontDatabase`. No system font dependency.
+Fonts are bundled as application resources (`.ttf`/`.woff2` files under `resources/fonts/`) and loaded at startup via `@font-face` CSS. No system font or CDN dependency. See [ui-design-system.md](ui-design-system.md) § Typography for the semantic type scale.
 
 #### Branding
 
@@ -133,16 +132,16 @@ Fonts are bundled as application resources (`.ttf` files under `resources/fonts/
 
 #### Layout Conventions
 
-- **Dark header bar** — RTI Blue (`#004C97`) background with white text and RTI logo
-- **Light content area** — white or near-white background for data panels
+- **Dark header bar** — RTI Blue (`#004A8A`) background with white text and RTI logo (glassmorphism optional)
+- **Light content area** — white or near-white background (`neutral-50`) for data panels
 - **Sidebar navigation** (where applicable) — RTI Blue background, white text, RTI Light Blue hover
 - **Status bar** — bottom of window, RTI Gray background, shows connection state and DDS participant health
-- All panels use consistent padding (8 px), border radius (4 px), and RTI Light Gray dividers
-- Color-coded status indicators use the semantic severity mapping above
+- All panels use consistent padding (12 px per design tokens), border radius (8 px cards, 16 px floating panels), and neutral-300 dividers
+- Color-coded status indicators use the semantic severity mapping above, with icons alongside color for accessibility
 
 #### Stylesheets
 
-All GUI applications use Tailwind CSS utility classes (provided by Quasar/NiceGUI) for layout and spacing. The brand palette is applied via `ui.colors(primary='#004C97', accent='#ED8B00', ...)` in `init_theme()`. No `.qss` stylesheet files are used.
+All GUI applications use Tailwind CSS utility classes (provided by Quasar/NiceGUI) for layout and spacing. The brand palette is applied via `ui.colors(primary='#004A8A', accent='#E68A00', ...)` in `init_theme()`. Glassmorphism effects use `backdrop-filter: blur()`. No `.qss` stylesheet files are used.
 
 #### Shared GUI Bootstrap
 
@@ -164,6 +163,60 @@ backend = MyBackend()  # registers hooks automatically at module import time
 ```
 
 The unified app entry point (`medtech.gui.app`) imports all page modules at startup. Each page module instantiates its `GuiBackend` subclass at module level — no manual lifecycle orchestration is needed in the main entry point.
+
+## CLI Tool
+
+The `medtech` CLI is a locally-installed Python console script that
+provides a streamlined quick-start workflow for building, launching, and
+scaling the medtech suite simulation. It is a thin convenience wrapper
+over native tools (`cmake`, `docker compose`, `docker run`) — every
+command prints the underlying invocation so developers can run native
+commands directly if they prefer.
+
+| Component | Version | Purpose |
+|-----------|---------|---------|
+| `click` | latest stable | CLI framework — composable subcommands, auto-generated `--help` |
+
+The entry point is declared in `pyproject.toml`:
+
+```toml
+[project.scripts]
+medtech = "medtech.cli:main"
+```
+
+After `pip install -e .` (or sourcing `setup.bash` in the install tree),
+the `medtech` command is available on PATH. No platform-specific wrapper
+script is needed — pip generates the appropriate shim for the active
+platform.
+
+### Command Summary
+
+| Command | Wraps | Purpose |
+|---------|-------|---------|
+| `medtech build` | `cmake --build build --target install` | Configure (if needed), build, and install |
+| `medtech run hospital` | `docker compose up -d` | Start infrastructure + central GUI |
+| `medtech run or --room-id OR-1` | `docker run --rm -d ...` (multiple) | Spawn Service Host + twin containers for one OR |
+| `medtech launch [SCENARIO]` | Sequence of `run` calls | Start a named simulation scenario end-to-end |
+| `medtech launch --list` | — | List available scenarios with descriptions |
+| `medtech stop` | `docker compose down` + `docker stop` for dynamic containers | Tear down the simulation |
+| `medtech status` | `docker compose ps` | Show running containers and GUI URLs |
+
+`medtech launch` is a convenience that calls the appropriate `run`
+commands for a named scenario. Developers who prefer manual control
+can compose their own topology with individual `run` calls.
+
+### Design Constraints
+
+- **Transparency:** Every Docker or CMake invocation is printed to
+  stdout before execution. The developer can copy-paste any command.
+- **No abstraction:** The CLI does not invent its own configuration
+  format, state files, or daemon processes. It delegates entirely to
+  `cmake`, `docker compose`, and `docker run`.
+- **No DDS dependency:** The CLI does not import `rti.connext` or
+  create DDS participants. It is a pure build/launch orchestrator.
+- **Fail-through:** If a command fails, the underlying tool's error
+  message is shown directly. The CLI does not swallow or reformat
+  errors.
 
 ## Build System
 

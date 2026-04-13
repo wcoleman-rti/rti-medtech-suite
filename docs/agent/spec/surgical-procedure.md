@@ -246,6 +246,55 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 
 ---
 
+## Digital Twin Visual Modernization
+
+### Scenario: Digital twin uses glassmorphism for HUD overlays `@gui` `@ui-modernization`
+
+**Given** the digital twin display is running with the 3D robot scene visible
+**When** any HUD overlay panel is displayed (joint values, mode badge, telemetry readout)
+**Then** the overlay uses a translucent background with backdrop blur (glassmorphism)
+**And** the overlay has a 16 px border radius and a 1 px translucent border
+**And** the 3D scene content behind the overlay is visibly blurred
+
+### Scenario: Selected joint shows glow effect `@gui` `@ui-modernization`
+
+**Given** the digital twin displays a multi-joint robot arm in the 3D scene
+**When** the user selects a joint (tap/click on the arm segment)
+**Then** the selected joint segment displays a soft glow effect using the `rti-light-blue` color at `selection_glow` opacity
+**And** the glow follows the segment geometry and updates with joint movement
+
+### Scenario: Robot mode badge uses modern status chip style `@gui` `@ui-modernization`
+
+**Given** the digital twin displays a mode badge for the robot's operational state
+**When** the mode is OPERATIONAL, PAUSED, E-STOP, or IDLE
+**Then** the badge uses the semantic status chip style (12 px radius, icon + label, tinted background)
+**And** E-STOP mode triggers a pulsing red border ring animation
+**And** the animation respects `prefers-reduced-motion` browser settings
+
+### Scenario: Digital twin applies Inter font for all UI text `@gui` `@ui-modernization`
+
+**Given** the digital twin page renders text overlays (joint labels, mode badge, telemetry values)
+**When** the page is displayed
+**Then** non-monospace text uses the Inter font family at appropriate semantic scale weights
+**And** numeric data values use Roboto Mono
+**And** fonts load from local static files with no CDN requests
+
+### Scenario: Digital twin uses design tokens for all visual values `@gui` `@ui-modernization`
+
+**Given** the digital twin renders UI elements (badges, overlays, data labels)
+**When** colors, spacing, radii, or transitions are applied
+**Then** all values derive from the centralized design token system
+**And** no hardcoded hex colors or pixel sizes appear in component-level rendering code
+
+### Scenario: Digital twin shows skeleton state during discovery `@gui` `@ui-modernization`
+
+**Given** the digital twin page loads before DDS endpoints have matched
+**When** the 3D scene area is rendered but no `RobotState` samples have arrived
+**Then** the scene area displays a skeleton placeholder animation (shimmer overlay) or an animated loading state
+**And** the skeleton is replaced by the live 3D scene once the first `RobotState` sample arrives
+
+---
+
 ## System Initialization
 
 ### Scenario: Procedure system reaches operational state within time budget `@integration` `@performance`

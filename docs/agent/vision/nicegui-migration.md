@@ -1,5 +1,18 @@
 # NiceGUI Migration — Vision & Technical Architecture
 
+> **Status: COMPLETE.** The PySide6 → NiceGUI migration is fully
+> implemented. All GUI applications (Hospital Dashboard, Procedure
+> Controller, Digital Twin) run on NiceGUI. PySide6 and pytest-qt
+> have been removed from the project. This document is retained as
+> the **authoritative architectural reference** for the NiceGUI
+> integration patterns, `GuiBackend` ABC contract, DDS event loop
+> model, and multi-page architecture. It is no longer a migration
+> plan — it is a living architectural specification.
+>
+> For the evolving visual design language (colors, typography,
+> animations, glassmorphism), see
+> [ui-design-system.md](ui-design-system.md).
+
 ## Rationale
 
 Replace PySide6 (Qt 6 desktop bindings) with [NiceGUI](https://nicegui.io/) as
@@ -419,13 +432,148 @@ NiceGUI's page routing enables a unified application serving all GUI modules:
 | `/alerts` | Clinical Alerts Dashboard | (new — visual frontend for alerts engine) |
 
 This replaces three separate `QApplication` processes with a single web app.
-The recommended navigation model is **`ui.sub_pages()`** (see
-[Additional Capabilities](#additional-nicegui-capabilities-to-leverage) below),
-which provides SPA-style client-side routing — the application shell (header,
-navigation drawer, connection status, DDS backends) persists across page
-transitions without full page reloads or WebSocket reconnections. Individual
-modules can also be deployed as standalone `@ui.page()` apps if isolation is
-required.
+The navigation model uses **`ui.sub_pages()`** for SPA-style client-side
+routing — the application shell (header, navigation drawer, connection
+status, DDS backends) persists across page transitions without full page
+reloads or WebSocket reconnections.
+
+#### Critical: Shell-First Routing
+
+The root shell function must be passed **directly to `ui.run()`** — not
+registered via `@ui.page("/")`. This ensures the shell handles **all** URL
+paths, including sub-page paths on browser refresh or direct link entry:
+
+```python
+def shell_page() -> None:
+    init_theme(title="Medtech Suite")
+    with ui.left_drawer(fixed=True):
+        # Navigation items
+        ...
+    ui.sub_pages({
+        "/dashboard": dashboard_content,
+        "/controller": controller_content,
+        "/twin/{room_id}": twin_content,
+        "/": lambda: ui.navigate.to("/dashboard"),
+    })
+
+ui.run(shell_page, storage_secret=..., reload=False)
+```
+
+**Each GUI module must NOT register a standalone `@ui.page()` at its
+sub-page route** when running in unified mode. Standalone `@ui.page()`
+handlers conflict with `ui.sub_pages()` routing — on browser refresh,
+the standalone handler wins and renders the page without the shell. Module
+`*_content()` functions are the entry points for `ui.sub_pages()`;
+standalone `*_page()` functions are only for `__main__` standalone mode.
+
+#### Distributed Deployment: Origin-Aware Hybrid Navigation
+
+In a physical deployment, GUI services may run on **different machines**.
+For example, a Digital Twin runs on `surgical-host:8081` while the
+Procedure Controller runs on `admin-host:8080`. The unified SPA shell
+cannot embed a NiceGUI page from a different origin as a sub-page — each
+NiceGUI instance owns its own WebSocket connection and asyncio event loop.
+
+The architecture handles this with **origin-aware navigation**:
+
+| gui_url Origin vs. Current Page Origin | Navigation Behavior |
+|---------------------------------------|---------------------|
+| **Same origin** (co-located in unified app) | In-app SPA navigation via `ui.navigate.to(path)` — stays in shell, no new tab |
+| **Different origin** (remote host) | Open in new browser tab via `ui.navigate.to(url, new_tab=True)` — standalone page on remote host |
+
+The `gui_url` property in `ServiceCatalog` already provides the full HTTP
+endpoint URL for each GUI service. The Procedure Controller's "Open" button
+compares the URL's origin to `window.location.origin`:
+
+```python
+# Conceptual origin-aware open handler (Procedure Controller)
+async def _open_gui(gui_url: str) -> None:
+    # Check if the service is co-located (same NiceGUI process)
+    parsed = urlparse(gui_url)
+    local_origin = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+    if _is_same_origin(local_origin):
+        # Same process — navigate within the SPA shell
+        ui.navigate.to(parsed.path)
+    else:
+        # Remote host — open standalone page in new tab
+        ui.navigate.to(gui_url, new_tab=True)
+```
+
+**Standalone page requirements:** When a GUI service is opened in a new
+tab (cross-origin), it must render a **self-contained page** with:
+- Its own header bar (RTI logo, title, theme toggle)
+- A "Return to Controller" link using the controller's announced URL
+  (also discoverable via `ServiceCatalog` `gui_url` on the controller's
+  own catalog entry, or via a well-known property key)
+- Full theme and font support (each standalone NiceGUI instance serves
+  its own static assets)
+
+This means every GUI service must maintain both:
+1. A `*_content()` function for embedding in the unified SPA shell
+2. A `*_page()` function for standalone operation (with its own shell)
+
+The `*_page()` function is registered via `@ui.page()` **only when the
+module runs as its own entry point** (`__main__`), never when imported
+by the unified app.
+
+#### Dynamic Sidebar Navigation
+
+The sidebar navigation in the unified app shell must NOT be a hardcoded
+list. Instead, it is built from two sources:
+
+1. **Static local pages** — pages whose content functions are compiled
+   into this process (e.g., Dashboard, Controller). These are always
+   present.
+
+2. **Discovered GUI services** — services with a non-empty `gui_url`
+   in their `ServiceCatalog`. These appear dynamically as services
+   start and disappear when services stop.
+
+The sidebar renders discovered GUI services in a separate "Services"
+section below the static navigation. Each entry shows:
+- The service's `display_name` (from `ServiceCatalog`)
+- The host's `room_id` (from the `room_id` property)
+- An icon indicating whether it is local (in-app navigation) or
+  remote (opens new tab), derived from the origin check above
+
+When a local GUI service is discovered (same origin), the shell can
+register its content function dynamically via `ui.sub_pages().add()`.
+When a remote GUI service is discovered, the sidebar entry opens a new
+tab.
+
+```python
+# Conceptual dynamic sidebar (simplified)
+_STATIC_NAV = [
+    ("/dashboard", ICONS["dashboard"], "Dashboard"),
+    ("/controller", ICONS["service"], "Controller"),
+]
+
+def _build_sidebar(drawer, controller_backend):
+    # Static entries (always present)
+    for path, icon, label in _STATIC_NAV:
+        _render_nav_button(drawer, path, icon, label)
+
+    # Dynamic entries from ServiceCatalog gui_url
+    ui.separator()
+    ui.label("Services").classes(...)
+    for (host_id, svc_id), catalog in controller_backend.catalogs.items():
+        gui_url = _catalog_property(catalog, "gui_url")
+        if not gui_url:
+            continue
+        room_id = _catalog_property(catalog, "room_id") or ""
+        label = f"{catalog.display_name}"
+        if room_id:
+            label += f" ({room_id})"
+        if _is_same_origin(gui_url):
+            _render_nav_button(drawer, urlparse(gui_url).path, ICONS["robot"], label)
+        else:
+            _render_nav_button(drawer, gui_url, ICONS["open_in_new"], label, new_tab=True)
+```
+
+This pattern generalizes naturally: any future GUI service (Clinical
+Alerts Dashboard, Foxglove Viewer, etc.) automatically appears in the
+sidebar of any machine that runs the unified app — with zero
+configuration changes.
 
 ---
 
@@ -516,13 +664,13 @@ required.
 from nicegui import app
 
 app.colors(
-    primary='#004C97',    # rti-blue
+    primary='#004A8A',    # rti-blue
     secondary='#63666A',  # rti-gray
-    accent='#ED8B00',     # rti-orange
-    positive='#A4D65E',   # rti-green
-    negative='#D32F2F',   # error-red
+    accent='#E68A00',     # rti-orange
+    positive='#059669',   # rti-green
+    negative='#DC2626',   # error-red
     info='#00B5E2',       # rti-light-blue
-    warning='#ED8B00',    # rti-orange (reused)
+    warning='#E68A00',    # rti-orange (reused)
 )
 ```
 

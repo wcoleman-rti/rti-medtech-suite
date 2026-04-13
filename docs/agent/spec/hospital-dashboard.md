@@ -208,3 +208,82 @@ The dashboard subscribes to the Hospital domain. All data arrives via Routing Se
 **When** Routing Service is restarted
 **Then** the dashboard resumes displaying live data within the initialization time budget
 **And** stale-data indicators are removed
+
+---
+
+## Visual Design & Theming
+
+### Scenario: Dashboard uses glassmorphism for floating overlay panels `@gui` `@ui-modernization`
+
+**Given** the hospital dashboard is running
+**When** any floating overlay (alert detail popover, filter dropdown, HUD panel) is displayed
+**Then** the overlay uses a translucent background with backdrop blur (glassmorphism)
+**And** the overlay has a 16 px border radius and a 1 px translucent border for edge definition
+**And** content behind the overlay is visibly blurred, creating a depth hierarchy
+
+### Scenario: Dashboard applies design token system for all visual values `@gui` `@ui-modernization`
+
+**Given** the hospital dashboard renders any page
+**When** colors, spacing, radii, shadows, or transitions are applied to elements
+**Then** all values are derived from the centralized design token system (`DESIGN_TOKENS` or `BRAND_COLORS`)
+**And** no hardcoded hex colors, pixel sizes, or timing strings appear in component-level code
+
+### Scenario: Skeleton loaders appear during initial data discovery `@gui` `@ui-modernization`
+
+**Given** the hospital dashboard is starting and DDS endpoints have not yet matched
+**When** the dashboard page renders before data is available
+**Then** procedure cards, vitals rows, and resource entries display skeleton placeholder animations (shimmer effect)
+**And** skeleton loaders are replaced by real data once DDS samples arrive
+**And** no blank or "waiting for data" text is shown during the discovery window
+
+### Scenario: Status chips include icon alongside color `@gui` `@ui-modernization`
+
+**Given** the dashboard displays status indicators for procedures, robots, or resources
+**When** any status chip is rendered (OPERATIONAL, E-STOP, PAUSED, IDLE, DISCONNECTED, etc.)
+**Then** the chip includes both a semantic icon and color-coded background tint
+**And** the status is distinguishable without relying solely on color (color-blind accessible)
+
+### Scenario: Critical alerts use attention-drawing pulse animation `@gui` `@ui-modernization`
+
+**Given** the dashboard alert feed is visible
+**When** a new CRITICAL alert appears
+**Then** the alert card slides in with a fade-in animation (300 ms)
+**And** CRITICAL severity alerts display a pulsing red border ring animation until acknowledged or scrolled past
+**And** the animation respects `prefers-reduced-motion` browser settings
+
+### Scenario: Card hover shows elevated state `@gui` `@ui-modernization`
+
+**Given** the dashboard is displaying procedure cards or resource tiles
+**When** the user hovers over a card (pointer device)
+**Then** the card smoothly scales to 1.02× and shadow increases to the `shadow-lg` tier (200 ms transition)
+**And** the hover state does not shift adjacent card positions (transform only, no layout reflow)
+
+### Scenario: Inter font renders for all non-monospace text `@gui` `@ui-modernization`
+
+**Given** the dashboard has loaded and fonts are available
+**When** any page renders
+**Then** headline labels, section headers, and body text use the Inter font family
+**And** numeric data values use Roboto Mono
+**And** no external font CDN requests are made (fonts loaded from local static files)
+
+### Scenario: Focus-visible rings appear on keyboard navigation `@gui` `@a11y`
+
+**Given** the dashboard is rendered in a browser
+**When** a user navigates interactive elements using the Tab key
+**Then** each focused element displays a visible 2 px blue (`info` color) outline ring
+**And** the ring does not appear on mouse/touch interactions (only `focus-visible`)
+
+### Scenario: Reduced motion preference disables animations `@gui` `@a11y`
+
+**Given** the user's browser has `prefers-reduced-motion: reduce` enabled
+**When** the dashboard renders
+**Then** all CSS animations (pulse, shimmer, slide-in) are suppressed
+**And** transitions complete near-instantly (≤ 1 ms)
+**And** the dashboard remains fully functional without motion
+
+### Scenario: Dashboard uses semantic type scale `@gui` `@ui-modernization`
+
+**Given** the dashboard renders text content
+**When** headings, body text, labels, and data values are displayed
+**Then** each text element uses a size from the semantic type scale (heading-1 through mono-small)
+**And** no arbitrary font sizes outside the type scale are used

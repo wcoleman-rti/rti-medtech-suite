@@ -25,8 +25,8 @@ Phases are grouped by release milestone. All phases within a milestone must be c
 
 > **Implementation order:** Execute phases in **milestone order**, which now
 > matches phase numbering: V1.0 phases (1–5) → V1.1 phase (6) →
-> V1.2 phase (20) → V2.0 phases (7–14) → V2.1 phase (21) →
-> V3.0 phases (15–19).
+> V1.2 phase (20) → V1.3 phase (UI-M) → V1.4 phase (SIM) →
+> V2.0 phases (7–14) → V2.1 phase (21) → V3.0 phases (15–19).
 
 ```
 ── V1.0.0 ──────────────────────────────────────────────────────────────────
@@ -65,6 +65,15 @@ Phase 20: Dynamic Multi-Arm           (depends on: Phases 1–5)
           Orchestration
 
     (Phase 20 can proceed in parallel with Phase 6)
+
+── V1.3.0 ──────────────────────────────────────────────────────────────────
+
+Phase UI-M: UI Modernization          (depends on: Phase 20, NiceGUI Migration)
+
+── V1.4.0 ──────────────────────────────────────────────────────────────────
+
+Phase SIM: Distributed Simulation     (depends on: Phase UI-M)
+           & CLI
 
 ── V2.0.0 ──────────────────────────────────────────────────────────────────
 
@@ -157,6 +166,26 @@ After all V1.0.0 phases (1–5, plus 3–4) are complete, a **final regression g
 | [phase-20-multi-arm.md](phase-20-multi-arm.md) | Phases 1–5 | `RobotArmAssignment` topic (IDL, QoS), `ArmAssignmentState`/`TablePosition` enums, multi-arm table positioning, Procedure Controller `control`-tag participant expansion, digital twin multi-arm rendering, `@multi-arm` test coverage |
 
 > **Prerequisite:** Phase 20 requires [spec/multi-arm-orchestration.md](../spec/multi-arm-orchestration.md) to be operator-approved before implementation begins.
+
+### V1.3.0 — UI Modernization (ready to execute)
+
+| Phase | Depends On | Key Deliverables |
+|-------|------------|------------------|
+| [phase-ui-modernization.md](phase-ui-modernization.md) | Phase 20, NiceGUI Migration | Design token system (`_tokens.py`), Inter font integration, glassmorphism overlays, modern status indicators (icon chips, skeleton loaders, pulse-critical), animation & transitions (hover elevate, slide-in, focus rings, reduced-motion), semantic type scale, accessibility improvements |
+
+> **No prerequisites.** This phase is immediately actionable — it builds on
+> the current V1.2 codebase. All changes are visual-only; no DDS, IDL, QoS,
+> or architectural modifications. Spec scenarios tagged `@ui-modernization`
+> in `hospital-dashboard.md` and `surgical-procedure.md` define the test
+> gate.
+
+### V1.4.0 — Distributed Simulation & CLI (planned)
+
+| Phase | Depends On | Key Deliverables |
+|-------|------------|------------------|
+| [phase-simulation-cli.md](phase-simulation-cli.md) | Phase UI-M (V1.3) | `medtech` CLI (click-based), split-GUI Docker topology, `medtech run hospital` / `medtech run or`, simulation scenarios, dynamic room addition |
+
+> **Prerequisite:** Phase SIM requires [spec/simulation-cli.md](../spec/simulation-cli.md) to be operator-approved before implementation begins.
 
 ### V2.0.0 Phases (planned)
 

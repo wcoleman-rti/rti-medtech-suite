@@ -23,7 +23,7 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 | Monitoring Library 2.0 | Enabled on every DomainParticipant via XML — no code-level opt-in |
 | Observability stack independence | Removing the `observability` Docker Compose profile does not affect functional behavior |
 | GUI shared theme | `init_theme()` applies RTI brand palette via `ui.colors()` and serves bundled fonts via `app.add_static_files('/fonts', ...)` at startup |
-| GUI header bar | RTI Blue (`#004C97`) background, white text, RTI logo left-aligned |
+| GUI header bar | RTI Blue (`#004A8A`) background, white text, RTI logo left-aligned |
 | GUI severity color — Critical | Red `#D32F2F` |
 | `@performance` test Docker tolerance multiplier | 10× (timing thresholds relaxed by factor of 10 in Docker simulation) |
 | `@performance` test native tolerance multiplier | 1× (timing thresholds as specified) |
@@ -370,8 +370,8 @@ Requirements **not** subject to the 10× multiplier:
 
 **Given** a NiceGUI GUI application (Hospital Dashboard, Procedure Controller, or Digital Twin) is launched
 **When** the application initializes
-**Then** `init_theme()` applies the RTI brand palette (`ui.colors(primary='#004C97', accent='#ED8B00', ...)`) without errors
-**And** the header bar uses RTI Blue (`#004C97`) background with white text
+**Then** `init_theme()` applies the RTI brand palette (`ui.colors(primary='#004A8A', accent='#E68A00', ...)`) without errors
+**And** the header bar uses RTI Blue (`#004A8A`) background with white text
 
 ### Scenario: GUI application displays RTI logo in header `@gui`
 
@@ -384,14 +384,14 @@ Requirements **not** subject to the 10× multiplier:
 
 **Given** a NiceGUI GUI application is launched
 **When** the application serves static assets
-**Then** Roboto Condensed, Montserrat, and Roboto Mono are available via `@font-face` CSS
+**Then** Inter and Roboto Mono are available via `@font-face` CSS
 **And** no system font dependency is required
 
 ### Scenario: Severity colors follow the semantic mapping `@gui`
 
 **Given** a NiceGUI GUI application displays a status indicator
 **When** the status changes to Normal, Warning, Critical, Info, or Disconnected
-**Then** the indicator uses the corresponding semantic color: Green (`#A4D65E`), Orange (`#ED8B00`), Red (`#D32F2F`), Light Blue (`#00B5E2`), or Light Gray (`#BBBCBC`) respectively
+**Then** the indicator uses the corresponding semantic color: Green (`#059669`), Orange (`#E68A00`), Red (`#DC2626`), Light Blue (`#00B5E2`), or Light Gray (`#BBBCBC`) respectively
 
 ---
 

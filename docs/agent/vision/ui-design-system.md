@@ -8,11 +8,21 @@ conform to these rules.
 
 ## Design Language
 
-**Material Design 3 (Material You) — Flat Modern variant.**
+**Modern Clinical — Glass + Flat Hybrid.**
 
-Influences: Google Material 3, Apple HIG touch-target guidelines,
-Fluent Design elevation model. Adapted for a medical/industrial
-context with the RTI brand palette.
+Influences: Material Design 4 (semantic token architecture, elevation
+layers), Apple HIG 2024 (dark-mode depth, focus rings, color
+temperature), Vercel/Geist design system (token-first approach, modern
+simplicity), Figma component architecture (variable fonts, glassmorphism
+surfaces), contemporary Dribbble/Framer motion trends (soft UI accents,
+spring animations). Adapted for a medical/industrial context with a
+refined RTI brand palette.
+
+The primary departure from the previous Material Design 3 Flat Modern
+variant: **floating overlays and HUD panels now use glassmorphism**
+(backdrop blur + frosted glass surfaces), while data-bearing elements
+remain flat. This creates a clear visual hierarchy between ambient
+chrome and actionable content.
 
 ---
 
@@ -20,39 +30,75 @@ context with the RTI brand palette.
 
 | # | Principle | Rule |
 |---|-----------|------|
-| 1 | **Flat fills, no gradients on data elements** | Interactive and data-bearing elements use solid flat color fills. Gradients are permitted *only* for ambient backgrounds (e.g., the full-widget top→bottom background gradient). |
-| 2 | **Rounded corners everywhere** | Panels and cards: 8 px radius. Small elements (cells, badges, pills): 4 px radius. Pill-shaped elements: radius = height / 2. |
-| 3 | **Elevation via shadow, not borders** | Floating panels (HUD, overlays) use a soft shadow (larger semi-transparent rect behind) instead of border lines. No 1 px strokes on panel edges. |
-| 4 | **Color as information** | Color encodes meaning (heatmap, status). Decorative color is minimized. Use the diverging heatmap ramp for continuous data and the semantic palette for discrete states. |
+| 1 | **Flat fills on data elements, glass on chrome** | Interactive and data-bearing elements use solid flat color fills. Floating overlays, HUD panels, and navigation surfaces use glassmorphism (backdrop blur + translucent fill). Gradients are permitted *only* for ambient backgrounds. |
+| 2 | **Variable rounded corners** | Large floating panels: 16 px radius. Data cards and modals: 8 px radius. Small elements (cells, badges): 4 px radius. Status chips and pills: 12 px radius. Pill-shaped elements: radius = height / 2. |
+| 3 | **Layered elevation** | Three semantic elevation tiers: `shadow-sm` (subtle cards), `shadow-md` (data cards), `shadow-lg` (floating panels). Glassmorphism panels add a 1 px translucent border (`rgba(255,255,255,0.12)` dark / `rgba(0,0,0,0.06)` light) for edge definition. No opaque 1 px strokes on panel edges. |
+| 4 | **Color as information** | Color encodes meaning (heatmap, status). Decorative color is minimized. Use the perceptually uniform heatmap ramp for continuous data and the semantic palette for discrete states. |
 | 5 | **Generous whitespace** | Minimum 12 px internal padding on panels. Minimum 8 px gap between grouped elements. |
 | 6 | **Touch-friendly targets** | Minimum 44 × 44 px tap targets per Apple/Google HIG. Interactive elements that are too small on touch screens must provide a larger hit-test area. |
 | 7 | **Progressive disclosure** | Default state shows minimal information. Detail is revealed on tap/click (expand-in-place pattern). No hover-dependent interactions (touch compatibility). |
-| 8 | **Consistent opacity tokens** | Background overlays: 85% opacity. Shadows: 15% opacity. Selection glow: 18% opacity. Disabled elements: 40% opacity. |
+| 8 | **Consistent design tokens** | All visual values (colors, spacing, radii, shadows, opacities, transitions) are defined in the centralized design token system. No hardcoded values in component code. |
+| 9 | **Accessible by default** | WCAG AAA contrast ratios for clinical text. Visible focus rings for keyboard navigation. `prefers-reduced-motion` support. Color-blind-friendly palette option. |
+| 10 | **Purposeful motion** | Transitions convey state change, not decoration. All animations respect `prefers-reduced-motion`. Critical clinical elements (E-STOP, alarms) use attention-drawing pulse animations. |
 
 ---
 
 ## Color Palette
 
-### Brand Colors (from RTI)
+### Brand Colors (refined from RTI)
+
+Brand colors are slightly desaturated from the original RTI palette for
+reduced eye fatigue in prolonged clinical monitoring, while remaining
+clearly recognizable as RTI brand tones.
 
 | Token | Hex | Usage |
 |-------|-----|-------|
-| `rti-blue` | `#004C97` | Primary brand, base elements |
-| `rti-orange` | `#ED8B00` | Accent, positive heatmap extreme |
+| `rti-blue` | `#004A8A` | Primary brand, base elements (desaturated from #004C97) |
+| `rti-orange` | `#E68A00` | Accent, positive heatmap extreme (warmer from #ED8B00) |
 | `rti-gray` | `#63666A` | Neutral text, disabled states |
 | `rti-light-blue` | `#00B5E2` | Interactive highlights, selection glow |
-| `rti-green` | `#A4D65E` | Healthy/connected/positive status |
+| `rti-green` | `#059669` | Healthy/connected/positive status (modern teal-green) |
 | `rti-light-gray` | `#BBBCBC` | Secondary labels |
+
+### Neutral Scale
+
+A 5-level neutral ramp provides fine-grained hierarchy for text,
+dividers, and backgrounds. Both the light and dark themes select
+from this scale.
+
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `neutral-950` | `#0F1419` | Darkest text, highest emphasis |
+| `neutral-800` | `#1E293B` | High-emphasis dark surfaces |
+| `neutral-700` | `#374151` | Primary body text (light theme) |
+| `neutral-500` | `#6B7280` | Secondary labels, muted icons |
+| `neutral-300` | `#D1D5DB` | Dividers, borders |
+| `neutral-100` | `#F1F5F9` | Subtle card backgrounds |
+| `neutral-50` | `#F9FAFB` | Page background (light theme) |
 
 ### Semantic Colors
 
 | Token | Hex | Usage |
 |-------|-----|-------|
-| `error-red` | `#D32F2F` | Errors, interlock, disconnected |
+| `success` | `#059669` | Operational, healthy, connected (= rti-green) |
+| `warning` | `#D97706` | Warning, caution, pending |
+| `critical` | `#DC2626` | Errors, E-STOP, alarms, interlock |
+| `info` | `#0284C7` | Informational, nominal, links |
+| `error-red` | `#DC2626` | Alias for `critical` — backward compatibility |
 | `heatmap-cold` | `#1565C0` | Negative heatmap extreme |
 | `heatmap-zero-dark` | `#263238` | Near-zero value (dark theme) |
 | `heatmap-zero-light` | `#78909C` | Near-zero value (light theme) |
-| `heatmap-hot` | `#ED8B00` | Positive heatmap extreme (= rti-orange) |
+| `heatmap-hot` | `#E68A00` | Positive heatmap extreme (= rti-orange) |
+
+### Clinical Severity Mapping
+
+| Severity | Color Token | Hex |
+|----------|-------------|-----|
+| Normal / Operational | `success` | `#059669` |
+| Warning / Caution | `warning` | `#D97706` |
+| Critical / E-STOP / Alarm | `critical` | `#DC2626` |
+| Info / Nominal | `info` | `#0284C7` |
+| Disconnected / Unknown | `neutral-500` | `#6B7280` |
 
 ### Theme Palettes
 
@@ -60,26 +106,48 @@ Each theme (dark / light) defines these tokens:
 
 | Token | Dark | Light |
 |-------|------|-------|
-| `bg-top` | `#0D1B2A` | `#E8EDF2` |
-| `bg-bottom` | `#1B2838` | `#F7F8FA` |
+| `bg-top` | `#0D1B2A` | `#F1F5F9` |
+| `bg-bottom` | `#1B2838` | `#F9FAFB` |
+| `surface` | `#1E293B` | `#FFFFFF` |
 | `grid` | `rgba(255,255,255,0.05)` | `rgba(0,0,0,0.05)` |
 | `arm` | `rgba(200,210,220,0.78)` | `rgba(80,90,100,0.78)` |
-| `hud-bg` | `rgba(13,27,42,0.85)` | `rgba(255,255,255,0.85)` |
-| `hud-label` | `#BBBCBC` | `#63666A` |
-| `hud-value` | `#00B5E2` | `#004C97` |
+| `hud-bg` | `rgba(13,27,42,0.65)` | `rgba(255,255,255,0.65)` |
+| `hud-border` | `rgba(255,255,255,0.12)` | `rgba(0,0,0,0.06)` |
+| `hud-label` | `#BBBCBC` | `#6B7280` |
+| `hud-value` | `#00B5E2` | `#004A8A` |
+| `glass-blur` | `12px` | `10px` |
 
 ---
 
 ## Typography
 
-| Role | Font | Weight | Size |
-|------|------|--------|------|
-| Headlines / labels | Roboto Condensed | Bold | 9–16 pt (context-dependent) |
-| Body / values | Roboto Mono | Bold | 7–11 pt (scales with widget) |
-| HUD small labels | Roboto Condensed | Regular | 7–9 pt |
+### Font Stack
 
-All monospace data values use `Roboto Mono` to prevent layout jitter
-when numeric values change.
+| Role | Font Family | Fallback | Notes |
+|------|-------------|----------|-------|
+| Headlines, panel titles, navigation | **Inter** | sans-serif | Variable font (weight 400–700); replaces Roboto Condensed for improved hinting and modern appearance |
+| Body text, data values, table content | **Inter** | sans-serif | Same variable font across headline and body roles for visual unity |
+| Monospace (data values, log output, raw DDS data) | **Roboto Mono** | monospace | Prevents layout jitter when numeric values change |
+
+Fonts are bundled as application resources (`.ttf`/`.woff2` files under
+`resources/fonts/`) and loaded at startup via `@font-face` CSS injection.
+No system font dependency. No external CDN requests.
+
+### Semantic Type Scale
+
+All text uses semantic size tokens — not arbitrary pixel values.
+
+| Token | Size | Weight | Line Height | Usage |
+|-------|------|--------|-------------|-------|
+| `heading-1` | 32 px | 700 (bold) | 1.2 | Page titles |
+| `heading-2` | 24 px | 700 | 1.3 | Section headers |
+| `heading-3` | 18 px | 600 (semibold) | 1.4 | Card titles, panel headers |
+| `body-large` | 16 px | 500 (medium) | 1.5 | Primary content, descriptions |
+| `body` | 14 px | 400 (regular) | 1.6 | Default body text |
+| `body-small` | 12 px | 400 | 1.5 | Secondary labels, timestamps |
+| `label` | 12 px | 600 | 1.4 | Form labels, chip text |
+| `mono-data` | 13 px | 700 | 1.4 | Numeric data values (Roboto Mono) |
+| `mono-small` | 11 px | 400 | 1.4 | HUD small labels (Roboto Mono) |
 
 ---
 
@@ -105,20 +173,36 @@ when numeric values change.
 - **Selection glow**: Semi-transparent `rti-light-blue` stroke
   following the arm path (same geometry, wider pen).
 
-### Floating HUD Panels
+### Floating HUD Panels (Glassmorphism)
 
-- Semi-transparent background (`hud-bg` at 85% opacity).
-- 8 px rounded corners.
-- Elevation shadow instead of border (offset blurred rect at 15%
-  opacity).
+- Translucent background (`hud-bg` at 65% opacity) with backdrop blur
+  (`backdrop-filter: blur(12px)` dark / `blur(10px)` light).
+- 16 px rounded corners (elevated panel radius).
+- 1 px translucent border (`hud-border`) for edge definition against
+  the blurred background. No opaque strokes.
+- Layered shadow: `shadow-lg` tier (`0 8px 24px rgba(0,0,0,0.12)`).
 - 12 px internal padding.
 
-### Status Indicators
+### Status Indicators (Modern)
 
-- Connection: colored dot (green = live, gray = disconnected).
-- Expanded: colored pill badge with fixed-width monospace coordinates.
-- Interlock: flat red overlay + flat red banner.
-- Disconnected: flat muted overlay + centered label.
+- **Connection**: Pulsing dot (green = live, gray = disconnected) with
+  smooth scale animation (`transform: scale(0.92) ↔ scale(1.0)`,
+  600 ms cycle).
+- **State chips**: 12 px border radius, icon + label, semantic
+  background tint at 10% opacity with full-opacity text. Dark and
+  light themes use distinct tint/text color pairs.
+- **Critical pulse**: E-STOP and alarm indicators use a pulsing
+  `box-shadow` ring animation:
+  ```css
+  @keyframes pulse-critical {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6); }
+    50% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+  }
+  ```
+- **Skeleton loaders**: During initial data fetch and DDS discovery,
+  empty cards show a pulse-animated placeholder (neutral-300 → neutral-100
+  shimmer, 1.5 s cycle) instead of "waiting for data" text.
+- Interlock: flat red overlay + flat red banner (unchanged).
 - Mode: pill badge (rounded rect, color fill at 16% + color border).
 
 ### Procedure Controller (Card-Based Orchestration UI)
@@ -158,15 +242,174 @@ when numeric values change.
 
 ---
 
+## Design Token Architecture
+
+All visual values are centralized in `medtech.gui._tokens` (Python) and
+injected into CSS via `ui.add_head_html()`. Components reference tokens
+by name — never hardcoded hex values, pixel sizes, or timing strings.
+
+```python
+DESIGN_TOKENS = {
+    "color": {
+        "brand": {
+            "primary": "#004A8A",
+            "accent": "#E68A00",
+        },
+        "semantic": {
+            "success": "#059669",
+            "warning": "#D97706",
+            "critical": "#DC2626",
+            "info": "#0284C7",
+        },
+        "neutral": {
+            "950": "#0F1419",
+            "800": "#1E293B",
+            "700": "#374151",
+            "500": "#6B7280",
+            "300": "#D1D5DB",
+            "100": "#F1F5F9",
+            "50": "#F9FAFB",
+        },
+    },
+    "spacing": {
+        "xs": "4px",
+        "sm": "8px",
+        "md": "12px",
+        "lg": "16px",
+        "xl": "24px",
+        "2xl": "32px",
+    },
+    "radius": {
+        "sm": "4px",
+        "md": "8px",
+        "lg": "12px",
+        "xl": "16px",
+        "pill": "9999px",
+    },
+    "shadow": {
+        "sm": "0 1px 3px rgba(0,0,0,0.06)",
+        "md": "0 4px 8px rgba(0,0,0,0.08)",
+        "lg": "0 8px 24px rgba(0,0,0,0.12)",
+    },
+    "opacity": {
+        "glass_bg": 0.65,
+        "shadow": 0.12,
+        "selection_glow": 0.18,
+        "disabled": 0.40,
+        "card_fill": 0.10,
+        "card_fill_active": 0.18,
+        "tile_fill": 0.16,
+    },
+    "transition": {
+        "fast": "150ms ease-out",
+        "default": "200ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "slow": "300ms ease-out",
+    },
+    "blur": {
+        "glass_dark": "12px",
+        "glass_light": "10px",
+    },
+}
+```
+
+The existing `BRAND_COLORS`, `OPACITY`, and `THEME_PALETTE` dicts in
+`_colors.py` must be updated to derive from or align with these tokens.
+During the transition, both systems may coexist; the token system is the
+authoritative source.
+
+---
+
+## Animation & Motion
+
+### Transition Classes
+
+All interactive elements apply CSS transitions via design tokens:
+
+| Context | Transition | Duration |
+|---------|-----------|----------|
+| Button hover/active | `all` | `fast` (150 ms ease-out) |
+| Card hover elevation | `box-shadow, transform` | `default` (200 ms spring) |
+| Theme switch | `background-color, color` | `slow` (300 ms ease-out) |
+| Page content swap | `opacity` | `fast` (150 ms ease-out) |
+| Status chip color change | `background-color, color` | `default` (200 ms) |
+
+### Attention Animations
+
+| Element | Animation | Duration | Trigger |
+|---------|-----------|----------|---------|
+| Connection dot | Scale pulse (0.92 ↔ 1.0) + opacity (0.55 ↔ 1.0) | 600 ms | Connected state |
+| E-STOP indicator | `pulse-critical` box-shadow ring | 1 s loop | EMERGENCY_STOP mode |
+| New alert card | Slide-in from top + fade-in | 300 ms | New CRITICAL alert |
+| Skeleton loader | Shimmer (neutral-300 → neutral-100) | 1.5 s loop | Data loading state |
+| Card hover | `transform: scale(1.02)` + shadow-lg | 200 ms | Pointer hover |
+
+### Reduced Motion Support
+
+All animations must be wrapped in a `prefers-reduced-motion` media query:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
+This CSS is injected globally by `init_theme()`.
+
+---
+
+## Accessibility
+
+### Contrast Requirements
+
+- **Clinical text** (vitals values, alert messages, procedure status):
+  WCAG AAA (7:1 contrast ratio minimum).
+- **Secondary labels** (timestamps, metadata): WCAG AA (4.5:1 minimum).
+- **Large text** (heading-1, heading-2): WCAG AA (3:1 minimum).
+
+### Focus Indicators
+
+All interactive elements must show a visible focus ring on keyboard
+navigation (`focus-visible`):
+
+```css
+:focus-visible {
+  outline: 2px solid #0284C7;
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+```
+
+This ensures keyboard-only users can navigate the full interface.
+
+### Color-Blind Support
+
+The semantic palette is designed to be distinguishable under the three
+most common color vision deficiencies (deuteranopia, protanopia,
+tritanopia). Additionally, a **High Contrast** theme option may be
+offered via the theme cycle (system → light → dark → HC → system).
+
+Status indicators must **never rely solely on color** — each status
+includes an icon and/or text label alongside the color encoding.
+
+---
+
 ## Prohibited Patterns
 
 | Pattern | Reason |
 |---------|--------|
 | Radial or linear gradients on data elements | Violates flat-fill principle |
-| 1 px border strokes on floating panels | Use elevation shadow instead |
+| 1 px opaque border strokes on floating panels | Use glassmorphism border or elevation shadow instead |
 | Hover-only interactions | Not touch-compatible |
 | Fixed pixel sizes for scalable elements | Must scale with widget dimensions |
-| Decorative drop shadows heavier than 15% opacity | Visual noise |
+| Decorative drop shadows heavier than 12% opacity | Visual noise |
+| Hardcoded hex colors in component code | Must reference design tokens or `BRAND_COLORS` |
+| Hardcoded pixel spacing in component code | Must reference spacing tokens |
+| Animations without `prefers-reduced-motion` guard | Accessibility violation |
+| Color-only status encoding (no icon/label) | Color-blind users cannot distinguish |
 
 ---
 

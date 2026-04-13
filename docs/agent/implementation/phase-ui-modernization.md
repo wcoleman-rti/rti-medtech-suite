@@ -241,7 +241,7 @@ client-side routing internally. But the current code uses `@ui.page("/")`
 
 ---
 
-## Step M.3 — Glassmorphism Overlays
+## Step M.3 — Glassmorphism Overlays ✅ `36947a2`
 
 ### Work
 
@@ -270,15 +270,15 @@ client-side routing internally. But the current code uses `@ui.page("/")`
 
 ### Test Gate (spec: hospital-dashboard.md — glassmorphism scenario; surgical-procedure.md — twin HUD scenario)
 
-- [ ] Floating overlays render with visible backdrop blur
-- [ ] Glass panels have 16 px radius and translucent border
-- [ ] Content behind overlays is visibly blurred
-- [ ] All existing `@gui` tests pass
-- [ ] Glass effect degrades gracefully in browsers without `backdrop-filter` support
+- [x] Floating overlays render with visible backdrop blur
+- [x] Glass panels have 16 px radius and translucent border
+- [x] Content behind overlays is visibly blurred
+- [x] All existing `@gui` tests pass
+- [x] Glass effect degrades gracefully in browsers without `backdrop-filter` support
 
 ---
 
-## Step M.4 — Modern Status Indicators
+## Step M.4 — Modern Status Indicators ✅ `585b0fc`
 
 ### Work
 
@@ -307,16 +307,16 @@ client-side routing internally. But the current code uses `@ui.page("/")`
 
 ### Test Gate (spec: hospital-dashboard.md — status chip icon, skeleton, pulse scenarios)
 
-- [ ] Status chips include both icon and color-coded background
-- [ ] Skeleton loaders appear before data arrives
-- [ ] Skeletons replaced by real data on first DDS sample
-- [ ] CRITICAL alerts pulse with red ring animation
-- [ ] E-STOP badge pulses with red ring animation
-- [ ] All existing `@gui` tests pass
+- [x] Status chips include both icon and color-coded background
+- [x] Skeleton loaders appear before data arrives
+- [x] Skeletons replaced by real data on first DDS sample
+- [x] CRITICAL alerts pulse with red ring animation
+- [x] E-STOP badge pulses with red ring animation
+- [x] All existing `@gui` tests pass
 
 ---
 
-## Step M.5 — Animation & Transitions
+## Step M.5 — Animation & Transitions ✅ `aa5720a`
 
 ### Work
 
@@ -352,16 +352,16 @@ client-side routing internally. But the current code uses `@ui.page("/")`
 
 ### Test Gate (spec: hospital-dashboard.md — hover, animation, focus, reduced-motion scenarios)
 
-- [ ] Cards scale on hover with smooth transition
-- [ ] New CRITICAL alerts slide in with fade animation
-- [ ] Focus-visible rings appear on keyboard Tab navigation
-- [ ] All animations suppressed when `prefers-reduced-motion: reduce` is set
-- [ ] Connection dot animates smoothly via CSS
-- [ ] All existing `@gui` tests pass
+- [x] Cards scale on hover with smooth transition
+- [x] New CRITICAL alerts slide in with fade animation
+- [x] Focus-visible rings appear on keyboard Tab navigation
+- [x] All animations suppressed when `prefers-reduced-motion: reduce` is set
+- [x] Connection dot animates smoothly via CSS
+- [x] All existing `@gui` tests pass
 
 ---
 
-## Step M.6 — Apply Semantic Type Scale Across All Pages
+## Step M.6 — Apply Semantic Type Scale Across All Pages ✅ `fd15160`
 
 ### Work
 
@@ -383,14 +383,14 @@ client-side routing internally. But the current code uses `@ui.page("/")`
 
 ### Test Gate (spec: hospital-dashboard.md — semantic type scale; surgical-procedure.md — Inter font)
 
-- [ ] All text elements use semantic type scale classes
-- [ ] No arbitrary Tailwind font-size classes remain in GUI modules
-- [ ] Visual hierarchy is consistent across dashboard, controller, and twin
-- [ ] All existing `@gui` tests pass
+- [x] All text elements use semantic type scale classes
+- [x] No arbitrary Tailwind font-size classes remain in GUI modules
+- [x] Visual hierarchy is consistent across dashboard, controller, and twin
+- [x] All existing `@gui` tests pass
 
 ---
 
-## Step M.7 — Documentation & Regression
+## Step M.7 — Documentation & Regression ✅ `fd15160`
 
 ### Work
 
@@ -407,12 +407,12 @@ client-side routing internally. But the current code uses `@ui.page("/")`
 
 ### Test Gate
 
-- [ ] Full `bash scripts/ci.sh` passes
-- [ ] All `@gui` tests pass (no regressions)
-- [ ] All `@ui-modernization` tests pass
-- [ ] Docker image builds with Inter font and updated assets
-- [ ] markdownlint passes on all updated docs
-- [ ] No open incidents related to UI modernization
+- [x] Full `bash scripts/ci.sh` passes (Gates 1–5; Gate 6 build requires CMake/SDK)
+- [x] All `@gui` tests pass (no regressions)
+- [x] All `@ui-modernization` tests pass
+- [ ] Docker image builds with Inter font and updated assets (requires Docker env)
+- [x] markdownlint passes on all updated docs
+- [x] No open incidents related to UI modernization
 
 ---
 

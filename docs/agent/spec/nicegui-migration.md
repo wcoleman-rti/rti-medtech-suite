@@ -1,5 +1,19 @@
 # Spec: NiceGUI Migration
 
+> **Status: COMPLETE (Steps N.1–N.5).** The PySide6 → NiceGUI migration
+> has been fully implemented for all three GUI applications. All
+> `@gui` tests have been rewritten with NiceGUI `User` fixtures.
+> PySide6 and pytest-qt have been removed. This spec remains
+> **authoritative** — its scenarios are ongoing behavioral contracts
+> that must continue to pass. Steps N.6–N.8 are tracked separately
+> in the migration phase file.
+>
+> For the evolving visual design modernization (glassmorphism,
+> design tokens, animation, accessibility), see the new scenarios in
+> [hospital-dashboard.md](hospital-dashboard.md) and
+> [surgical-procedure.md](surgical-procedure.md) tagged
+> `@ui-modernization`.
+
 Behavioral specifications for the PySide6 → NiceGUI migration. These scenarios
 validate that migrated GUI applications preserve existing behavior and leverage
 new NiceGUI capabilities.
@@ -108,10 +122,10 @@ integration, multi-client behavior, theming, and DDS event loop unification.
 
 ### Scenario: RTI brand colors are applied globally `@gui` `@unit`
 
-**Given** the NiceGUI app starts with `app.colors(primary='#004C97', accent='#ED8B00', ...)`
+**Given** the NiceGUI app starts with `app.colors(primary='#004A8A', accent='#E68A00', ...)`
 **When** any page renders
-**Then** primary-colored elements use RTI Blue (#004C97)
-**And** accent-colored elements use RTI Orange (#ED8B00)
+**Then** primary-colored elements use RTI Blue (#004A8A)
+**And** accent-colored elements use RTI Orange (#E68A00)
 
 ### Scenario: Dark mode toggle works without page reload `@gui`
 
@@ -123,9 +137,9 @@ integration, multi-client behavior, theming, and DDS event loop unification.
 
 ### Scenario: Custom fonts are loaded from local static files `@gui` `@unit`
 
-**Given** Roboto Condensed and Roboto Mono are served via `app.add_static_files('/fonts', ...)`
+**Given** Inter and Roboto Mono are served via `app.add_static_files('/fonts', ...)`
 **When** a page renders
-**Then** headline labels use Roboto Condensed Bold
+**Then** headline and body labels use Inter (variable weight)
 **And** numeric value labels use Roboto Mono Bold
 **And** no external font CDN requests are made
 
@@ -186,6 +200,80 @@ integration, multi-client behavior, theming, and DDS event loop unification.
 **And** the header bar, connection dot, and navigation drawer persist
 **And** the WebSocket connection remains open (no reconnection)
 **And** all `GuiBackend` instances remain active — no DDS reinitialization
+
+### Scenario: Browser refresh at sub-page preserves the app shell `@gui` `@ui-modernization`
+
+**Given** the unified app is running and the user is viewing `/dashboard`
+**When** the user refreshes the browser (F5 or Ctrl+R)
+**Then** the page re-renders with the full SPA shell (header, sidebar drawer, connection dot)
+**And** the dashboard content is displayed in the content area
+**And** the sidebar navigation is fully functional
+
+### Scenario: Direct URL entry renders full app shell `@gui` `@ui-modernization`
+
+**Given** the unified app is running
+**When** a user pastes `http://localhost:8080/controller` directly into the browser address bar
+**Then** the page renders with the full SPA shell (header, sidebar, connection dot)
+**And** the controller content is displayed in the content area
+**And** the user can navigate to any other page via the sidebar without using the browser back button
+
+### Scenario: Active nav item is highlighted in sidebar `@gui` `@ui-modernization`
+
+**Given** the unified app is running with the sidebar navigation visible
+**When** the user navigates to `/dashboard`
+**Then** the "Dashboard" nav item in the sidebar is visually highlighted (active state)
+**And** other nav items (Controller, Digital Twin) are in their default (inactive) state
+**When** the user navigates to `/controller`
+**Then** the "Controller" nav item becomes highlighted and "Dashboard" returns to inactive
+
+### Scenario: Breadcrumb shows current page context `@gui` `@ui-modernization`
+
+**Given** the unified app header displays a breadcrumb or dynamic title
+**When** the user navigates to `/dashboard`
+**Then** the header shows "Medtech Suite › Dashboard" (or equivalent contextual title)
+**When** the user navigates to `/twin/OR-3`
+**Then** the header shows "Medtech Suite › Digital Twin — OR-3"
+
+### Scenario: Shared link to sub-page works for new visitors `@gui` `@ui-modernization`
+
+**Given** the unified app is running
+**When** a new browser session opens `/twin/OR-1` for the first time (no prior navigation)
+**Then** the full SPA shell renders with header, sidebar, and digital twin content for OR-1
+**And** the user can navigate to other pages via the sidebar
+
+### Scenario: Discovered GUI service appears in sidebar dynamically `@gui` `@ui-modernization`
+
+**Given** the unified app is running with an empty "Discovered Services" sidebar section
+**When** a remote service publishes a `ServiceCatalog` sample with `gui_url = "http://host-b:8082/twin/OR-3"`
+**Then** a new sidebar entry appears under "Discovered Services" within 5 seconds
+**And** the entry label shows the service's `display_name` and `room_id` (e.g., "Digital Twin — OR-3")
+
+### Scenario: Same-origin gui_url navigates within the SPA shell `@gui` `@ui-modernization`
+
+**Given** the sidebar shows a discovered service whose `gui_url` origin matches the current app origin
+**When** the user clicks that sidebar entry
+**Then** the SPA shell navigates to the sub-page path without a full page reload
+**And** the sidebar entry is highlighted as active
+
+### Scenario: Cross-origin gui_url opens in a new browser tab `@gui` `@ui-modernization`
+
+**Given** the sidebar shows a discovered service whose `gui_url` origin differs from the current app origin
+**When** the user clicks that sidebar entry
+**Then** a new browser tab opens with the full `gui_url`
+**And** the current SPA shell remains unchanged
+
+### Scenario: Service disposal removes sidebar entry `@gui` `@ui-modernization`
+
+**Given** the sidebar shows a discovered service entry for "Digital Twin — OR-3"
+**When** that service's `ServiceCatalog` sample is disposed (NOT_ALIVE_NO_WRITERS or explicit dispose)
+**Then** the sidebar entry is removed within 5 seconds
+
+### Scenario: Standalone page provides return navigation `@gui` `@ui-modernization`
+
+**Given** a user opens a cross-origin `gui_url` in a new tab (standalone mode)
+**When** the standalone page renders
+**Then** a "← Return to Controller" link is visible at the top of the page
+**And** clicking it navigates back to the originating Procedure Controller URL
 
 > **Note:** The `/alerts` route (Clinical Alerts Dashboard) is a **new capability**
 > enabled by the migration, not a 1:1 PySide6 replacement. Its behavioral spec
