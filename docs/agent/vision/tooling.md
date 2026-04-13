@@ -215,32 +215,62 @@ commands directly.
 # Build and install
 medtech build
 
-# Launch the default distributed simulation (2 ORs, split GUI)
+# Launch the default distributed simulation (1 hospital, 2 ORs, split GUI)
 medtech launch
 # equivalent to:
 #   medtech run hospital
-#   medtech run or --room-id OR-1
-#   medtech run or --room-id OR-3
+#   medtech run or --name OR-1
+#   medtech run or --name OR-3
 
 # Launch a specific scenario
 medtech launch minimal
 
+# Launch multi-site (2 named hospitals with NAT isolation)
+medtech launch multi-site
+
 # List available scenarios
 medtech launch --list
 
-# Start infrastructure + central GUI only
+# --- Single hospital (unnamed, flat networks, no NAT) ---
+
 medtech run hospital
 # Running: docker run --rm -d --name cloud-discovery-service ...
 # Running: docker run --rm -d --name routing-service ...
 # Running: docker run --rm -d --name medtech-gui -p 8080:8080 ...
 
-# Add an OR (service hosts + digital twin)
-medtech run or --room-id OR-5
+medtech run or --name OR-5
 # Running: docker run --rm -d --name clinical-service-host-or5 \
 #   --network medtech_surgical-net -e ROOM_ID=OR-5 ...
 # Running: docker run --rm -d --name robot-service-host-or5 ...
 # Running: docker run --rm -d --name medtech-twin-or5 -p 8083:8080 ...
 # ✓ OR-5 started — twin at http://localhost:8083/twin/OR-5
+
+# --- Multi-hospital (named, isolated networks + NAT) ---
+
+medtech run hospital --name hospital-a
+# Running: docker network create medtech_wan-net --subnet 172.30.0.0/24
+# Running: docker network create medtech_hospital-a_surgical-net --subnet 10.10.1.0/24
+# Running: docker network create medtech_hospital-a_hospital-net --subnet 10.10.2.0/24
+# Running: docker run --privileged -d --name hospital-a-nat ...
+# Running: docker run --rm -d --name hospital-a-cds ...
+# Running: docker run --rm -d --name hospital-a-routing ...
+# Running: docker run --rm -d --name hospital-a-gui -p 8080:8080 ...
+# ✓ hospital-a started — dashboard at http://localhost:8080
+
+medtech run hospital --name hospital-b
+# Running: docker network create medtech_hospital-b_surgical-net --subnet 10.20.1.0/24
+# ...
+# Running: docker run --privileged -d --name hospital-b-nat ...
+# Running: docker run --rm -d --name hospital-b-gui -p 9080:8080 ...
+# ✓ hospital-b started — dashboard at http://localhost:9080
+
+medtech run or --name OR-1 --hospital hospital-a
+# Running: docker run --rm -d --name hospital-a-twin-or1 -p 8081:8080 ...
+# ✓ OR-1 started on hospital-a — twin at http://localhost:8081/twin/OR-1
+
+medtech run or --name OR-4 --hospital hospital-b
+# Running: docker run --rm -d --name hospital-b-twin-or4 -p 9081:8080 ...
+# ✓ OR-4 started on hospital-b — twin at http://localhost:9081/twin/OR-4
 
 # Show running containers and URLs
 medtech status
@@ -256,7 +286,8 @@ medtech stop
 
 | Scenario | Description |
 |----------|-------------|
-| `distributed` (default) | Split GUI: dashboard + controller on `hospital-net`, per-OR twins on `surgical-net`, 2 ORs |
+| `distributed` (default) | Single unnamed hospital, split GUI, 2 ORs |
+| `multi-site` | 2 named hospitals with NAT isolation, 2 ORs each |
 | `unified` | Monolithic GUI (pre-V1.4 behavior), 2 ORs — no separate twin containers |
 | `minimal` | Single OR, split GUI, no observability stack |
 

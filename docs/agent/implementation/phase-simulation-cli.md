@@ -1,8 +1,9 @@
 # Phase SIM: Distributed Simulation & CLI
 
 **Goal:** Provide a developer-facing quick-start workflow: a `medtech` CLI
-tool for build/launch/scale, and a split-GUI Docker topology that
-simulates production network separation. Per-OR containers are launched
+tool for build/launch/scale, a split-GUI Docker topology that simulates
+production network separation, and multi-hospital NAT-isolated simulation
+for realistic WAN deployment testing. Per-OR containers are launched
 dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 **Depends on:** Phase UI-M (V1.3 — UI Modernization), Phase 20 (Multi-Arm)
@@ -27,6 +28,12 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 - Create `modules/shared/medtech/cli/__init__.py` (exports `main`)
 - Create `modules/shared/medtech/cli/_main.py` with a `click.group()`
   entry point and a helper function that prints and runs shell commands
+- Create `modules/shared/medtech/cli/_naming.py` with auto-name
+  generation helpers:
+  - `next_hospital_name()` — scans running `medtech_*` networks,
+    returns next available name if needed
+  - `next_or_name(hospital)` — scans running containers for the
+    hospital, returns next sequential OR name (`OR-1`, `OR-2`, …)
 - Add `[project.scripts] medtech = "medtech.cli:main"` to `pyproject.toml`
 - Implement `medtech build`:
   - Check for `build/` directory; run `cmake -B build -S .` if absent
@@ -39,7 +46,9 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
   - Print the underlying `docker ps` command
 - Implement `medtech stop`:
   - Run `docker stop` for all containers matching the medtech naming
-    convention (infrastructure, GUI, and dynamic OR containers)
+    convention (infrastructure, GUI, NAT routers, and dynamic OR
+    containers)
+  - Run `docker network rm` for all `medtech_*` networks
   - Print each command before execution
 
 ### Test Gate
@@ -49,6 +58,8 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 - [ ] `medtech build --help` prints build usage
 - [ ] `medtech status --help` prints status usage
 - [ ] `medtech stop --help` prints stop usage
+- [ ] `medtech stop` removes containers **and** Docker networks
+- [ ] `next_or_name()` returns `OR-1` when no ORs are running
 - [ ] All existing tests pass
 - [ ] Lint passes
 
@@ -59,7 +70,12 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 ### Work
 
 - Implement `medtech run` as a `click.group()` subcommand group
-- Implement `medtech run hospital`:
+- Implement `medtech run hospital [--name NAME]`:
+
+  **Unnamed hospital** (no `--name`):
+  - Create flat Docker networks (`medtech_surgical-net`,
+    `medtech_hospital-net`, `medtech_orchestration-net`) if they
+    do not exist
   - Run sequential `docker run --rm -d` commands:
     1. Cloud Discovery Service (`cloud-discovery-service` image,
        attached to `surgical-net`, `hospital-net`, `orchestration-net`)
@@ -67,20 +83,44 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
        `surgical-net`, `hospital-net`)
     3. Central GUI (`medtech-gui` image, attached to `hospital-net`,
        `orchestration-net`, port 8080)
-  - Create Docker networks (`medtech_surgical-net`,
-    `medtech_hospital-net`, `medtech_orchestration-net`) if they
-    do not exist
-  - Print each `docker run` command, then print a URL summary
-    (dashboard at `http://localhost:8080`)
+  - No NAT router is created
+
+  **Named hospital** (e.g., `--name hospital-a`):
+  - Create per-hospital private Docker networks with explicit subnets
+    allocated by hospital ordinal (N=1,2,…):
+    - `medtech_hospital-a_surgical-net`   — `10.(N×10).1.0/24`
+    - `medtech_hospital-a_hospital-net`   — `10.(N×10).2.0/24`
+    - `medtech_hospital-a_orchestration-net` — `10.(N×10).3.0/24`
+  - Create shared `medtech_wan-net` (`172.30.0.0/24`) if it does not
+    exist (created exactly once, shared by all hospitals)
+  - Launch a privileged NAT router container (`hospital-a-nat`):
+    - Dual-homed on all three private networks **and** `wan-net`
+    - `--privileged`, `sysctl net.ipv4.ip_forward=1`
+    - On startup, runs `iptables -t nat -A POSTROUTING -o eth3 -j MASQUERADE`
+      (where eth3 is the wan-net interface)
+    - Image: lightweight alpine with iptables
+  - Run CDS, Routing Service, and GUI on the private networks
+  - GUI host port allocated by hospital ordinal:
+    1st hospital = 8080, 2nd = 9080, 3rd = 10080, etc.
+
+  **Common behavior:**
+  - Print each `docker run` command before execution
+  - Print a URL summary (dashboard URL)
   - Accept `--observability` flag to include the observability
     containers (Collector Service, Prometheus, Grafana)
+  - Error if an unnamed hospital already exists and `--name` is
+    not provided
 
 ### Test Gate
 
-- [ ] `medtech run hospital` starts CDS, Routing Service, and GUI containers
-- [ ] `medtech run hospital --help` documents options
+- [ ] `medtech run hospital` starts CDS, Routing Service, and GUI containers (flat networks)
+- [ ] `medtech run hospital --name hospital-a` creates per-hospital networks with explicit subnets
+- [ ] NAT router container is created for named hospitals with `--privileged` and IP forwarding
+- [ ] `medtech_wan-net` is created exactly once across multiple named hospitals
+- [ ] GUI port allocation follows ordinal scheme (8080, 9080, …)
 - [ ] Each underlying `docker run` command is printed to stdout
 - [ ] Docker networks are created if absent
+- [ ] Second unnamed hospital errors
 - [ ] All existing tests pass
 - [ ] Lint passes
 
@@ -90,20 +130,31 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ### Work
 
-- Implement `medtech run or --room-id ROOM_ID [--twin-port PORT]`:
-  - Derive container names from room ID (lowercase, hyphenated):
+- Implement `medtech run or [--name NAME] [--hospital HOSPITAL] [--twin-port PORT]`:
+  - If `--name` is omitted, auto-generate using `next_or_name(hospital)`
+    (e.g., `OR-1`, `OR-2`)
+  - If `--hospital` is omitted:
+    - If exactly one hospital is running (named or unnamed), target it
+    - If multiple hospitals are running, error:
+      "Multiple hospitals running. Specify --hospital NAME."
+    - If no hospital is running, error
+  - Derive container names from OR name (lowercase, hyphenated):
     e.g., `OR-5` → `clinical-service-host-or5`,
     `robot-service-host-or5`, `operational-service-host-or5`,
     `operator-service-host-or5`, `medtech-twin-or5`
-  - If `--twin-port` is not specified, scan host ports starting from
-    8081 and assign the first available
+    (for named hospitals, prefix with hospital name:
+    `hospital-a-clinical-service-host-or5`)
+  - If `--twin-port` is not specified, auto-assign from the hospital's
+    twin port range (unnamed base: 8081; hospital-a base: 8081;
+    hospital-b base: 9081; etc.)
   - For each container, run `docker run --rm -d`:
     - `--name <container-name>`
-    - `--network medtech_surgical-net` (service hosts also join
-      `medtech_orchestration-net` if they require orchestration access)
+    - `--network <hospital-prefix>_surgical-net` (service hosts also
+      join `<hospital-prefix>_orchestration-net` if they require
+      orchestration access)
     - `--label medtech.dynamic=true` (for `medtech stop` cleanup)
-    - `-e ROOM_ID=<room_id>` `-e PROCEDURE_ID=<room_id>-001`
-    - `-e HOST_ID=<host-type>-<room_id_lower>`
+    - `-e ROOM_ID=<name>` `-e PROCEDURE_ID=<name>-001`
+    - `-e HOST_ID=<host-type>-<name_lower>`
     - `-e MEDTECH_GUI_EXTERNAL_URL=http://localhost:<twin_port>`
       (twin container only)
     - All standard `medtech-env` variables (read from `.env` or
@@ -112,12 +163,17 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
     - Image: `medtech/app-python` or `medtech/app-cpp` as appropriate
     - Command: the module entry point for each service type
   - Print each `docker run` command before execution
-  - Print summary: room ID, container names, twin URL
+  - Print summary: OR name, hospital, container names, twin URL
 
 ### Test Gate
 
-- [ ] `medtech run or --room-id OR-5` starts 5 containers
+- [ ] `medtech run or --name OR-5` starts 5 containers
       (4 service hosts + 1 twin)
+- [ ] `medtech run or` (no `--name`) auto-generates `OR-1`
+- [ ] `medtech run or --hospital hospital-a` targets named hospital networks
+- [ ] `medtech run or` errors when multiple hospitals are running and
+      `--hospital` is omitted
+- [ ] `medtech run or` infers hospital when only one is running
 - [ ] Each `docker run` command is printed to stdout
 - [ ] Twin is accessible at the assigned host port
 - [ ] Containers have the `medtech.dynamic=true` label
@@ -140,6 +196,13 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
           "hospital_args": [],
           "rooms": ["OR-1", "OR-3"],
       },
+      "multi-site": {
+          "description": "Two named hospitals with NAT isolation, 2 ORs each",
+          "hospitals": [
+              {"name": "hospital-a", "rooms": ["OR-1", "OR-2"]},
+              {"name": "hospital-b", "rooms": ["OR-1", "OR-2"]},
+          ],
+      },
       "unified": {
           "description": "Monolithic GUI (pre-V1.4), 2 ORs",
           "compose_profiles": ["unified-gui"],
@@ -157,16 +220,21 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
   - For `unified`: run `docker compose --profile unified-gui up -d`
     plus the existing per-OR compose services (no `run or` calls)
   - For `distributed` / `minimal`: call `medtech run hospital`, then
-    `medtech run or` for each room in the scenario
-  - Print a final URL summary table
+    `medtech run or --name <NAME>` for each room in the scenario
+  - For `multi-site`: call `medtech run hospital --name <NAME>` for
+    each hospital, then `medtech run or --name <OR> --hospital <NAME>`
+    for each room within each hospital
+  - Print a final URL summary table (including per-hospital dashboard
+    URLs for `multi-site`)
 - Implement `medtech launch --list`:
   - Print scenario names and descriptions in a table
 
 ### Test Gate
 
-- [ ] `medtech launch --list` prints all three scenarios
+- [ ] `medtech launch --list` prints all four scenarios
 - [ ] `medtech launch --help` documents the scenario argument
 - [ ] `medtech launch` starts the distributed scenario by default
+- [ ] `medtech launch multi-site` starts two hospitals with NAT + 4 ORs
 - [ ] `medtech launch unified` starts the monolithic GUI
 - [ ] `medtech launch minimal` starts a single-OR scenario
 - [ ] All existing tests pass
@@ -202,7 +270,7 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 - [ ] `docker compose up -d` starts infrastructure + central GUI
       (no twin containers)
 - [ ] `http://localhost:8080` serves dashboard + controller
-- [ ] `medtech run or --room-id OR-1` starts twin accessible at
+- [ ] `medtech run or --name OR-1` starts twin accessible at
       assigned port
 - [ ] Procedure Controller sidebar discovers twin `gui_url` entries
 - [ ] Clicking twin sidebar entry opens new browser tab
@@ -226,7 +294,7 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
   diagnostic tools (`medtech` is for launch/scale; `medtech-diag` is
   for DDS inspection)
 - Run the full quality gate pipeline (`bash scripts/ci.sh`)
-- Run `medtech launch` → `medtech run or --room-id OR-5` →
+- Run `medtech launch` → `medtech run or --name OR-5` →
   `medtech status` → `medtech stop` workflow end-to-end
 
 ### Test Gate
@@ -234,9 +302,11 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 - [ ] All `@simulation` and `@cli` spec tests pass
 - [ ] All existing tests pass
 - [ ] Lint passes (including markdownlint)
-- [ ] `medtech launch` → `medtech run or --room-id OR-5` →
+- [ ] `medtech launch` → `medtech run or --name OR-5` →
       `medtech status` → `medtech stop` workflow completes without
       errors
+- [ ] `medtech launch multi-site` → `medtech status` → `medtech stop`
+      workflow completes without errors
 - [ ] `medtech launch unified` runs monolithic GUI end-to-end
 
 ---
@@ -246,21 +316,27 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 ### Work
 
 - Implement `medtech status --topology`:
-  - Run `docker network inspect` on each medtech network
-    (`medtech_surgical-net`, `medtech_hospital-net`,
-    `medtech_orchestration-net`)
+  - Run `docker network inspect` on each `medtech_*` network
+    (flat networks for unnamed hospitals, per-hospital prefixed
+    networks for named hospitals, plus `medtech_wan-net`)
   - Parse the JSON response to extract container names, IPs, and
     mapped host ports per network
-  - Render an ASCII tree grouping containers by network:
+  - Render an ASCII tree grouping containers by network, organized
+    by hospital when named hospitals exist:
     ```
-    surgical-net (172.20.0.0/16)
-    ├── or-1-twin        172.20.0.2   (ports: 8081)
-    ├── cloud-discovery   172.20.0.10
-    └── routing-service   172.20.0.11
+    hospital-a
+    ├── hospital-a_surgical-net (10.10.1.0/24)
+    │   ├── hospital-a-clinical-or1   10.10.1.2  (ports: -)
+    │   ├── cloud-discovery-a          10.10.1.10
+    │   └── routing-service-a          10.10.1.11
+    ├── hospital-a_hospital-net (10.10.2.0/24)
+    │   ├── medtech-gui-a              10.10.2.2  (ports: 8080)
+    │   └── cloud-discovery-a          10.10.2.10
+    └── hospital-a-nat ⟷ wan-net (172.30.0.2)
 
-    hospital-net (172.21.0.0/16)
-    ├── medtech-gui       172.21.0.2   (ports: 8080)
-    └── cloud-discovery   172.21.0.10
+    wan-net (172.30.0.0/24)
+    ├── hospital-a-nat   172.30.0.2
+    └── hospital-b-nat   172.30.0.3
     ```
   - Print the underlying `docker network inspect` commands
 - Implement `medtech launch --dockgraph`:
@@ -287,6 +363,8 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 - [ ] `medtech status --topology` renders a non-empty ASCII tree
 - [ ] Each network group lists its attached containers with IPs
+- [ ] Multi-hospital topology groups containers by hospital name
+- [ ] `wan-net` section shows NAT router containers from all hospitals
 - [ ] `medtech launch --dockgraph` starts DockGraph on port 7800
 - [ ] DockGraph container has `medtech.dynamic=true` label
 - [ ] `medtech stop` removes the DockGraph container

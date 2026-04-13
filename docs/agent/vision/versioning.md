@@ -103,9 +103,10 @@ A version may only be cut when **all** of the following are true:
 | Module / Capability | Features |
 |---------------------|----------|
 | Split-GUI Docker deployment | Per-OR twin containers on `surgical-net`, central GUI on `hospital-net`, all containers via `docker run` |
-| `medtech` CLI | `build`, `run hospital`, `run or`, `launch`, `status`, `status --topology`, `stop` — thin wrapper over native tools |
+| Multi-hospital simulation | Named hospitals with isolated private networks, NAT routers (`iptables MASQUERADE`), shared `wan-net`, per-hospital subnet/port allocation |
+| `medtech` CLI | `build`, `run hospital [--name]`, `run or [--name] [--hospital]`, `launch`, `status`, `status --topology`, `stop` — unified `--name` across all multi-instance commands |
 | Topology visualization | `medtech status --topology` (ASCII); optional [DockGraph](https://github.com/dockgraph/dockgraph) sidecar at `http://localhost:7800` |
-| Simulation scenarios | Distributed (default), unified (fallback), minimal |
+| Simulation scenarios | Distributed (default), multi-site, unified (fallback), minimal |
 
 ---
 

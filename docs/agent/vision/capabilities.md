@@ -305,8 +305,9 @@ QoS, or architectural modifications.
 **Theme:** Developer-facing infrastructure for hands-on exploration.
 Split-GUI Docker deployment simulates production network topology with
 per-OR displays on `surgical-net` and a hospital command center on
-`hospital-net`. The `medtech` CLI provides a single entry point for
-build, launch, and dynamic scaling.
+`hospital-net`. Named hospitals get isolated private networks with NAT
+routers simulating real WAN boundaries. The `medtech` CLI provides a
+single entry point for build, launch, and dynamic scaling.
 
 #### Split-GUI Deployment
 - Per-OR digital twin containers deployed on `surgical-net` in standalone mode
@@ -319,6 +320,19 @@ build, launch, and dynamic scaling.
   compose retained only for image building and as a legacy reference path
 - `medtech launch unified` retains monolithic fallback
 
+#### Multi-Hospital Simulation
+- `medtech run hospital --name hospital-a` creates isolated per-hospital
+  Docker networks with explicit subnets
+- Privileged NAT router container per hospital (`iptables MASQUERADE`,
+  `ip_forward=1`) simulates WAN uplink
+- Shared `wan-net` (172.30.0.0/24) connects all NAT routers — hospitals
+  cannot reach each other's private networks directly
+- Docker IPAM handles IP assignment; no external DHCP needed
+- Subnet allocation: 10.(N×10).{1,2,3}.0/24 per hospital
+- Port allocation: per-hospital GUI base port (8080, 9080, 10080, ...)
+- Reused by V3.0 WAN testing (Tier A/B) and `medtech run cloud` without
+  modification
+
 #### Topology Visualization
 - `medtech status --topology` — ASCII tree of running containers grouped
   by Docker network (zero dependencies)
@@ -328,17 +342,21 @@ build, launch, and dynamic scaling.
 
 #### `medtech` CLI
 - Locally-installed Python console script (click-based, `[project.scripts]` entry)
+- Unified `--name` on all multi-instance `run` commands; auto-generated
+  when omitted (e.g., `hospital-1`, `OR-1`)
 - `medtech build` — configure, build, and install via CMake
-- `medtech run hospital` — start infrastructure + central GUI via sequential `docker run`
-- `medtech run or --room-id OR-1` — spawn Service Host + twin containers via `docker run --rm`
+- `medtech run hospital [--name NAME]` — start a hospital instance
+  (unnamed = flat; named = isolated + NAT)
+- `medtech run or [--name NAME] [--hospital NAME]` — spawn Service Host
+  + twin containers for one OR
 - `medtech launch [SCENARIO]` — run a named scenario (sequence of `run` calls)
-- `medtech stop` — tear down all simulation containers
-- `medtech status` — show running containers and GUI URLs
-- `medtech status --topology` — ASCII tree of containers by network
+- `medtech stop` — tear down all simulation containers and networks
+- `medtech status` / `medtech status --topology`
 - All commands print underlying invocations for transparency
 
 #### Simulation Scenarios
-- `distributed` (default) — split GUI, 2 ORs, full observability
+- `distributed` (default) — single unnamed hospital, split GUI, 2 ORs
+- `multi-site` — 2 named hospitals with NAT isolation, 2 ORs each
 - `unified` — monolithic GUI (pre-V1.4 behavior)
 - `minimal` — single OR, split GUI, no observability
 

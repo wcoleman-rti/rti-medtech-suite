@@ -425,6 +425,112 @@ Each logical host is a Docker container. Custom Docker networks simulate the net
 | `orchestration-net` | Orchestration control-plane | Procedure Controller, Service Hosts (dual-homed: surgical-net + orchestration-net), Cloud Discovery Service — Service Hosts bridge both networks to host surgical services on `surgical-net` while receiving orchestration commands on `orchestration-net` |
 | `cloud-net` **(V3.0)** | Enterprise WAN | WAN Routing Service (dual-homed: hospital-net + cloud-net), Command Center dashboard, Cloud Discovery Service — **not created until V3.0 implementation** |
 
+#### Multi-Hospital Simulation (V1.4)
+
+The `medtech` CLI supports launching multiple independent hospital
+instances on a single machine. Each named hospital gets its own set of
+isolated Docker networks, its own infrastructure containers, and a NAT
+router container that simulates the hospital's uplink to a public WAN.
+
+**Unnamed (default) mode:** `medtech run hospital` (no `--name`) creates
+flat, shared Docker networks with no NAT — the simplest path for
+single-hospital exploration. This is backward-compatible with all
+existing scenarios.
+
+**Named mode:** `medtech run hospital --name hospital-a` creates
+per-hospital private networks with explicit subnets and a privileged
+NAT router container that performs `iptables MASQUERADE` on a shared
+`wan-net`. This simulates production-like network isolation where each
+hospital is behind its own NAT boundary, reachable only via the WAN
+segment.
+
+##### Network Topology — Named Hospitals
+
+```
+medtech_wan-net (172.30.0.0/24) ─── simulated public internet
+├── hospital-a-nat    172.30.0.2    (MASQUERADE)
+├── hospital-b-nat    172.30.0.3    (MASQUERADE)
+└── wan-cds           172.30.0.10   (Cloud Discovery Service — V3.0)
+
+medtech_hospital-a_surgical-net (10.10.1.0/24) ─── private
+├── hospital-a-cds
+├── hospital-a-routing
+├── hospital-a-robot-service-host-or1
+├── hospital-a-twin-or1           :8081
+└── hospital-a-nat  (dual-homed → wan-net)
+
+medtech_hospital-a_hospital-net (10.10.2.0/24) ─── private
+├── hospital-a-cds
+├── hospital-a-routing
+├── hospital-a-gui                :8080
+└── hospital-a-nat  (dual-homed → wan-net)
+
+medtech_hospital-b_surgical-net (10.20.1.0/24) ─── private
+├── hospital-b-cds
+├── hospital-b-routing
+├── hospital-b-robot-service-host-or4
+├── hospital-b-twin-or4           :9081
+└── hospital-b-nat  (dual-homed → wan-net)
+
+medtech_hospital-b_hospital-net (10.20.2.0/24) ─── private
+├── hospital-b-cds
+├── hospital-b-routing
+├── hospital-b-gui                :9080
+└── hospital-b-nat  (dual-homed → wan-net)
+```
+
+##### NAT Router Container
+
+Each named hospital launches a lightweight privileged container
+(`hospital-<name>-nat`) that bridges the hospital's private networks
+to `wan-net`. The NAT router:
+
+- Enables IP forwarding (`net.ipv4.ip_forward=1`)
+- Applies `iptables -t nat -A POSTROUTING -o eth-wan -j MASQUERADE`
+  (cone NAT — destination-independent mapping, compatible with RTI CDS
+  NAT traversal per [wan-testing-strategy.md](wan-testing-strategy.md))
+- Is dual-homed on the hospital's private networks + `wan-net`
+- Does **not** run any DDS participants — it is pure L3 infrastructure
+
+The NAT router ensures that hospital-private containers cannot directly
+reach containers on another hospital's networks. Cross-hospital
+communication must traverse NAT, exactly as in a real multi-facility
+deployment. This infrastructure is reused by V3.0 WAN testing (Tier A
+and Tier B) without modification.
+
+Docker's built-in IPAM handles IP assignment within each network. No
+external DHCP is needed — Docker assigns IPs from the configured subnet
+on `docker network create --subnet`.
+
+##### Subnet Allocation
+
+| Hospital | surgical-net | hospital-net | orchestration-net |
+|----------|-------------|-------------|-------------------|
+| unnamed (default) | Docker default | Docker default | Docker default |
+| hospital-a | 10.10.1.0/24 | 10.10.2.0/24 | 10.10.3.0/24 |
+| hospital-b | 10.20.1.0/24 | 10.20.2.0/24 | 10.20.3.0/24 |
+| hospital-c | 10.30.1.0/24 | 10.30.2.0/24 | 10.30.3.0/24 |
+| hospital-N | 10.(N×10).1.0/24 | 10.(N×10).2.0/24 | 10.(N×10).3.0/24 |
+
+The CLI allocates subnets by hospital ordinal (based on creation order).
+The `wan-net` subnet (`172.30.0.0/24`) is shared and created once.
+
+##### Port Allocation — Named Hospitals
+
+| Hospital | GUI base port | Twin port range |
+|----------|--------------|-----------------|
+| unnamed (default) | 8080 | 8081+ |
+| 1st named (hospital-a) | 8080 | 8081+ |
+| 2nd named (hospital-b) | 9080 | 9081+ |
+| 3rd named (hospital-c) | 10080 | 10081+ |
+
+##### V3.0 Extension: Cloud Layer
+
+V3.0 adds `medtech run cloud --name <id>` which launches a Cloud CDS
+and WAN Routing Service on `wan-net`, enabling cross-hospital data
+bridging through the NAT infrastructure already deployed by V1.4. The
+Docker topology, NAT routers, and subnet scheme require no changes.
+
 #### Split-GUI Deployment (V1.4)
 
 The default simulation (via `medtech launch` or `medtech run` commands)
@@ -432,13 +538,24 @@ deploys GUI modules as separate containers to simulate production-like
 network separation, where per-OR displays run on the surgical LAN and the
 hospital command center runs on the backbone.
 
+**Single hospital (unnamed):**
+
 | Container | Launched By | Network | Serves | Host Port | Simulates |
 |-----------|-------------|---------|--------|-----------|-----------|
 | `cloud-discovery-service` | `docker run --rm` | `hospital-net`, `surgical-net`, `orchestration-net` | Multicast-free discovery | — | CDS appliance |
 | `routing-service` | `docker run --rm` | `hospital-net`, `surgical-net` | Procedure → Hospital bridge | — | Routing appliance |
 | `medtech-gui` | `docker run --rm` | `hospital-net`, `orchestration-net` | Dashboard + Procedure Controller (SPA shell) | 8080 | Hospital control room workstation |
 | `medtech-twin-or1` | `docker run --rm` | `surgical-net` | Digital Twin (OR-1, standalone) | 8081 | In-OR display at OR-1 |
-| `medtech-twin-or3` | `docker run --rm` | `surgical-net` | Digital Twin (OR-3, standalone) | 8082 | In-OR display at OR-3 |
+
+**Named hospital (`--name hospital-a`):**
+
+| Container | Launched By | Network | Host Port |
+|-----------|-------------|---------|-----------|
+| `hospital-a-nat` | `docker run --privileged` | private nets + `wan-net` | — |
+| `hospital-a-cds` | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_surgical-net`, `hospital-a_orchestration-net` | — |
+| `hospital-a-routing` | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_surgical-net` | — |
+| `hospital-a-gui` | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_orchestration-net` | 8080 |
+| `hospital-a-twin-or1` | `docker run --rm` | `hospital-a_surgical-net` | 8081 |
 
 All containers — infrastructure (CDS, Routing Service), the central GUI,
 and per-OR service hosts and twins — are launched via `docker run --rm`.
@@ -469,10 +586,12 @@ browser via Docker port mapping. When `MEDTECH_GUI_EXTERNAL_URL` is
 unset, the service falls back to its container-internal address.
 
 **Dynamic room addition:** The developer adds ORs at any time via
-`medtech run or --room-id OR-5`. New containers join the existing Docker
-networks, discover CDS, and auto-register in the Procedure Controller
-sidebar via `ServiceCatalog`. No compose override files or template
-generation is required.
+`medtech run or --name OR-5` (or `medtech run or --name OR-5 --hospital hospital-a`
+for named hospitals). New containers join the existing Docker networks,
+discover CDS, and auto-register in the Procedure Controller sidebar via
+`ServiceCatalog`. When `--name` is omitted, the CLI auto-generates a
+unique name (e.g., `OR-1`, `OR-2`). No compose override files or
+template generation is required.
 
 **Unified-GUI fallback:** `medtech launch unified` (or
 `docker compose --profile unified-gui up`) deploys a single

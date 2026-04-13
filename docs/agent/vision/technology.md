@@ -191,17 +191,12 @@ platform.
 
 ### Command Summary
 
-| Command | Wraps | Purpose |
-|---------|-------|---------|
-| `medtech build` | `cmake --build build --target install` | Configure (if needed), build, and install |
-| `medtech run hospital` | Sequential `docker run --rm -d` (CDS, Routing, GUI) | Start infrastructure + central GUI |
-| `medtech run or --room-id OR-1` | `docker run --rm -d ...` (multiple) | Spawn Service Host + twin containers for one OR |
-| `medtech launch [SCENARIO]` | Sequence of `run` calls | Start a named simulation scenario end-to-end |
-| `medtech launch --list` | — | List available scenarios with descriptions |
-| `medtech launch --dockgraph` | Adds a DockGraph sidecar container | Include topology visualizer at `http://localhost:7800` |
-| `medtech stop` | `docker stop` for all `medtech.*` containers | Tear down the simulation |
-| `medtech status` | `docker ps --filter` | Show running containers and GUI URLs |
-| `medtech status --topology` | `docker network inspect` | ASCII tree of containers grouped by network |
+| Command | Wraps | Purpose |\n|---------|-------|---------|\n| `medtech build` | `cmake --build build --target install` | Configure (if needed), build, and install |\n| `medtech run hospital [--name NAME]` | Sequential `docker run --rm -d` (CDS, Routing, GUI; + NAT router if named) | Start a hospital instance — unnamed = flat networks, named = isolated + NAT |\n| `medtech run or [--name NAME] [--hospital NAME]` | `docker run --rm -d ...` (multiple) | Spawn Service Host + twin containers for one OR |\n| `medtech run cloud --name NAME` | `docker run --rm -d` (CDS, WAN RS) | *V3.0:* Start a cloud instance on `wan-net` |\n| `medtech launch [SCENARIO]` | Sequence of `run` calls | Start a named simulation scenario end-to-end |\n| `medtech launch --list` | — | List available scenarios with descriptions |\n| `medtech launch --dockgraph` | Adds a DockGraph sidecar container | Include topology visualizer at `http://localhost:7800` |\n| `medtech stop` | `docker stop` + `docker network rm` | Tear down all containers and networks |\n| `medtech status` | `docker ps --filter` | Show running containers and GUI URLs |\n| `medtech status --topology` | `docker network inspect` | ASCII tree of containers grouped by network |
+
+All multi-instance `run` commands accept `--name`. When omitted, the
+CLI auto-generates a unique name by scanning running containers (e.g.,
+`hospital-1`, `OR-1`). This ensures every resource has an explicit
+identity in `docker ps`, `medtech status`, and DockGraph.
 
 `medtech launch` is a convenience that calls the appropriate `run`
 commands for a named scenario. Developers who prefer manual control
