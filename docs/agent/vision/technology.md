@@ -169,9 +169,9 @@ The unified app entry point (`medtech.gui.app`) imports all page modules at star
 The `medtech` CLI is a locally-installed Python console script that
 provides a streamlined quick-start workflow for building, launching, and
 scaling the medtech suite simulation. It is a thin convenience wrapper
-over native tools (`cmake`, `docker compose`, `docker run`) — every
-command prints the underlying invocation so developers can run native
-commands directly if they prefer.
+over native tools (`cmake`, `docker run`) — every command prints the
+underlying invocation so developers can run native commands directly if
+they prefer.
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
@@ -194,12 +194,14 @@ platform.
 | Command | Wraps | Purpose |
 |---------|-------|---------|
 | `medtech build` | `cmake --build build --target install` | Configure (if needed), build, and install |
-| `medtech run hospital` | `docker compose up -d` | Start infrastructure + central GUI |
+| `medtech run hospital` | Sequential `docker run --rm -d` (CDS, Routing, GUI) | Start infrastructure + central GUI |
 | `medtech run or --room-id OR-1` | `docker run --rm -d ...` (multiple) | Spawn Service Host + twin containers for one OR |
 | `medtech launch [SCENARIO]` | Sequence of `run` calls | Start a named simulation scenario end-to-end |
 | `medtech launch --list` | — | List available scenarios with descriptions |
-| `medtech stop` | `docker compose down` + `docker stop` for dynamic containers | Tear down the simulation |
-| `medtech status` | `docker compose ps` | Show running containers and GUI URLs |
+| `medtech launch --dockgraph` | Adds a DockGraph sidecar container | Include topology visualizer at `http://localhost:7800` |
+| `medtech stop` | `docker stop` for all `medtech.*` containers | Tear down the simulation |
+| `medtech status` | `docker ps --filter` | Show running containers and GUI URLs |
+| `medtech status --topology` | `docker network inspect` | ASCII tree of containers grouped by network |
 
 `medtech launch` is a convenience that calls the appropriate `run`
 commands for a named scenario. Developers who prefer manual control
@@ -211,7 +213,7 @@ can compose their own topology with individual `run` calls.
   stdout before execution. The developer can copy-paste any command.
 - **No abstraction:** The CLI does not invent its own configuration
   format, state files, or daemon processes. It delegates entirely to
-  `cmake`, `docker compose`, and `docker run`.
+  `cmake` and `docker run`.
 - **No DDS dependency:** The CLI does not import `rti.connext` or
   create DDS participants. It is a pure build/launch orchestrator.
 - **Fail-through:** If a command fails, the underlying tool's error

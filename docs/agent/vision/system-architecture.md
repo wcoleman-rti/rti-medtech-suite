@@ -425,6 +425,69 @@ Each logical host is a Docker container. Custom Docker networks simulate the net
 | `orchestration-net` | Orchestration control-plane | Procedure Controller, Service Hosts (dual-homed: surgical-net + orchestration-net), Cloud Discovery Service — Service Hosts bridge both networks to host surgical services on `surgical-net` while receiving orchestration commands on `orchestration-net` |
 | `cloud-net` **(V3.0)** | Enterprise WAN | WAN Routing Service (dual-homed: hospital-net + cloud-net), Command Center dashboard, Cloud Discovery Service — **not created until V3.0 implementation** |
 
+#### Split-GUI Deployment (V1.4)
+
+The default simulation (via `medtech launch` or `medtech run` commands)
+deploys GUI modules as separate containers to simulate production-like
+network separation, where per-OR displays run on the surgical LAN and the
+hospital command center runs on the backbone.
+
+| Container | Launched By | Network | Serves | Host Port | Simulates |
+|-----------|-------------|---------|--------|-----------|-----------|
+| `cloud-discovery-service` | `docker run --rm` | `hospital-net`, `surgical-net`, `orchestration-net` | Multicast-free discovery | — | CDS appliance |
+| `routing-service` | `docker run --rm` | `hospital-net`, `surgical-net` | Procedure → Hospital bridge | — | Routing appliance |
+| `medtech-gui` | `docker run --rm` | `hospital-net`, `orchestration-net` | Dashboard + Procedure Controller (SPA shell) | 8080 | Hospital control room workstation |
+| `medtech-twin-or1` | `docker run --rm` | `surgical-net` | Digital Twin (OR-1, standalone) | 8081 | In-OR display at OR-1 |
+| `medtech-twin-or3` | `docker run --rm` | `surgical-net` | Digital Twin (OR-3, standalone) | 8082 | In-OR display at OR-3 |
+
+All containers — infrastructure (CDS, Routing Service), the central GUI,
+and per-OR service hosts and twins — are launched via `docker run --rm`.
+The `medtech` CLI wraps these calls (see [tooling.md](tooling.md) §
+`medtech` CLI). The `docker-compose.yml` is retained for image building
+(`docker compose build`) and as a legacy/reference path, but the
+standard runtime launch path is pure `docker run`.
+
+Each twin container runs `python -m surgical_procedure.digital_twin` in
+standalone mode (`__main__` guard). It creates its own `control`-tag
+DomainParticipant on `surgical-net`, subscribes to `RobotState`,
+`RobotCommand`, `SafetyInterlock`, `OperatorInput`, and
+`RobotArmAssignment`, and serves a NiceGUI web page on its container
+port 8080 (mapped to a unique host port).
+
+The central `medtech-gui` container runs the SPA shell with dashboard and
+controller pages on `hospital-net`. Its sidebar discovers remote twin
+containers via `ServiceCatalog` `gui_url` properties advertised by the
+Service Hosts on the Orchestration domain. Because twins are on different
+origins, the origin-aware navigation (Phase UI-M, Step M.0) opens them
+in new browser tabs — exactly as a production deployment would behave.
+
+**`gui_url` browser reachability:** Each GUI container sets
+`MEDTECH_GUI_EXTERNAL_URL` in its environment (e.g.,
+`http://localhost:8081`). The service builds its advertised `gui_url`
+from this value, ensuring the URL is reachable by the developer's
+browser via Docker port mapping. When `MEDTECH_GUI_EXTERNAL_URL` is
+unset, the service falls back to its container-internal address.
+
+**Dynamic room addition:** The developer adds ORs at any time via
+`medtech run or --room-id OR-5`. New containers join the existing Docker
+networks, discover CDS, and auto-register in the Procedure Controller
+sidebar via `ServiceCatalog`. No compose override files or template
+generation is required.
+
+**Unified-GUI fallback:** `medtech launch unified` (or
+`docker compose --profile unified-gui up`) deploys a single
+`medtech-gui` container running all GUI modules in-process (the pre-V1.4
+monolithic behavior). This profile is retained for environments where
+split-GUI port mapping is impractical.
+
+**Topology visualization:** `medtech status --topology` renders an ASCII
+tree of running containers grouped by Docker network (see
+[tooling.md](tooling.md) § DockGraph). For a richer interactive view,
+[DockGraph](https://github.com/dockgraph/dockgraph) can be launched as
+an optional sidecar (`medtech launch --dockgraph`) — it presents a
+real-time, zoomable graph of containers, networks, and their
+relationships in the browser at `http://localhost:7800`.
+
 ### Docker Compose Service Startup Ordering
 
 Docker Compose `depends_on` with health checks must enforce the following startup order

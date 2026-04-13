@@ -183,7 +183,7 @@ After all V1.0.0 phases (1–5, plus 3–4) are complete, a **final regression g
 
 | Phase | Depends On | Key Deliverables |
 |-------|------------|------------------|
-| [phase-simulation-cli.md](phase-simulation-cli.md) | Phase UI-M (V1.3) | `medtech` CLI (click-based), split-GUI Docker topology, `medtech run hospital` / `medtech run or`, simulation scenarios, dynamic room addition |
+| [phase-simulation-cli.md](phase-simulation-cli.md) | Phase UI-M (V1.3) | `medtech` CLI (click-based), split-GUI Docker topology (pure `docker run`), `medtech run hospital` / `medtech run or`, `medtech status --topology`, optional DockGraph sidecar, simulation scenarios, dynamic room addition |
 
 > **Prerequisite:** Phase SIM requires [spec/simulation-cli.md](../spec/simulation-cli.md) to be operator-approved before implementation begins.
 

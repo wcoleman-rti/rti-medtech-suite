@@ -82,6 +82,33 @@ A version may only be cut when **all** of the following are true:
 
 ---
 
+### V1.3.0 — UI Modernization
+
+**Implementation phases:** Phase UI-M (UI Modernization)
+
+**Theme:** Modernize the visual design of all GUI applications with a cohesive design system. Visual-only changes — no DDS, IDL, QoS, or architectural modifications.
+
+| Module / Capability | Features |
+|---------------------|----------|
+| Design token system, Inter font, glassmorphism, status indicators, animations, semantic type scale | Visual design modernization across all GUI modules |
+
+---
+
+### V1.4.0 — Distributed Simulation & CLI
+
+**Implementation phases:** Phase SIM (Distributed Simulation & CLI)
+
+**Theme:** Developer-facing infrastructure for hands-on exploration. Split-GUI Docker deployment and `medtech` CLI.
+
+| Module / Capability | Features |
+|---------------------|----------|
+| Split-GUI Docker deployment | Per-OR twin containers on `surgical-net`, central GUI on `hospital-net`, all containers via `docker run` |
+| `medtech` CLI | `build`, `run hospital`, `run or`, `launch`, `status`, `status --topology`, `stop` — thin wrapper over native tools |
+| Topology visualization | `medtech status --topology` (ASCII); optional [DockGraph](https://github.com/dockgraph/dockgraph) sidecar at `http://localhost:7800` |
+| Simulation scenarios | Distributed (default), unified (fallback), minimal |
+
+---
+
 ### V2.0.0 — Security & Hospital Integration Gateways
 
 **Implementation phases:** 7 (Security), plus new gateway modules (Phases 8–13)

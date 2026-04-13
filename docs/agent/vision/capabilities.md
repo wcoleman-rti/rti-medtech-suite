@@ -281,6 +281,75 @@ the Procedure Controller and digital twin display.
 
 ---
 
+### V1.3.0 — UI Modernization
+
+**Theme:** Modernize the visual design of all GUI applications with a
+cohesive design system — design tokens, glassmorphism, Inter font,
+semantic type scale, modern status indicators, animations, and
+accessibility improvements. All changes are visual-only — no DDS, IDL,
+QoS, or architectural modifications.
+
+| Module / Capability | Features |
+|---------------------|----------|
+| Design token system | Centralized `DESIGN_TOKENS` dict, all visual values derived from tokens |
+| Inter font integration | Variable font loaded from local static files, semantic type scale CSS |
+| Glassmorphism overlays | Backdrop blur + translucent surfaces on floating panels and HUD elements |
+| Modern status indicators | Icon-prefixed status chips, skeleton loaders, pulse-critical animation |
+| Animation & transitions | Hover elevate, slide-in alerts, focus-visible rings, `prefers-reduced-motion` |
+| Semantic type scale | 9-class typography hierarchy applied consistently across all GUI modules |
+
+---
+
+### V1.4.0 — Distributed Simulation & CLI
+
+**Theme:** Developer-facing infrastructure for hands-on exploration.
+Split-GUI Docker deployment simulates production network topology with
+per-OR displays on `surgical-net` and a hospital command center on
+`hospital-net`. The `medtech` CLI provides a single entry point for
+build, launch, and dynamic scaling.
+
+#### Split-GUI Deployment
+- Per-OR digital twin containers deployed on `surgical-net` in standalone mode
+- Central GUI (dashboard + controller) deployed on `hospital-net`
+- Origin-aware sidebar navigation opens cross-origin twins in new tabs
+- `MEDTECH_GUI_EXTERNAL_URL` env var ensures browser-reachable `gui_url`
+- Per-OR containers launched dynamically via `docker run --rm` — no
+  duplicated compose service blocks
+- All containers (infrastructure, GUI, per-OR) launched via `docker run`;
+  compose retained only for image building and as a legacy reference path
+- `medtech launch unified` retains monolithic fallback
+
+#### Topology Visualization
+- `medtech status --topology` — ASCII tree of running containers grouped
+  by Docker network (zero dependencies)
+- Optional [DockGraph](https://github.com/dockgraph/dockgraph) sidecar
+  (`medtech launch --dockgraph`) — real-time interactive browser graph
+  of containers, networks, and relationships at `http://localhost:7800`
+
+#### `medtech` CLI
+- Locally-installed Python console script (click-based, `[project.scripts]` entry)
+- `medtech build` — configure, build, and install via CMake
+- `medtech run hospital` — start infrastructure + central GUI via sequential `docker run`
+- `medtech run or --room-id OR-1` — spawn Service Host + twin containers via `docker run --rm`
+- `medtech launch [SCENARIO]` — run a named scenario (sequence of `run` calls)
+- `medtech stop` — tear down all simulation containers
+- `medtech status` — show running containers and GUI URLs
+- `medtech status --topology` — ASCII tree of containers by network
+- All commands print underlying invocations for transparency
+
+#### Simulation Scenarios
+- `distributed` (default) — split GUI, 2 ORs, full observability
+- `unified` — monolithic GUI (pre-V1.4 behavior)
+- `minimal` — single OR, split GUI, no observability
+
+| Module / Capability | Connext Features Demonstrated |
+|---------------------|-------------------------------|
+| Split-GUI deployment | Same DDS topology, different container boundaries — proves network-level isolation without DDS changes |
+| Dynamic room addition | ServiceCatalog auto-discovery of new Service Hosts/twins at runtime, `gui_url` advertisement |
+| CLI-driven orchestration | Developer-facing entry point — no DDS knowledge required to build and launch |
+
+---
+
 ### V2.1.0 — Teleoperation / Remote Operator
 
 **Theme:** Extend operator control to hospital and cloud levels with

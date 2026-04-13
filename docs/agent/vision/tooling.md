@@ -190,7 +190,129 @@ python tools/partition-inspector.py --filter "room/OR-3/*"
 
 **Implementation phase:** Phase 2.
 
-### QoS Compatibility Checker (Pre-Flight)
+### `medtech` CLI — Build, Launch & Scale
+
+**What:** A locally-installed Python console script (`medtech`) that
+provides a single entry point for the developer quick-start workflow:
+build the project, launch simulation scenarios in Docker, dynamically
+add operating rooms, and check system status.
+
+**Design philosophy:** The CLI is a thin wrapper over native tools
+(`cmake`, `docker run`). Every command prints the exact underlying
+invocation before running it, so developers can run or adapt the native
+commands directly.
+
+**When to use:**
+
+- "I just cloned the repo — how do I build and run it?" → `medtech build && medtech launch`
+- "I want to add another OR to the running simulation" → `medtech run or --room-id OR-5`
+- "What's running and where do I open it?" → `medtech status`
+- "I want to tear everything down" → `medtech stop`
+
+**Interface:**
+
+```bash
+# Build and install
+medtech build
+
+# Launch the default distributed simulation (2 ORs, split GUI)
+medtech launch
+# equivalent to:
+#   medtech run hospital
+#   medtech run or --room-id OR-1
+#   medtech run or --room-id OR-3
+
+# Launch a specific scenario
+medtech launch minimal
+
+# List available scenarios
+medtech launch --list
+
+# Start infrastructure + central GUI only
+medtech run hospital
+# Running: docker run --rm -d --name cloud-discovery-service ...
+# Running: docker run --rm -d --name routing-service ...
+# Running: docker run --rm -d --name medtech-gui -p 8080:8080 ...
+
+# Add an OR (service hosts + digital twin)
+medtech run or --room-id OR-5
+# Running: docker run --rm -d --name clinical-service-host-or5 \
+#   --network medtech_surgical-net -e ROOM_ID=OR-5 ...
+# Running: docker run --rm -d --name robot-service-host-or5 ...
+# Running: docker run --rm -d --name medtech-twin-or5 -p 8083:8080 ...
+# ✓ OR-5 started — twin at http://localhost:8083/twin/OR-5
+
+# Show running containers and URLs
+medtech status
+
+# Show topology: containers grouped by Docker network
+medtech status --topology
+
+# Tear down everything
+medtech stop
+```
+
+**Scenarios** (used with `medtech launch`):
+
+| Scenario | Description |
+|----------|-------------|
+| `distributed` (default) | Split GUI: dashboard + controller on `hospital-net`, per-OR twins on `surgical-net`, 2 ORs |
+| `unified` | Monolithic GUI (pre-V1.4 behavior), 2 ORs — no separate twin containers |
+| `minimal` | Single OR, split GUI, no observability stack |
+
+**Implementation phase:** Phase SIM (Distributed Simulation & CLI).
+
+### DockGraph — Docker Topology Visualizer (Optional)
+
+**What:** [DockGraph](https://github.com/dockgraph/dockgraph) is a
+self-hosted, real-time Docker infrastructure visualizer. It renders
+containers, networks, volumes, and their relationships as an interactive,
+zoomable graph in the browser.
+
+**Why it fits:** Unlike container management tools (Portainer, lazydocker,
+dozzle), DockGraph focuses on **topology** — showing which containers
+are on which networks, `depends_on` edges, volume mounts, and
+cross-network connections. This is exactly the view needed to understand
+the medtech suite’s multi-network Docker simulation.
+
+**Key features:**
+
+- Live topology graph with network grouping (containers visually
+  clustered by `surgical-net`, `hospital-net`, `orchestration-net`)
+- Compose-aware — mount the compose file and it shows services that
+  haven’t started yet
+- Real-time — watches Docker event stream; new `medtech run or`
+  containers appear within seconds
+- Detail panels — click any container to see stats, ports, mounts,
+  env, labels, logs, health, network config
+- Read-only API — cannot start, stop, or modify containers
+- Self-excluding — hides its own container from the graph
+- Single container, single port (7800), read-only Docker socket mount
+
+**Quick start:**
+
+```bash
+# Standalone
+docker run -d -p 7800:7800 \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  --label dockgraph.self=true \
+  dockgraph/dockgraph
+
+# Or via the medtech CLI
+medtech launch --dockgraph
+```
+
+Open `http://localhost:7800` to see the full Docker topology.
+
+**Maturity note:** DockGraph is a young project (first release early
+2026, BSL 1.1 license converting to Apache 2.0 after 4 years). It is
+recommended as an **optional** developer convenience, not a hard
+dependency. The built-in `medtech status --topology` provides a
+zero-dependency ASCII fallback for terminal-based inspection.
+
+**Integration:** DockGraph is not part of the medtech build or test
+pipeline. It is documented here as a recommended optional sidecar
+for topology exploration during development.
 
 **What:** A pre-flight validation script that loads all QoS XML profiles and
 simulates the topic-filter resolution for every defined writer/reader topic pair.
