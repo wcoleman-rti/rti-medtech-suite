@@ -748,7 +748,7 @@ def twin_content(room_id: str) -> None:
     # ---- Mode badge at top of content area --------------------------------
     with ui.row().classes("w-full items-center gap-3 px-4 pt-2"):
         ui.icon(ICONS["robot"]).classes("text-2xl")
-        ui.label(f"Room: {room_id}").classes("text-lg font-bold")
+        ui.label(f"Room: {room_id}").classes("type-h3")
         ui.space()
         mode_badge = ui.badge(
             current_backend.operational_mode,
@@ -1089,7 +1089,7 @@ def _build_scene(
         if not assignments:
             return
         with arm_status_container:
-            ui.label("Arm Assignments").classes("text-sm font-bold mt-2")
+            ui.label("Arm Assignments").classes("type-label mt-2")
             for robot_id, assignment in sorted(assignments.items()):
                 status = ArmAssignmentState(int(getattr(assignment, "status", 0)))
                 color = ARM_STATE_COLORS.get(status, BRAND_COLORS["gray"])
@@ -1099,10 +1099,10 @@ def _build_scene(
                     f"{robot_id} — {status.name}",
                     icon="precision_manufacturing",
                 ).classes("w-full").props(f'header-style="color: {color}"'):
-                    ui.label(f"Position: {tp.name}").classes("text-xs")
-                    ui.label(f"State: {status.name}").classes("text-xs")
+                    ui.label(f"Position: {tp.name}").classes("type-body-sm")
+                    ui.label(f"State: {status.name}").classes("type-body-sm")
                     if caps:
-                        ui.label(f"Capabilities: {caps}").classes("text-xs")
+                        ui.label(f"Capabilities: {caps}").classes("type-body-sm")
 
     def _set_arm_visibility(arm_obj: dict[str, Any], visible: bool) -> None:
         """Set material opacity on all arm parts (including base) to show/hide."""

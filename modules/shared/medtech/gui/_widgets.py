@@ -66,9 +66,9 @@ def create_stat_card(
             if icon:
                 ui.icon(icon, color=color).classes("text-2xl")
             with ui.column(align_items="start").classes("gap-0"):
-                value_label = ui.label(str(value)).classes("text-2xl font-bold")
+                value_label = ui.label(str(value)).classes("type-h1")
                 value_label.style(f"color: {color};")
-                ui.label(label).classes("text-sm text-gray-500")
+                ui.label(label).classes("type-body-sm text-gray-500")
     card.value_label = value_label
     return card
 
@@ -79,7 +79,7 @@ def create_section_header(text: str, icon: str = "") -> Any:
     with row:
         if icon:
             ui.icon(icon, color=BRAND_COLORS["blue"]).classes("text-xl")
-        ui.label(text).classes("text-lg font-bold brand-heading")
+        ui.label(text).classes("type-h2 brand-heading")
     return row
 
 

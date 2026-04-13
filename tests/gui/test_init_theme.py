@@ -734,3 +734,96 @@ class TestAnimationsAndTransitions:
             ".transition-fast" in c[1][0] for c in head_calls if len(c[1]) > 0
         )
         assert transition_injected, "init_theme() must inject transitions CSS"
+
+
+# ---------------------------------------------------------------------------
+# Semantic type scale application tests (@ui-modernization Step M.6)
+# ---------------------------------------------------------------------------
+
+
+class TestSemanticTypeScale:
+    """Widget helpers use semantic type scale instead of ad-hoc Tailwind classes."""
+
+    def test_stat_card_value_uses_type_h1(self, monkeypatch: pytest.MonkeyPatch):
+        """create_stat_card() value label uses .type-h1."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        card = widgets_module.create_stat_card(42, "Test")
+        class_str = " ".join(str(c) for c in card.value_label.class_calls)
+        assert "type-h1" in class_str
+
+    def test_stat_card_description_uses_type_body_sm(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        """create_stat_card() description label uses .type-body-sm."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        widgets_module.create_stat_card(42, "Test")
+        label_calls = [c for c in recorder.calls if c[0] == "label"]
+        desc_label = label_calls[-1][3]
+        class_str = " ".join(str(c) for c in desc_label.class_calls)
+        assert "type-body-sm" in class_str
+
+    def test_section_header_uses_type_h2(self, monkeypatch: pytest.MonkeyPatch):
+        """create_section_header() text label uses .type-h2."""
+        recorder = Recorder()
+        _patch_widget_ui(monkeypatch, recorder)
+
+        widgets_module.create_section_header("Test Section")
+        label_calls = [c for c in recorder.calls if c[0] == "label"]
+        assert len(label_calls) >= 1
+        header_label = label_calls[-1][3]
+        class_str = " ".join(str(c) for c in header_label.class_calls)
+        assert "type-h2" in class_str
+
+    def test_no_arbitrary_font_sizes_in_dashboard(self):
+        """Dashboard module uses no arbitrary Tailwind font-size classes."""
+        import inspect
+
+        from hospital_dashboard.dashboard import dashboard as dash_mod
+
+        source = inspect.getsource(dash_mod)
+        # These specific patterns indicate ad-hoc sizing on labels
+        for pattern in [
+            '"text-2xl font-bold"',
+            '"text-lg font-bold"',
+            '"text-sm text-gray-500"',
+            '"text-xs text-gray-500"',
+        ]:
+            assert (
+                pattern not in source
+            ), f"Dashboard still uses ad-hoc Tailwind class: {pattern}"
+
+    def test_no_arbitrary_font_sizes_in_controller(self):
+        """Controller module uses no arbitrary Tailwind font-size classes on labels."""
+        import inspect
+
+        from hospital_dashboard.procedure_controller import controller as ctrl_mod
+
+        source = inspect.getsource(ctrl_mod)
+        for pattern in [
+            '"text-lg font-bold brand-heading"',
+            '"text-xl font-bold brand-heading"',
+            '"text-sm text-gray-500"',
+        ]:
+            assert (
+                pattern not in source
+            ), f"Controller still uses ad-hoc Tailwind class: {pattern}"
+
+    def test_no_arbitrary_font_sizes_in_twin(self):
+        """Digital twin module uses no arbitrary Tailwind font-size classes on labels."""
+        import inspect
+
+        from surgical_procedure.digital_twin import digital_twin as twin_mod
+
+        source = inspect.getsource(twin_mod)
+        for pattern in [
+            '"text-lg font-bold"',
+            '"text-sm font-bold',
+            '"text-xs"',
+        ]:
+            assert (
+                pattern not in source
+            ), f"Digital twin still uses ad-hoc Tailwind class: {pattern}"

@@ -839,7 +839,7 @@ def controller_content() -> None:
         render_summary_cards()
 
         status_label = ui.label(current_backend.status_message).classes(
-            "text-sm text-gray-500"
+            "type-body-sm text-gray-500"
         )
 
         render_main_view()
@@ -960,7 +960,7 @@ def _render_service_grid(current_backend: ControllerBackend, refresh_ui: Any) ->
                 # Room filter chips
                 known_rooms = current_backend.known_room_ids()
                 if known_rooms:
-                    ui.label("Room:").classes("text-xs text-gray-400")
+                    ui.label("Room:").classes("type-label text-gray-400")
                     for rid in [None] + known_rooms:  # type: ignore[list-item]
                         label = "All" if rid is None else rid
                         active_room = current_backend._view.room_filter == rid
@@ -978,7 +978,7 @@ def _render_service_grid(current_backend: ControllerBackend, refresh_ui: Any) ->
                 # Procedure filter chips
                 known_procs = current_backend.known_procedure_ids()
                 if known_procs:
-                    ui.label("Procedure:").classes("text-xs text-gray-400")
+                    ui.label("Procedure:").classes("type-label text-gray-400")
                     for pid in [None] + known_procs:  # type: ignore[list-item]
                         label = "All" if pid is None else pid
                         active_proc = current_backend._view.procedure_filter == pid
@@ -1077,7 +1077,7 @@ def _render_host_tile(
         with ui.column().classes("w-full items-center gap-3"):
             with ui.row().classes("items-center gap-3"):
                 ui.icon(ICONS["host"], color=BRAND_COLORS["blue"]).classes("text-4xl")
-                ui.label(host_id).classes("text-lg font-bold brand-heading")
+                ui.label(host_id).classes("type-h3 brand-heading")
                 ui.badge(str(len(services)), color=BRAND_COLORS["orange"]).props(
                     "rounded"
                 ).classes("text-base").style(
@@ -1154,7 +1154,7 @@ def _render_service_tile(
             with ui.row().classes("items-center gap-3"):
                 ui.icon(ICONS["service"], color=border_color).classes("text-4xl")
                 display = getattr(catalog, "display_name", "") or service_id
-                ui.label(display).classes("text-lg font-bold brand-heading")
+                ui.label(display).classes("type-h3 brand-heading")
             with ui.row().classes("gap-2"):
                 is_stopped = state_name.upper() in ("STOPPED", "FAILED", "UNKNOWN")
 
@@ -1256,12 +1256,12 @@ def _render_service_detail(
         display = getattr(catalog, "display_name", "") or service_id
         with ui.row().classes("w-full items-center gap-4"):
             create_status_chip(state_name)
-            ui.label(display).classes("text-lg font-bold brand-heading")
+            ui.label(display).classes("type-h3 brand-heading")
         with ui.column().classes("gap-1 mt-2"):
-            ui.label(f"Host: {host_id}").classes("text-base brand-heading")
+            ui.label(f"Host: {host_id}").classes("type-body-lg brand-heading")
             health = getattr(catalog, "health_summary", "") or ""
             if health:
-                ui.label(health).classes("text-base text-gray-500")
+                ui.label(health).classes("type-body text-gray-500")
 
 
 def _render_diagnostics_view(current_backend: ControllerBackend) -> None:
@@ -1339,8 +1339,8 @@ async def _open_service_config_dialog(
     with ui.dialog() as dlg, ui.card().classes(
         "min-w-[28rem] rounded-lg p-6 glass-panel"
     ).style("box-shadow: 0 4px 24px rgba(0,0,0,0.25);"):
-        ui.label("Configure Service").classes("text-xl font-bold brand-heading")
-        ui.label(f"{service_id} on {host_id}").classes("text-sm text-gray-500")
+        ui.label("Configure Service").classes("type-h2 brand-heading")
+        ui.label(f"{service_id} on {host_id}").classes("type-body-sm text-gray-500")
         ui.separator()
 
         if descriptors:
@@ -1366,7 +1366,7 @@ async def _open_service_config_dialog(
                 )
         else:
             ui.label("No configurable properties advertised.").classes(
-                "text-sm text-gray-500 italic"
+                "type-body-sm text-gray-500 italic"
             )
 
         with ui.row().classes("w-full justify-end gap-2 mt-4"):

@@ -548,18 +548,18 @@ def dashboard_content() -> None:
                                 with ui.row().classes("w-full items-center gap-2"):
                                     create_status_chip(entry.phase)
                                     ui.label(entry.room or entry.procedure_id).classes(
-                                        "text-lg font-bold"
+                                        "type-h3"
                                     )
                                     ui.space()
-                                    ui.label(entry.phase).classes("text-sm")
+                                    ui.label(entry.phase).classes("type-body")
                                 ui.label(
                                     f"Patient: {entry.patient_name or '—'}"
-                                ).classes("text-sm text-gray-500")
+                                ).classes("type-body-sm text-gray-500")
                                 ui.label(
                                     f"Type: {entry.procedure_type or '—'}"
-                                ).classes("text-sm text-gray-500")
+                                ).classes("type-body-sm text-gray-500")
                                 ui.label(f"Surgeon: {entry.surgeon or '—'}").classes(
-                                    "text-sm text-gray-500"
+                                    "type-body-sm text-gray-500"
                                 )
 
                     render_procedure_list()
@@ -600,7 +600,7 @@ def dashboard_content() -> None:
                                             ):
                                                 ui.label(
                                                     entry.room or entry.procedure_id
-                                                ).classes("font-bold")
+                                                ).classes("type-h3")
                                                 create_status_chip(entry.robot_state)
 
                             render_robot_status()
@@ -671,11 +671,13 @@ def dashboard_content() -> None:
                         card_classes += " pulse-critical"
                     with ui.card().classes(card_classes):
                         ui.label(f"{alert.severity} · {alert.room or '—'}").classes(
-                            "font-bold"
+                            "type-h3"
                         )
-                        ui.label(alert.patient_name or "—").classes("text-sm")
-                        ui.label(alert.category or "").classes("text-xs text-gray-500")
-                        ui.label(alert.message or "").classes("text-sm")
+                        ui.label(alert.patient_name or "—").classes("type-body")
+                        ui.label(alert.category or "").classes(
+                            "type-body-sm text-gray-500"
+                        )
+                        ui.label(alert.message or "").classes("type-body")
 
         render_alert_feed()
 
