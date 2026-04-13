@@ -697,6 +697,10 @@ def main() -> None:
         NICEGUI_STORAGE_SECRET_ENV, NICEGUI_STORAGE_SECRET_DEFAULT
     )
 
+    from medtech.gui._theme import _resource_dir
+
+    favicon_path = _resource_dir() / "images" / "favicon.ico"
+
     _current_backend()
     try:
         ui.run(
@@ -704,7 +708,7 @@ def main() -> None:
             storage_secret=storage_secret,
             reload=False,
             title="Hospital Dashboard — Medtech Suite",
-            favicon="/images/favicon.ico",
+            favicon=str(favicon_path) if favicon_path.is_file() else None,
         )
     except KeyboardInterrupt:
         pass

@@ -161,7 +161,7 @@ def shell_page() -> None:
     dark_mode = ui.dark_mode(_theme_mode_value(stored_mode))  # noqa: F841
 
     # Track current path for active-nav highlighting and breadcrumb
-    current_path = ui.state("")
+    current_path: dict[str, str] = {"value": ""}
     breadcrumb_label: ui.label | None = None
 
     # --- Dynamic breadcrumb in header ---
@@ -244,12 +244,12 @@ def shell_page() -> None:
         discovered_container = ui.column().classes("w-full gap-1")
 
         # Obtain browser origin once for same-origin / cross-origin detection
-        browser_origin = ui.state("")
+        browser_origin: dict[str, str] = {"value": ""}
 
         async def _detect_origin() -> None:
             try:
                 origin = await ui.run_javascript("window.location.origin")
-                browser_origin.set_value(origin)  # type: ignore[union-attr]
+                browser_origin["value"] = origin
             except Exception:
                 pass
 
@@ -270,8 +270,8 @@ def shell_page() -> None:
                     parsed = urlparse(gui_url)
                     svc_origin = f"{parsed.scheme}://{parsed.netloc}"
                     is_local = (
-                        browser_origin.value  # type: ignore[union-attr]
-                        and svc_origin == browser_origin.value  # type: ignore[union-attr]
+                        browser_origin["value"]
+                        and svc_origin == browser_origin["value"]
                     )
                     if is_local:
                         svc_path = parsed.path or "/"
@@ -313,7 +313,10 @@ def shell_page() -> None:
     # Track path changes for active highlighting
     if hasattr(ui.context, "client") and hasattr(ui.context.client, "sub_pages_router"):
         ui.context.client.sub_pages_router.on_path_changed(
-            lambda path: (current_path.set_value(path), _update_active_nav(path))
+            lambda path: (
+                current_path.__setitem__("value", path),
+                _update_active_nav(path),
+            )
         )
     # Set initial active state
     _update_active_nav("/dashboard")
@@ -345,13 +348,17 @@ def main() -> None:
 
     app.add_static_files("/static", "resources/")
 
+    from medtech.gui._theme import _resource_dir
+
+    favicon_path = _resource_dir() / "images" / "favicon.ico"
+
     try:
         ui.run(
             root=shell_page,
             storage_secret=storage_secret,
             reload=False,
             title="Medtech Suite",
-            favicon="/images/favicon.ico",
+            favicon=str(favicon_path) if favicon_path.is_file() else None,
         )
     except KeyboardInterrupt:
         pass

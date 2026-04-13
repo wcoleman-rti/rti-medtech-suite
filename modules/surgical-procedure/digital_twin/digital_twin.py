@@ -1175,6 +1175,10 @@ def main() -> None:
     room_id = os.environ.get("ROOM_ID", "OR-1")
     _get_backend(room_id)
 
+    from medtech.gui._theme import _resource_dir
+
+    favicon_path = _resource_dir() / "images" / "favicon.ico"
+
     # Root redirect: navigating to / sends the browser to the room-specific page.
     @ui.page("/")
     def _root() -> None:
@@ -1185,7 +1189,7 @@ def main() -> None:
             storage_secret=storage_secret,
             reload=False,
             title="Digital Twin — Medtech Suite",
-            favicon="/images/favicon.ico",
+            favicon=str(favicon_path) if favicon_path.is_file() else None,
         )
     except KeyboardInterrupt:
         pass
