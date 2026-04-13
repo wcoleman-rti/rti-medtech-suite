@@ -475,4 +475,4 @@ class TestControllerPage:
 
     def test_constants_remain_available(self):
         assert ICONS["dashboard"] == "space_dashboard"
-        assert BRAND_COLORS["blue"] == "#004C97"
+        assert BRAND_COLORS["blue"] == "#004A8A"

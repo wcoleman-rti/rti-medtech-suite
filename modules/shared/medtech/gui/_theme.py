@@ -87,7 +87,7 @@ def init_theme(_app: Any | None = None, *, title: str = "Medtech Suite") -> Any:
         positive=BRAND_COLORS["green"],
         negative=BRAND_COLORS["red"],
         info=BRAND_COLORS["light_blue"],
-        warning=BRAND_COLORS["orange"],
+        warning=BRAND_COLORS["amber"],
     )
     app.add_static_files("/fonts", _fonts_dir())
     app.add_static_files("/images", _resource_dir() / "images")

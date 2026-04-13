@@ -10,6 +10,7 @@ from medtech.gui._theme import (
     create_header,
     init_theme,
 )
+from medtech.gui._tokens import DESIGN_TOKENS
 from medtech.gui._widgets import (
     ConnectionDot,
     create_empty_state,
@@ -21,6 +22,7 @@ from medtech.gui._widgets import (
 __all__ = [
     "BRAND_COLORS",
     "ConnectionDot",
+    "DESIGN_TOKENS",
     "GuiBackend",
     "ICONS",
     "NICEGUI_QUASAR_CONFIG",
