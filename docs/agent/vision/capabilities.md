@@ -132,7 +132,7 @@ The full release version policy — including version increment rules, release c
 
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|
-| Procedure Controller (NiceGUI web app) | DDS RPC client (Modern C++ and Python), multi-domain participant (Hospital + Orchestration), asyncio integration |
+| Procedure Controller (NiceGUI web app) | DDS RPC client (Modern C++ and Python), Orchestration-only participant (Domain 11, room-scoped) + Procedure operational read, asyncio integration |
 | Service Host framework | DDS RPC service, dual-mode service lifecycle, per-host unique service naming |
 | Orchestration domain | Dedicated domain for infrastructure control-plane, `Pattern.Status` for state topics, `Pattern.RPC` for command channel |
 | `ServiceCatalog` + `ServiceStatus` topics | TRANSIENT_LOCAL state reconstruction, write-on-change, liveliness-based host failure detection |

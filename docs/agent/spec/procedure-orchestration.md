@@ -244,20 +244,21 @@ is added or changed.*
 **And** the controller receives the `OperationResult` reply
 **And** the controller observes the `ServiceStatus` transition to `STOPPED`
 
-### Scenario: Procedure Controller joins both Orchestration and Hospital domains `@integration` `@orchestration`
+### Scenario: Procedure Controller joins the Orchestration domain and reads Procedure context directly `@integration` `@orchestration`
 
 **Given** the Procedure Controller process starts
 **When** the controller creates its DomainParticipants
 **Then** one participant is on the Orchestration domain (for RPC and status)
-**And** one participant is on the Hospital domain (for scheduling context, read-only)
-**And** the controller does not join the Procedure domain directly
+**And** one participant is on the Procedure domain (`operational` tag, read-only — for `ProcedureStatus` and `ProcedureContext`)
+**And** one participant is on the Procedure domain (`control` tag, read-only — for `RobotArmAssignment`)
+**And** the controller does not join the Hospital domain
 
-### Scenario: Procedure Controller is read-only on the Hospital domain `@integration` `@orchestration`
+### Scenario: Procedure Controller does not publish on any domain `@integration` `@orchestration`
 
-**Given** the Procedure Controller has a participant on the Hospital domain
-**When** the controller accesses Hospital domain data
-**Then** the controller only subscribes (reads) — it never publishes on the Hospital domain
-**And** all Hospital domain data arrives via the existing Routing Service bridge from the Procedure domain
+**Given** the Procedure Controller has participants on the Orchestration and Procedure domains
+**When** the controller operates normally
+**Then** the controller only subscribes (reads) on the Procedure domain — it never publishes
+**And** the controller only publishes via DDS RPC on the Orchestration domain (request/reply)
 
 ---
 

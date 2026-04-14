@@ -75,6 +75,10 @@ Phase UI-M: UI Modernization          (depends on: Phase 20, NiceGUI Migration)
 Phase SIM: Distributed Simulation     (depends on: Phase UI-M)
            & CLI
 
+    ├──► Revision: Domain ID Migration (depends on: Phase SIM;
+    │        prerequisite for V2.0 — aligns domain IDs, RS routes,
+    │        and controller plane with decade-offset architecture)
+
 ── V2.0.0 ──────────────────────────────────────────────────────────────────
 
 Phase 7: Security                    (depends on: Phases 1–5)

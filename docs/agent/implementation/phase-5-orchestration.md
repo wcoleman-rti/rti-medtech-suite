@@ -43,7 +43,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - Add orchestration participant profiles to `interfaces/participants/Participants.xml`:
   - `Participant::Orchestration` — Domain 11, no domain tag, with contained entities for `ServiceCatalog` writer/reader, `ServiceStatus` writer/reader, and `ServiceHostControl` RPC endpoints
   - `Participant::ProcedureController_Orchestration` — controller's Orchestration domain participant (RPC client + status subscriber)
-  - `Participant::ProcedureController_Hospital` — controller's Hospital domain participant (read-only subscriber)
+  - ~~`Participant::ProcedureController_Hospital`~~ — *removed by `revision-domain-id-migration`; controller is Orchestration-only per system-architecture.md*
 - Add orchestration entity name constants to `interfaces/idl/app_names/app_names.idl` per the naming convention in [dds-consistency.md §1 Step 2](../vision/dds-consistency.md)
 - Verify generated code compiles (C++) and imports (Python)
 
@@ -218,12 +218,12 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 - Author the Procedure Controller NiceGUI application (`modules/hospital-dashboard/procedure_controller/controller.py`):
   - Creates one participant on the Orchestration domain (`Participant::ProcedureController_Orchestration`)
-  - Creates one participant on the Hospital domain (`Participant::ProcedureController_Hospital`, read-only)
+  - ~~Creates one participant on the Hospital domain~~ — *removed by `revision-domain-id-migration`; replaced by Domain 10 operational read*
   - Subscribes to `ServiceCatalog` and `ServiceStatus` on the Orchestration domain
   - Displays available Service Hosts and their service states
   - Provides UI controls to: select a host, start a service, stop a service, view capabilities/health
   - Issues RPC commands via `ServiceHostControl` client stubs
-  - Reads scheduling context from the Hospital domain (read-only)
+  - Reads procedure context from the Procedure domain (`operational` tag, read-only — per `revision-domain-id-migration`)
   - Uses `background_tasks.create()` / asyncio for DDS data reception per [dds-consistency.md §5](../vision/dds-consistency.md)
   - Writes on the asyncio event loop use `NonBlockingWrite` QoS snippet per vision policy
 - Apply shared GUI design standard: RTI Blue header, Roboto fonts, NiceGUI theme
@@ -235,9 +235,9 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - [x] Procedure Controller displays service states (ServiceStatus rendered)
 - [x] `start_service` RPC issued from GUI results in service starting on target host
 - [x] `stop_service` RPC issued from GUI results in service stopping
-- [x] Controller is read-only on Hospital domain (no DataWriters created)
+- [x] ~~Controller is read-only on Hospital domain~~ — *superseded by `revision-domain-id-migration` (controller drops Hospital participant entirely)*
 - [x] Controller restart reconstructs state from TRANSIENT_LOCAL (within 15 s)
-- [x] Controller does not join Procedure domain
+- [x] ~~Controller does not join Procedure domain~~ — *superseded by `revision-domain-id-migration` (controller gains a Domain 10 operational read participant)*
 - [x] GUI remains responsive during concurrent data arrival
 - [x] `bash scripts/ci.sh` passes
 
