@@ -35,13 +35,13 @@ Domain IDs use a **decade-offset** scheme: the tens digit encodes the deployment
 | 10 | Procedure | Room | Surgical data (domain tags: `control` / `clinical` / `operational`) |
 | 11 | Orchestration | Room | Service Host lifecycle, RPC, catalog, status |
 | 12 | Command | Room | (Reserved — V2.1 room-level reverse control) |
-| 19 | Room Observability | Room | Monitoring Library 2.0 per-room telemetry |
+| 19 | Room Observability | Room | Monitoring Library 2.0 per-room telemetry; Collector forwards to Domain 29 |
 | 20 | Hospital | Hospital | Integration domain: extracted room data + hospital-native topics |
 | 22 | Hospital Command | Hospital | (Reserved — V2.1 remote teleoperation reverse path) |
-| 29 | Hospital Observability | Hospital | Facility-level telemetry aggregation |
+| 29 | Hospital Observability | Hospital | Aggregated telemetry: room-forwarded (from Domain 19) + hospital-native; Collector forwards to Domain 39 |
 | 30 | Cloud | Cloud | Integration domain: extracted hospital data + cloud-native topics (V3.0) |
 | 32 | Cloud Command | Cloud | (Reserved — V3.0 reverse control) |
-| 39 | Cloud Observability | Cloud | Enterprise telemetry aggregation (V3.0) |
+| 39 | Cloud Observability | Cloud | Terminal telemetry aggregation: exports to Prometheus / Loki / OTEL (V3.0) |
 
 > **Migration note:** Previous domain ID assignments (10 = Procedure, 11 = Hospital,
 > 15 = Orchestration, 20 = Observability) are superseded by this scheme. All XML
@@ -118,6 +118,140 @@ valid and explicitly supported by RTI Connext.
 > traffic should flow through the dedicated Hospital Command domain (22) with
 > appropriate domain tags, not through the integration domain. This change requires
 > operator approval and a revision of this section.
+
+### Tiered Infrastructure Deployment
+
+The layered databus requires three RTI infrastructure services — Cloud Discovery
+Service, Routing Service, and Collector Service — deployed according to consistent
+rules at every level. These rules ensure that discovery bootstrapping, cross-level
+data routing, and observability forwarding work uniformly regardless of whether a
+deployment instance is a room, a hospital, or a cloud facility.
+
+#### Rule 1 — Cloud Discovery Service Per Instance
+
+Every deployment instance deploys its own CDS instance. Multicast availability
+is **never assumed** — CDS is the universal discovery bootstrapper for all
+participants within the instance. This applies regardless of whether the instance
+interacts with other levels.
+
+| Level | CDS Container | Networks | Role |
+|-------|---------------|----------|------|
+| Room | (uses hospital-level CDS — room is not independently discoverable) | — | Room participants use the hospital CDS via `surgical-net` / `orchestration-net` attachment |
+| Hospital | `<hospital>-cds` | `hospital-net`, `surgical-net`, `orchestration-net` | Intra-hospital discovery for all participants + upward-facing initial peer for room RS and Collector |
+| Cloud (V3.0) | `wan-cds` | `wan-net` | Cross-facility discovery for WAN RS, hospital-to-cloud Collector forwarding, and cloud-level applications |
+
+The observing level's CDS also serves as the **initial peer for upward-facing
+participants** from the level below. For example, the per-room Routing Service's
+Hospital-domain output participant and the room-level Collector Service's
+forwarding participant both use the hospital CDS as their initial peer.
+
+> **Room-level CDS exception:** Rooms do not deploy their own CDS in V1.x because
+> the hospital CDS is directly reachable from all room networks (it is attached to
+> `surgical-net` and `orchestration-net`). If a future deployment model requires
+> rooms to operate in network isolation from the hospital (e.g., disconnected OR
+> carts), a per-room CDS can be added without architectural changes.
+
+#### Rule 2 — Routing Service as Upward Gateway
+
+If a deployment instance is observed from above, it deploys a Routing Service
+whose **upward-facing output participant** uses the upper-level CDS as its
+initial peer. This is the sole mechanism by which data flows upward through
+the layered databus.
+
+| Gateway | Direction | Input Domains | Output Domain | Upward Initial Peer |
+|---------|-----------|---------------|---------------|---------------------|
+| Per-room MedtechBridge | Room → Hospital | Domain 10, 11 | Domain 20 | `rtps@udpv4://<hospital>-cds:7400` |
+| Per-hospital WAN RS (V3.0) | Hospital → Cloud | Domain 20 | Domain 30 | `rtps@udpv4://wan-cds:7400` |
+
+The upward-facing initial peer is configured as a **hostname**, not an IP
+address. Connext 7.6.0 supports hostname resolution in initial peers. For
+environments where the upper-level CDS may not be reachable at RS startup
+(e.g., hospital CDS starts after room RS), the `dns_tracker_polling_period`
+QoS setting in `discovery_config` enables periodic DNS re-resolution so
+that the RS output participant discovers the upper-level CDS when it becomes
+available — without requiring restart.
+
+```xml
+<!-- Upward-facing participant discovery config -->
+<discovery_config>
+    <dns_tracker_polling_period>
+        <sec>5</sec>
+        <nanosec>0</nanosec>
+    </dns_tracker_polling_period>
+</discovery_config>
+<discovery>
+    <initial_peers>
+        <element>rtps@udpv4://hospital-a-cds:7400</element>
+    </initial_peers>
+</discovery>
+```
+
+#### Rule 3 — Collector Service Per Instance with Forwarding Chain
+
+Every deployment instance deploys a Collector Service on its **level-respective
+observability domain** (offset +9). Lower-level Collectors forward telemetry
+upward to the next level's Collector using the Collector Service forwarding
+capability introduced in Connext 7.6.0.
+
+Forwarding is DDS-based: the Collector receives telemetry on one domain
+(`OBSERVABILITY_DOMAIN`) and forwards it on a **separate output domain**
+(`OBSERVABILITY_OUTPUT_DOMAIN`). The output domain is the observability
+domain of the next level up. The Collector discovers the upstream Collector
+via `OBSERVABILITY_OUTPUT_COLLECTOR_PEER`, which points to the upper-level
+CDS (or a direct address).
+
+**Observability Forwarding Chain:**
+
+| Level | Collector Input Domain | Collector Output Domain | Forwards To | `OBSERVABILITY_OUTPUT_COLLECTOR_PEER` |
+|-------|----------------------|------------------------|-------------|--------------------------------------|
+| Room | Domain 19 | Domain 29 | Hospital Collector | `rtps@udpv4://<hospital>-cds:7400` |
+| Hospital | Domain 29 | Domain 39 | Cloud Collector (V3.0) | `rtps@udpv4://wan-cds:7400` |
+| Cloud (V3.0) | Domain 39 | — (terminal) | Prometheus / Loki / OTEL | — |
+
+This forwarding chain aligns perfectly with the decade-offset domain
+numbering: a room Collector forwards on Domain 29 (hospital observability),
+where the hospital Collector is already listening. The hospital Collector
+aggregates local hospital-level telemetry AND forwarded room telemetry on
+Domain 29, then forwards both upward on Domain 39.
+
+**Participant `<collector_initial_peers>` configuration:** All application
+participants within a deployment instance configure their Monitoring Library
+2.0 `<collector_initial_peers>` to point to the directly-reachable
+instance-local Collector Service. This is set via environment variable or
+QoS XML and ensures telemetry reaches the local Collector without requiring
+multicast or manual peer configuration.
+
+**Docker environment variable configuration:**
+
+```bash
+# Room-level Collector (receives from room participants, forwards to hospital)
+docker run --rm \
+  -e OBSERVABILITY_DOMAIN=19 \
+  -e OBSERVABILITY_OUTPUT_DOMAIN=29 \
+  -e OBSERVABILITY_OUTPUT_COLLECTOR_PEER="rtps@udpv4://hospital-a-cds:7400" \
+  -e CFG_NAME="NonSecureForwarderLANtoLAN" \
+  rticom/collector-service:latest
+
+# Hospital-level Collector (receives from rooms + local, forwards to cloud)
+docker run --rm \
+  -e OBSERVABILITY_DOMAIN=29 \
+  -e OBSERVABILITY_OUTPUT_DOMAIN=39 \
+  -e OBSERVABILITY_OUTPUT_COLLECTOR_PEER="rtps@udpv4://wan-cds:7400" \
+  -e CFG_NAME="NonSecureForwarderLANtoLAN" \
+  rticom/collector-service:latest
+
+# Cloud-level Collector (terminal — exports to Prometheus/Loki, no forwarding)
+docker run --rm \
+  -e OBSERVABILITY_DOMAIN=39 \
+  -e CFG_NAME="NonSecure" \
+  rticom/collector-service:latest
+```
+
+> **Note:** The upper-level CDS is used as the Collector forwarding initial
+> peer because the forwarding Collector uses standard DDS discovery to find
+> the upstream Collector. If the upper-level CDS is not yet available at
+> startup, `dns_tracker_polling_period` in the Collector's participant XML
+> handles late DNS resolution — same as for Routing Service upward peers.
 
 ### Procedure Domain
 
@@ -622,13 +756,27 @@ forwards metrics, logs, and security events to the local Collector
 Service via its dedicated participant on the Room Observability domain
 (Domain 19).
 
+The hospital-level Collector operates as a **forwarding Collector** per
+[Rule 3 — Collector Service Per Instance](#rule-3--collector-service-per-instance-with-forwarding-chain).
+It receives telemetry from two sources on Domain 29 (Hospital Observability):
+
+1. **Room-level Collectors** — each room's Collector forwards telemetry
+   from Domain 19 → Domain 29 via the Collector forwarding chain.
+2. **Hospital-level participants** — hospital-native applications
+   (dashboard, ClinicalAlerts engine) publish their Monitoring Library
+   telemetry directly to Domain 29.
+
+The hospital Collector then forwards the aggregated telemetry upward to
+Domain 39 (Cloud Observability) via `OBSERVABILITY_OUTPUT_DOMAIN=39`, using
+the WAN-level CDS as the forwarding initial peer (V3.0).
+
 The per-hospital Collector Service serves a **dual role**:
 
 1. **Telemetry pipeline** — aggregates Monitoring Library 2.0
-   telemetry from all local participants and forwards it to a central
-   Collector Service at the cloud level (V3.0). The central Collector
-   stores data in Prometheus (metrics) and Grafana Loki (logs) for
-   enterprise-wide dashboards and alerting.
+   telemetry from all local participants (room-forwarded + hospital-native)
+   and forwards it to a central Collector Service at the cloud level
+   (V3.0). The central Collector stores data in Prometheus (metrics) and
+   Grafana Loki (logs) for enterprise-wide dashboards and alerting.
 2. **Agent-observer data source** — serves as the runtime data
    backend for a specialized **Connext Runtime MCP Server** deployed
    at the cloud level (V3.0). The MCP server queries per-hospital
@@ -838,20 +986,47 @@ Shared memory (SHMEM) transport is appropriate and efficient for communication b
 - UDPv4 may still be enabled as a fallback for participants that cross host boundaries
 - Security policy implications for SHMEM-only paths are deferred to [vision/security.md](security.md)
 
+#### Hostname-Based Initial Peers and DNS Tracking
+
+Upward-facing participants (RS output, Collector forwarding) use **hostname-based
+initial peers** (e.g., `rtps@udpv4://hospital-a-cds:7400`) rather than hardcoded
+IP addresses. This decouples peer configuration from IP assignment and allows the
+same configuration to work across different Docker network setups.
+
+Connext 7.6.0 resolves hostnames at participant creation by default. In
+deployments where the target host may not be reachable at startup (e.g., the
+hospital CDS starts after the room RS), configure `dns_tracker_polling_period`
+to enable periodic DNS re-resolution:
+
+```xml
+<discovery_config>
+    <dns_tracker_polling_period>
+        <sec>5</sec>
+        <nanosec>0</nanosec>
+    </dns_tracker_polling_period>
+</discovery_config>
+```
+
+This setting is applied to upward-facing participant profiles in `Participants.xml`.
+Intra-level participants (those using only the local CDS) do not need DNS tracking
+because the local CDS is guaranteed to start before application participants via
+Docker Compose health check ordering.
+
 ### Cloud Discovery Service
 
 Hospital networks commonly restrict UDP multicast for security reasons, making standard DDS unicast/multicast discovery unreliable. RTI Cloud Discovery Service provides multicast-free participant discovery:
 
 - Participants configure Cloud Discovery Service as their initial peer instead of multicast addresses
 - Cloud Discovery Service acts as a rendezvous server, brokering discovery between participants without requiring multicast routing
-- Deployed on `hospital-net` (and optionally on `surgical-net` for consistency)
+- Each deployment instance deploys its own CDS (see [Rule 1 — CDS Per Instance](#rule-1--cloud-discovery-service-per-instance))
+- The upper-level CDS also serves as the initial peer for upward-facing RS and Collector participants from the level below
 - Primary + backup Cloud Discovery Service instances recommended for high availability
 
-**Design decision (resolved):** Cloud Discovery Service runs as a dedicated container
-(`rticom/cloud-discovery-service` from Docker Hub) attached to both `hospital-net` and
-`surgical-net`. This gives all participants on both networks a direct discovery path.
-Configuration and deployment details are in
-[Phase 1 Step 1.4](../implementation/phase-1-foundation.md).
+**Design decision (resolved):** At the hospital level, Cloud Discovery Service runs
+as a dedicated container (`rticom/cloud-discovery-service` from Docker Hub) attached
+to `hospital-net`, `surgical-net`, and `orchestration-net`. This gives all participants
+across all hospital networks a direct discovery path. Configuration and deployment
+details are in [Phase 1 Step 1.4](../implementation/phase-1-foundation.md).
 
 ### Routing Service Deployment (Per-Room MedtechBridge)
 

@@ -389,7 +389,15 @@ an "Open" action button should be rendered for that service instance.
 Dedicated room-level domain for **RTI Observability Framework** telemetry. Monitoring Library 2.0 creates a dedicated DomainParticipant on this domain in every process to publish metrics, logs, and security events. RTI Collector Service subscribes on this domain to aggregate telemetry and export it to Prometheus (metrics), Grafana Loki (logs), or an OpenTelemetry Collector.
 
 **Domain 19** is the room-level observability domain (decade 10, offset +9). A separate
-Hospital Observability domain (Domain 29) aggregates facility-level telemetry.
+Hospital Observability domain (Domain 29) aggregates facility-level telemetry, and
+Cloud Observability (Domain 39) aggregates enterprise-wide telemetry (V3.0).
+
+**Observability forwarding chain:** The offset +9 domains at each level form a Collector
+Service forwarding chain. Room Collectors receive on Domain 19 and forward to Domain 29.
+Hospital Collectors receive on Domain 29 (room-forwarded + hospital-native telemetry) and
+forward to Domain 39. Cloud Collectors receive on Domain 39 and export to
+Prometheus/Loki/OTEL. See [system-architecture.md — Rule 3](system-architecture.md) for
+the full forwarding configuration.
 
 **Why a separate domain:**
 
@@ -428,6 +436,19 @@ into the Hospital integration domain:
 
 WAN Routing Service bridges Domain 20 → Domain 30 across facility boundaries (V3.0).
 Only a configured subset of data crosses boundaries.
+
+### Observability Forwarding (Collector Service Chain)
+
+Collector Service forwarding bridges observability telemetry upward through the
+deployment levels using level-respective observability domains:
+
+- **Domain 19 → Domain 29:** Room Collector forwards room-level telemetry to the Hospital Collector
+- **Domain 29 → Domain 39:** Hospital Collector forwards aggregated telemetry to the Cloud Collector (V3.0)
+
+This is not Routing Service bridging — it uses the Connext 7.6.0 Collector Service
+built-in forwarding capability (`OBSERVABILITY_OUTPUT_DOMAIN` +
+`OBSERVABILITY_OUTPUT_COLLECTOR_PEER`). See
+[system-architecture.md — Rule 3](system-architecture.md) for configuration details.
 See [system-architecture.md](system-architecture.md) for topology.
 
 ---
