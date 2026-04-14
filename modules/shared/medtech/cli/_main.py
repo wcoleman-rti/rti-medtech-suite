@@ -45,13 +45,19 @@ def main() -> None:
 
 
 @main.command()
-def build() -> None:
-    """Build the project using CMake."""
+@click.option("--no-docker", is_flag=True, help="Skip Docker image build.")
+def build(no_docker: bool) -> None:
+    """Build the project (CMake + Docker images)."""
     import os
 
     if not os.path.isdir("build"):
         run_cmd(["cmake", "-B", "build", "-S", "."])
     run_cmd(["cmake", "--build", "build", "--target", "install"])
+    if not no_docker:
+        run_cmd(
+            ["docker", "compose", "--profile", "build", "build"],
+            check=False,
+        )
 
 
 @main.command()
@@ -69,13 +75,7 @@ def status(topology: bool) -> None:
             "docker",
             "ps",
             "--filter",
-            "name=medtech",
-            "--filter",
-            "name=cloud-discovery",
-            "--filter",
-            "name=routing-service",
-            "--filter",
-            "name=collector",
+            "label=medtech.dynamic=true",
             "--format",
             "json",
         ],
@@ -83,8 +83,7 @@ def status(topology: bool) -> None:
         text=True,
     )
     click.secho(
-        "  $ docker ps --filter name=medtech --filter name=cloud-discovery "
-        "--filter name=routing-service --filter name=collector --format json",
+        "  $ docker ps --filter label=medtech.dynamic=true --format json",
         fg="cyan",
     )
 
@@ -144,7 +143,7 @@ def status(topology: bool) -> None:
 @main.command()
 def stop() -> None:
     """Stop all medtech containers and remove Docker networks."""
-    # Find and stop containers
+    # Find and stop containers by label (all dynamic containers are labelled)
     result = subprocess.run(
         [
             "docker",
@@ -152,19 +151,7 @@ def stop() -> None:
             "-a",
             "-q",
             "--filter",
-            "name=medtech",
-            "--filter",
-            "name=cloud-discovery",
-            "--filter",
-            "name=routing-service",
-            "--filter",
-            "name=collector",
-            "--filter",
-            "name=hospital-",
-            "--filter",
-            "name=prometheus",
-            "--filter",
-            "name=grafana",
+            "label=medtech.dynamic=true",
         ],
         capture_output=True,
         text=True,
@@ -174,8 +161,8 @@ def stop() -> None:
     ]
 
     if container_ids:
+        # Containers are created with --rm, so stop auto-removes them.
         run_cmd(["docker", "stop"] + container_ids)
-        run_cmd(["docker", "rm", "-f"] + container_ids, check=False)
     else:
         click.echo("No medtech containers to stop.")
 
