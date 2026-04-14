@@ -347,7 +347,7 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ---
 
-## Step SIM.7 — Topology Visualization
+## Step SIM.7 — Topology Visualization ✅ `e36b2ff`
 
 ### Work
 
@@ -397,12 +397,12 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ### Test Gate
 
-- [ ] `medtech status --topology` renders a non-empty ASCII tree
-- [ ] Each network group lists its attached containers with IPs
-- [ ] Multi-hospital topology groups containers by hospital name
-- [ ] `wan-net` section shows NAT router containers from all hospitals
-- [ ] `medtech launch --dockgraph` starts DockGraph on port 7800
-- [ ] DockGraph container has `medtech.dynamic=true` label
-- [ ] `medtech stop` removes the DockGraph container
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] `medtech status --topology` renders a non-empty ASCII tree
+- [x] Each network group lists its attached containers with IPs
+- [x] Multi-hospital topology groups containers by hospital name
+- [x] `wan-net` section shows NAT router containers from all hospitals
+- [x] `medtech launch --dockgraph` starts DockGraph on port 7800
+- [x] DockGraph container has `medtech.dynamic=true` label
+- [x] `medtech stop` removes the DockGraph container
+- [x] All existing tests pass
+- [x] Lint passes
