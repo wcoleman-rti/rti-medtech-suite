@@ -408,6 +408,7 @@ def _start_service_container(
         "run",
         "--rm",
         "-d",
+        "--no-healthcheck",
         "--name",
         name,
         "--label",

@@ -113,7 +113,7 @@ def status(topology: bool) -> None:
     click.echo(f"{'NAME':<{name_w}}  {'STATUS':<20}  PORTS")
     click.echo(f"{'-' * name_w}  {'-' * 20}  {'-' * 30}")
 
-    gui_urls: list[str] = []
+    gui_urls: set[str] = set()
     for c in containers:
         name = c.get("Names", "")
         state = c.get("Status", "")
@@ -131,12 +131,12 @@ def status(topology: bool) -> None:
                         host_port = host_part.rsplit(":", 1)[-1]
                     else:
                         host_port = host_part
-                    gui_urls.append(f"http://localhost:{host_port}")
+                    gui_urls.add(f"http://localhost:{host_port}")
 
     if gui_urls:
         click.echo()
         click.secho("GUI URLs:", bold=True)
-        for url in gui_urls:
+        for url in sorted(gui_urls):
             click.secho(f"  {url}", fg="green")
 
 

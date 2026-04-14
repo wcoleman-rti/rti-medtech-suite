@@ -352,7 +352,7 @@ def main() -> None:
         r for r in app.routes if getattr(r, "path", None) not in _standalone_paths
     ]
 
-    app.add_static_files("/static", "resources/")
+    app.add_static_files("/static", str(_resource_dir()))
 
     favicon_path = _resource_dir() / "images" / "favicon.ico"
 
