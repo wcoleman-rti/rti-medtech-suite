@@ -291,7 +291,7 @@ must rediscover, so this should only be done when the operational context
 genuinely changes and the re-discovery overhead is acceptable.
 
 > **Orchestration domain exception:** DomainParticipant partitions on the
-> Orchestration domain (Domain 15) are **static** — they encode orchestration
+> Orchestration domain (Domain 11) are **static** — they encode orchestration
 > tier membership (`procedure`, `facility`, etc.) and must **never** be changed
 > at runtime. Tier membership is a deployment-time property; changing it on a
 > live participant would cause unnecessary re-discovery churn across all
@@ -717,7 +717,7 @@ consistent across C++ and Python and allows it to appear directly in DDS
 topic types (`ServiceStatus`), RPC interfaces (`ServiceHostControl`),
 and any future on-wire health or inter-service monitoring scenarios.
 
-See [data-model.md — Domain 15](data-model.md) for the authoritative
+See [data-model.md — Domain 11](data-model.md) for the authoritative
 enum values and the IDL module structure.
 
 Every service exposes a pollable `state` property that returns the
@@ -1574,7 +1574,7 @@ for the `<propagation_qos>` configuration.
 ### Health Monitoring
 
 - Enable `<administration>` and `<monitoring>` in the Routing Service XML.
-- Use the Observability domain (Domain 20) for monitoring traffic,
+- Use the Room Observability domain (Domain 19) for monitoring traffic,
   consistent with the application observability strategy.
 - Set practical publication periods (status: 5 s, statistics: 1 s).
 - Monitor at service/session/route granularity.

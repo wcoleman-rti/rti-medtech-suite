@@ -72,14 +72,14 @@ A Clinical Decision Support (ClinicalAlerts module) engine that subscribes to pa
 
 | Feature | Where Exercised |
 |---------|-----------------|
-| Multi-domain isolation | Procedure domain vs Hospital domain |
+| Multi-domain isolation | Procedure domain (Domain 10) vs Hospital integration domain (Domain 20) vs Orchestration domain (Domain 11) |
 | Domain tags (risk-class) | `control` vs `clinical` vs `operational` within Procedure domain |
 | Domain partitions | Room/procedure isolation across surgical instances; wildcard matching for aggregation |
 | Real-time deterministic streaming | Robot teleop, waveforms, camera frames |
 | QoS differentiation | Stream vs State vs Command patterns, topic-filter-bound profiles |
 | Content-filtered topics | Dashboard per-room views, ClinicalAlerts per-patient subscription |
 | Time-based filter | GUI readers downsampled to display refresh rate |
-| Routing Service (cross-domain bridge) | Procedure → Hospital, selective topic/data forwarding |
+| Routing Service (per-room MedtechBridge) | Domain 10+11 → Domain 20, selective topic/data forwarding |
 | TRANSIENT_LOCAL durability | Late-joining dashboards receive current state |
 | Exclusive ownership (failover) | Service gateway redundancy (simulated) |
 | XML-based QoS configuration | All QoS from shared profiles, zero programmatic QoS |
@@ -112,7 +112,7 @@ The full release version policy — including version increment rules, release c
 
 #### Procedure Controller
 - Surgeon-facing NiceGUI web application (`/controller`) for driving the procedure lifecycle: select patient, procedure type, equipment configuration, start procedure, monitor, stop
-- Subscribes to Hospital domain for scheduling context and patient information (read-only, via Routing Service bridge)
+- Room-level standalone application on Domain 11 (Orchestration, room-scoped)
 - Issues service lifecycle commands via DDS RPC (`ServiceHostControl` interface) to targeted Service Hosts on the Orchestration domain
 - Subscribes to `ServiceCatalog` and `ServiceStatus` topics on the Orchestration domain for real-time visibility of host availability and service state
 - Reconstructs full orchestration state on restart via TRANSIENT_LOCAL status topics

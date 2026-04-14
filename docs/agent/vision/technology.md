@@ -692,7 +692,7 @@ All Dockerfiles use pinned Ubuntu 24.04 LTS as the base (`FROM ubuntu:24.04`). N
 
 All modules use a consistent, structured logging approach built on the **RTI Connext Logging API** (`rti::config::Logger` in Modern C++, `rti.connextdds.Logger` in Python). Application log messages are written using the logger's **USER** category methods (e.g., `logger.warning(...)`, `logger.notice(...)`). These messages are captured locally and — when Monitoring Library 2.0 is enabled — automatically forwarded through the RTI Observability Framework pipeline to RTI Collector Service, which exports them to Grafana Loki (or an OpenTelemetry Collector) for centralized search and dashboarding.
 
-The native Connext logging API emits user-category messages that Monitoring Library 2.0 collects and forwards to Collector Service alongside middleware telemetry. Application code does not create a participant or topic for logging — Monitoring Library 2.0’s dedicated participant on the Observability domain (Domain 20) handles all telemetry transport.
+The native Connext logging API emits user-category messages that Monitoring Library 2.0 collects and forwards to Collector Service alongside middleware telemetry. Application code does not create a participant or topic for logging — Monitoring Library 2.0's dedicated participant on the Room Observability domain (Domain 19) handles all telemetry transport.
 
 ### Log Levels
 
@@ -827,7 +827,7 @@ All Connext applications are instrumented with the **RTI Observability Framework
 
 Every DomainParticipant is instrumented with Monitoring Library 2.0 via QoS XML configuration. The library collects middleware telemetry — metrics (throughput, latency, matched endpoints), logs, entity status changes (liveliness, dropped samples), discovery events, and security events — and forwards it to Collector Service. No application code changes are required; instrumentation is enabled entirely through XML properties.
 
-Monitoring Library 2.0 creates a **dedicated DomainParticipant** on the Observability domain (Domain 20) to distribute telemetry. This keeps observability traffic isolated from application data on the Procedure and Hospital domains. The domain ID and optional participant QoS profile are configured in the MONITORING QoS policy:
+Monitoring Library 2.0 creates a **dedicated DomainParticipant** on the Room Observability domain (Domain 19) to distribute telemetry. This keeps observability traffic isolated from application data on the Procedure and Hospital domains. The domain ID and optional participant QoS profile are configured in the MONITORING QoS policy:
 
 ```xml
 <participant_factory_qos>
@@ -835,7 +835,7 @@ Monitoring Library 2.0 creates a **dedicated DomainParticipant** on the Observab
         <enable>true</enable>
         <distribution_settings>
             <dedicated_participant>
-                <domain_id>20</domain_id>
+                <domain_id>19</domain_id>
             </dedicated_participant>
         </distribution_settings>
         <telemetry_data>
@@ -848,7 +848,7 @@ Monitoring Library 2.0 creates a **dedicated DomainParticipant** on the Observab
 </participant_factory_qos>
 ```
 
-This configuration is defined once in the shared participant factory QoS profile (via `BuiltinQosSnippetLib::Feature.Monitoring2.Enable` as a base) and applies to all applications. The default Monitoring Library 2.0 domain ID is 2; the medtech suite overrides it to 20 to align with the project’s domain numbering scheme (see [data-model.md — Domain 20](data-model.md)).
+This configuration is defined once in the shared participant factory QoS profile (via `BuiltinQosSnippetLib::Feature.Monitoring2.Enable` as a base) and applies to all applications. The default Monitoring Library 2.0 domain ID is 2; the medtech suite overrides it to 19 to align with the project's decade-offset domain numbering scheme (see [data-model.md — Domain 19](data-model.md)).
 
 ### Collector Service
 

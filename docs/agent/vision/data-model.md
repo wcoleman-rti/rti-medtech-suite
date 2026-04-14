@@ -204,13 +204,16 @@ interval. This is an optional diagnostic aid, not a functional requirement:
 
 ## Domain Definitions
 
-Domain IDs start at 10 (domain 0 is reserved for prototyping/testing).
+Domain IDs follow the **decade-offset** scheme defined in
+[system-architecture.md — Domain Numbering Guide](system-architecture.md):
+tens digit = deployment level, units digit = function class.
+Domain 0 is reserved for prototyping/testing.
 
 **Domain Naming Rule:** Numeric domain IDs are defined **exactly once** — in the
 headings below (e.g., "Domain 10 — Procedure") and in the corresponding
 `<domain>` element in `Domains.xml`. Every other document, code comment,
 spec scenario, implementation step, and log message must reference a domain
-by **name only** (e.g., "Procedure domain", "Hospital domain", "Observability domain").
+by **name only** (e.g., "Procedure domain", "Hospital domain", "Room Observability domain").
 If a domain ID changes, only this section and `Domains.xml` require an update.
 
 ### Domain 10 — Procedure
@@ -246,20 +249,23 @@ Data streams that cross a risk class boundary must not operate within the same d
 | `ProcedureStatus` | `Surgery::ProcedureStatus` | `operational` | `procedure_id` | Running status (in-progress, completing, alert). Published by each instance. TRANSIENT_LOCAL. Bridged to Hospital domain. |
 | `RobotArmAssignment` | `Surgery::RobotArmAssignment` | `control` | `robot_id` | *(V1.2)* Arm-to-table spatial assignment and positioning lifecycle. Write-on-change, TRANSIENT_LOCAL. `dispose()` on arm removal. |
 
-### Domain 11 — Hospital
+### Domain 20 — Hospital Integration
 
-The facility-wide layer. Aggregated data for dashboards, clinical decision support, and resource coordination.
+The facility-wide integration layer. Domain 20 receives extracted data from room-level
+domains (Domain 10 and Domain 11) via per-room Routing Service (MedtechBridge), and hosts
+hospital-native topics published by hospital-level applications.
 
 The Hospital domain has **no domain tags**. All participants on the Hospital domain discover
-each other directly — there is no tag-based discovery scoping. All bridged data from the Procedure domain's three
-risk-class tags lands in a single flat domain. This is intentional: Hospital-domain
+each other directly — there is no tag-based discovery scoping. Bridged data from the
+Procedure domain's three risk-class tags and extracted orchestration data (ServiceCatalog)
+land in a single flat integration domain. This is intentional: Hospital-domain
 participants are read-only observers — they do not publish commands or interlocks
 back into the Procedure domain. Domain-tag isolation protects the surgical process
 from cross-class interference between actors; since there are no actors on the Hospital
 domain, tags would add participant complexity with no safety benefit. The trust boundary
 is Routing Service (one-way, selective bridge). See
-[system-architecture.md — Hospital Domain](system-architecture.md) for the full
-rationale and escalation trigger.
+[system-architecture.md — Hospital Integration Domain](system-architecture.md) for the
+full rationale and escalation trigger.
 
 #### Topics
 
@@ -274,10 +280,11 @@ rationale and escalation trigger.
 | `ClinicalAlert` | `ClinicalAlerts::ClinicalAlert` | `alert_id` | Risk-based alerts from ClinicalAlerts engine. |
 | `RiskScore` | `ClinicalAlerts::RiskScore` | `patient.id`, `score_kind` | Computed risk scores (sepsis, hemorrhage, etc.). |
 | `ResourceAvailability` | `Hospital::ResourceAvailability` | `resource_id` | *(V1.1)* OR, bed, equipment, and staff availability. Deferred to V1.1 — no simulator or dashboard panel in V1.0. |
+| `ServiceCatalog` | `Orchestration::ServiceCatalog` | `host_id`, `service_id` | Bridged from Domain 11 (Orchestration) via per-room RS. Enables dashboard room/GUI discovery without joining Domain 11. |
 
-### Domain 12 — Cloud / Enterprise (V3.0)
+### Domain 30 — Cloud / Enterprise (V3.0)
 
-The multi-facility command center layer. Aggregated operational data bridged from individual hospital sites via WAN Routing Service (Real-Time WAN Transport — `UDPv4_WAN`). See [system-architecture.md](system-architecture.md) for WAN topology and transport configuration.
+The multi-facility command center layer (Domain 30). Aggregated operational data bridged from individual hospital sites (Domain 20) via WAN Routing Service (Real-Time WAN Transport — `UDPv4_WAN`). See [system-architecture.md](system-architecture.md) for WAN topology and transport configuration.
 
 #### Topics
 
@@ -290,11 +297,12 @@ The multi-facility command center layer. Aggregated operational data bridged fro
 
 DomainParticipant partition format: `facility/<hospital_id>` (e.g., `facility/HOSP-NYC-01`).
 
-### Domain 15 — Orchestration
+### Domain 11 — Orchestration (Room-Scoped)
 
 Infrastructure lifecycle management layer for procedure service orchestration. The Procedure Controller and Service Hosts communicate on this domain using a hybrid of DDS RPC (directed commands) and pub/sub (asynchronous state distribution).
 
-**Why domain 15:** Positioned between the application domains (10–12) and the infrastructure domain (20) in the ID numbering scheme. Like the Observability domain, the Orchestration domain is infrastructure — not clinical data.
+**Domain 11** is the room-level orchestration domain (decade 10, offset +1). The Procedure
+Controller runs as a room-level application, joining only this domain.
 
 **No domain tags.** All participants discover each other directly. See [system-architecture.md — Orchestration Domain](system-architecture.md) for the full rationale.
 
@@ -346,7 +354,7 @@ Types defined in `module Orchestration`:
 > monitoring, inter-service status queries, and future health-check RPC
 > extensions.
 
-**DomainParticipant partition scheme (Domain 15 only):** The Orchestration domain uses
+**DomainParticipant partition scheme (Domain 11 only):** The Orchestration domain uses
 no Publisher/Subscriber partition QoS. Tier-level visibility isolation is achieved
 via **DomainParticipant-level partitions**, set once at startup and never changed
 during a participant's lifetime:
@@ -354,7 +362,7 @@ during a participant's lifetime:
 | Role | DomainParticipant partition |
 |------|------------------------------|
 | Procedure-tier Service Host (manages Domain 10 services) | `procedure` |
-| Facility-tier Service Host (manages Domain 11 services) — future | `facility` |
+| Facility-tier Service Host (manages Domain 20 services) — future | `facility` |
 | Procedure Controller GUI | `procedure` |
 | Hospital Admin / cross-tier observer | `*` (wildcard) |
 | Unconfigured / untiered host | `unassigned` |
@@ -376,9 +384,12 @@ The Procedure Controller filters hosts and services by `room_id` and `procedure_
 in the application layer. The presence of a non-empty `gui_url` property signals that
 an "Open" action button should be rendered for that service instance.
 
-### Domain 20 — Observability
+### Domain 19 — Room Observability
 
-Dedicated domain for **RTI Observability Framework** telemetry. Monitoring Library 2.0 creates a dedicated DomainParticipant on this domain in every process to publish metrics, logs, and security events. RTI Collector Service subscribes on this domain to aggregate telemetry and export it to Prometheus (metrics), Grafana Loki (logs), or an OpenTelemetry Collector.
+Dedicated room-level domain for **RTI Observability Framework** telemetry. Monitoring Library 2.0 creates a dedicated DomainParticipant on this domain in every process to publish metrics, logs, and security events. RTI Collector Service subscribes on this domain to aggregate telemetry and export it to Prometheus (metrics), Grafana Loki (logs), or an OpenTelemetry Collector.
+
+**Domain 19** is the room-level observability domain (decade 10, offset +9). A separate
+Hospital Observability domain (Domain 29) aggregates facility-level telemetry.
 
 **Why a separate domain:**
 
@@ -386,7 +397,7 @@ Dedicated domain for **RTI Observability Framework** telemetry. Monitoring Libra
 - **Safety** — temporarily increasing telemetry verbosity for debugging must not affect discovery, deadline enforcement, or sample delivery on Domains 10 or 11.
 - **Isolation** — Collector Service only needs to join the Observability domain. It does not participate in application domains, reducing its attack surface and resource footprint.
 
-The Observability domain has **no domain tags** and **no application-defined topics**. Monitoring Library 2.0 creates its internal telemetry topics, publishers, and subscribers automatically — no XML topic or endpoint definitions are needed in `Domains.xml`.
+The Room Observability domain has **no domain tags** and **no application-defined topics**. Monitoring Library 2.0 creates its internal telemetry topics, publishers, and subscribers automatically — no XML topic or endpoint definitions are needed in `Domains.xml`.
 
 #### Configuration
 
@@ -398,18 +409,26 @@ The domain ID is set in the MONITORING QoS policy on the `DomainParticipantFacto
         <enable>true</enable>
         <distribution_settings>
             <dedicated_participant>
-                <domain_id>20</domain_id>
+                <domain_id>19</domain_id>
             </dedicated_participant>
         </distribution_settings>
     </monitoring>
 </participant_factory_qos>
 ```
 
-This overrides the Monitoring Library 2.0 default (domain 2) to place observability traffic on the project’s designated Observability domain. The configuration is defined once in the shared QoS profile and applies to all applications. See [technology.md — Observability Standard](technology.md) for the full QoS configuration.
+This overrides the Monitoring Library 2.0 default (domain 2) to place observability traffic on the project’s designated Room Observability domain (Domain 19). The configuration is defined once in the shared QoS profile and applies to all applications. See [technology.md — Observability Standard](technology.md) for the full QoS configuration.
 
-### Cross-Domain Bridging (Routing Service)
+### Cross-Domain Bridging (Per-Room Routing Service)
 
-Routing Service bridges selected topics from the Procedure domain to the Hospital domain (and within the Procedure domain across domain tags where explicitly needed). WAN Routing Service bridges the Hospital domain to the Cloud domain across facility boundaries. Only a configured subset of data crosses boundaries. Topics bridged Procedure → Hospital: `ProcedureStatus`, `ProcedureContext`, `PatientVitals`, `AlarmMessages`, `DeviceTelemetry`, `RobotState`. See [system-architecture.md](system-architecture.md) for topology.
+Per-room Routing Service (MedtechBridge) bridges selected topics from room-level domains
+into the Hospital integration domain:
+
+- **Domain 10 → Domain 20:** `ProcedureStatus`, `ProcedureContext`, `PatientVitals`, `AlarmMessages`, `DeviceTelemetry`, `RobotState`
+- **Domain 11 → Domain 20:** `ServiceCatalog` (room/GUI discovery)
+
+WAN Routing Service bridges Domain 20 → Domain 30 across facility boundaries (V3.0).
+Only a configured subset of data crosses boundaries.
+See [system-architecture.md](system-architecture.md) for topology.
 
 ---
 

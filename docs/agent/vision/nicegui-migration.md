@@ -141,7 +141,7 @@ consistency that `Service` provides for orchestrated services. Without a
 shared interface, each of the three GUI modules could diverge in lifecycle
 method naming, shutdown cleanup, and logging conventions. A `GuiBackend`
 ABC enforces a consistent contract — just as `Service` does — so the
-unified app (Step N.6) can manage all backends uniformly.
+unified app and standalone apps can manage all backends uniformly.
 
 Like `Service`, `GuiBackend` is a **pure skeleton** — all abstract, no
 domain logic. It does not own a participant, create DDS resources, or
@@ -163,6 +163,21 @@ earlier startup hook). DDS initialization (`initialize_connext()`,
 construction. The `start()` method — which launches `background_tasks` —
 runs later when the event loop is active, triggered by NiceGUI's startup
 hook automatically.
+
+> **Deployment-level participant model:** Under the A2 hybrid architecture,
+> GUI backends join only the domain(s) at their deployment level:
+>
+> - **Hospital Dashboard** (`medtech-gui` on `hospital-net`) — one participant
+>   on Domain 20 (Hospital integration). Receives all data via per-room RS bridge.
+> - **Procedure Controller** (`medtech-controller` on `orchestration-net`) — one
+>   participant on Domain 11 (Orchestration, room-scoped). Room-level deployment.
+> - **Digital Twin** (`medtech-twin` on `surgical-net`) — one participant on
+>   Domain 10 (`control` tag). Room-level deployment.
+>
+> No GUI backend spans deployment levels. The dashboard does NOT join
+> orchestration or procedure domains — it discovers rooms and services via
+> `ServiceCatalog` data bridged from Domain 11 → Domain 20 by the per-room
+> Routing Service.
 
 | Aspect | `Service` (orchestration) | `GuiBackend` (NiceGUI) |
 |--------|---------------------------|------------------------|
@@ -421,23 +436,41 @@ I/O integration:
 
 ### Multi-Page Architecture
 
-NiceGUI's page routing enables a unified application serving all GUI modules:
+NiceGUI's page routing enables structured navigation within each deployment-level
+application. Under the A2 hybrid architecture, the hospital-level and room-level
+GUIs are **separate NiceGUI instances** running on different Docker networks —
+they are not merged into a single SPA.
 
-| Route | Module | Current Standalone App |
-|-------|--------|----------------------|
-| `/` | Landing / navigation | (new) |
-| `/dashboard` | Hospital Dashboard | `modules/hospital-dashboard/dashboard/` |
-| `/controller` | Procedure Controller | `modules/hospital-dashboard/procedure_controller/` |
-| `/twin/{room_id}` | Digital Twin Display | `modules/surgical-procedure/digital_twin/` |
+#### Hospital Dashboard App (`medtech-gui` on `hospital-net`)
+
+| Route | Module | Notes |
+|-------|--------|-------|
+| `/` | Landing / redirect to dashboard | |
+| `/dashboard` | Hospital Dashboard | Domain 20 — procedure overview, vitals, alerts |
 | `/alerts` | Clinical Alerts Dashboard | (new — visual frontend for alerts engine) |
 
-This replaces three separate `QApplication` processes with a single web app.
-The navigation model uses **`ui.sub_pages()`** for SPA-style client-side
-routing — the application shell (header, navigation drawer, connection
-status, DDS backends) persists across page transitions without full page
-reloads or WebSocket reconnections.
+The dashboard app uses `ui.sub_pages()` for SPA-style client-side routing between
+its own pages. Room-level GUIs (controller, twin) are discovered via
+`ServiceCatalog` data bridged from Domain 11 → Domain 20 by the per-room Routing
+Service. They are always opened in **new browser tabs** (cross-origin navigation)
+because they run on different hosts/networks.
 
-#### Critical: Shell-First Routing
+#### Room-Level Standalone Apps
+
+| App | Container | Network | Route | Domain |
+|-----|-----------|---------|-------|--------|
+| Procedure Controller | `medtech-controller-<room>` | `orchestration-net` | `/controller` | Domain 11 |
+| Digital Twin | `medtech-twin-<room>` | `surgical-net` | `/twin` | Domain 10 (`control` tag) |
+
+Each room-level app is a self-contained NiceGUI instance with its own header
+bar, theme, and static assets. The controller and twin run as `@ui.page()`
+entry points (not sub-pages of a shell) because they are standalone processes.
+
+This replaces the earlier design where a single unified SPA served all three
+GUI modules. The split aligns with the A2 hybrid architecture constraint that
+no application spans deployment levels.
+
+#### Critical: Shell-First Routing (Hospital Dashboard App)
 
 The root shell function must be passed **directly to `ui.run()`** — not
 registered via `@ui.page("/")`. This ensures the shell handles **all** URL
@@ -445,26 +478,23 @@ paths, including sub-page paths on browser refresh or direct link entry:
 
 ```python
 def shell_page() -> None:
-    init_theme(title="Medtech Suite")
+    init_theme(title="Hospital Dashboard")
     with ui.left_drawer(fixed=True):
-        # Navigation items
+        # Dashboard navigation + discovered room GUIs
         ...
     ui.sub_pages({
         "/dashboard": dashboard_content,
-        "/controller": controller_content,
-        "/twin/{room_id}": twin_content,
+        "/alerts": alerts_content,
         "/": lambda: ui.navigate.to("/dashboard"),
     })
 
 ui.run(shell_page, storage_secret=..., reload=False)
 ```
 
-**Each GUI module must NOT register a standalone `@ui.page()` at its
-sub-page route** when running in unified mode. Standalone `@ui.page()`
-handlers conflict with `ui.sub_pages()` routing — on browser refresh,
-the standalone handler wins and renders the page without the shell. Module
-`*_content()` functions are the entry points for `ui.sub_pages()`;
-standalone `*_page()` functions are only for `__main__` standalone mode.
+**Dashboard sub-pages must NOT register standalone `@ui.page()` at their
+sub-page routes** when running in the hospital app. Standalone `@ui.page()`
+handlers conflict with `ui.sub_pages()` routing. Module `*_content()`
+functions are the entry points for `ui.sub_pages()`.
 
 #### Distributed Deployment: Origin-Aware Hybrid Navigation
 
@@ -516,47 +546,46 @@ The `*_page()` function is registered via `@ui.page()` **only when the
 module runs as its own entry point** (`__main__`), never when imported
 by the unified app.
 
-#### Dynamic Sidebar Navigation
+#### Dynamic Sidebar Navigation (Hospital Dashboard)
 
-The sidebar navigation in the unified app shell must NOT be a hardcoded
-list. Instead, it is built from two sources:
+The sidebar navigation in the hospital dashboard app is built from two sources:
 
 1. **Static local pages** — pages whose content functions are compiled
-   into this process (e.g., Dashboard, Controller). These are always
-   present.
+   into the hospital dashboard process (e.g., Dashboard, Alerts). These
+   are always present.
 
-2. **Discovered GUI services** — services with a non-empty `gui_url`
-   in their `ServiceCatalog`. These appear dynamically as services
-   start and disappear when services stop.
+2. **Discovered room GUI services** — services with a non-empty `gui_url`
+   in their `ServiceCatalog` data (bridged from Domain 11 → Domain 20 by
+   per-room RS). These appear dynamically as rooms start and disappear
+   when rooms are torn down.
 
-The sidebar renders discovered GUI services in a separate "Services"
-section below the static navigation. Each entry shows:
+Because all discovered room GUIs run on different origins (room-level
+containers on `surgical-net` or `orchestration-net`), they are **always**
+opened in new browser tabs. There is no same-origin in-app navigation to
+room GUIs from the hospital dashboard.
+
+The sidebar renders discovered GUI services in a "Rooms" dropdown section.
+Each entry shows:
 - The service's `display_name` (from `ServiceCatalog`)
 - The host's `room_id` (from the `room_id` property)
-- An icon indicating whether it is local (in-app navigation) or
-  remote (opens new tab), derived from the origin check above
-
-When a local GUI service is discovered (same origin), the shell can
-register its content function dynamically via `ui.sub_pages().add()`.
-When a remote GUI service is discovered, the sidebar entry opens a new
-tab.
+- An "open in new tab" icon indicating cross-origin navigation
 
 ```python
 # Conceptual dynamic sidebar (simplified)
 _STATIC_NAV = [
     ("/dashboard", ICONS["dashboard"], "Dashboard"),
-    ("/controller", ICONS["service"], "Controller"),
+    ("/alerts", ICONS["alert"], "Alerts"),
 ]
 
-def _build_sidebar(drawer, controller_backend):
+def _build_sidebar(drawer, dashboard_backend):
     # Static entries (always present)
     for path, icon, label in _STATIC_NAV:
         _render_nav_button(drawer, path, icon, label)
 
-    # Dynamic entries from ServiceCatalog gui_url
+    # Dynamic entries from ServiceCatalog gui_url (bridged from Domain 11)
     ui.separator()
-    ui.label("Services").classes(...)
-    for (host_id, svc_id), catalog in controller_backend.catalogs.items():
+    ui.label("Rooms").classes(...)
+    for (host_id, svc_id), catalog in dashboard_backend.catalogs.items():
         gui_url = _catalog_property(catalog, "gui_url")
         if not gui_url:
             continue
@@ -564,16 +593,14 @@ def _build_sidebar(drawer, controller_backend):
         label = f"{catalog.display_name}"
         if room_id:
             label += f" ({room_id})"
-        if _is_same_origin(gui_url):
-            _render_nav_button(drawer, urlparse(gui_url).path, ICONS["robot"], label)
-        else:
-            _render_nav_button(drawer, gui_url, ICONS["open_in_new"], label, new_tab=True)
+        # Always new tab — room GUIs are cross-origin
+        _render_nav_button(drawer, gui_url, ICONS["open_in_new"], label, new_tab=True)
 ```
 
-This pattern generalizes naturally: any future GUI service (Clinical
-Alerts Dashboard, Foxglove Viewer, etc.) automatically appears in the
-sidebar of any machine that runs the unified app — with zero
-configuration changes.
+This pattern generalizes naturally: any future room-level GUI service
+(Foxglove Viewer, camera feed, etc.) automatically appears in the
+dashboard sidebar when its Service Host advertises a `gui_url` — with
+zero configuration changes.
 
 ---
 

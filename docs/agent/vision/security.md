@@ -107,7 +107,7 @@ CN=<role>/<instance>, O=MedtechSuite, OU=<module>
 | `hospital-dashboard` | hospital-dashboard | `CN=hospital-dashboard/dash-1, O=MedtechSuite, OU=hospital-dashboard` | Hospital |
 | `clinical-alerts-engine` | clinical-alerts | `CN=clinical-alerts-engine/cds-1, O=MedtechSuite, OU=clinical-alerts` | Hospital |
 | `resource-sim` | hospital-dashboard | `CN=resource-sim/sim-1, O=MedtechSuite, OU=hospital-dashboard` | Hospital |
-| `routing-service` | services/routing | `CN=routing-service/rs-1, O=MedtechSuite, OU=routing` | Procedure (all 3 tags) + Hospital |
+| `routing-service` | services/routing | `CN=routing-service/rs-1, O=MedtechSuite, OU=routing` | Procedure (all 3 tags) + Orchestration + Hospital |
 | `cloud-discovery-service` | services | `CN=cloud-discovery-service/cds-infra-1, O=MedtechSuite, OU=infrastructure` | Infrastructure (discovery only) |
 
 The `/<instance>` suffix (e.g., `/OR-1`, `/dash-1`) distinguishes multiple deployments of the same role. Permissions are granted using `<subject_name_expression>` with POSIX `fnmatch()` wildcard matching on `CN=<role>/*, O=MedtechSuite, OU=<module>`, so adding a new OR or dashboard instance requires only a new leaf cert — no permissions changes.

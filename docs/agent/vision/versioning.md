@@ -48,9 +48,9 @@ A version may only be cut when **all** of the following are true:
 |---------------------|-------------------------------|
 | Surgical Procedure (multi-instance) | Domain tags, domain partitions, `control`/`clinical`/`operational` QoS patterns, exclusive ownership failover |
 | Procedure Orchestration | DDS RPC, Orchestration domain, `medtech::Service` interface, dual-mode services, Service Host framework |
-| Hospital Dashboard (NiceGUI) | Hospital domain subscription, TRANSIENT_LOCAL late-join, content-filtered topics, asyncio DDS integration |
+| Hospital Dashboard (NiceGUI) | Hospital integration domain (Domain 20) subscription, TRANSIENT_LOCAL late-join, content-filtered topics, asyncio DDS integration |
 | Clinical Alerts & Decision Support | Risk scoring, alert generation, cross-domain subscription via Routing Service |
-| Routing Service | Selective Procedure → Hospital topic bridging, multiple sessions by traffic class |
+| Routing Service | Per-room MedtechBridge: Domain 10+11 → Domain 20, selective topic bridging, multiple sessions by traffic class |
 | Cloud Discovery Service | Multicast-free discovery on `hospital-net` and `orchestration-net` |
 | CMake unified build | C++17, Python, rtiddsgen C++11/Python, `RTIConnextDDS::cpp2_api`, build-dir generated code |
 
@@ -77,7 +77,7 @@ A version may only be cut when **all** of the following are true:
 | `RobotArmAssignment` topic | Write-on-change state with `dispose()` for instance removal, TRANSIENT_LOCAL for late-joining controllers |
 | Multi-arm lifecycle | Keyed instances per `robot_id`, liveliness-based arm health detection |
 | Table position assignment | Spatial assignment as DDS state data, correlated with `RobotState` via shared `robot_id` key |
-| Procedure Controller expansion | Multi-domain participant model: Orchestration + Procedure `control` + Hospital |
+| Procedure Controller expansion | Room-level Orchestration-only participant (Domain 11) |
 | Digital twin enhancement | Table layout visualization with per-arm status indicators |
 
 ---

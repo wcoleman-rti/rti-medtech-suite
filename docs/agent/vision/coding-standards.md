@@ -774,7 +774,7 @@ assert len(isolated_reader.take()) == 0, "Data leaked across domains"
 #### Parallel Execution (pytest-xdist)
 
 The test suite runs in parallel via `pytest-xdist` with
-`--dist loadgroup`. Tests that share DDS domain 15 (orchestration)
+`--dist loadgroup`. Tests that share DDS domain 11 (orchestration)
 must be grouped:
 
 ```python
