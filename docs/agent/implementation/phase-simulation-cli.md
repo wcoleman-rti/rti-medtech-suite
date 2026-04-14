@@ -76,13 +76,19 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
   - Create flat Docker networks (`medtech_surgical-net`,
     `medtech_hospital-net`, `medtech_orchestration-net`) if they
     do not exist
-  - Run sequential `docker run --rm -d` commands:
-    1. Cloud Discovery Service (`cloud-discovery-service` image,
-       attached to `surgical-net`, `hospital-net`, `orchestration-net`)
-    2. Routing Service (`routing-service` image, attached to
-       `surgical-net`, `hospital-net`)
-    3. Collector Service (`rticom/collector-service` image, attached
-       to `hospital-net`) — always launched as base infrastructure
+  - Run sequential `docker run --rm -d` commands using the gateway
+    shared-namespace pattern:
+    1. Hospital-gateway base container (`cloud-discovery-service`
+       image, attached to `surgical-net`, `hospital-net`,
+       `orchestration-net`) — provides CDS for hospital-level
+       participant discovery
+    2. Routing Service (`routing-service` image,
+       `--network container:hospital-gateway`) — shares the
+       gateway's network namespace; bridges room domains (10s)
+       into hospital domains (20s)
+    3. Collector Service (`rticom/collector-service` image,
+       `--network container:hospital-gateway`) — shares the
+       gateway's network namespace; forwards Dom 19 → 29
     4. Central GUI (`medtech-gui` image, attached to `hospital-net`,
        `orchestration-net`, port 8080)
   - No NAT router is created
@@ -108,8 +114,9 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
     - The entrypoint enables IP forwarding and applies
       `iptables -t nat -A POSTROUTING -o $NAT_WAN_IFACE -j MASQUERADE`
       for each private subnet
-  - Run CDS, Routing Service, Collector Service, and GUI on the
-    private networks
+  - Run a per-hospital gateway (CDS base with co-located RS and
+    Collector via `--network container:<name>-gateway`) and GUI
+    on the private networks
   - GUI host port allocated by hospital ordinal:
     1st hospital = 8080, 2nd = 9080, 3rd = 10080, etc.
 
@@ -125,7 +132,7 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ### Test Gate
 
-- [ ] `medtech run hospital` starts CDS, Routing Service, Collector Service, and GUI containers (flat networks)
+- [ ] `medtech run hospital` starts hospital-gateway (CDS + RS + Collector in shared namespace) and GUI containers (flat networks)
 - [ ] `medtech run hospital --name hospital-a` creates per-hospital networks with explicit subnets
 - [ ] NAT router container is created for named hospitals with `--privileged` and IP forwarding
 - [ ] `medtech_wan-net` is created exactly once across multiple named hospitals
@@ -150,6 +157,18 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
     - If multiple hospitals are running, error:
       "Multiple hospitals running. Specify --hospital NAME."
     - If no hospital is running, error
+  - **Room-gateway launch** — before starting application containers,
+    launch a room-level gateway using the shared-namespace pattern:
+    1. Room-gateway base container (`cloud-discovery-service` image,
+       `--name <or-name>-gateway`, attached to the hospital's
+       Docker networks) — provides CDS for OR-LAN participant
+       discovery (required for multicast-free environments)
+    2. Routing Service (`routing-service` image,
+       `--network container:<or-name>-gateway`) — bridges room
+       domains (10/11/19) into hospital domains (20s)
+    3. Collector Service (`rticom/collector-service` image,
+       `--network container:<or-name>-gateway`) — forwards
+       Dom 19 → hospital Collector on Dom 29
   - Derive container names from OR name (lowercase, hyphenated):
     e.g., `OR-5` → `clinical-service-host-or5`,
     `robot-service-host-or5`, `operational-service-host-or5`,
@@ -179,7 +198,8 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ### Test Gate
 
-- [ ] `medtech run or --name OR-5` starts 5 containers
+- [ ] `medtech run or --name OR-5` starts room-gateway (CDS + RS +
+      Collector in shared namespace) plus 5 application containers
       (4 service hosts + 1 twin)
 - [ ] `medtech run or` (no `--name`) auto-generates `OR-1`
 - [ ] `medtech run or --hospital hospital-a` targets named hospital networks

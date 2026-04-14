@@ -3,7 +3,7 @@
 **Goal:** Introduce the service-oriented orchestration layer: the
 `medtech::Service` interface, dual-mode participant pattern, Service Host
 framework, Procedure Controller GUI, and the Orchestration domain
-(Domain 15) with DDS RPC and pub/sub state distribution.
+(Domain 11) with DDS RPC and pub/sub state distribution.
 
 **Depends on:** Phases 1–2 (Foundation + Surgical Procedure complete)
 **Blocks:** Phase 3 (Hospital Dashboard), Phase 4 (Clinical Alerts)
@@ -12,7 +12,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 **Vision references:**
 - [vision/capabilities.md — V1.0.0](../vision/capabilities.md)
 - [vision/system-architecture.md — Orchestration Domain](../vision/system-architecture.md)
-- [vision/data-model.md — Domain 15](../vision/data-model.md)
+- [vision/data-model.md — Domain 11](../vision/data-model.md)
 - [vision/dds-consistency.md — §3 Service Interface, Dual-Mode Participant](../vision/dds-consistency.md)
 - [vision/coding-standards.md](../vision/coding-standards.md)
 
@@ -36,12 +36,12 @@ framework, Procedure Controller GUI, and the Orchestration domain
   - `HealthReport` struct: alive flag, summary, diagnostics
   - `@service("DDS") interface ServiceHostControl`: `start_service`, `stop_service`, `update_service`, `get_capabilities`, `get_health`
 - Add `connextdds_rtiddsgen_run()` calls for C++11 and Python code generation of the orchestration IDL
-- Add Domain 15 definition to `interfaces/domains/Domains.xml` with no domain tag
+- Add Domain 11 definition to `interfaces/domains/Domains.xml` with no domain tag
 - Author `Pattern.RPC` QoS profile in `interfaces/qos/Patterns.xml`: RELIABLE, KEEP_ALL, appropriate history depth
 - Author `Pattern.Status` QoS profile (if not already covered by existing `Patterns::State`): TRANSIENT_LOCAL, RELIABLE, KEEP_LAST 1, liveliness 2 s
 - Author topic-specific profiles for `ServiceCatalog` and `ServiceStatus` in `interfaces/qos/TopicProfiles.xml` inheriting from the appropriate pattern
 - Add orchestration participant profiles to `interfaces/participants/Participants.xml`:
-  - `Participant::Orchestration` — Domain 15, no domain tag, with contained entities for `ServiceCatalog` writer/reader, `ServiceStatus` writer/reader, and `ServiceHostControl` RPC endpoints
+  - `Participant::Orchestration` — Domain 11, no domain tag, with contained entities for `ServiceCatalog` writer/reader, `ServiceStatus` writer/reader, and `ServiceHostControl` RPC endpoints
   - `Participant::ProcedureController_Orchestration` — controller's Orchestration domain participant (RPC client + status subscriber)
   - `Participant::ProcedureController_Hospital` — controller's Hospital domain participant (read-only subscriber)
 - Add orchestration entity name constants to `interfaces/idl/app_names/app_names.idl` per the naming convention in [dds-consistency.md §1 Step 2](../vision/dds-consistency.md)
@@ -52,7 +52,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - [x] `cmake --build build` succeeds with orchestration IDL generated
 - [x] C++ can `#include <orchestration/Orchestration.hpp>` and reference `Orchestration::ServiceState`
 - [x] Python can `from orchestration import Orchestration` and reference all enum values
-- [x] Domain 15 is present in the installed `Domains.xml`
+- [x] Domain 11 is present in the installed `Domains.xml`
 - [x] `Pattern.RPC` and orchestration topic profiles are present in installed QoS XML
 - [x] QoS compatibility checker (`tools/qos-checker.py`) passes with the new profiles
 - [x] `bash scripts/ci.sh --lint` passes

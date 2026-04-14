@@ -13,7 +13,7 @@ the Procedure Controller and digital twin display.
 - [vision/capabilities.md — V1.2.0](../vision/capabilities.md)
 - [vision/data-model.md — `Surgery::RobotArmAssignment`](../vision/data-model.md)
 - [vision/data-model.md — `ArmAssignmentState`, `TablePosition`, `MAX_ARM_COUNT`](../vision/data-model.md)
-- [vision/data-model.md — Domain 15 DomainParticipant partition scheme](../vision/data-model.md)
+- [vision/data-model.md — Domain 11 DomainParticipant partition scheme](../vision/data-model.md)
 - [vision/data-model.md — Well-known `ServiceCatalog` property keys](../vision/data-model.md)
 - [vision/system-architecture.md — Procedure Controller participant model](../vision/system-architecture.md)
 - [vision/system-architecture.md — Orchestration Partition Strategy](../vision/system-architecture.md)

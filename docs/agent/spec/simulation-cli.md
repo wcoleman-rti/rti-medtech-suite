@@ -26,7 +26,8 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 **Given** Docker images are built
 **When** the developer runs `medtech run hospital`
 **Then** the CLI creates flat Docker networks (`medtech_surgical-net`, `medtech_hospital-net`, `medtech_orchestration-net`) if they do not exist
-**And** the CLI runs sequential `docker run --rm -d` commands for Cloud Discovery Service, Routing Service, Collector Service (`rticom/collector-service`), and the central GUI container
+**And** the CLI launches a hospital-gateway container (CDS base) followed by co-located Routing Service and Collector containers sharing its network namespace via `--network container:hospital-gateway`
+**And** the CLI launches the central GUI container
 **And** no NAT router container is created
 **And** each underlying command is printed to stdout
 **And** the output includes the dashboard URL (`http://localhost:8080`)
@@ -38,7 +39,7 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 **Then** the CLI creates per-hospital private networks (`medtech_hospital-a_surgical-net`, `medtech_hospital-a_hospital-net`, `medtech_hospital-a_orchestration-net`) with explicit subnets
 **And** the CLI creates the shared `medtech_wan-net` (172.30.0.0/24) if it does not exist
 **And** a privileged NAT router container (`hospital-a-nat`) is launched, dual-homed on the private networks and `wan-net`, with IP forwarding and `iptables MASQUERADE`
-**And** per-hospital CDS, Routing Service, Collector Service, and GUI containers are launched on the private networks
+**And** a per-hospital gateway container (CDS base with co-located RS and Collector via `--network container:<name>-gateway`) and GUI container are launched on the private networks
 **And** the GUI is mapped to a host port allocated by hospital ordinal (1st = 8080, 2nd = 9080, etc.)
 **And** each command is printed to stdout
 
@@ -46,7 +47,7 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 
 **Given** Docker images are built
 **When** the developer runs `medtech run hospital --observability`
-**Then** the usual infrastructure containers are started (CDS, Routing Service, Collector Service, GUI)
+**Then** the usual infrastructure containers are started (hospital-gateway with co-located RS and Collector, GUI)
 **And** Prometheus and Grafana containers are also started for local telemetry visualization
 **And** each container's `docker run` command is printed to stdout
 
@@ -69,7 +70,8 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 
 **Given** a hospital is running
 **When** the developer runs `medtech run or --name OR-1`
-**Then** the CLI runs `docker run --rm -d` for each required Service Host container (clinical, operational, operator, robot) and a digital twin container
+**Then** the CLI launches a room-gateway container (CDS base with co-located RS and Collector via `--network container:<OR-name>-gateway`) on the hospital's Docker networks
+**And** the CLI runs `docker run --rm -d` for each required Service Host container (clinical, operational, operator, robot) and a digital twin container
 **And** each `docker run` command is printed to stdout before execution
 **And** containers are attached to the hospital's Docker networks
 **And** the twin container is assigned a host port (auto-assigned from the hospital's twin port range)

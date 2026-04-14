@@ -2,7 +2,7 @@
 
 Behavioral specifications for the V1.0 Procedure Orchestration milestone:
 the `medtech::Service` interface, dual-mode participant pattern, Service
-Host framework, Procedure Controller GUI, Orchestration domain (Domain 15)
+Host framework, Procedure Controller GUI, Orchestration domain (Domain 11)
 communication, and DDS RPC lifecycle management.
 
 The Orchestration domain uses **no Publisher/Subscriber partitions** and no
@@ -265,7 +265,7 @@ is added or changed.*
 
 ### Scenario: Orchestration domain is isolated from the Procedure domain `@integration` `@orchestration` `@isolation`
 
-**Given** a participant on the Orchestration domain (Domain 15)
+**Given** a participant on the Orchestration domain (Domain 11)
 **And** a participant on the Procedure domain (Domain 10, any tag)
 **When** both are running
 **Then** they do not discover each other
