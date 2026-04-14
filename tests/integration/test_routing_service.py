@@ -217,20 +217,16 @@ class TestRoutingServiceConfig:
         assert "StreamingSession" in session_names
 
     def test_administration_on_domain_20(self):
-        """Administration uses Observability domain (20)."""
+        """Administration is commented out (autoenable conflict with Transport QoS)."""
         admin = self.rs.find("administration")
-        assert admin is not None
-        did = admin.find("domain_id")
-        assert did is not None and did.text.strip() == "20"
+        # Admin is disabled until a dedicated admin QoS profile is created
+        # that doesn't set autoenable_created_entities=false.
+        assert admin is None
 
     def test_monitoring_on_domain_20(self):
-        """Monitoring uses Observability domain (20)."""
+        """Monitoring is commented out (autoenable conflict with Transport QoS)."""
         mon = self.rs.find("monitoring")
-        assert mon is not None
-        did = mon.find("domain_id")
-        assert did is not None and did.text.strip() == "20"
-        enabled = mon.find("enabled")
-        assert enabled is not None and enabled.text.strip() == "true"
+        assert mon is None
 
     def test_topic_route_input_output_participants_valid(self):
         """Every topic_route references valid participant names."""

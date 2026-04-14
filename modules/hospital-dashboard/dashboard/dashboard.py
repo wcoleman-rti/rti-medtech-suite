@@ -218,9 +218,6 @@ class DashboardBackend(GuiBackend):
         if participant is None:
             raise RuntimeError("Failed to create Hospital dashboard participant")
 
-        qos = participant.qos
-        qos.partition.name = ["room/*/procedure/*"]
-        participant.qos = qos
         participant.enable()
         self._participant = participant
 
@@ -533,7 +530,9 @@ def dashboard_content() -> None:
     current_backend = _current_backend()
 
     with ui.column().classes("w-full gap-4 p-4"):
-        with ui.splitter().classes("w-full h-[44rem]") as splitter:
+        with ui.splitter().classes("w-full").style(
+            "min-height: 20rem; max-height: 60vh;"
+        ) as splitter:
             with splitter.before:
                 with ui.column().classes("w-full gap-3"):
                     create_section_header("Active Procedures", ICONS["procedures"])
@@ -644,17 +643,21 @@ def dashboard_content() -> None:
 
                             render_resource_panel()
 
-        with ui.row().classes("w-full items-center gap-3"):
+        with ui.row().classes("w-full items-center gap-4"):
             ui.select(
                 ["ALL", "INFO", "WARNING", "CRITICAL"],
                 value=current_backend.severity_filter,
                 label="Severity",
+            ).props("outlined dense options-dense").classes("min-w-[8rem]").style(
+                "color: inherit;"
             )
             ui.select(
                 ["ALL"],
                 value=current_backend.room_filter,
                 label="Room",
-            )
+            ).props(
+                "outlined dense options-dense"
+            ).classes("min-w-[8rem]").style("color: inherit;")
 
         create_section_header("Alert Feed", ICONS["alerts"])
 

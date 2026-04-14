@@ -118,6 +118,30 @@ def _glassmorphism_css() -> str:
         "  body.dark .glass-panel { background: rgba(13,27,42,0.92); }"
         "  body:not(.dark) .glass-panel { background: rgba(255,255,255,0.92); }"
         "}"
+        # Theme-aware logo: show white in dark mode, color in light mode
+        "body.dark .rti-logo-light { display: none; }"
+        "body.dark .rti-logo-dark { display: inline; }"
+        "body:not(.dark) .rti-logo-light { display: inline; }"
+        "body:not(.dark) .rti-logo-dark { display: none; }"
+        # Rooms dropdown menu — glass-panel treatment with stronger contrast
+        ".rooms-dropdown.q-menu {"
+        "  background: var(--glass-bg);"
+        "  backdrop-filter: blur(var(--glass-blur));"
+        "  -webkit-backdrop-filter: blur(var(--glass-blur));"
+        "  border: 1px solid var(--glass-border);"
+        "  border-radius: 12px;"
+        "  box-shadow: 0 12px 40px rgba(0,0,0,0.25);"
+        "  min-width: 200px;"
+        "  padding: 8px 4px;"
+        "}"
+        "body.dark .rooms-dropdown.q-menu {"
+        "  background: rgba(13,27,42,0.92);"
+        "  border: 1px solid rgba(255,255,255,0.18);"
+        "}"
+        "body:not(.dark) .rooms-dropdown.q-menu {"
+        "  background: rgba(255,255,255,0.95);"
+        "  border: 1px solid rgba(0,0,0,0.10);"
+        "}"
         "</style>"
     )
 
@@ -203,8 +227,17 @@ def _transitions_css() -> str:
     )
 
 
-def init_theme(_app: Any | None = None, *, title: str = "Medtech Suite") -> Any:
-    """Apply RTI branding and return the shared header shell."""
+def init_theme(
+    _app: Any | None = None, *, title: str = "Medtech Suite", header: bool = True
+) -> Any | None:
+    """Apply RTI branding and optionally return the shared header shell.
+
+    Parameters
+    ----------
+    header:
+        When *False*, skip ``create_header()`` — caller supplies its own
+        navigation chrome (e.g. the SPA floating nav pill).
+    """
     app.config.quasar_config.update(NICEGUI_QUASAR_CONFIG)
     app.colors(
         primary=BRAND_COLORS["blue"],
@@ -229,10 +262,13 @@ def init_theme(_app: Any | None = None, *, title: str = "Medtech Suite") -> Any:
     ui.add_head_html(
         "<style>"
         "body { transition: background-color 0.3s ease, color 0.3s ease; }"
+        ".nicegui-sub-pages { align-items: stretch; width: 100%; }"
         "</style>",
         shared=True,
     )
-    return create_header(title=title)
+    if header:
+        return create_header(title=title)
+    return None
 
 
 def create_header(

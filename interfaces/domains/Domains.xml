@@ -94,14 +94,6 @@
             <topic name="ServiceStatus"  register_type_ref="Orchestration::ServiceStatus"/>
         </domain>
 
-        <!--
-            Domain 20 — Observability
-            No application-defined topics. Monitoring Library 2.0 creates
-            internal telemetry topics automatically.
-        -->
-        <domain name="Observability" domain_id="20">
-        </domain>
-
     </domain_library>
 
 </dds>

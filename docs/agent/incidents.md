@@ -2671,3 +2671,116 @@ after closure. They form the project's decision log.
   Service (reusable logic) → standalone `main.cpp` → ServiceHost `main.cpp`
   (with orchestration RPC). All DDS entity wiring lives in the service class.
 - **Date closed:** 2026-04-10
+
+---
+
+## INC-086: Empty Observability domain breaks Routing Service XML validation
+
+- **Status:** Closed
+- **Category:** Bug
+- **Date opened:** 2026-04-13
+- **Phase/Step:** Phase UI-M / Routing Service integration
+- **Documents involved:** `interfaces/domains/Domains.xml`,
+  `services/routing/RoutingService.xml`
+- **Description:** The `MedtechDomains::Observability` domain (domain 20)
+  was declared as an empty `<domain>` element with no `<register_type>` or
+  `<topic>` children. While the application-level QoS provider accepted
+  this, Routing Service's stricter XML parser rejected it with:
+  `Element 'domain': Missing child element(s). Expected is one of
+  ( register_type, topic ).` This caused RS to exit with code 255.
+- **Root cause:** The Observability domain was a placeholder for Monitoring
+  Library 2.0 internal topics, which are created automatically at runtime
+  and don't need XML declarations. The empty element violated the XSD
+  `xs:sequence` constraint requiring at least one child.
+- **Resolution:** Removed the empty `Observability` domain from
+  `Domains.xml`. Domain 20 is not referenced by any participant config
+  or routing service route. Monitoring Library creates its topics
+  independently of domain library declarations.
+- **Guideline:** Do not declare empty `<domain>` elements in domain
+  library XML. If a domain has no application-defined topics, omit it.
+- **Date closed:** 2026-04-13
+
+---
+
+## INC-087: content_filter / datareader_qos element ordering in SurgicalParticipants.xml
+
+- **Status:** Closed
+- **Category:** Bug
+- **Date opened:** 2026-04-13
+- **Phase/Step:** Phase UI-M / Routing Service integration
+- **Documents involved:** `interfaces/participants/SurgicalParticipants.xml`
+- **Description:** Three `<data_reader>` elements in the `ControlRobot`
+  participant's `RobotSubscriber` had `<datareader_qos>` preceding
+  `<content_filter>`. The RTI DDS profiles XSD requires `<content_filter>`
+  to appear before `<datareader_qos>` within a `<data_reader>` element.
+  While the application-level QoS provider tolerated the misordering,
+  Routing Service's XML parser (which validates the full
+  `NDDS_QOS_PROFILES` file set) rejected it with: `Element
+  'content_filter': This element is not expected.` This caused RS to exit
+  with code 255.
+- **Root cause:** The original XML was authored with `<datareader_qos>`
+  first, then `<content_filter>`. The XSD `xs:sequence` defines
+  `content_filter` before `datareader_qos` in the element order.
+- **Resolution:** Reordered all three `<data_reader>` elements to place
+  `<content_filter>` before `<datareader_qos>`, matching the XSD schema.
+  Affected readers: `OperatorInputReader`, `RobotCommandReader`,
+  `SafetyInterlockReader`.
+- **Guideline:** When authoring participant XML with both
+  `<content_filter>` and `<datareader_qos>` inside a `<data_reader>`,
+  always place `<content_filter>` first. Use the XSD schema
+  (`rti_dds_profiles.xsd`) as the authoritative element order reference.
+- **Date closed:** 2026-04-13
+
+---
+
+## INC-088: Routing Service admin/monitoring incompatible with autoenable=false
+
+- **Status:** Open
+- **Category:** Limitation
+- **Date opened:** 2026-04-13
+- **Phase/Step:** Phase UI-M / Routing Service integration
+- **Documents involved:** `services/routing/RoutingService.xml`,
+  `interfaces/qos/Participants.xml`
+- **Description:** The Routing Service `<administration>` and
+  `<monitoring>` sections create internal DDS participants on Domain 20.
+  These participants inherit QoS from `Participants::Transport`, which
+  sets `entity_factory.autoenable_created_entities` to `false`. RS's
+  internal admin publisher is never explicitly enabled, causing:
+  `DDS_DataWriter_enableI: ERROR: parent publisher is not enabled`.
+  This prevents RS from starting when admin/monitoring is configured.
+- **Root cause:** `Participants::Transport` disables auto-enable so that
+  application participants can set partition QoS before enabling. RS's
+  internal admin participant inherits this but has no mechanism to
+  explicitly enable after creation.
+- **Possible resolutions:**
+  1. Create a dedicated `Participants::AdminTransport` QoS profile that
+     inherits from `Transport` but re-enables auto-enable.
+  2. Override `entity_factory` inline in the RS `<administration>` section.
+  3. Leave admin/monitoring commented out (current state).
+- **Resolution:** Pending. Admin and monitoring sections are commented out
+  in `RoutingService.xml` with an explanatory note. Functional bridging
+  is unaffected.
+
+---
+
+## INC-089: Dashboard empty — requires Routing Service bridge (Domain 10 → 11)
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-13
+- **Phase/Step:** Phase UI-M / Dashboard integration
+- **Documents involved:** `modules/hospital-dashboard/dashboard/dashboard.py`,
+  `services/routing/RoutingService.xml`, `scripts/simulate_room.py`
+- **Description:** The Hospital Dashboard subscribes on Domain 11
+  (Hospital) but simulation services publish on Domain 10 (Procedure).
+  Data only reaches Domain 11 via Routing Service bridging. Running
+  `simulate_room.py` without Routing Service left the Dashboard empty
+  with no procedures, vitals, or alerts displayed.
+- **Root cause:** Routing Service was not launched as part of the room
+  simulation. The domain separation (Procedure 10 → Hospital 11) is
+  architecturally correct but requires the bridge to be running.
+- **Resolution:** `simulate_room.py` now automatically launches Routing
+  Service alongside the other room services. The `--no-bridge` flag
+  skips RS if not needed. RS uses the standard `NDDS_QOS_PROFILES`
+  from `setup.bash` (after INC-086 and INC-087 fixes).
+- **Date closed:** 2026-04-13

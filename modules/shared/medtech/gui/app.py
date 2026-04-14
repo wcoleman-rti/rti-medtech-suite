@@ -21,14 +21,13 @@ Architecture notes:
 
     ``shell_page`` is passed as the ``root`` argument to ``ui.run()``, making
     it the handler for **all** URL paths. ``ui.sub_pages()`` inside it does
-    client-side routing so the shell (header, drawer, connection dot) persists
-    across all navigations and browser refreshes.
+    client-side routing so the floating navigation pill persists across all
+    navigations and browser refreshes.
 """
 
 from __future__ import annotations
 
 import os
-from urllib.parse import urlparse
 
 from fastapi.responses import JSONResponse
 
@@ -38,6 +37,7 @@ from hospital_dashboard.dashboard.dashboard import dashboard_content  # noqa: F4
 from hospital_dashboard.procedure_controller.controller import (  # noqa: F401
     ControllerBackend,
     controller_content,
+    controller_content_for_room,
 )
 from medtech.gui._backend import GuiBackend
 from medtech.gui._icons import ICONS
@@ -45,9 +45,11 @@ from medtech.gui._theme import (
     NICEGUI_STORAGE_SECRET_DEFAULT,
     NICEGUI_STORAGE_SECRET_ENV,
     NICEGUI_THEME_MODE_KEY,
+    _resource_dir,
     _theme_mode_value,
     init_theme,
 )
+from medtech.gui._widgets import ConnectionDot
 from nicegui import app, ui
 from surgical_procedure.digital_twin.digital_twin import twin_content  # noqa: F401
 
@@ -90,13 +92,12 @@ async def ready() -> JSONResponse:
 # Tier 1 — Static local pages (always present)
 _STATIC_NAV_ITEMS = [
     ("/dashboard", ICONS["dashboard"], "Dashboard"),
-    ("/controller", ICONS["service"], "Controller"),
 ]
 
 # Page display names keyed by route prefix (for breadcrumb)
 _PAGE_TITLES: dict[str, str] = {
     "/dashboard": "Dashboard",
-    "/controller": "Controller",
+    "/controller/": "Controller",
     "/twin/": "Digital Twin",
 }
 
@@ -121,64 +122,120 @@ def _get_controller_backend() -> ControllerBackend | None:
     return None
 
 
-def _discovered_gui_services() -> list[tuple[str, str, str, str]]:
-    """Return discovered GUI services from ServiceCatalog.
+def _discovered_rooms() -> list[str]:
+    """Return discovered room IDs from ServiceCatalog.
 
-    Returns list of (display_name, room_id, gui_url, icon) tuples for
-    services that have a non-empty gui_url property.
+    Returns a sorted list of unique room_id strings.
     """
     ctrl = _get_controller_backend()
     if ctrl is None:
         return []
-    results: list[tuple[str, str, str, str]] = []
+    seen_rooms: set[str] = set()
     for (_host_id, _service_id), catalog in ctrl.catalogs.items():
-        gui_url = ""
-        display_name = ""
-        room_id = ""
         for prop in getattr(catalog, "properties", None) or []:
             name = getattr(prop, "name", "")
             val = getattr(prop, "current_value", "") or ""
-            if name == "gui_url" and val:
-                gui_url = val
-            elif name == "display_name" and val:
-                display_name = val
-            elif name == "room_id" and val:
-                room_id = val
-        if gui_url:
-            label = display_name or _service_id
-            if room_id:
-                label = f"{label} ({room_id})"
-            icon = ICONS.get("robot", "smart_toy")
-            results.append((label, room_id, gui_url, icon))
-    return results
+            if name == "room_id" and val:
+                seen_rooms.add(val)
+    return sorted(seen_rooms)
 
 
 def shell_page() -> None:
-    """Root SPA shell: persistent header + left drawer + sub-pages content."""
-    init_theme(title="Medtech Suite")
+    """Root SPA shell: full-screen content with floating navigation pill."""
+    init_theme(title="Medtech Suite", header=False)
 
     stored_mode = app.storage.user.get(NICEGUI_THEME_MODE_KEY, "system")
     dark_mode = ui.dark_mode(_theme_mode_value(stored_mode))  # noqa: F841
 
-    # Track current path for active-nav highlighting and breadcrumb
-    current_path: dict[str, str] = {"value": ""}
-    breadcrumb_label: ui.label | None = None
-
-    # --- Dynamic breadcrumb in header ---
-    # We inject a breadcrumb label into the header's content area
-    with ui.header().classes(
-        "items-center gap-4 px-4 py-3 bg-primary text-white"
-    ).style("box-shadow: 0 4px 12px rgba(0,0,0,0.15);"):
-        from medtech.gui._theme import _logo_path
-
-        logo = _logo_path()
+    # ---- Floating navigation pill (top-center overlay) --------------------
+    # Positioned absolutely over the full-screen content.  No header or
+    # sidebar — the entire viewport belongs to the active page.
+    _NAV_PILL_CSS = (
+        "position: fixed; top: 18px; left: 50%; transform: translateX(-50%);"
+        " z-index: 100; pointer-events: auto;"
+        " max-width: 95vw; white-space: nowrap;"
+    )
+    with ui.row().classes(
+        "items-center gap-2 px-4 py-2 rounded-full glass-panel flex-nowrap"
+    ).style(_NAV_PILL_CSS):
+        # Theme-aware logo: white logo for dark mode, color logo for light mode.
         ui.html(
-            f'<img src="/images/{logo.name}" style="height: 2rem; width: auto;" alt="RTI">'
+            '<img src="/images/rti-logo-white.png" '
+            'class="rti-logo-dark" '
+            'style="height: 1.8rem; width: auto; opacity: 0.85;" alt="RTI">'
+            '<img src="/images/rti-logo-color.png" '
+            'class="rti-logo-light" '
+            'style="height: 1.8rem; width: auto; opacity: 0.85;" alt="RTI">'
         )
-        ui.label("Medtech Suite").classes("text-2xl font-bold brand-heading")
-        breadcrumb_label = ui.label("").classes("text-sm text-white/70 font-normal")
-        ui.space()
-        # Theme toggle
+
+        # --- Static page tabs ---
+        nav_buttons: dict[str, ui.button] = {}
+        for path, icon, label in _STATIC_NAV_ITEMS:
+            btn = (
+                ui.button(label, icon=icon, on_click=lambda p=path: ui.navigate.to(p))
+                .props("flat no-caps size=md")
+                .classes("rounded-full px-4 transition-fast")
+            )
+            nav_buttons[path] = btn
+
+        # --- Discovered services (collapsed "Rooms" dropdown) ---------------
+        # A single button with a badge count instead of one button per room.
+        # Scales to dozens of ORs without widening the pill.
+        with ui.button("Rooms", icon=ICONS.get("robot", "smart_toy")).props(
+            "flat no-caps size=md"
+        ).classes("rounded-full px-4 transition-fast"):
+            rooms_badge = ui.badge("0").props("floating color=accent")
+            rooms_badge.set_visibility(False)
+            with ui.menu().props("auto-close").classes("rooms-dropdown") as rooms_menu:
+                pass  # populated by render_discovered_rooms
+
+        @ui.refreshable
+        def render_discovered_rooms() -> None:
+            rooms_menu.clear()
+            rooms = _discovered_rooms()
+            count = len(rooms)
+            rooms_badge.set_text(str(count))
+            rooms_badge.set_visibility(count > 0)
+            if not rooms:
+                with rooms_menu:
+                    ui.menu_item(
+                        "No rooms discovered",
+                        auto_close=True,
+                    ).props(
+                        "disable"
+                    ).classes("text-sm italic opacity-60")
+                return
+            with rooms_menu:
+                for room_id in rooms:
+                    with ui.row().classes("items-center gap-4 px-3 py-1"):
+                        ui.label(room_id).classes(
+                            "type-label min-w-[4rem] text-sm font-semibold"
+                        )
+                        ui.button(
+                            "Controller",
+                            icon=ICONS["service"],
+                            on_click=lambda r=room_id: ui.navigate.to(
+                                f"/controller/{r}"
+                            ),
+                        ).props("flat dense no-caps size=md").classes("rounded-full")
+                        ui.button(
+                            "Twin",
+                            icon=ICONS.get("robot", "smart_toy"),
+                            on_click=lambda r=room_id: ui.navigate.to(f"/twin/{r}"),
+                        ).props("flat dense no-caps size=md").classes("rounded-full")
+
+        render_discovered_rooms()
+
+        def _safe_refresh() -> None:
+            try:
+                render_discovered_rooms.refresh()
+            except RuntimeError:
+                pass
+
+        ui.timer(2.0, _safe_refresh)
+
+        # --- Separator + theme toggle + connection dot ---
+        ui.separator().props("vertical").classes("mx-2 h-6")
         stored = app.storage.user.get(NICEGUI_THEME_MODE_KEY, "system")
         dm = ui.dark_mode(_theme_mode_value(stored))
 
@@ -192,134 +249,48 @@ def shell_page() -> None:
                 mode = "system"
             app.storage.user[NICEGUI_THEME_MODE_KEY] = mode
 
-        with ui.button(on_click=lambda: _cycle_to(None)).props("flat round").classes(
-            "text-white"
+        with ui.button(on_click=lambda: _cycle_to(None)).props(
+            "flat round size=sm"
         ).bind_visibility_from(dm, "value", value=True):
-            ui.icon(ICONS["dark_mode"]).classes("text-xl")
-        with ui.button(on_click=lambda: _cycle_to(True)).props("flat round").classes(
-            "text-white"
+            ui.icon(ICONS["dark_mode"]).classes("text-base")
+        with ui.button(on_click=lambda: _cycle_to(True)).props(
+            "flat round size=sm"
         ).bind_visibility_from(dm, "value", value=False):
-            ui.icon(ICONS["light_mode"]).classes("text-xl")
-        with ui.button(on_click=lambda: _cycle_to(False)).props("flat round").classes(
-            "text-white"
+            ui.icon(ICONS["light_mode"]).classes("text-base")
+        with ui.button(on_click=lambda: _cycle_to(False)).props(
+            "flat round size=sm"
         ).bind_visibility_from(dm, "value", backward=lambda v: v is None):
-            ui.icon(ICONS["auto_mode"]).classes("text-xl")
-        from medtech.gui._widgets import ConnectionDot
+            ui.icon(ICONS["auto_mode"]).classes("text-base")
 
         ConnectionDot(connected=True)
 
-    # --- Navigation drawer ---
-    nav_buttons: dict[str, ui.button] = {}
-
+    # ---- Active-tab highlighting ------------------------------------------
     def _update_active_nav(path: str) -> None:
-        """Highlight the nav button matching the current path."""
         for btn_path, btn in nav_buttons.items():
             if path == btn_path or (btn_path != "/" and path.startswith(btn_path)):
-                btn.classes(add="bg-white/20 font-bold", remove="")
+                btn.classes(add="bg-primary text-white", remove="")
             else:
-                btn.classes(remove="bg-white/20 font-bold")
-        # Update breadcrumb
-        if breadcrumb_label is not None:
-            title = _page_title_for_path(path)
-            breadcrumb_label.set_text(f"› {title}" if title != "Home" else "")
+                btn.classes(remove="bg-primary text-white")
 
-    with ui.left_drawer(fixed=True).classes(
-        "bg-primary text-white flex flex-col gap-2 pt-4"
-    ):
-        ui.label("Navigation").classes("px-4 font-bold text-sm uppercase text-white/60")
-        for path, icon, label in _STATIC_NAV_ITEMS:
-            btn = (
-                ui.button(on_click=lambda p=path: ui.navigate.to(p))
-                .props("flat align=left")
-                .classes("w-full text-white justify-start px-4 gap-3")
-            )
-            with btn:
-                ui.icon(icon).classes("text-xl")
-                ui.label(label).classes("text-sm")
-            nav_buttons[path] = btn
-
-        # Tier 2 — Discovered GUI services (dynamic)
-        ui.separator().classes("my-2 bg-white/20")
-        ui.label("Services").classes("px-4 font-bold text-sm uppercase text-white/60")
-        discovered_container = ui.column().classes("w-full gap-1")
-
-        # Obtain browser origin once for same-origin / cross-origin detection
-        browser_origin: dict[str, str] = {"value": ""}
-
-        async def _detect_origin() -> None:
-            try:
-                origin = await ui.run_javascript("window.location.origin")
-                browser_origin["value"] = origin
-            except Exception:
-                pass
-
-        ui.timer(0.5, _detect_origin, once=True)
-
-        @ui.refreshable
-        def render_discovered_services() -> None:
-            discovered_container.clear()
-            services = _discovered_gui_services()
-            if not services:
-                with discovered_container:
-                    ui.label("No services discovered").classes(
-                        "px-4 text-xs text-white/40 italic"
-                    )
-                return
-            with discovered_container:
-                for svc_label, _room_id, gui_url, svc_icon in services:
-                    parsed = urlparse(gui_url)
-                    svc_origin = f"{parsed.scheme}://{parsed.netloc}"
-                    is_local = (
-                        browser_origin["value"]
-                        and svc_origin == browser_origin["value"]
-                    )
-                    if is_local:
-                        svc_path = parsed.path or "/"
-
-                        def _nav_local(p: str = svc_path) -> None:
-                            ui.navigate.to(p)
-
-                        click_fn = _nav_local
-                        hint_icon = "home"
-                    else:
-
-                        def _nav_remote(u: str = gui_url) -> None:
-                            ui.navigate.to(u, new_tab=True)
-
-                        click_fn = _nav_remote
-                        hint_icon = "open_in_new"
-
-                    with ui.button(on_click=click_fn).props("flat align=left").classes(
-                        "w-full text-white justify-start px-4 gap-3 text-xs"
-                    ):
-                        ui.icon(svc_icon).classes("text-lg")
-                        ui.label(svc_label).classes("text-xs")
-                        ui.icon(hint_icon).classes("text-xs text-white/50")
-
-        render_discovered_services()
-        ui.timer(2.0, render_discovered_services.refresh)
-
-    # Content area — ui.sub_pages() swaps this without a full page reload
-    with ui.column().classes("w-full h-full p-0 m-0"):
+    # ---- Full-screen content area -----------------------------------------
+    # Top padding reserves space so page content doesn't hide behind the pill.
+    with ui.column().classes("w-full h-full p-0 m-0").style("padding-top: 64px;"):
         ui.sub_pages(
             {
                 "/dashboard": dashboard_content,
-                "/controller": controller_content,
+                "/controller/{room_id}": controller_content_for_room,
                 "/twin/{room_id}": twin_content,
                 "/": lambda: ui.navigate.to("/dashboard"),
             }
         )
 
     # Track path changes for active highlighting
+    initial_path = "/dashboard"
     if hasattr(ui.context, "client") and hasattr(ui.context.client, "sub_pages_router"):
-        ui.context.client.sub_pages_router.on_path_changed(
-            lambda path: (
-                current_path.__setitem__("value", path),
-                _update_active_nav(path),
-            )
-        )
-    # Set initial active state
-    _update_active_nav("/dashboard")
+        router = ui.context.client.sub_pages_router
+        initial_path = router.current_path.split("?")[0] or "/dashboard"
+        router.on_path_changed(lambda path: _update_active_nav(path))
+    _update_active_nav(initial_path)
 
 
 # ---------------------------------------------------------------------------
@@ -333,11 +304,12 @@ def main() -> None:
         NICEGUI_STORAGE_SECRET_ENV, NICEGUI_STORAGE_SECRET_DEFAULT
     )
 
-    # Eagerly instantiate stable backends (dashboard, controller) before
-    # ui.run() so they register app.on_startup / on_shutdown hooks while the
-    # app is still in the pre-start state.  The digital twin backend is
-    # room-scoped and created lazily on first page visit; GuiBackend.__init__
-    # handles that case by scheduling the start coroutine as a background task.
+    # Eagerly instantiate the dashboard and a discovery-only controller
+    # backend before ui.run() so they register app.on_startup /
+    # on_shutdown hooks while the app is still in the pre-start state.
+    # The discovery controller provides ServiceCatalog data for room
+    # discovery in the nav pill.  Per-room controller views and digital
+    # twin backends are created lazily on first page visit.
     from hospital_dashboard.dashboard.dashboard import _current_backend as _dash_init
     from hospital_dashboard.procedure_controller.controller import (
         _current_backend as _ctrl_init,
@@ -346,9 +318,19 @@ def main() -> None:
     _dash_init()
     _ctrl_init()
 
-    app.add_static_files("/static", "resources/")
+    # Remove standalone @ui.page routes registered by module imports so that
+    # the root=shell_page catch-all handles all paths through the SPA shell.
+    _standalone_paths = {
+        "/dashboard",
+        "/controller",
+        "/controller/{room_id}",
+        "/twin/{room_id}",
+    }
+    app.routes[:] = [
+        r for r in app.routes if getattr(r, "path", None) not in _standalone_paths
+    ]
 
-    from medtech.gui._theme import _resource_dir
+    app.add_static_files("/static", "resources/")
 
     favicon_path = _resource_dir() / "images" / "favicon.ico"
 

@@ -37,7 +37,12 @@
             </documentation>
         </annotation>
 
-        <!-- Remote administration on Observability domain -->
+        <!-- Remote administration on Observability domain.
+             Disabled: the Participants::Transport QoS profile sets
+             autoenable_created_entities=false, which conflicts with
+             RS's internal admin participant. Enable when a dedicated
+             admin QoS profile is available. -->
+        <!--
         <administration>
             <domain_id>20</domain_id>
             <distributed_logger>
@@ -45,8 +50,10 @@
                 <filter_level>WARNING</filter_level>
             </distributed_logger>
         </administration>
+        -->
 
-        <!-- Remote monitoring on Observability domain -->
+        <!-- Remote monitoring on Observability domain — disabled (same reason). -->
+        <!--
         <monitoring>
             <enabled>true</enabled>
             <domain_id>20</domain_id>
@@ -59,6 +66,7 @@
                 <nanosec>0</nanosec>
             </statistics_sampling_period>
         </monitoring>
+        -->
 
         <domain_route name="ProcedureToHospital">
 

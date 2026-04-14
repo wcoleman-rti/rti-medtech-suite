@@ -62,6 +62,9 @@ class FakeElement:
         self.styles.append(value)
         return self
 
+    def props(self, *args: Any, **kwargs: Any) -> "FakeElement":
+        return self
+
     def bind_value(self, *args: Any, **kwargs: Any) -> "FakeElement":
         return self
 

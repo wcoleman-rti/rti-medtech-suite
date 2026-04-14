@@ -164,7 +164,9 @@ route to nodes on the networks its instance is attached to.
 ║  ║   ║  ◄═ ORCHESTRATION DATABUS (Domain 11) ═══►    ║         ║        ║
 ║  ║   ║  Controller · Service Hosts                   ║         ║        ║
 ║  ║   ╚═══════════════════════════════════════════════╝         ║        ║
+║  ║                                                             ║        ║
 ║  ╚═════════════════════════════════════════════════════════════╝        ║
+║                                                                         ║ 
 ╚═════════════════════════════════════════════════════════════════════════╝
 
 Legend:  ╔═══╗ deployable instance   ◄═══► databus   ┏━━━┓ gateway

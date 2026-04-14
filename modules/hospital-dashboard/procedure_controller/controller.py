@@ -761,6 +761,16 @@ class ControllerBackend(GuiBackend):
 
 backend: ControllerBackend | None = None
 
+# Per-room controller backends (lazy, like DigitalTwinBackend)
+_controller_backends: dict[str, ControllerBackend] = {}
+
+
+def _get_backend(room_id: str) -> ControllerBackend:
+    """Return (or create on first access) the ControllerBackend for *room_id*."""
+    if room_id not in _controller_backends:
+        _controller_backends[room_id] = ControllerBackend(room_id=room_id)
+    return _controller_backends[room_id]
+
 
 def _current_backend() -> ControllerBackend:
     global backend
@@ -776,9 +786,20 @@ def controller_page() -> None:
     controller_content()
 
 
+def controller_content_for_room(room_id: str) -> None:
+    """Render controller content for a specific room.  Per-room sub_pages variant."""
+    current_backend = _get_backend(room_id)
+    _render_controller_ui(current_backend)
+
+
 def controller_content() -> None:
-    """Render controller content.  Call this from the SPA shell's sub_pages."""
+    """Render controller content (legacy singleton).  Call from SPA sub_pages."""
     current_backend = _current_backend()
+    _render_controller_ui(current_backend)
+
+
+def _render_controller_ui(current_backend: ControllerBackend) -> None:
+    """Shared controller UI rendering for both singleton and per-room backends."""
 
     def refresh_ui() -> None:
         render_summary_cards.refresh()

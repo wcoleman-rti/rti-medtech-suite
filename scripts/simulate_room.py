@@ -38,6 +38,16 @@ _PYTHON_SERVICE_HOSTS = {
 }
 
 
+def _find_routing_service() -> str | None:
+    """Locate the rtiroutingservice binary, return None if not found."""
+    nddshome = os.environ.get("NDDSHOME", "")
+    if nddshome:
+        candidate = os.path.join(nddshome, "bin", "rtiroutingservice")
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
 def _base_env(room_id: str, procedure_id: str) -> dict[str, str]:
     env = os.environ.copy()
     env["ROOM_ID"] = room_id
@@ -120,6 +130,11 @@ def main() -> None:
         action="store_true",
         help="Skip launching the operational service host",
     )
+    parser.add_argument(
+        "--no-bridge",
+        action="store_true",
+        help="Skip launching Routing Service (bridge Domain 10 → 11 for Dashboard)",
+    )
     args = parser.parse_args()
 
     n_arms = max(1, min(args.arms, 8))
@@ -183,6 +198,28 @@ def main() -> None:
             label,
         )
         procs.append((host_id, proc))
+
+    # ── Routing Service (Domain 10 → 11 bridge for Dashboard) ──────
+    if not args.no_bridge:
+        rs_bin = _find_routing_service()
+        if rs_bin:
+            rs_cfg = os.path.join("services", "routing", "RoutingService.xml")
+            if os.path.isfile(rs_cfg):
+                env = _base_env(room, procedure)
+                label = "Routing Service  (Domain 10 → 11 bridge)"
+                proc = _spawn(
+                    [rs_bin, "-cfgFile", rs_cfg, "-cfgName", "MedtechBridge"],
+                    env,
+                    label,
+                )
+                procs.append(("routing-service", proc))
+            else:
+                print(f"  ⚠  Routing Service config not found: {rs_cfg}")
+                print("     Dashboard will not receive data (no bridge).")
+        else:
+            print("  ⚠  rtiroutingservice not found in $NDDSHOME/bin/")
+            print("     Dashboard will not receive data (no bridge).")
+            print("     Use --no-bridge to suppress this warning.")
 
     print(f"\n  {len(procs)} processes running. Press Ctrl-C to stop all.\n")
     print("  Launch the GUI in another terminal:")

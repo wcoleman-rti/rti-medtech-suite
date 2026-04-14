@@ -1044,8 +1044,33 @@ def _build_scene(
 
     # All arms start hidden; update_scene shows those with assignments.
 
-    # ---- Arm assignment overlay (HTML below scene) -------------------------
-    arm_status_container = ui.column().classes("w-full px-4 gap-1 glass-panel")
+    # ---- Arm assignment overlay (floating toggle panel) ----------------------
+    # Instead of a large static section below the scene, we use a small
+    # floating button in the bottom-right corner that reveals a glassmorphism
+    # panel on click.  Keeps the 3D view maximised.
+    _arm_panel_visible = {"value": False}
+
+    arm_panel = (
+        ui.column()
+        .classes("gap-2 p-4 glass-panel rounded-xl")
+        .style(
+            "position: fixed; bottom: 70px; right: 16px; z-index: 90;"
+            " max-width: 22rem; max-height: 50vh; overflow-y: auto;"
+        )
+    )
+    arm_panel.set_visibility(False)
+
+    def _toggle_arm_panel() -> None:
+        _arm_panel_visible["value"] = not _arm_panel_visible["value"]
+        arm_panel.set_visibility(_arm_panel_visible["value"])
+
+    (
+        ui.button(icon="precision_manufacturing", on_click=_toggle_arm_panel)
+        .props("fab color=primary")
+        .style("position: fixed; bottom: 16px; right: 16px; z-index: 91;")
+    )
+    arm_fab_badge = ui.badge("0").props("floating color=accent")
+    arm_fab_badge.set_visibility(False)
 
     def _position_for_assignment(assignment: Any) -> TablePosition | None:
         """Return the TablePosition for an assignment, or None if UNKNOWN."""
@@ -1083,13 +1108,18 @@ def _build_scene(
         return pos_map
 
     def _build_arm_overlay() -> None:
-        """Rebuild the arm status overlay from current assignments."""
-        arm_status_container.clear()
+        """Rebuild the floating arm status panel from current assignments."""
+        arm_panel.clear()
         assignments = current_backend.arm_assignments
+        count = len(assignments)
+        arm_fab_badge.set_text(str(count))
+        arm_fab_badge.set_visibility(count > 0)
         if not assignments:
+            arm_panel.set_visibility(False)
+            _arm_panel_visible["value"] = False
             return
-        with arm_status_container:
-            ui.label("Arm Assignments").classes("type-label mt-2")
+        with arm_panel:
+            ui.label("Arm Assignments").classes("type-label")
             for robot_id, assignment in sorted(assignments.items()):
                 status = ArmAssignmentState(int(getattr(assignment, "status", 0)))
                 color = ARM_STATE_COLORS.get(status, BRAND_COLORS["gray"])
@@ -1105,18 +1135,17 @@ def _build_scene(
                         ui.label(f"Capabilities: {caps}").classes("type-body-sm")
 
     def _set_arm_visibility(arm_obj: dict[str, Any], visible: bool) -> None:
-        """Set material opacity on all arm parts (including base) to show/hide."""
-        opacity = 1.0 if visible else 0.0
+        """Toggle three.js visibility on all arm parts (including base)."""
         for part in arm_obj["base_parts"]:
-            part.material(opacity=opacity)
+            part.visible(visible)
         for seg in arm_obj["arm_segs"]:
-            seg.material(opacity=opacity)
+            seg.visible(visible)
         for jsph in arm_obj["jnt_spheres"]:
-            jsph.material(opacity=opacity)
-        arm_obj["shoulder_sphere"].material(opacity=opacity)
-        arm_obj["tool_sphere"].material(opacity=opacity)
-        arm_obj["nib"].material(opacity=opacity)
-        arm_obj["instr_dot"].material(opacity=opacity)
+            jsph.visible(visible)
+        arm_obj["shoulder_sphere"].visible(visible)
+        arm_obj["tool_sphere"].visible(visible)
+        arm_obj["nib"].visible(visible)
+        arm_obj["instr_dot"].visible(visible)
 
     # Track previous assignment state for visibility delta
     _prev_arm_count = [0]

@@ -429,40 +429,24 @@ class TestReadinessProbe:
 
 
 class TestShellPage:
-    """shell_page() renders header, navigation drawer, sub_pages, and breadcrumb."""
+    """shell_page() renders floating nav pill + full-screen sub_pages."""
 
     def _patch_shell(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         """Patch all NiceGUI widgets used by shell_page() and return call log."""
         import medtech.gui.app as app_module
 
         log: dict[str, list[Any]] = {
-            "left_drawer": [],
+            "row": [],
             "label": [],
             "button": [],
             "icon": [],
             "column": [],
             "sub_pages": [],
             "dark_mode": [],
-            "header": [],
             "html": [],
-            "space": [],
             "separator": [],
             "timer": [],
-            "state": [],
         }
-
-        class FakeState:
-            """Fake ui.state() return value."""
-
-            def __init__(self, initial: Any = "") -> None:
-                self._value = initial
-
-            @property
-            def value(self) -> Any:
-                return self._value
-
-            def set_value(self, v: Any) -> None:
-                self._value = v
 
         def _make_fake(kind: str) -> Any:
             def factory(*a: Any, **kw: Any) -> FakeElement:
@@ -472,13 +456,12 @@ class TestShellPage:
             return factory
 
         for widget in (
-            "left_drawer",
+            "row",
             "label",
             "button",
             "icon",
             "column",
             "sub_pages",
-            "header",
             "html",
             "separator",
         ):
@@ -489,18 +472,8 @@ class TestShellPage:
         )
         monkeypatch.setattr(
             app_module.ui,
-            "space",
-            lambda *a, **kw: FakeElement("space"),
-        )
-        monkeypatch.setattr(
-            app_module.ui,
             "timer",
             lambda *a, **kw: (log["timer"].append({"args": a, "kwargs": kw}), None)[1],
-        )
-        monkeypatch.setattr(
-            app_module.ui,
-            "state",
-            lambda initial="": FakeState(initial),
         )
 
         # Mock ui.refreshable decorator to be a no-op passthrough
@@ -512,11 +485,16 @@ class TestShellPage:
 
         # Mock init_theme to avoid real NiceGUI calls
         monkeypatch.setattr(
-            app_module, "init_theme", lambda *a, **kw: FakeElement("header")
+            app_module, "init_theme", lambda *a, **kw: FakeElement("row")
         )
 
-        # Mock _discovered_gui_services to return empty list
-        monkeypatch.setattr(app_module, "_discovered_gui_services", lambda: [])
+        # Mock _discovered_rooms to return empty list
+        monkeypatch.setattr(app_module, "_discovered_rooms", lambda: [])
+
+        # Mock ConnectionDot
+        monkeypatch.setattr(
+            app_module, "ConnectionDot", lambda **kw: FakeElement("dot")
+        )
 
         # Mock ui.context to avoid sub_pages_router access
         monkeypatch.setattr(
@@ -534,23 +512,37 @@ class TestShellPage:
 
         return log
 
-    def test_shell_page_creates_left_drawer(
+    def test_shell_page_creates_nav_pill(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """shell_page() creates a ui.row for the floating navigation pill."""
+        import medtech.gui.app as app_module
+
+        log = self._patch_shell(monkeypatch)
+        app_module.shell_page()
+        assert len(log["row"]) >= 1
+
+    def test_shell_page_no_header_or_drawer(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """shell_page() creates a ui.left_drawer for navigation."""
+        """shell_page() does not create ui.header or ui.left_drawer."""
         import medtech.gui.app as app_module
 
-        log = self._patch_shell(monkeypatch)
+        self._patch_shell(monkeypatch)
+        # Also patch header/left_drawer to detect if they're called
+        header_calls: list[Any] = []
+        drawer_calls: list[Any] = []
+        monkeypatch.setattr(
+            app_module.ui,
+            "header",
+            lambda *a, **kw: header_calls.append(1) or FakeElement("header"),
+        )
+        monkeypatch.setattr(
+            app_module.ui,
+            "left_drawer",
+            lambda *a, **kw: drawer_calls.append(1) or FakeElement("drawer"),
+        )
         app_module.shell_page()
-        assert len(log["left_drawer"]) >= 1
-
-    def test_shell_page_creates_header(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """shell_page() creates a ui.header for the app bar."""
-        import medtech.gui.app as app_module
-
-        log = self._patch_shell(monkeypatch)
-        app_module.shell_page()
-        assert len(log["header"]) >= 1
+        assert len(header_calls) == 0
+        assert len(drawer_calls) == 0
 
     def test_shell_page_registers_sub_pages(
         self, monkeypatch: pytest.MonkeyPatch
@@ -564,7 +556,7 @@ class TestShellPage:
         assert len(log["sub_pages"]) == 1
         routes = log["sub_pages"][0]["args"][0]
         assert "/dashboard" in routes
-        assert "/controller" in routes
+        assert "/controller/{room_id}" in routes
         assert "/twin/{room_id}" in routes
 
     def test_shell_page_sub_pages_use_content_functions(
@@ -574,7 +566,7 @@ class TestShellPage:
         import medtech.gui.app as app_module
         from hospital_dashboard.dashboard.dashboard import dashboard_content
         from hospital_dashboard.procedure_controller.controller import (
-            controller_content,
+            controller_content_for_room,
         )
         from surgical_procedure.digital_twin.digital_twin import twin_content
 
@@ -583,52 +575,20 @@ class TestShellPage:
 
         routes = log["sub_pages"][0]["args"][0]
         assert routes["/dashboard"] is dashboard_content
-        assert routes["/controller"] is controller_content
+        assert routes["/controller/{room_id}"] is controller_content_for_room
         assert routes["/twin/{room_id}"] is twin_content
 
-    def test_shell_page_navigation_drawer_has_static_items(
+    def test_shell_page_nav_pill_has_static_buttons(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Navigation drawer contains static entries for Dashboard and Controller."""
+        """Navigation pill contains button entries for Dashboard and Controller."""
         import medtech.gui.app as app_module
 
         log = self._patch_shell(monkeypatch)
         app_module.shell_page()
 
-        # Static nav buttons (Dashboard, Controller) + at least theme toggle buttons
+        # Static nav buttons (Dashboard, Controller) + theme toggle buttons
         assert len(log["button"]) >= 2
-
-    def test_shell_page_has_breadcrumb_label(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """shell_page() renders a breadcrumb label in the header area."""
-        import medtech.gui.app as app_module
-
-        log = self._patch_shell(monkeypatch)
-        app_module.shell_page()
-
-        # Multiple labels are created; at least one is the breadcrumb
-        assert len(log["label"]) >= 3  # "Medtech Suite", "Navigation", breadcrumb, ...
-
-    def test_shell_page_discovered_services_section(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """shell_page() renders a 'Services' section in the drawer."""
-        import medtech.gui.app as app_module
-
-        label_texts: list[str] = []
-        base_log = self._patch_shell(monkeypatch)
-
-        def _capture_label(*a: Any, **kw: Any) -> FakeElement:
-            if a:
-                label_texts.append(str(a[0]))
-            base_log["label"].append({"args": a, "kwargs": kw})
-            return FakeElement("label")
-
-        monkeypatch.setattr(app_module.ui, "label", _capture_label)
-        app_module.shell_page()
-
-        assert "Services" in label_texts or "Navigation" in label_texts
 
     def test_shell_page_root_redirect(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Root '/' route redirects to '/dashboard' via sub_pages."""
@@ -639,7 +599,6 @@ class TestShellPage:
 
         routes = log["sub_pages"][0]["args"][0]
         assert "/" in routes
-        # The callable should trigger a navigation to /dashboard
 
 
 # ---------------------------------------------------------------------------
@@ -658,7 +617,7 @@ class TestPageTitleForPath:
     def test_controller_path(self) -> None:
         from medtech.gui.app import _page_title_for_path
 
-        assert _page_title_for_path("/controller") == "Controller"
+        assert _page_title_for_path("/controller/OR-1") == "Controller"
 
     def test_twin_with_room_id(self) -> None:
         from medtech.gui.app import _page_title_for_path
@@ -686,8 +645,8 @@ class TestPageTitleForPath:
 # ---------------------------------------------------------------------------
 
 
-class TestDiscoveredGuiServices:
-    """_discovered_gui_services() extracts GUI service info from ServiceCatalog."""
+class TestDiscoveredRooms:
+    """_discovered_rooms() extracts room IDs from ServiceCatalog."""
 
     def setup_method(self) -> None:
         GuiBackend._clear_registry()
@@ -697,9 +656,86 @@ class TestDiscoveredGuiServices:
 
     def test_returns_empty_when_no_controller(self) -> None:
         """Returns empty list when no ControllerBackend is registered."""
-        from medtech.gui.app import _discovered_gui_services
+        from medtech.gui.app import _discovered_rooms
 
-        assert _discovered_gui_services() == []
+        assert _discovered_rooms() == []
+
+    def test_room_id_discovered(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A catalog with room_id is returned as a discovered room."""
+        import medtech.gui.app as app_module
+        from hospital_dashboard.procedure_controller.controller import ControllerBackend
+
+        # Fake property with room_id
+        class _Prop:
+            def __init__(self, name: str, current_value: str) -> None:
+                self.name = name
+                self.current_value = current_value
+
+        class _Catalog:
+            def __init__(self, props: list[_Prop]) -> None:
+                self.properties = props
+
+        class _FakeController(ControllerBackend):
+            def __init__(self) -> None:
+                pass  # skip DDS init
+
+            @property
+            def catalogs(self) -> dict[tuple[str, str], Any]:
+                return {
+                    ("host1", "svc1"): _Catalog(
+                        [
+                            _Prop("room_id", "OR-1"),
+                            _Prop("display_name", "Robot Arm"),
+                        ]
+                    ),
+                }
+
+            def is_ready(self) -> bool:
+                return True
+
+        ctrl = _FakeController()
+        GuiBackend._registry.append(ctrl)
+        monkeypatch.setattr(app_module, "_get_controller_backend", lambda: ctrl)
+
+        results = app_module._discovered_rooms()
+        assert len(results) == 1
+        assert results[0] == "OR-1"
+
+    def test_room_id_deduplication(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Multiple catalogs with the same room_id yield only one entry."""
+        import medtech.gui.app as app_module
+        from hospital_dashboard.procedure_controller.controller import ControllerBackend
+
+        class _Prop:
+            def __init__(self, name: str, current_value: str) -> None:
+                self.name = name
+                self.current_value = current_value
+
+        class _Catalog:
+            def __init__(self, props: list[_Prop]) -> None:
+                self.properties = props
+
+        class _FakeController(ControllerBackend):
+            def __init__(self) -> None:
+                pass
+
+            @property
+            def catalogs(self) -> dict[tuple[str, str], Any]:
+                return {
+                    ("h1", "s1"): _Catalog([_Prop("room_id", "OR-2")]),
+                    ("h1", "s2"): _Catalog([_Prop("room_id", "OR-2")]),
+                }
+
+            def is_ready(self) -> bool:
+                return True
+
+        ctrl = _FakeController()
+        GuiBackend._registry.append(ctrl)
+        monkeypatch.setattr(app_module, "_get_controller_backend", lambda: ctrl)
+
+        results = app_module._discovered_rooms()
+        assert len(results) == 1
+        assert results[0] == "OR-2"
 
 
 # ---------------------------------------------------------------------------
@@ -716,16 +752,16 @@ class TestStaticNavItems:
         paths = [item[0] for item in _STATIC_NAV_ITEMS]
         assert "/dashboard" in paths
 
-    def test_static_nav_has_controller(self) -> None:
+    def test_controller_is_per_room_not_static(self) -> None:
         from medtech.gui.app import _STATIC_NAV_ITEMS
 
         paths = [item[0] for item in _STATIC_NAV_ITEMS]
-        assert "/controller" in paths
+        assert "/controller" not in paths
 
     def test_static_nav_count(self) -> None:
         from medtech.gui.app import _STATIC_NAV_ITEMS
 
-        assert len(_STATIC_NAV_ITEMS) == 2
+        assert len(_STATIC_NAV_ITEMS) == 1
 
 
 # ---------------------------------------------------------------------------
