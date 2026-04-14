@@ -35,15 +35,13 @@
             <!-- Discovery peers: Connext defaults (multicast + localhost) -->
         </qos_profile>
 
-        <!-- Docker simulation — multicast disabled, explicit CDS peers -->
+        <!-- Docker simulation — multicast disabled.
+             NDDS_DISCOVERY_PEERS env var supplies the per-container CDS peer
+             (e.g. hospital-gateway:7400, or-1-gateway:7400).  No initial_peers
+             are set here so the env var is not overridden by XML. -->
         <qos_profile name="Docker">
             <domain_participant_qos>
                 <discovery>
-                    <initial_peers>
-                        <element>builtin.shmem://</element>
-                        <element>builtin.udpv4://localhost</element>
-                        <element>rtps@udpv4://cloud-discovery-service:7400</element>
-                    </initial_peers>
                     <multicast_receive_addresses/>
                 </discovery>
                 <property>
