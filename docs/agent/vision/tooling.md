@@ -234,8 +234,9 @@ medtech launch --list
 # --- Single hospital (unnamed, flat networks, no NAT) ---
 
 medtech run hospital
-# Running: docker run --rm -d --name cloud-discovery-service ...
-# Running: docker run --rm -d --name routing-service ...
+# Running: docker run --rm -d --name gateway ...  (CDS base)
+# Running: docker run --rm -d --name gateway-rs --network container:gateway ...  (co-located RS)
+# Running: docker run --rm -d --name gateway-collector --network container:gateway ...  (co-located Collector)
 # Running: docker run --rm -d --name medtech-gui -p 8080:8080 ...
 
 medtech run or --name OR-5
@@ -252,8 +253,9 @@ medtech run hospital --name hospital-a
 # Running: docker network create medtech_hospital-a_surgical-net --subnet 10.10.1.0/24
 # Running: docker network create medtech_hospital-a_hospital-net --subnet 10.10.2.0/24
 # Running: docker run --privileged -d --name hospital-a-nat ...
-# Running: docker run --rm -d --name hospital-a-cds ...
-# Running: docker run --rm -d --name hospital-a-routing ...
+# Running: docker run --rm -d --name hospital-a-gateway ...  (CDS base)
+# Running: docker run --rm -d --name hospital-a-gateway-rs --network container:hospital-a-gateway ...  (co-located RS)
+# Running: docker run --rm -d --name hospital-a-gateway-collector --network container:hospital-a-gateway ...  (co-located Collector)
 # Running: docker run --rm -d --name hospital-a-gui -p 8080:8080 ...
 # ✓ hospital-a started — dashboard at http://localhost:8080
 

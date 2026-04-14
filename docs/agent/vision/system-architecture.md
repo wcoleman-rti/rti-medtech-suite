@@ -181,7 +181,7 @@ available — without requiring restart.
 </discovery_config>
 <discovery>
     <initial_peers>
-        <element>rtps@udpv4://hospital-a-cds:7400</element>
+        <element>rtps@udpv4://hospital-a-gateway:7400</element>
     </initial_peers>
 </discovery>
 ```
@@ -228,7 +228,7 @@ multicast or manual peer configuration.
 docker run --rm \
   -e OBSERVABILITY_DOMAIN=19 \
   -e OBSERVABILITY_OUTPUT_DOMAIN=29 \
-  -e OBSERVABILITY_OUTPUT_COLLECTOR_PEER="rtps@udpv4://hospital-a-cds:7400" \
+  -e OBSERVABILITY_OUTPUT_COLLECTOR_PEER="rtps@udpv4://hospital-a-gateway:7400" \
   -e CFG_NAME="NonSecureForwarderLANtoLAN" \
   rticom/collector-service:latest
 
@@ -665,9 +665,48 @@ Each logical host is a Docker container. Custom Docker networks simulate the net
 
 | Docker Network | Simulates | Containers |
 |----------------|-----------|------------|
-| `surgical-net` | Per-OR surgical LAN | Robot sim, surgeon console, digital twin display, bedside monitors, procedure context sim, Service Hosts, per-room Routing Service |
-| `hospital-net` | Hospital backbone | Dashboard, ClinicalAlerts engine, Cloud Discovery Service, Collector Service, Prometheus, Grafana Loki, Grafana |
-| `orchestration-net` | Orchestration control-plane | Procedure Controller, Service Hosts (dual-homed: surgical-net + orchestration-net), per-room Routing Service (dual-homed: surgical-net + hospital-net, also on orchestration-net for Domain 11 input), Cloud Discovery Service — Service Hosts bridge both networks to host surgical services on `surgical-net` while receiving orchestration commands on `orchestration-net` |
+| `surgical-net` | Per-OR surgical LAN | Robot sim, surgeon console, digital twin display, bedside monitors, procedure context sim, Service Hosts, per-room gateway (`*-or<N>-gateway`: RS + Collector, shared namespace) |
+| `hospital-net` | Hospital backbone | Hospital gateway (`*-gateway`: CDS + RS + Collector, shared namespace), Dashboard, ClinicalAlerts engine, Prometheus, Grafana Loki, Grafana |
+| `orchestration-net` | Orchestration control-plane | Procedure Controller, Service Hosts (dual-homed: surgical-net + orchestration-net), hospital gateway, per-room gateway — Service Hosts bridge both networks to host surgical services on `surgical-net` while receiving orchestration commands on `orchestration-net` |
+| `cloud-net` **(V3.0)** | Enterprise WAN | Cloud gateway (`cloud-gateway`: CDS + WAN RS + Collector, shared namespace), Command Center dashboard — **not created until V3.0 implementation** |
+
+#### Infrastructure Gateway Containers (Shared Network Namespace)
+
+In production, RTI infrastructure services (CDS, Routing Service, Collector Service) for
+a given deployment instance are co-located on a single infrastructure appliance. The Docker
+simulation preserves this **"container == host"** metaphor using Docker's shared network
+namespace (`--network container:<base>`): multiple containers share a single network
+identity (IP address, hostname, port space) while running official RTI Docker Hub images
+unmodified.
+
+**How it works:** A base container is launched first with all required Docker network
+attachments. Subsequent infrastructure containers join the base container's network
+namespace via `--network container:<base>`. All containers in the group share the same
+IP on every attached network, appear as a single node in topology visualization, and
+can communicate via `localhost`. Port conflicts are not a concern because CDS (7400),
+RS (admin port), and Collector Service (control/exporter ports) use distinct port ranges.
+
+**Gateway naming convention:** The consolidated infrastructure node is named `gateway`
+with a deployment-instance prefix. The name is deliberately service-neutral — it
+represents the combined discovery, routing, and telemetry gateway at the boundary of
+the deployment instance, not any single RTI service.
+
+| Instance Level | Gateway Hostname | Base Image | Co-located Services |
+|----------------|-----------------|------------|---------------------|
+| Hospital | `<hospital>-gateway` | `rticom/cloud-discovery-service` | CDS (base) + RS + Collector |
+| Room | `<hospital>-<room>-gateway` | `rticom/routing-service` (or custom) | RS (base) + Collector |
+| Cloud (V3.0) | `cloud-gateway` | `rticom/cloud-discovery-service` | CDS (base) + WAN RS + Collector |
+| Unnamed hospital | `gateway` | `rticom/cloud-discovery-service` | CDS (base) + RS + Collector |
+
+The base image determines startup ordering — CDS starts first at the hospital and cloud
+levels (other services need discovery), RS starts first at the room level (the room's
+primary role is data routing). The `medtech` CLI launches the base container, waits for
+its health check, then launches co-located services with `--network container:<gateway>`.
+
+**Topology visualization benefit:** `medtech status --topology` and DockGraph show
+consolidated gateway nodes rather than a proliferation of per-service infrastructure
+containers, making the simulated topology visually match the production architecture
+diagram.
 | `cloud-net` **(V3.0)** | Enterprise WAN | WAN Routing Service (dual-homed: hospital-net + cloud-net), Command Center dashboard, Cloud Discovery Service — **not created until V3.0 implementation** |
 
 #### Multi-Hospital Simulation (V1.4)
@@ -695,31 +734,37 @@ segment.
 medtech_wan-net (172.30.0.0/24) ─── simulated public internet
 ├── hospital-a-nat    172.30.0.2    (MASQUERADE)
 ├── hospital-b-nat    172.30.0.3    (MASQUERADE)
-└── wan-cds           172.30.0.10   (Cloud Discovery Service — V3.0)
+└── cloud-gateway     172.30.0.10   (CDS + WAN RS + Collector — V3.0)
 
 medtech_hospital-a_surgical-net (10.10.1.0/24) ─── private
-├── hospital-a-cds
-├── hospital-a-routing
+├── hospital-a-gateway              (CDS + RS + Collector — shared namespace)
+├── hospital-a-or1-gateway          (per-room RS + Collector — shared namespace)
 ├── hospital-a-robot-service-host-or1
 ├── hospital-a-twin-or1           :8081
 └── hospital-a-nat  (dual-homed → wan-net)
 
 medtech_hospital-a_hospital-net (10.10.2.0/24) ─── private
-├── hospital-a-cds
-├── hospital-a-routing
+├── hospital-a-gateway              (same node as above — multi-homed)
+├── hospital-a-or1-gateway          (same node — multi-homed)
 ├── hospital-a-gui                :8080
 └── hospital-a-nat  (dual-homed → wan-net)
 
+medtech_hospital-a_orchestration-net (10.10.3.0/24) ─── private
+├── hospital-a-gateway              (same node — multi-homed)
+├── hospital-a-or1-gateway          (same node — multi-homed)
+├── hospital-a-controller-or1
+└── hospital-a-robot-service-host-or1  (dual-homed: surgical + orchestration)
+
 medtech_hospital-b_surgical-net (10.20.1.0/24) ─── private
-├── hospital-b-cds
-├── hospital-b-routing
+├── hospital-b-gateway
+├── hospital-b-or4-gateway
 ├── hospital-b-robot-service-host-or4
 ├── hospital-b-twin-or4           :9081
 └── hospital-b-nat  (dual-homed → wan-net)
 
 medtech_hospital-b_hospital-net (10.20.2.0/24) ─── private
-├── hospital-b-cds
-├── hospital-b-routing
+├── hospital-b-gateway
+├── hospital-b-or4-gateway
 ├── hospital-b-gui                :9080
 └── hospital-b-nat  (dual-homed → wan-net)
 ```
@@ -821,8 +866,9 @@ The `wan-net` subnet (`172.30.0.0/24`) is shared and created once.
 
 ##### V3.0 Extension: Cloud Layer
 
-V3.0 adds `medtech run cloud --name <id>` which launches a Cloud CDS
-and WAN Routing Service on `wan-net`, enabling cross-hospital data
+V3.0 adds `medtech run cloud --name <id>` which launches a
+`cloud-gateway` container on `wan-net` (CDS + WAN Routing Service +
+Collector, shared network namespace), enabling cross-hospital data
 bridging through the NAT infrastructure already deployed by V1.4. The
 Docker topology, NAT routers, and subnet scheme require no changes.
 
@@ -837,9 +883,9 @@ hospital command center runs on the backbone.
 
 | Container | Launched By | Network | Serves | Host Port | Simulates |
 |-----------|-------------|---------|--------|-----------|-----------|
-| `cloud-discovery-service` | `docker run --rm` | `hospital-net`, `surgical-net`, `orchestration-net` | Multicast-free discovery | — | CDS appliance |
-| `routing-service` | `docker run --rm` | `hospital-net`, `surgical-net`, `orchestration-net` | Per-room MedtechBridge: Domain 10+11 → 20 | — | Per-room routing appliance |
-| `collector-service` | `docker run --rm` | `hospital-net` | Telemetry aggregation (Monitoring Library 2.0) | — | Per-facility Collector Service appliance |
+| `gateway` (base) | `docker run --rm` | `hospital-net`, `surgical-net`, `orchestration-net` | CDS — discovery bootstrapper | — | Hospital infrastructure appliance |
+| `gateway` + RS | `docker run --rm --network container:gateway` | (shares `gateway` namespace) | Per-room MedtechBridge: Domain 10+11 → 20 | — | (co-located on gateway) |
+| `gateway` + Collector | `docker run --rm --network container:gateway` | (shares `gateway` namespace) | Telemetry aggregation (Domain 29) | — | (co-located on gateway) |
 | `medtech-gui` | `docker run --rm` | `hospital-net` | Hospital Dashboard (SPA shell — dashboard only) | 8080 | Hospital control room workstation |
 | `medtech-controller-or1` | `docker run --rm` | `orchestration-net` | Procedure Controller (OR-1, room-scoped) | — | In-OR orchestration controller |
 | `medtech-twin-or1` | `docker run --rm` | `surgical-net` | Digital Twin (OR-1, standalone) | 8081 | In-OR display at OR-1 |
@@ -849,20 +895,22 @@ hospital command center runs on the backbone.
 | Container | Launched By | Network | Host Port |
 |-----------|-------------|---------|-----------|
 | `hospital-a-nat` | `docker run --privileged` | private nets + `wan-net` | — |
-| `hospital-a-cds` | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_surgical-net`, `hospital-a_orchestration-net` | — |
-| `hospital-a-routing` | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_surgical-net`, `hospital-a_orchestration-net` | — |
-| `hospital-a-collector` | `docker run --rm` | `hospital-a_hospital-net` | — |
+| `hospital-a-gateway` (base: CDS) | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_surgical-net`, `hospital-a_orchestration-net` | — |
+| `hospital-a-gateway` + RS | `docker run --rm --network container:hospital-a-gateway` | (shared namespace) | — |
+| `hospital-a-gateway` + Collector | `docker run --rm --network container:hospital-a-gateway` | (shared namespace) | — |
 | `hospital-a-gui` | `docker run --rm` | `hospital-a_hospital-net` | 8080 |
 | `hospital-a-controller-or1` | `docker run --rm` | `hospital-a_orchestration-net` | — |
 | `hospital-a-twin-or1` | `docker run --rm` | `hospital-a_surgical-net` | 8081 |
 
-All containers — infrastructure (CDS, Routing Service, Collector Service),
-the central GUI, and per-OR service hosts and twins — are launched via
-`docker run --rm`.
-The `medtech` CLI wraps these calls (see [tooling.md](tooling.md) §
-`medtech` CLI). The `docker-compose.yml` is retained for image building
-(`docker compose build`) and as a legacy/reference path, but the
-standard runtime launch path is pure `docker run`.
+Infrastructure services within a gateway group share a single network identity.
+The `--network container:<base>` flag causes the RS and Collector containers to
+join the base CDS container's network namespace — they share the same IP address,
+hostname, and port space on all attached networks. This mirrors a production
+deployment where CDS, RS, and Collector run as co-located processes on a single
+infrastructure appliance.
+
+> **Docker Compose equivalent:** `network_mode: "service:<base-service>"` provides
+> the same shared-namespace behavior in Compose files.
 
 Each twin container runs `python -m surgical_procedure.digital_twin` in
 standalone mode (`__main__` guard). It creates its own `control`-tag
@@ -912,28 +960,27 @@ relationships in the browser at `http://localhost:7800`.
 Docker Compose `depends_on` with health checks must enforce the following startup order
 to prevent intermittent initialization failures:
 
-1. **Cloud Discovery Service** starts first and reports healthy (listening on its configured
-   port) before any application container starts. All participants use Cloud Discovery
-   Service as their initial peer; if it is unavailable at startup, discovery is delayed
+1. **Gateway container (CDS base)** starts first and reports healthy (CDS listening on
+   port 7400) before any other container starts. All participants use the gateway
+   hostname as their initial peer; if it is unavailable at startup, discovery is delayed
    and initialization time budgets may be exceeded.
-2. **Routing Service** starts after Cloud Discovery Service is healthy and before any
-   Hospital domain consumer (dashboard, ClinicalAlerts engine). Routing Service must be dual-homed
-   and matched on both networks before bridged data can flow.
-3. **Surgical procedure instances** start after Cloud Discovery Service is healthy.
+2. **Gateway co-located services (RS, Collector)** start after the CDS base is healthy,
+   within the same network namespace. Routing Service must be discoverable on both
+   networks before bridged data can flow. Collector Service should be available before
+   application participants start so that Monitoring Library 2.0 telemetry is captured
+   from the beginning.
+3. **Surgical procedure instances** start after the gateway is healthy.
    They operate entirely on `surgical-net` and do not depend on Routing Service or
    Hospital domain services.
-4. **Hospital domain applications** (dashboard, ClinicalAlerts engine) start after both Cloud
-   Discovery Service and Routing Service are healthy.
-5. **Collector Service** starts alongside other infrastructure services. It has no
-   strict ordering dependency but should be available before application participants
-   start so that Monitoring Library 2.0 telemetry is captured from the beginning.
-6. **Visualization stack** (Prometheus, Grafana Loki, Grafana) — when enabled via
+4. **Hospital domain applications** (dashboard, ClinicalAlerts engine) start after the
+   gateway (including RS) is healthy.
+5. **Visualization stack** (Prometheus, Grafana Loki, Grafana) — when enabled via
    `--observability` for local development, or as cloud infrastructure in V3.0 —
    has no startup ordering dependency with application services.
 
 Health checks use the simplest reliable method per service:
-- Cloud Discovery Service: TCP port check on its configured listening port
-- Routing Service: TCP port check on its administration port or a custom "ready" script
+- Gateway (CDS base): TCP port check on CDS listening port (7400)
+- Gateway (RS co-located): TCP port check on RS administration port
 - Application containers: a process-alive check (`CMD ["pgrep", "-f", "<process>"]`)
 
 ### Transport Configuration
@@ -964,7 +1011,7 @@ Containers set `MEDTECH_TRANSPORT_PROFILE=Docker` which selects the Docker trans
         <initial_peers>
             <element>builtin.shmem://</element>
             <element>builtin.udpv4://localhost</element>
-            <element>rtps@udpv4://cloud-discovery-service:7400</element>
+            <element>rtps@udpv4://gateway:7400</element>
         </initial_peers>
         <multicast_receive_addresses/>
     </discovery>
@@ -989,7 +1036,7 @@ Shared memory (SHMEM) transport is appropriate and efficient for communication b
 #### Hostname-Based Initial Peers and DNS Tracking
 
 Upward-facing participants (RS output, Collector forwarding) use **hostname-based
-initial peers** (e.g., `rtps@udpv4://hospital-a-cds:7400`) rather than hardcoded
+initial peers** (e.g., `rtps@udpv4://hospital-a-gateway:7400`) rather than hardcoded
 IP addresses. This decouples peer configuration from IP assignment and allows the
 same configuration to work across different Docker network setups.
 
@@ -1022,11 +1069,13 @@ Hospital networks commonly restrict UDP multicast for security reasons, making s
 - The upper-level CDS also serves as the initial peer for upward-facing RS and Collector participants from the level below
 - Primary + backup Cloud Discovery Service instances recommended for high availability
 
-**Design decision (resolved):** At the hospital level, Cloud Discovery Service runs
-as a dedicated container (`rticom/cloud-discovery-service` from Docker Hub) attached
-to `hospital-net`, `surgical-net`, and `orchestration-net`. This gives all participants
-across all hospital networks a direct discovery path. Configuration and deployment
-details are in [Phase 1 Step 1.4](../implementation/phase-1-foundation.md).
+**Design decision (resolved):** At the hospital level, the CDS runs as the base
+process of the consolidated `<hospital>-gateway` container
+(`rticom/cloud-discovery-service` from Docker Hub), attached to `hospital-net`,
+`surgical-net`, and `orchestration-net`. This gives all participants across all
+hospital networks a direct discovery path — and RS + Collector co-locate in the
+same network namespace. Configuration and deployment details are in
+[Phase 1 Step 1.4](../implementation/phase-1-foundation.md).
 
 ### Routing Service Deployment (Per-Room MedtechBridge)
 
