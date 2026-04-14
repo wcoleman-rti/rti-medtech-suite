@@ -88,6 +88,108 @@ Domain IDs use a **decade-offset** scheme: the tens digit encodes the deployment
           room/OR-1/procedure/...   room/OR-3/procedure/...
 ```
 
+#### Gateway Interconnection — Layered Databus with Deployable Instances
+
+The medtech suite instantiates the RTI layered databus pattern with three
+deployment tiers. Each tier is a **replicable deployment instance** containing
+its own databuses and participants, with a **gateway** at its boundary that
+selectively routes application data **northbound only** to the next tier.
+This mirrors the RTI V2X reference architecture where a Vehicle is a bounded
+instance containing internal databuses, connected upward through Routing
+Service to fleet and municipal layers.
+
+Unlike the traditional flat layered-databus diagram where gateways float
+between layers, this diagram nests each instance inside its parent to show
+**where the gateway lives** — it belongs to the instance it serves, sitting
+at user boundary between its local databuses and the parent-level databus.
+This makes network visibility explicit: a gateway can only discover and
+route to nodes on the networks its instance is attached to.
+
+> **Cloud-gateway omits RS** — hospital-level Routing Services already bridge
+> Domain 20 → 30 and publish directly into the Cloud databus. Cloud-native
+> applications discover those RS output participants via standard DDS
+> discovery. A cloud-side RS would add an unnecessary hop. However, if cloud
+> services are not directly WAN-accessible, a WAN RS at the cloud boundary
+> may serve as a single ingress point (firewall-like) — this is a V3.0
+> deployment decision, orthogonal to data-plane routing.
+
+```text
+╔═════════════════════════════════════════════════════════════════════════╗
+║  CLOUD INSTANCE  ×1                                                     ║
+║  (Cloud)                 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓               ║
+║                          ┃         cloud-gateway        ┃               ║
+║                          ┃         -------------        ┃               ║
+║                          ┃  CDS (discovery)             ┃               ║ 
+║                          ┃  Collector (telemetry fwd)   ┃               ║ 
+║                          ┗━━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━┛               ║ 
+║                                             │                           ║ 
+║                                             ▼                           ║  
+║  ◄═══════ ENTERPRISE / CLOUD DATABUS (Domain 30) ═════════►  V3.0       ║ 
+║  Command Center · MCP Server · Central Collector                        ║
+║                                             ▲                           ║
+║                                   CLOUD-WAN │                           ║
+║  ╔══════════════════════════════════════════╪══════════════════╗        ║
+║  ║ HOSPITAL INSTANCE  ×N                    │                  ║        ║
+║  ║ (Hospital A, Hospital B, ...)            │                  ║        ║
+║  ║                                          │                  ║        ║
+║  ║               ┏━━━━━━━━━━━━━━━━━━━━━━━━━━┷━━━┓              ║        ║
+║  ║               ┃  *-gateway (per hospital)    ┃              ║        ║
+║  ║               ┃  ------------------------    ┃              ║        ║
+║  ║               ┃  CDS (discovery)             ┃ ▲ north-     ║        ║
+║  ║               ┃  Collector (telemetry fwd)   ┃ │ bound      ║        ║
+║  ║               ┃  RS (selective routing)      ┃ │ only       ║        ║
+║  ║               ┗━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━┛              ║        ║
+║  ║                                │                            ║        ║
+║  ║                                ▼                            ║        ║
+║  ║  ◄══════ HOSPITAL INTEGRATION DATABUS (Domain 20) ════►     ║        ║
+║  ║  Dashboard · ClinicalAlerts Engine · Room Aggregation       ║        ║
+║  ║                                ▲                            ║        ║
+║  ║                   HOSPITAL-LAN │                            ║        ║
+║  ║   ╔════════════════════════════╪══════════════════╗         ║        ║
+║  ║   ║ ROOM INSTANCE  ×M          │                  ║         ║        ║
+║  ║   ║ (OR-1, ICU-3, ...)         │                  ║         ║        ║
+║  ║   ║                            │                  ║         ║        ║
+║  ║   ║       ┏━━━━━━━━━━━━━━━━━━━━┷━━━━━━━┓          ║         ║        ║
+║  ║   ║       ┃  *-or1-gateway (per room)  ┃          ║         ║        ║
+║  ║   ║       ┃  ------------------------  ┃          ║         ║        ║
+║  ║   ║       ┃  CDS (discovery)           ┃ ▲ north- ║         ║        ║
+║  ║   ║       ┃  Collector (telemetry fwd) ┃ │ bound  ║         ║        ║
+║  ║   ║       ┃  RS (selective routing)    ┃ │ only   ║         ║        ║
+║  ║   ║       ┗━━━━━━━━━━━┯━━━━━━━━━━━━━━━━┛          ║         ║        ║
+║  ║   ║            OR-LAN │                           ║         ║        ║
+║  ║   ║                   ▼                           ║         ║        ║
+║  ║   ║  ◄══ PROCEDURE DATABUS (Domain 10) ══════►    ║         ║        ║
+║  ║   ║  Robot Arms · Digital Twin                    ║         ║        ║
+║  ║   ║                                               ║         ║        ║
+║  ║   ║  ◄═ ORCHESTRATION DATABUS (Domain 11) ═══►    ║         ║        ║
+║  ║   ║  Controller · Service Hosts                   ║         ║        ║
+║  ║   ╚═══════════════════════════════════════════════╝         ║        ║
+║  ╚═════════════════════════════════════════════════════════════╝        ║
+╚═════════════════════════════════════════════════════════════════════════╝
+
+Legend:  ╔═══╗ deployable instance   ◄═══► databus   ┏━━━┓ gateway
+         ▲ northbound-only flow      ×N replication
+```
+
+**Observability plane** (Collector Service forwarding chain — parallel to
+data plane):
+
+```text
+  ┌──────────┐            ┌──────────┐            ┌──────────┐
+  │ Dom 19   │──  fwd  ──►│ Dom 29   │──  fwd  ──►│ Dom 39   │──► Prometheus
+  │ (room)   │            │(hospital)│            │ (cloud)  │    Loki
+  └──────────┘            └──────────┘            └──────────┘
+  room-gateway             hospital-gateway        cloud-gateway
+  Collector                Collector               Collector
+```
+
+Each gateway's Collector Service receives telemetry on the local observability
+domain and forwards it northbound to the next tier's observability domain. The
+chain terminates at the cloud Collector, which stores metrics in Prometheus and
+logs in Grafana Loki.
+
+Unified data model: all levels share the same IDL type definitions.
+
 ### Cross-Domain Topic Routing (A2 Hybrid Architecture)
 
 The medtech suite uses a **cross-domain topic routing** architecture: Routing Service
@@ -136,9 +238,9 @@ interacts with other levels.
 
 | Level | CDS Container | Networks | Role |
 |-------|---------------|----------|------|
-| Room | (uses hospital-level CDS — room is not independently discoverable) | — | Room participants use the hospital CDS via `surgical-net` / `orchestration-net` attachment |
-| Hospital | `<hospital>-cds` | `hospital-net`, `surgical-net`, `orchestration-net` | Intra-hospital discovery for all participants + upward-facing initial peer for room RS and Collector |
-| Cloud (V3.0) | `wan-cds` | `wan-net` | Cross-facility discovery for WAN RS, hospital-to-cloud Collector forwarding, and cloud-level applications |
+| Room | `<hospital>-<room>-gateway` (base) | `surgical-net`, `orchestration-net` | Multicast-free discovery for room-local participants (robot service hosts, digital twin, procedure controller). Also the initial peer for upward-facing RS output participants on `hospital-net` |
+| Hospital | `<hospital>-gateway` (base) | `hospital-net`, `surgical-net`, `orchestration-net` | Intra-hospital discovery for all participants + upward-facing initial peer for hospital RS and Collector on `wan-net` |
+| Cloud (V3.0) | `cloud-gateway` (base) | `wan-net` | Cross-facility discovery for hospital WAN RS output participants, hospital-to-cloud Collector forwarding, and cloud-level applications |
 
 The observing level's CDS also serves as the **initial peer for upward-facing
 participants** from the level below. For example, the per-room Routing Service's
@@ -665,10 +767,10 @@ Each logical host is a Docker container. Custom Docker networks simulate the net
 
 | Docker Network | Simulates | Containers |
 |----------------|-----------|------------|
-| `surgical-net` | Per-OR surgical LAN | Robot sim, surgeon console, digital twin display, bedside monitors, procedure context sim, Service Hosts, per-room gateway (`*-or<N>-gateway`: RS + Collector, shared namespace) |
+| `surgical-net` | Per-OR surgical LAN | Robot sim, surgeon console, digital twin display, bedside monitors, procedure context sim, Service Hosts, per-room gateway (`*-or<N>-gateway`: CDS + RS + Collector, shared namespace) |
 | `hospital-net` | Hospital backbone | Hospital gateway (`*-gateway`: CDS + RS + Collector, shared namespace), Dashboard, ClinicalAlerts engine, Prometheus, Grafana Loki, Grafana |
 | `orchestration-net` | Orchestration control-plane | Procedure Controller, Service Hosts (dual-homed: surgical-net + orchestration-net), hospital gateway, per-room gateway — Service Hosts bridge both networks to host surgical services on `surgical-net` while receiving orchestration commands on `orchestration-net` |
-| `cloud-net` **(V3.0)** | Enterprise WAN | Cloud gateway (`cloud-gateway`: CDS + WAN RS + Collector, shared namespace), Command Center dashboard — **not created until V3.0 implementation** |
+| `cloud-net` **(V3.0)** | Enterprise WAN | Cloud gateway (`cloud-gateway`: CDS + Collector, shared namespace), Command Center dashboard — **not created until V3.0 implementation** |
 
 #### Infrastructure Gateway Containers (Shared Network Namespace)
 
@@ -694,14 +796,13 @@ the deployment instance, not any single RTI service.
 | Instance Level | Gateway Hostname | Base Image | Co-located Services |
 |----------------|-----------------|------------|---------------------|
 | Hospital | `<hospital>-gateway` | `rticom/cloud-discovery-service` | CDS (base) + RS + Collector |
-| Room | `<hospital>-<room>-gateway` | `rticom/routing-service` (or custom) | RS (base) + Collector |
-| Cloud (V3.0) | `cloud-gateway` | `rticom/cloud-discovery-service` | CDS (base) + WAN RS + Collector |
+| Room | `<hospital>-<room>-gateway` | `rticom/cloud-discovery-service` | CDS (base) + RS + Collector |
+| Cloud (V3.0) | `cloud-gateway` | `rticom/cloud-discovery-service` | CDS (base) + Collector |
 | Unnamed hospital | `gateway` | `rticom/cloud-discovery-service` | CDS (base) + RS + Collector |
 
-The base image determines startup ordering — CDS starts first at the hospital and cloud
-levels (other services need discovery), RS starts first at the room level (the room's
-primary role is data routing). The `medtech` CLI launches the base container, waits for
-its health check, then launches co-located services with `--network container:<gateway>`.
+The base image is `rticom/cloud-discovery-service` at all levels — CDS starts first
+(other services need discovery). The `medtech` CLI launches the base container, waits
+for its health check, then launches co-located services with `--network container:<gateway>`.
 
 **Topology visualization benefit:** `medtech status --topology` and DockGraph show
 consolidated gateway nodes rather than a proliferation of per-service infrastructure
@@ -734,11 +835,11 @@ segment.
 medtech_wan-net (172.30.0.0/24) ─── simulated public internet
 ├── hospital-a-nat    172.30.0.2    (MASQUERADE)
 ├── hospital-b-nat    172.30.0.3    (MASQUERADE)
-└── cloud-gateway     172.30.0.10   (CDS + WAN RS + Collector — V3.0)
+└── cloud-gateway     172.30.0.10   (CDS + Collector — V3.0)
 
 medtech_hospital-a_surgical-net (10.10.1.0/24) ─── private
 ├── hospital-a-gateway              (CDS + RS + Collector — shared namespace)
-├── hospital-a-or1-gateway          (per-room RS + Collector — shared namespace)
+├── hospital-a-or1-gateway          (per-room CDS + RS + Collector — shared namespace)
 ├── hospital-a-robot-service-host-or1
 ├── hospital-a-twin-or1           :8081
 └── hospital-a-nat  (dual-homed → wan-net)
@@ -867,10 +968,20 @@ The `wan-net` subnet (`172.30.0.0/24`) is shared and created once.
 ##### V3.0 Extension: Cloud Layer
 
 V3.0 adds `medtech run cloud --name <id>` which launches a
-`cloud-gateway` container on `wan-net` (CDS + WAN Routing Service +
-Collector, shared network namespace), enabling cross-hospital data
-bridging through the NAT infrastructure already deployed by V1.4. The
-Docker topology, NAT routers, and subnet scheme require no changes.
+`cloud-gateway` container on `wan-net` (CDS + Collector, shared
+network namespace), enabling cross-hospital data bridging through the
+NAT infrastructure already deployed by V1.4. Hospital-level Routing
+Services bridge Domain 20 → 30 directly; cloud-native applications
+discover those RS output participants via standard DDS discovery on
+Domain 30. The Docker topology, NAT routers, and subnet scheme require
+no changes.
+
+> **V3.0 WAN ingress consideration:** If cloud services are not directly
+> accessible on the WAN (e.g., behind a firewall), a WAN Routing Service
+> at the cloud boundary may serve as a single ingress point — analogous
+> to RTI's edge-to-data-center pattern where both sides act as WAN
+> gateway endpoints. This is a deployment/security decision, orthogonal
+> to the data-plane routing architecture.
 
 #### Split-GUI Deployment (V1.4)
 
