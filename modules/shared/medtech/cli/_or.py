@@ -313,7 +313,7 @@ def _start_room_gateway(
             "/opt/medtech/config/CloudDiscoveryService.xml:ro",
             "-v",
             f"{license_file}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro",
-            "medtech/cloud-discovery-service",
+            "rticom/cloud-discovery-service:7.6.0",
             "-cfgFile",
             "/opt/medtech/config/CloudDiscoveryService.xml",
             "-cfgName",

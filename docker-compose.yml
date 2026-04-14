@@ -55,14 +55,7 @@ services:
   # ─── Infrastructure ─────────────────────────────────────────────
 
   cloud-discovery-service:
-    image: medtech/cloud-discovery-service
-    build:
-      context: .
-      dockerfile: docker/cloud-discovery-service.Dockerfile
-      additional_contexts:
-        connext: "${NDDSHOME:-/opt/rti.com/rti_connext_dds-7.6.0}"
-      args:
-        <<: *build-args
+    image: rticom/cloud-discovery-service:7.6.0
     container_name: cloud-discovery-service
     command: ["-cfgFile", "/opt/medtech/config/CloudDiscoveryService.xml", "-cfgName", "DockerCDS", "-verbosity", "WARN"]
     volumes:

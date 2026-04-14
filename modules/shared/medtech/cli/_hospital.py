@@ -15,9 +15,18 @@ from medtech.cli._run import run
 # Constants
 # ---------------------------------------------------------------------------
 
-_PROJECT_ROOT = (
-    Path(__file__).resolve().parents[4]
-)  # modules/shared/medtech/cli -> root
+
+def _find_project_root() -> Path:
+    """Walk up from this file to find the project root (contains pyproject.toml)."""
+    current = Path(__file__).resolve().parent
+    for parent in (current, *current.parents):
+        if (parent / "pyproject.toml").exists():
+            return parent
+    # Fallback: source tree layout (modules/shared/medtech/cli -> root)
+    return Path(__file__).resolve().parents[4]
+
+
+_PROJECT_ROOT = _find_project_root()
 
 # Common medtech-env variables matching docker-compose.yml x-medtech-env
 _MEDTECH_ENV: dict[str, str] = {
@@ -263,7 +272,7 @@ def _start_gateway(
             "-v",
             f"{os.environ.get('RTI_LICENSE_FILE', str(root / 'rti_license.dat'))}:"
             "/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro",
-            "medtech/cloud-discovery-service",
+            "rticom/cloud-discovery-service:7.6.0",
             "-cfgFile",
             "/opt/medtech/config/CloudDiscoveryService.xml",
             "-cfgName",
