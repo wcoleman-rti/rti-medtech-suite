@@ -65,7 +65,7 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ---
 
-## Step SIM.2 — `medtech run hospital`
+## Step SIM.2 — `medtech run hospital` ✅ `04b7aee`
 
 ### Work
 
@@ -132,16 +132,16 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ### Test Gate
 
-- [ ] `medtech run hospital` starts hospital-gateway (CDS + RS + Collector in shared namespace) and GUI containers (flat networks)
-- [ ] `medtech run hospital --name hospital-a` creates per-hospital networks with explicit subnets
-- [ ] NAT router container is created for named hospitals with `--privileged` and IP forwarding
-- [ ] `medtech_wan-net` is created exactly once across multiple named hospitals
-- [ ] GUI port allocation follows ordinal scheme (8080, 9080, …)
-- [ ] Each underlying `docker run` command is printed to stdout
-- [ ] Docker networks are created if absent
-- [ ] Second unnamed hospital errors
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] `medtech run hospital` starts hospital-gateway (CDS + RS + Collector in shared namespace) and GUI containers (flat networks)
+- [x] `medtech run hospital --name hospital-a` creates per-hospital networks with explicit subnets
+- [x] NAT router container is created for named hospitals with `--privileged` and IP forwarding
+- [x] `medtech_wan-net` is created exactly once across multiple named hospitals
+- [x] GUI port allocation follows ordinal scheme (8080, 9080, …)
+- [x] Each underlying `docker run` command is printed to stdout
+- [x] Docker networks are created if absent
+- [x] Second unnamed hospital errors
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 
