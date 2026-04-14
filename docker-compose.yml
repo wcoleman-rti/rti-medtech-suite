@@ -1,4 +1,4 @@
-# Docker Compose configuration for medtech-suite simulation
+# Docker Compose configuration for rti-medtech-suite simulation
 #
 # Usage:
 #   docker compose --profile build build             Build all base images

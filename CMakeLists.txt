@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(medtech-suite LANGUAGES CXX)
+project(rti-medtech-suite LANGUAGES CXX)
 
 # --- Connext version and architecture (single source of truth) ---
 set(CONNEXT_VERSION "7.6.0" CACHE STRING "RTI Connext DDS version")

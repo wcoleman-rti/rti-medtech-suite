@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 
-os.chdir("/mnt/c/Users/wcoleman/Documents/repos/medtech-suite")
+os.chdir("/mnt/c/Users/wcoleman/Documents/repos/rti-medtech-suite")
 result = subprocess.run(
     [
         sys.executable,

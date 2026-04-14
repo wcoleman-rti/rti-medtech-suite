@@ -906,7 +906,7 @@ The forwarding level for user logs is configured in QoS XML via `<user_forwardin
 ## Project Layout (Target)
 
 ```
-medtech-suite/
+rti-medtech-suite/
 ├── CMakeLists.txt                  # Top-level unified build
 ├── docker-compose.yml              # Multi-container orchestration
 ├── requirements.txt                # Pinned Python package dependencies

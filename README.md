@@ -92,7 +92,7 @@ medtech launch --list
 ## Project Structure
 
 ```text
-medtech-suite/
+rti-medtech-suite/
 ├── interfaces/          # IDL types, QoS XML, domain library
 │   ├── idl/             # IDL type definitions
 │   ├── qos/             # QoS profile XML hierarchy

@@ -1,7 +1,7 @@
 # Third-Party Notices
 
 This file documents third-party software and materials used by the
-medtech-suite project. These components are fetched automatically
+rti-medtech-suite project. These components are fetched automatically
 during CMake configure or build — they are not system prerequisites
 and are not committed to the source tree.
 

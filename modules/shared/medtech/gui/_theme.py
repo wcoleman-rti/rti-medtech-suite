@@ -22,7 +22,14 @@ def _resource_dir() -> Path:
     env = os.environ.get("MEDTECH_RESOURCE_DIR")
     if env:
         return Path(env)
+    # Walk up from this file looking for a sibling share/resources directory.
+    # Works from install tree (install/lib/python/…) and Docker (/opt/medtech/lib/…).
     here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "share" / "resources"
+        if candidate.is_dir():
+            return candidate
+    # Fallback: source tree layout (modules/shared/medtech/gui -> root)
     return here.parents[4] / "install" / "share" / "resources"
 
 
