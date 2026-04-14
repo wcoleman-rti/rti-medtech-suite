@@ -304,22 +304,25 @@ def create_header(
                     mode = "system"
                 app.storage.user[NICEGUI_THEME_MODE_KEY] = mode
 
-            with ui.button(on_click=lambda: _cycle_to(None)).props(
-                "flat round"
-            ).classes("text-white").bind_visibility_from(
-                dark_mode, "value", value=True
+            with (
+                ui.button(on_click=lambda: _cycle_to(None))
+                .props("flat round")
+                .classes("text-white")
+                .bind_visibility_from(dark_mode, "value", value=True)
             ):
                 ui.icon(ICONS["dark_mode"]).classes("text-xl")
-            with ui.button(on_click=lambda: _cycle_to(True)).props(
-                "flat round"
-            ).classes("text-white").bind_visibility_from(
-                dark_mode, "value", value=False
+            with (
+                ui.button(on_click=lambda: _cycle_to(True))
+                .props("flat round")
+                .classes("text-white")
+                .bind_visibility_from(dark_mode, "value", value=False)
             ):
                 ui.icon(ICONS["light_mode"]).classes("text-xl")
-            with ui.button(on_click=lambda: _cycle_to(False)).props(
-                "flat round"
-            ).classes("text-white").bind_visibility_from(
-                dark_mode, "value", backward=lambda v: v is None
+            with (
+                ui.button(on_click=lambda: _cycle_to(False))
+                .props("flat round")
+                .classes("text-white")
+                .bind_visibility_from(dark_mode, "value", backward=lambda v: v is None)
             ):
                 ui.icon(ICONS["auto_mode"]).classes("text-xl")
         header.connection_dot = ConnectionDot(connected=connected)

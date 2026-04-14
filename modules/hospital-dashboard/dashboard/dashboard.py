@@ -530,9 +530,11 @@ def dashboard_content() -> None:
     current_backend = _current_backend()
 
     with ui.column().classes("w-full gap-4 p-4"):
-        with ui.splitter().classes("w-full").style(
-            "min-height: 20rem; max-height: 60vh;"
-        ) as splitter:
+        with (
+            ui.splitter()
+            .classes("w-full")
+            .style("min-height: 20rem; max-height: 60vh;") as splitter
+        ):
             with splitter.before:
                 with ui.column().classes("w-full gap-3"):
                     create_section_header("Active Procedures", ICONS["procedures"])

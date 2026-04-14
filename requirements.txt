@@ -1,5 +1,6 @@
 rti.connext==7.6.0
 nicegui>=2.0
+click>=8.0
 pytest==8.2.*
 pytest-asyncio>=1.0
 pytest-xdist[psutil]==3.5.*

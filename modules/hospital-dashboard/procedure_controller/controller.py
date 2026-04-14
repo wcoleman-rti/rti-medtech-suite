@@ -913,10 +913,13 @@ def _render_summary_card(
         if active
         else f"box-shadow: 0 2px 8px rgba(0,0,0,{OPACITY['shadow']});"
     )
-    with ui.card().classes(
-        "min-h-32 cursor-pointer rounded-lg p-5 transition hover:shadow-lg hover-elevate"
-    ).style(f"background: {_hex_to_rgba(color, fill_alpha)}; {glow_style}").on(
-        "click", on_click
+    with (
+        ui.card()
+        .classes(
+            "min-h-32 cursor-pointer rounded-lg p-5 transition hover:shadow-lg hover-elevate"
+        )
+        .style(f"background: {_hex_to_rgba(color, fill_alpha)}; {glow_style}")
+        .on("click", on_click)
     ):
         with ui.row().classes("items-center gap-4"):
             ui.icon(icon, color=color).classes("text-5xl")
@@ -932,8 +935,12 @@ def _render_host_grid(current_backend: ControllerBackend, refresh_ui: Any) -> No
         create_empty_state("Searching for service hosts...", ICONS["dashboard"])
         return
     services_by_host = current_backend._services_by_host()
-    with ui.element("div").classes("w-full").style(
-        "display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: 1rem; align-content: start;"
+    with (
+        ui.element("div")
+        .classes("w-full")
+        .style(
+            "display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: 1rem; align-content: start;"
+        )
     ):
         for host_id, services in sorted(services_by_host.items()):
             _render_host_tile(current_backend, refresh_ui, host_id, services)
@@ -1040,8 +1047,12 @@ def _render_service_grid(current_backend: ControllerBackend, refresh_ui: Any) ->
         if not visible_items:
             create_empty_state("No matching services", ICONS["service"])
         else:
-            with ui.element("div").classes("w-full").style(
-                "display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 1rem; align-content: start;"
+            with (
+                ui.element("div")
+                .classes("w-full")
+                .style(
+                    "display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 1rem; align-content: start;"
+                )
             ):
                 for (host_id, service_id), catalog in sorted(visible_items):
                     status = current_backend.service_states.get((host_id, service_id))
@@ -1089,10 +1100,16 @@ def _render_host_tile(
     card_style = (
         f"background: {_hex_to_rgba(BRAND_COLORS['blue'], fill_alpha)}; {glow_style}"
     )
-    with ui.card().classes(
-        "w-full rounded-lg p-6 transition cursor-pointer hover:shadow-lg hover-elevate"
-    ).style(card_style).on(
-        "click", lambda hid=host_id: (current_backend.select_host(hid), refresh_ui())
+    with (
+        ui.card()
+        .classes(
+            "w-full rounded-lg p-6 transition cursor-pointer hover:shadow-lg hover-elevate"
+        )
+        .style(card_style)
+        .on(
+            "click",
+            lambda hid=host_id: (current_backend.select_host(hid), refresh_ui()),
+        )
     ):
         # --- Collapsed: icon + name + badge, centered row of action buttons ---
         with ui.column().classes("w-full items-center gap-3"):
@@ -1167,9 +1184,14 @@ def _render_service_tile(
 
     # When selected, span the full grid row so tiles reflow below
     card_style = f"border-left: 6px solid {border_color}; background: {background_color}; {glow_style}"
-    with ui.card().classes(
-        "w-full rounded-lg p-5 transition cursor-pointer hover:shadow-lg hover-elevate"
-    ).style(card_style).on("click", _on_tile_click):
+    with (
+        ui.card()
+        .classes(
+            "w-full rounded-lg p-5 transition cursor-pointer hover:shadow-lg hover-elevate"
+        )
+        .style(card_style)
+        .on("click", _on_tile_click)
+    ):
         # --- Collapsed: centered icon + name, centered action row ---
         with ui.column().classes("w-full items-center gap-3"):
             with ui.row().classes("items-center gap-3"):
@@ -1236,15 +1258,23 @@ def _render_host_detail(
     services: dict[str, Orchestration.ServiceCatalog],
 ) -> None:
     """Detail pane rendered below the host grid for the selected host."""
-    with ui.card().classes("w-full rounded-lg p-5").style(
-        f"background: {_hex_to_rgba(BRAND_COLORS['blue'], OPACITY['card_fill'])};"
-        f" box-shadow: 0 2px 10px rgba(0,0,0,0.18);"
+    with (
+        ui.card()
+        .classes("w-full rounded-lg p-5")
+        .style(
+            f"background: {_hex_to_rgba(BRAND_COLORS['blue'], OPACITY['card_fill'])};"
+            f" box-shadow: 0 2px 10px rgba(0,0,0,0.18);"
+        )
     ):
         ui.label(f"{host_id} — Services").classes(
             "text-lg font-bold brand-heading mb-2"
         )
-        with ui.element("div").classes("w-full").style(
-            "display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0.75rem;"
+        with (
+            ui.element("div")
+            .classes("w-full")
+            .style(
+                "display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0.75rem;"
+            )
         ):
             for service_id, catalog in sorted(services.items()):
                 status = current_backend.service_states.get((host_id, service_id))
@@ -1269,10 +1299,14 @@ def _render_service_detail(
     """Detail pane rendered below the service grid for the selected service."""
     state_name = _state_name(status.state) if status is not None else "UNKNOWN"
     border_color = _service_state_color(status)
-    with ui.card().classes("w-full rounded-lg p-5").style(
-        f"border-left: 6px solid {border_color};"
-        f" background: {_hex_to_rgba(border_color, OPACITY['card_fill'])};"
-        f" box-shadow: 0 2px 10px rgba(0,0,0,0.18);"
+    with (
+        ui.card()
+        .classes("w-full rounded-lg p-5")
+        .style(
+            f"border-left: 6px solid {border_color};"
+            f" background: {_hex_to_rgba(border_color, OPACITY['card_fill'])};"
+            f" box-shadow: 0 2px 10px rgba(0,0,0,0.18);"
+        )
     ):
         display = getattr(catalog, "display_name", "") or service_id
         with ui.row().classes("w-full items-center gap-4"):
@@ -1357,9 +1391,12 @@ async def _open_service_config_dialog(
         refresh_ui()
 
     submit_label = "Update" if action_type == "update" else "Start"
-    with ui.dialog() as dlg, ui.card().classes(
-        "min-w-[28rem] rounded-lg p-6 glass-panel"
-    ).style("box-shadow: 0 4px 24px rgba(0,0,0,0.25);"):
+    with (
+        ui.dialog() as dlg,
+        ui.card()
+        .classes("min-w-[28rem] rounded-lg p-6 glass-panel")
+        .style("box-shadow: 0 4px 24px rgba(0,0,0,0.25);"),
+    ):
         ui.label("Configure Service").classes("type-h2 brand-heading")
         ui.label(f"{service_id} on {host_id}").classes("type-body-sm text-gray-500")
         ui.separator()

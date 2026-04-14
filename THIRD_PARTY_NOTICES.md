@@ -67,6 +67,7 @@ Versions are pinned in that file — refer to it for current pins.
 | `black` | [MIT](https://github.com/psf/black/blob/main/LICENSE) | Python code formatter |
 | `isort` | [MIT](https://github.com/PyCQA/isort/blob/main/LICENSE) | Python import sorter |
 | `ruff` | [MIT](https://github.com/astral-sh/ruff/blob/main/LICENSE) | Python linter |
+| `click` | [BSD-3-Clause](https://github.com/pallets/click/blob/main/LICENSE.txt) | CLI framework for `medtech` command |
 
 When adding a new Python dependency:
 

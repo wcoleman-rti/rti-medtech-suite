@@ -155,9 +155,11 @@ def shell_page() -> None:
         " z-index: 100; pointer-events: auto;"
         " max-width: 95vw; white-space: nowrap;"
     )
-    with ui.row().classes(
-        "items-center gap-2 px-4 py-2 rounded-full glass-panel flex-nowrap"
-    ).style(_NAV_PILL_CSS):
+    with (
+        ui.row()
+        .classes("items-center gap-2 px-4 py-2 rounded-full glass-panel flex-nowrap")
+        .style(_NAV_PILL_CSS)
+    ):
         # Theme-aware logo: white logo for dark mode, color logo for light mode.
         ui.html(
             '<img src="/images/rti-logo-white.png" '
@@ -181,9 +183,11 @@ def shell_page() -> None:
         # --- Discovered services (collapsed "Rooms" dropdown) ---------------
         # A single button with a badge count instead of one button per room.
         # Scales to dozens of ORs without widening the pill.
-        with ui.button("Rooms", icon=ICONS.get("robot", "smart_toy")).props(
-            "flat no-caps size=md"
-        ).classes("rounded-full px-4 transition-fast"):
+        with (
+            ui.button("Rooms", icon=ICONS.get("robot", "smart_toy"))
+            .props("flat no-caps size=md")
+            .classes("rounded-full px-4 transition-fast")
+        ):
             rooms_badge = ui.badge("0").props("floating color=accent")
             rooms_badge.set_visibility(False)
             with ui.menu().props("auto-close").classes("rooms-dropdown") as rooms_menu:
@@ -249,17 +253,23 @@ def shell_page() -> None:
                 mode = "system"
             app.storage.user[NICEGUI_THEME_MODE_KEY] = mode
 
-        with ui.button(on_click=lambda: _cycle_to(None)).props(
-            "flat round size=sm"
-        ).bind_visibility_from(dm, "value", value=True):
+        with (
+            ui.button(on_click=lambda: _cycle_to(None))
+            .props("flat round size=sm")
+            .bind_visibility_from(dm, "value", value=True)
+        ):
             ui.icon(ICONS["dark_mode"]).classes("text-base")
-        with ui.button(on_click=lambda: _cycle_to(True)).props(
-            "flat round size=sm"
-        ).bind_visibility_from(dm, "value", value=False):
+        with (
+            ui.button(on_click=lambda: _cycle_to(True))
+            .props("flat round size=sm")
+            .bind_visibility_from(dm, "value", value=False)
+        ):
             ui.icon(ICONS["light_mode"]).classes("text-base")
-        with ui.button(on_click=lambda: _cycle_to(False)).props(
-            "flat round size=sm"
-        ).bind_visibility_from(dm, "value", backward=lambda v: v is None):
+        with (
+            ui.button(on_click=lambda: _cycle_to(False))
+            .props("flat round size=sm")
+            .bind_visibility_from(dm, "value", backward=lambda v: v is None)
+        ):
             ui.icon(ICONS["auto_mode"]).classes("text-base")
 
         ConnectionDot(connected=True)

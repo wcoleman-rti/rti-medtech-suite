@@ -1125,10 +1125,14 @@ def _build_scene(
                 color = ARM_STATE_COLORS.get(status, BRAND_COLORS["gray"])
                 tp = TablePosition(int(getattr(assignment, "table_position", 0)))
                 caps = str(getattr(assignment, "capabilities", ""))
-                with ui.expansion(
-                    f"{robot_id} — {status.name}",
-                    icon="precision_manufacturing",
-                ).classes("w-full").props(f'header-style="color: {color}"'):
+                with (
+                    ui.expansion(
+                        f"{robot_id} — {status.name}",
+                        icon="precision_manufacturing",
+                    )
+                    .classes("w-full")
+                    .props(f'header-style="color: {color}"')
+                ):
                     ui.label(f"Position: {tp.name}").classes("type-body-sm")
                     ui.label(f"State: {status.name}").classes("type-body-sm")
                     if caps:

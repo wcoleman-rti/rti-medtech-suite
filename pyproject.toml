@@ -1,3 +1,16 @@
+[project]
+name = "medtech-suite"
+version = "1.4.0-dev"
+requires-python = ">=3.10"
+dependencies = ["click>=8.0"]
+
+[project.scripts]
+medtech = "medtech.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["modules/shared"]
+include = ["medtech*"]
+
 [tool.black]
 line-length = 88
 
