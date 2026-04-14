@@ -91,3 +91,4 @@ and observability stack. They are not fetched during CMake configure/build.
 | `prom/prometheus` | v2.51.0 | [Apache-2.0](https://github.com/prometheus/prometheus/blob/main/LICENSE) | Metrics scraping and storage |
 | `grafana/loki` | 2.9.0 | [AGPL-3.0](https://github.com/grafana/loki/blob/main/LICENSE) | Log aggregation |
 | `grafana/grafana` | 10.4.0 | [AGPL-3.0](https://github.com/grafana/grafana/blob/main/LICENSE) | Dashboards and visualization |
+| `dockgraph/dockgraph` | latest | [BSL-1.1](https://github.com/dockgraph/dockgraph/blob/main/LICENSE) (converts to Apache-2.0 after 4 years) | Optional Docker topology visualization sidecar (`medtech launch --dockgraph`) |

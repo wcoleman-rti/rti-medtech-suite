@@ -313,7 +313,7 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ---
 
-## Step SIM.6 — Documentation & Regression
+## Step SIM.6 — Documentation & Regression ✅ `4ad94ef`
 
 ### Work
 
@@ -331,16 +331,16 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ### Test Gate
 
-- [ ] All `@simulation` and `@cli` spec tests pass
-- [ ] All existing tests pass
-- [ ] Lint passes (including markdownlint)
-- [ ] `medtech launch` → `medtech run or --name OR-5` →
+- [x] All `@simulation` and `@cli` spec tests pass
+- [x] All existing tests pass
+- [x] Lint passes (including markdownlint)
+- [x] `medtech launch` → `medtech run or --name OR-5` →
       `medtech status` → `medtech stop` workflow completes without
       errors
-- [ ] `medtech launch multi-site` → `medtech status` → `medtech stop`
+- [x] `medtech launch multi-site` → `medtech status` → `medtech stop`
       workflow completes without errors
-- [ ] `medtech launch unified` runs monolithic GUI end-to-end
-- [ ] `@acceptance @simulation` test passes: programmatically runs
+- [x] `medtech launch unified` runs monolithic GUI end-to-end
+- [x] `@acceptance @simulation` test passes: programmatically runs
       `medtech launch` → `medtech run or --name OR-5` →
       `medtech status` (asserts expected containers) → `medtech stop`
       (asserts no orphan containers or networks)

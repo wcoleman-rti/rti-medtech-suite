@@ -55,8 +55,15 @@ def build() -> None:
 
 
 @main.command()
-def status() -> None:
+@click.option(
+    "--topology", is_flag=True, help="Show ASCII topology tree with network details."
+)
+def status(topology: bool) -> None:
     """Show running medtech containers and GUI URLs."""
+    if topology:
+        _show_topology()
+        return
+
     result = subprocess.run(
         [
             "docker",
@@ -191,3 +198,123 @@ def stop() -> None:
         run_cmd(["docker", "network", "rm"] + networks, check=False)
     else:
         click.echo("No medtech networks to remove.")
+
+
+# ---------------------------------------------------------------------------
+# Topology viewer (medtech status --topology)
+# ---------------------------------------------------------------------------
+
+
+def _show_topology() -> None:
+    """Inspect Docker networks and render an ASCII topology tree."""
+    # Find medtech networks
+    net_result = subprocess.run(
+        [
+            "docker",
+            "network",
+            "ls",
+            "--filter",
+            "name=medtech_",
+            "--format",
+            "{{.Name}}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    click.secho(
+        "  $ docker network ls --filter name=medtech_ --format {{.Name}}",
+        fg="cyan",
+    )
+
+    network_names = sorted(
+        n.strip() for n in net_result.stdout.strip().splitlines() if n.strip()
+    )
+    if not network_names:
+        click.echo("No medtech networks found.")
+        return
+
+    # Inspect each network
+    network_data: dict[str, dict] = {}
+    for net_name in network_names:
+        inspect_result = subprocess.run(
+            ["docker", "network", "inspect", net_name],
+            capture_output=True,
+            text=True,
+        )
+        click.secho(f"  $ docker network inspect {net_name}", fg="cyan")
+        if inspect_result.returncode == 0 and inspect_result.stdout.strip():
+            try:
+                data = json.loads(inspect_result.stdout)
+                if data and isinstance(data, list):
+                    network_data[net_name] = data[0]
+            except json.JSONDecodeError:
+                pass
+
+    if not network_data:
+        click.echo("No network details available.")
+        return
+
+    # Group networks by hospital prefix
+    hospitals: dict[str, list[str]] = {}
+    wan_nets: list[str] = []
+    flat_nets: list[str] = []
+
+    for net_name in network_names:
+        bare = net_name.removeprefix("medtech_")
+        if bare == "wan-net":
+            wan_nets.append(net_name)
+        elif "_" in bare and bare.split("_")[0].startswith("hospital-"):
+            h_name = bare.split("_")[0]
+            hospitals.setdefault(h_name, []).append(net_name)
+        else:
+            flat_nets.append(net_name)
+
+    # Render flat networks (unnamed hospital)
+    if flat_nets:
+        click.echo()
+        click.secho("(unnamed hospital)", bold=True)
+        for i, net_name in enumerate(flat_nets):
+            is_last = i == len(flat_nets) - 1
+            _render_network(net_name, network_data.get(net_name, {}), is_last)
+
+    # Render named hospitals
+    for h_name in sorted(hospitals.keys()):
+        click.echo()
+        click.secho(h_name, bold=True)
+        nets = sorted(hospitals[h_name])
+        for i, net_name in enumerate(nets):
+            is_last = i == len(nets) - 1
+            _render_network(net_name, network_data.get(net_name, {}), is_last)
+
+    # Render WAN
+    for net_name in wan_nets:
+        click.echo()
+        _render_network(net_name, network_data.get(net_name, {}), is_last=True)
+
+
+def _render_network(net_name: str, data: dict, is_last: bool) -> None:
+    """Render a single network's containers as an ASCII sub-tree."""
+    subnet = ""
+    ipam = data.get("IPAM", {})
+    configs = ipam.get("Config", [])
+    if configs:
+        subnet = configs[0].get("Subnet", "")
+
+    prefix = "\u2514\u2500\u2500 " if is_last else "\u251c\u2500\u2500 "
+    child_prefix = "    " if is_last else "\u2502   "
+
+    label = f"{net_name} ({subnet})" if subnet else net_name
+    click.echo(f"{prefix}{label}")
+
+    containers = data.get("Containers", {})
+    if not containers:
+        click.echo(f"{child_prefix}(empty)")
+        return
+
+    sorted_containers = sorted(containers.values(), key=lambda c: c.get("Name", ""))
+    for j, cinfo in enumerate(sorted_containers):
+        c_name = cinfo.get("Name", "")
+        c_ip = cinfo.get("IPv4Address", "").split("/")[0]
+        c_last = j == len(sorted_containers) - 1
+        c_prefix = "\u2514\u2500\u2500 " if c_last else "\u251c\u2500\u2500 "
+        click.echo(f"{child_prefix}{c_prefix}{c_name:<35} {c_ip}")
