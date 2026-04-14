@@ -145,7 +145,7 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ---
 
-## Step SIM.3 — `medtech run or`
+## Step SIM.3 — `medtech run or` ✅ `91ce7d0`
 
 ### Work
 
@@ -198,20 +198,20 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ### Test Gate
 
-- [ ] `medtech run or --name OR-5` starts room-gateway (CDS + RS +
+- [x] `medtech run or --name OR-5` starts room-gateway (CDS + RS +
       Collector in shared namespace) plus 5 application containers
       (4 service hosts + 1 twin)
-- [ ] `medtech run or` (no `--name`) auto-generates `OR-1`
-- [ ] `medtech run or --hospital hospital-a` targets named hospital networks
-- [ ] `medtech run or` errors when multiple hospitals are running and
+- [x] `medtech run or` (no `--name`) auto-generates `OR-1`
+- [x] `medtech run or --hospital hospital-a` targets named hospital networks
+- [x] `medtech run or` errors when multiple hospitals are running and
       `--hospital` is omitted
-- [ ] `medtech run or` infers hospital when only one is running
-- [ ] Each `docker run` command is printed to stdout
-- [ ] Twin is accessible at the assigned host port
-- [ ] Containers have the `medtech.dynamic=true` label
-- [ ] `medtech stop` removes dynamically added containers
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] `medtech run or` infers hospital when only one is running
+- [x] Each `docker run` command is printed to stdout
+- [x] Twin is accessible at the assigned host port
+- [x] Containers have the `medtech.dynamic=true` label
+- [x] `medtech stop` removes dynamically added containers
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 
