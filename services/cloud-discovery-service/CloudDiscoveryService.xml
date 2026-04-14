@@ -12,7 +12,7 @@
         </transport>
 
         <domain_list>
-            <allow_domain_id>10,11,20</allow_domain_id>
+            <allow_domain_id>10,11,15,20</allow_domain_id>
         </domain_list>
 
         <forwarder>
