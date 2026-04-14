@@ -20,7 +20,7 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ---
 
-## Step SIM.1 — `medtech` CLI Scaffold
+## Step SIM.1 — `medtech` CLI Scaffold ✅ `eeff608`
 
 ### Work
 
@@ -53,15 +53,15 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ### Test Gate
 
-- [ ] `pip install -e .` makes `medtech` available on PATH
-- [ ] `medtech --help` prints available commands
-- [ ] `medtech build --help` prints build usage
-- [ ] `medtech status --help` prints status usage
-- [ ] `medtech stop --help` prints stop usage
-- [ ] `medtech stop` removes containers **and** Docker networks
-- [ ] `next_or_name()` returns `OR-1` when no ORs are running
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] `pip install -e .` makes `medtech` available on PATH
+- [x] `medtech --help` prints available commands
+- [x] `medtech build --help` prints build usage
+- [x] `medtech status --help` prints status usage
+- [x] `medtech stop --help` prints stop usage
+- [x] `medtech stop` removes containers **and** Docker networks
+- [x] `next_or_name()` returns `OR-1` when no ORs are running
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 

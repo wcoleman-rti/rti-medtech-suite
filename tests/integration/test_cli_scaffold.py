@@ -28,7 +28,6 @@ class TestCLIScaffold:
     def test_medtech_help(self) -> None:
         """medtech --help prints available commands."""
         from click.testing import CliRunner
-
         from medtech.cli._main import main
 
         runner = CliRunner()
@@ -41,7 +40,6 @@ class TestCLIScaffold:
     def test_build_help(self) -> None:
         """medtech build --help prints build usage."""
         from click.testing import CliRunner
-
         from medtech.cli._main import main
 
         runner = CliRunner()
@@ -52,7 +50,6 @@ class TestCLIScaffold:
     def test_status_help(self) -> None:
         """medtech status --help prints status usage."""
         from click.testing import CliRunner
-
         from medtech.cli._main import main
 
         runner = CliRunner()
@@ -63,7 +60,6 @@ class TestCLIScaffold:
     def test_stop_help(self) -> None:
         """medtech stop --help prints stop usage."""
         from click.testing import CliRunner
-
         from medtech.cli._main import main
 
         runner = CliRunner()
@@ -78,7 +74,6 @@ class TestStopCommand:
     def test_stop_removes_containers_and_networks(self) -> None:
         """medtech stop removes containers AND Docker networks."""
         from click.testing import CliRunner
-
         from medtech.cli._main import main
 
         runner = CliRunner()
@@ -93,9 +88,7 @@ class TestAutoNaming:
 
     def test_next_or_name_no_ors(self) -> None:
         """next_or_name() returns OR-1 when no ORs are running."""
-        with patch(
-            "medtech.cli._naming._running_containers", return_value=[]
-        ):
+        with patch("medtech.cli._naming._running_containers", return_value=[]):
             assert next_or_name() == "OR-1"
 
     def test_next_or_name_skips_existing(self) -> None:
