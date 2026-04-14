@@ -215,7 +215,7 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ---
 
-## Step SIM.4 — Scenarios & `medtech launch`
+## Step SIM.4 — Scenarios & `medtech launch` ✅ `93e7a6d`
 
 ### Work
 
@@ -263,14 +263,14 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ### Test Gate
 
-- [ ] `medtech launch --list` prints all four scenarios
-- [ ] `medtech launch --help` documents the scenario argument
-- [ ] `medtech launch` starts the distributed scenario by default
-- [ ] `medtech launch multi-site` starts two hospitals with NAT + 4 ORs
-- [ ] `medtech launch unified` starts the monolithic GUI
-- [ ] `medtech launch minimal` starts a single-OR scenario
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] `medtech launch --list` prints all four scenarios
+- [x] `medtech launch --help` documents the scenario argument
+- [x] `medtech launch` starts the distributed scenario by default
+- [x] `medtech launch multi-site` starts two hospitals with NAT + 4 ORs
+- [x] `medtech launch unified` starts the monolithic GUI
+- [x] `medtech launch minimal` starts a single-OR scenario
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 

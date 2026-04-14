@@ -9,12 +9,23 @@ import sys
 import click
 
 
-def run_cmd(args: list[str], *, check: bool = True, capture: bool = False) -> int:
+def run_cmd(
+    args: list[str],
+    *,
+    check: bool = True,
+    capture: bool = False,
+    env_override: dict[str, str] | None = None,
+) -> int:
     """Print and execute a shell command. Returns the exit code."""
     cmd_str = " ".join(args)
     click.secho(f"  $ {cmd_str}", fg="cyan")
+    env = None
+    if env_override:
+        import os
+
+        env = {**os.environ, **env_override}
     if capture:
-        result = subprocess.run(args, capture_output=True, text=True)
+        result = subprocess.run(args, capture_output=True, text=True, env=env)
         if result.stdout:
             click.echo(result.stdout.rstrip())
         if result.returncode != 0 and result.stderr:
@@ -22,7 +33,7 @@ def run_cmd(args: list[str], *, check: bool = True, capture: bool = False) -> in
         if check and result.returncode != 0:
             sys.exit(result.returncode)
         return result.returncode
-    result = subprocess.run(args)
+    result = subprocess.run(args, env=env)
     if check and result.returncode != 0:
         sys.exit(result.returncode)
     return result.returncode

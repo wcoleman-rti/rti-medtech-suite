@@ -33,12 +33,15 @@ def launch(scenario: str, list_scenarios: bool, dockgraph: bool) -> None:
     spec = SCENARIOS[scenario]
 
     if "compose_profiles" in spec:
-        # Unified mode — use docker compose
+        # Unified mode — use docker compose with MEDTECH_GUI_MODE=unified
         profiles = spec["compose_profiles"]
         profile_flags = []
         for p in profiles:
             profile_flags.extend(["--profile", p])
-        run_cmd(["docker", "compose"] + profile_flags + ["up", "-d"])
+        run_cmd(
+            ["docker", "compose"] + profile_flags + ["up", "-d"],
+            env_override={"MEDTECH_GUI_MODE": "unified"},
+        )
     elif "hospitals" in spec:
         # Multi-site mode
         _launch_multi_site(spec)

@@ -29,19 +29,25 @@ from __future__ import annotations
 
 import os
 
-from fastapi.responses import JSONResponse
+# MEDTECH_GUI_MODE controls which GUI modules are loaded:
+#   "unified"               — all modules (dashboard, controller, twin)
+#   "controller-dashboard"  — dashboard + controller only (twins run separately)
+# Default is "unified" for backward compatibility.
+_GUI_MODE = os.environ.get("MEDTECH_GUI_MODE", "unified")
+
+from fastapi.responses import JSONResponse  # noqa: E402
 
 # Import page builder functions — module-level GuiBackend instantiation
 # happens inside these modules, self-registering lifecycle hooks.
-from hospital_dashboard.dashboard.dashboard import dashboard_content  # noqa: F401
-from hospital_dashboard.procedure_controller.controller import (  # noqa: F401
+from hospital_dashboard.dashboard.dashboard import dashboard_content  # noqa: F401, E402
+from hospital_dashboard.procedure_controller.controller import (  # noqa: F401, E402
     ControllerBackend,
     controller_content,
     controller_content_for_room,
 )
-from medtech.gui._backend import GuiBackend
-from medtech.gui._icons import ICONS
-from medtech.gui._theme import (
+from medtech.gui._backend import GuiBackend  # noqa: E402
+from medtech.gui._icons import ICONS  # noqa: E402
+from medtech.gui._theme import (  # noqa: E402
     NICEGUI_STORAGE_SECRET_DEFAULT,
     NICEGUI_STORAGE_SECRET_ENV,
     NICEGUI_THEME_MODE_KEY,
@@ -49,9 +55,15 @@ from medtech.gui._theme import (
     _theme_mode_value,
     init_theme,
 )
-from medtech.gui._widgets import ConnectionDot
-from nicegui import app, ui
-from surgical_procedure.digital_twin.digital_twin import twin_content  # noqa: F401
+from medtech.gui._widgets import ConnectionDot  # noqa: E402
+from nicegui import app, ui  # noqa: E402
+
+# Conditionally import the digital twin module only in unified mode.
+# In split-GUI mode (controller-dashboard), twins run in separate containers.
+if _GUI_MODE == "unified":
+    from surgical_procedure.digital_twin.digital_twin import twin_content  # noqa: F401
+else:
+    twin_content = None  # type: ignore[assignment]
 
 # ---------------------------------------------------------------------------
 # Health / Readiness probes (FastAPI routes)
@@ -285,14 +297,14 @@ def shell_page() -> None:
     # ---- Full-screen content area -----------------------------------------
     # Top padding reserves space so page content doesn't hide behind the pill.
     with ui.column().classes("w-full h-full p-0 m-0").style("padding-top: 64px;"):
-        ui.sub_pages(
-            {
-                "/dashboard": dashboard_content,
-                "/controller/{room_id}": controller_content_for_room,
-                "/twin/{room_id}": twin_content,
-                "/": lambda: ui.navigate.to("/dashboard"),
-            }
-        )
+        routes: dict = {
+            "/dashboard": dashboard_content,
+            "/controller/{room_id}": controller_content_for_room,
+            "/": lambda: ui.navigate.to("/dashboard"),
+        }
+        if twin_content is not None:
+            routes["/twin/{room_id}"] = twin_content
+        ui.sub_pages(routes)
 
     # Track path changes for active highlighting
     initial_path = "/dashboard"

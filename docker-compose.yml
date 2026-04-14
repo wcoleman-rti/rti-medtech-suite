@@ -395,6 +395,7 @@ services:
       <<: *medtech-env
       MEDTECH_NICEGUI_STORAGE_SECRET: "${MEDTECH_NICEGUI_STORAGE_SECRET:-changeme-set-in-env}"
       MEDTECH_APP_NAME: "medtech-gui"
+      MEDTECH_GUI_MODE: "${MEDTECH_GUI_MODE:-controller-dashboard}"
     ports:
       - "8080:8080"
     volumes: *config-volumes

@@ -453,6 +453,9 @@ class DigitalTwinBackend(GuiBackend):
         # ---- Multi-arm tracking ------------------------------------------
         self.arm_assignments: dict[str, RobotArmAssignment] = {}
 
+        # ---- External GUI URL (split-GUI mode) --------------------------
+        self.gui_url: str = ""
+
         # ---- Internal -------------------------------------------------------
         self._running: bool = False
         self._tasks: list[asyncio.Task[Any]] = []
@@ -477,6 +480,10 @@ class DigitalTwinBackend(GuiBackend):
     @property
     def name(self) -> str:
         return "DigitalTwin"
+
+    def gui_urls(self) -> list[str]:
+        """Return the external GUI URL when running in split-GUI mode."""
+        return [self.gui_url] if self.gui_url else []
 
     # ---------------------------------------------------------------------- #
     # Private helpers                                                         #
@@ -1206,7 +1213,13 @@ def main() -> None:
     )
 
     room_id = os.environ.get("ROOM_ID", "OR-1")
-    _get_backend(room_id)
+    backend = _get_backend(room_id)
+
+    # Split-GUI mode: derive gui_url from the externally-reachable base URL
+    # set by the CLI's ``medtech run or`` when launching a per-OR twin container.
+    external_url = os.environ.get("MEDTECH_GUI_EXTERNAL_URL", "")
+    if external_url:
+        backend.gui_url = f"{external_url.rstrip('/')}/twin/{room_id}"
 
     from medtech.gui._theme import _resource_dir
 
