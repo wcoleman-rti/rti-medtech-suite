@@ -4,6 +4,13 @@ Index of all diagnostic and development tools for the medtech suite.
 See [vision/tooling.md](../docs/agent/vision/tooling.md) for full
 documentation and usage rationale.
 
+> **Note:** The `medtech` CLI (`medtech build`, `medtech launch`,
+> `medtech run`, `medtech status`, `medtech stop`) is for building,
+> launching, and scaling the simulation environment. The diagnostic
+> tools below are for **inspecting DDS runtime behavior** once the
+> system is running. Install the CLI with `pip install -e .` from
+> the project root.
+
 ## Available Tools
 
 | Tool | Description | Status |

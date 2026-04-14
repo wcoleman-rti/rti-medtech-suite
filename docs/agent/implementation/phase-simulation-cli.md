@@ -274,7 +274,7 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ---
 
-## Step SIM.5 — Split-GUI Docker Topology
+## Step SIM.5 — Split-GUI Docker Topology ✅ `b641ecc`
 
 ### Work
 
@@ -299,17 +299,17 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ### Test Gate
 
-- [ ] `docker compose up -d` starts infrastructure + central GUI
+- [x] `docker compose up -d` starts infrastructure + central GUI
       (no twin containers)
-- [ ] `http://localhost:8080` serves dashboard + controller
-- [ ] `medtech run or --name OR-1` starts twin accessible at
+- [x] `http://localhost:8080` serves dashboard + controller
+- [x] `medtech run or --name OR-1` starts twin accessible at
       assigned port
-- [ ] Procedure Controller sidebar discovers twin `gui_url` entries
-- [ ] Clicking twin sidebar entry opens new browser tab
-- [ ] `docker compose --profile unified-gui up -d` starts monolithic
+- [x] Procedure Controller sidebar discovers twin `gui_url` entries
+- [x] Clicking twin sidebar entry opens new browser tab
+- [x] `docker compose --profile unified-gui up -d` starts monolithic
       GUI serving all modules
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 

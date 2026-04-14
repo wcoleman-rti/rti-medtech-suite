@@ -43,17 +43,41 @@ source $NDDSHOME/resource/scripts/rtisetenv_x64Linux4gcc8.5.0.bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e .
 
-# 3. Build and install
-cmake -B build -S .
-cmake --build build
-cmake --install build
+# 3. Build and install via the CLI
+medtech build
 
 # 4. Activate runtime environment
 source install/setup.bash
 
-# 5. Run tests
-pytest tests/
+# 5. Launch the simulation (split-GUI, 2 ORs)
+medtech launch
+
+# 6. Open the dashboard
+#    http://localhost:8080
+
+# 7. Scale — add another OR on the fly
+medtech run or --name OR-5
+
+# 8. Check running containers
+medtech status
+
+# 9. Tear down
+medtech stop
+```
+
+### Alternative Workflows
+
+```bash
+# Multi-site NAT-isolated simulation (2 hospitals, 2 ORs each)
+medtech launch multi-site
+
+# Monolithic GUI (pre-V1.4 style — all modules in one process)
+medtech launch unified
+
+# List all available scenarios
+medtech launch --list
 ```
 
 ## Project Structure
