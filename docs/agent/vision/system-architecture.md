@@ -769,9 +769,9 @@ Each logical host is a Docker container. Custom Docker networks simulate the net
 
 | Docker Network | Simulates | Containers |
 |----------------|-----------|------------|
-| `surgical-net` | Per-OR surgical LAN | Robot sim, surgeon console, digital twin display, bedside monitors, procedure context sim, Service Hosts, per-room gateway (`*-or<N>-gateway`: CDS + RS + Collector, shared namespace) |
-| `hospital-net` | Hospital backbone | Hospital gateway (`*-gateway`: CDS + RS + Collector, shared namespace), Dashboard, ClinicalAlerts engine, Prometheus, Grafana Loki, Grafana |
-| `orchestration-net` | Orchestration control-plane | Procedure Controller, Service Hosts (dual-homed: surgical-net + orchestration-net), hospital gateway, per-room gateway — Service Hosts bridge both networks to host surgical services on `surgical-net` while receiving orchestration commands on `orchestration-net` |
+| `surgical-net` | Per-OR surgical LAN | Robot sim, surgeon console, digital twin display, bedside monitors, procedure context sim, Service Hosts, room-level GUI containers (twin, controller — dual-homed with `orchestration-net`), per-room gateway (`*-or<N>-gateway`: CDS + RS + Collector, shared namespace) |
+| `hospital-net` | Hospital backbone | Hospital gateway (`*-gateway`: CDS + RS + Collector, shared namespace), Hospital Dashboard, ClinicalAlerts engine, Prometheus, Grafana Loki, Grafana |
+| `orchestration-net` | Orchestration control-plane | Procedure Controller, room-level GUI containers (for `medtech.gui.room_nav` sibling discovery via ServiceCatalog), Service Hosts (dual-homed: surgical-net + orchestration-net), hospital gateway, per-room gateway — Service Hosts bridge both networks to host surgical services on `surgical-net` while receiving orchestration commands on `orchestration-net` |
 | `cloud-net` **(V3.0)** | Enterprise WAN | Cloud gateway (`cloud-gateway`: CDS + Collector, shared namespace), Command Center dashboard — **not created until V3.0 implementation** |
 
 #### Infrastructure Gateway Containers (Shared Network Namespace)
@@ -999,9 +999,15 @@ hospital command center runs on the backbone.
 | `gateway` (base) | `docker run --rm` | `hospital-net`, `surgical-net`, `orchestration-net` | CDS — discovery bootstrapper | — | Hospital infrastructure appliance |
 | `gateway` + RS | `docker run --rm --network container:gateway` | (shares `gateway` namespace) | Per-room MedtechBridge: Domain 10+11 → 20 | — | (co-located on gateway) |
 | `gateway` + Collector | `docker run --rm --network container:gateway` | (shares `gateway` namespace) | Telemetry aggregation (Domain 29) | — | (co-located on gateway) |
-| `medtech-gui` | `docker run --rm` | `hospital-net` | Hospital Dashboard (SPA shell — dashboard only) | 8080 | Hospital control room workstation |
-| `medtech-controller-or1` | `docker run --rm` | `orchestration-net` | Procedure Controller (OR-1, room-scoped) | — | In-OR orchestration controller |
-| `medtech-twin-or1` | `docker run --rm` | `surgical-net` | Digital Twin (OR-1, standalone) | 8081 | In-OR display at OR-1 |
+| `medtech-gui` | `docker run --rm` | `hospital-net` | Hospital Dashboard (dashboard only — room-level GUIs served by per-room containers) | 8080 | Hospital control room workstation |
+| `medtech-controller-or1` | `docker run --rm` | `surgical-net`, `orchestration-net` | Procedure Controller (OR-1, room-deployed) | 8091 | In-OR orchestration controller |
+| `medtech-twin-or1` | `docker run --rm` | `surgical-net`, `orchestration-net` | Digital Twin (OR-1) | 8081 | In-OR display at OR-1 |
+
+> **Room-level GUI containers** (controller, twin, future camera display) are launched
+> by `medtech run or`, not by `medtech run hospital`. Each room GUI joins both
+> `surgical-net` (for Procedure domain data) and `orchestration-net` (for
+> `medtech.gui.room_nav` sibling discovery via `ServiceCatalog`). Each is served
+> on its own host port — separate origins from the hospital dashboard.
 
 **Named hospital (`--name hospital-a`):**
 
@@ -1012,8 +1018,8 @@ hospital command center runs on the backbone.
 | `hospital-a-gateway` + RS | `docker run --rm --network container:hospital-a-gateway` | (shared namespace) | — |
 | `hospital-a-gateway` + Collector | `docker run --rm --network container:hospital-a-gateway` | (shared namespace) | — |
 | `hospital-a-gui` | `docker run --rm` | `hospital-a_hospital-net` | 8080 |
-| `hospital-a-controller-or1` | `docker run --rm` | `hospital-a_orchestration-net` | — |
-| `hospital-a-twin-or1` | `docker run --rm` | `hospital-a_surgical-net` | 8081 |
+| `hospital-a-controller-or1` | `docker run --rm` | `hospital-a_surgical-net`, `hospital-a_orchestration-net` | 8091 |
+| `hospital-a-twin-or1` | `docker run --rm` | `hospital-a_surgical-net`, `hospital-a_orchestration-net` | 8081 |
 
 Infrastructure services within a gateway group share a single network identity.
 The `--network container:<base>` flag causes the RS and Collector containers to
@@ -1032,12 +1038,22 @@ DomainParticipant on `surgical-net`, subscribes to `RobotState`,
 `RobotArmAssignment`, and serves a NiceGUI web page on its container
 port 8080 (mapped to a unique host port).
 
-The central `medtech-gui` container runs the hospital dashboard SPA on `hospital-net`.
+The central `medtech-gui` container runs the hospital dashboard on `hospital-net`.
 It subscribes to Domain 20 (Hospital integration) for all procedure, vitals, and alert
-data. Its sidebar discovers remote twin and controller containers via `ServiceCatalog`
-data bridged from Domain 11 → Domain 20 by the per-room Routing Service. Because twins
-and controllers are on different origins, the origin-aware navigation (Phase UI-M,
-Step M.0) opens them in new browser tabs — exactly as a production deployment would behave.
+data. It discovers room-level GUIs (controller, twin) via RS-bridged `ServiceCatalog`
+`gui_url` properties from Domain 11 → Domain 20. Room GUIs are served by per-room
+containers on separate origins — navigation from the dashboard to a room opens a
+**new browser tab** (with the `open_in_new` icon), exactly as a production deployment
+would behave.
+
+**Room-level GUI navigation:** Each room GUI container (controller, twin, etc.) embeds a
+shared navigation module (`medtech.gui.room_nav`) that creates a read-only Orchestration
+domain participant, subscribes to `ServiceCatalog` filtered by `room_id`, and renders a
+floating nav pill with buttons for each discovered sibling GUI. This enables same-tab
+horizontal navigation between room GUIs (e.g., controller → twin → future camera display)
+without infrastructure coupling. The nav pill also provides a visual `open_in_new`-annotated
+link to the hospital dashboard URL. The module is deployment-agnostic — it works identically
+on Docker, physical hardware, or mixed environments.
 
 **`gui_url` browser reachability:** Each GUI container sets
 `MEDTECH_GUI_EXTERNAL_URL` in its environment (e.g.,
