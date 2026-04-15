@@ -83,7 +83,7 @@ Phase SIM: Distributed Simulation     (depends on: Phase UI-M)
     │
     └──► Revision: Databus Terminology Alignment
               (depends on: Revision: Domain ID Migration;
-               splits MedtechDomains into Room/Hospital/Cloud libraries,
+               splits monolithic domain library into Room/Hospital/Cloud libraries,
                adopts "databus" terminology across docs)
 
 ── V1.5.0 ──────────────────────────────────────────────────────────────────────

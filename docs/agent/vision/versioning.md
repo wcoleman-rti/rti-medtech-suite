@@ -114,8 +114,8 @@ routes, and controller participant plane with the decade-offset
 architecture. Patch release, no new capabilities.
 
 **Revision: Databus Terminology Alignment** — Adopts RTI's "databus"
-terminology across all documentation, splits the single
-`MedtechDomains` XML domain library into per-level libraries (`Room`,
+terminology across all documentation, splits the single monolithic
+XML domain library into per-level libraries (`Room`,
 `Hospital`, `Cloud`), and enforces the No-Numeric-ID Rule restricting
 domain ID references to 4 canonical locations. Patch release, no new
 capabilities.
