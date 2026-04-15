@@ -2860,3 +2860,160 @@ after closure. They form the project's decision log.
   notifications.
 - **Resolution:** All 25 occurrences fixed in commit `350d430`.
 - **Date closed:** 2026-04-15
+
+---
+
+## INC-093: Dockerfile NDDS_QOS_PROFILES missing OrchestrationParticipants.xml
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-15
+- **Phase/Step:** Revision: UX Alignment / Step UX.8
+- **Documents involved:** `docker/medtech-app.Dockerfile`, `tests/qos/CMakeLists.txt`
+- **Description:** Both the C++ runtime and Python runtime stages in
+  `medtech-app.Dockerfile` had `NDDS_QOS_PROFILES` that listed only
+  `SurgicalParticipants.xml` — `OrchestrationParticipants.xml` was
+  missing despite being added in Phase 5 (Procedure Orchestration).
+  Similarly, `tests/qos/CMakeLists.txt` omitted it from the CTest
+  environment. These omissions were pre-existing (unrelated to UX.7–10
+  work) but had no runtime impact because the Dockerfile images are
+  only used for Python apps that import their own participant config
+  by name (the QoS provider still finds the XML via `NDDS_QOS_PROFILES`
+  as long as base QoS and domain libraries are present). The CTest QoS
+  loading test only validated SurgicalParticipants entities. Both were
+  fixed as part of UX.8 when adding HospitalParticipants.xml.
+- **Guideline:** When adding a new participant XML file, grep for all
+  `NDDS_QOS_PROFILES` definitions (setup.bash.in, docker-compose.yml,
+  Dockerfiles, CMakeLists test properties, CLI _hospital.py) and verify
+  each includes the full set. A CI gate that validates all participant
+  library names are loadable in every deployment context would catch
+  this class of drift.
+- **Resolution:** Fixed in commit `9506926` (UX.8). All three
+  participant XMLs now appear in all NDDS_QOS_PROFILES definitions.
+- **Date closed:** 2026-04-15
+
+---
+
+## INC-094: Flaky xdist tests — DDS timing under parallel execution
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-15
+- **Phase/Step:** Revision: UX Alignment / Steps UX.7, UX.9
+- **Documents involved:** `tests/integration/test_multi_instance.py`,
+  `tests/integration/test_robot_service_host.py`
+- **Description:** Two test suites failed intermittently under
+  `pytest-xdist` parallel execution:
+  1. `TestMultiInstanceIsolation::test_device_telemetry_isolation` —
+     `assert data1` failed (no DDS data received within timeout).
+  2. `TestRobotServiceHost` — all 11 tests in the suite failed with
+     `AssertionError: robot-service-host did not publish ServiceCatalog
+     within 10 s`.
+  Both pass reliably when run in isolation (`python -m pytest <file>
+  -x --tb=short -q`). The failures appear to be DDS discovery timing
+  sensitivity when many participants start concurrently across xdist
+  workers sharing the same host network. No code changes caused these
+  failures — they occurred during unrelated UX.7 and UX.9 CI runs.
+- **Guideline:** Per workflow.md Section 3, flaky tests are blocking
+  failures. These did not recur on retry so were not blocking, but
+  the pattern warrants monitoring. If frequency increases, consider:
+  (a) increasing discovery timeouts in affected test fixtures,
+  (b) assigning these tests to a dedicated xdist group
+  (`@pytest.mark.xdist_group`) to reduce participant contention, or
+  (c) escalating to investigate xdist + DDS SHM transport interactions.
+- **Resolution:** Non-recurring on retry. Logged for cross-session
+  awareness.
+- **Date closed:** 2026-04-15
+
+---
+
+## INC-095: Spec and vision docs contain stale import paths after UX.7–UX.10
+
+- **Status:** Open
+- **Category:** Doc Consistency
+- **Date opened:** 2026-04-15
+- **Phase/Step:** Revision: UX Alignment / Step UX.10
+- **Documents involved:** `spec/common-behaviors.md`,
+  `spec/nicegui-migration.md`, `spec/simulation-cli.md`,
+  `spec/procedure-orchestration.md`, `vision/system-architecture.md`,
+  `vision/nicegui-migration.md`
+- **Description:** UX.7–UX.10 moved three components to new module
+  paths, but the spec and vision docs still reference the old paths in
+  forward-looking / normative sections:
+  1. `medtech.gui.app` → `hospital_dashboard.dashboard.dashboard`
+     (or note it no longer exists) — common-behaviors.md L34, L382
+  2. `hospital_dashboard.procedure_controller` →
+     `surgical_procedure.procedure_controller` — common-behaviors.md L396
+  3. `medtech.gui.room_nav` → `surgical_procedure.room_nav` —
+     nicegui-migration.md L261/L513/L519/L530/L532,
+     simulation-cli.md L91, procedure-orchestration.md L337,
+     system-architecture.md L824/L1059/L1100
+  Historical/completed step descriptions in revision-ux-alignment.md
+  and phase files are correct as-is for traceability.
+- **Possible resolutions:**
+  1. Update all stale references in spec and vision docs (with user
+     approval per workflow.md Section 1)
+  2. Add a "V1.5.0 path changes" annotation at the top of affected
+     docs noting the rename
+- **Resolution:** Pending user approval to update docs/agent content.
+- **Date closed:** —
+
+---
+
+## INC-096: Remove pytest-xdist — serial execution eliminates DDS parallel flakiness
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-15
+- **Phase/Step:** Test infrastructure
+- **Documents involved:** `pyproject.toml`, `requirements.txt`,
+  `docs/agent/workflow.md`, `docs/agent/vision/coding-standards.md`,
+  `docs/agent/vision/nicegui-migration.md`,
+  15 test files under `tests/integration/` and `tests/gui/`
+- **Description:** pytest-xdist (`-n auto --dist loadgroup`) was adopted
+  to speed up the 661-test suite. In practice, DDS's shared-medium
+  discovery model made parallel execution fundamentally problematic:
+  participants on the same domain auto-discover each other across xdist
+  workers, causing transport QoS mismatches (INC-051, INC-072, INC-077),
+  cross-test sample pollution (INC-069), service host interference
+  (INC-061), and CPU contention timeouts (INC-081). These were not
+  flaky tests — they were deterministic failures caused by violating
+  DDS's shared-medium assumptions.
+
+  Mitigations accumulated over time: `xdist_group` markers on 30 of 56
+  test files (54%), `message_size_max=1400` enforcement, QueryCondition
+  content-aware waits, and zombie process guards. Despite this, each
+  new test or domain risked introducing new parallel failures that
+  required costly ci.sh reruns to diagnose.
+
+  With the suite completing in ~29s serially, the ~14s xdist savings
+  were negated by a single unnecessary rerun (~2-3 min with
+  `--skip-build`).
+- **Resolution:** Removed pytest-xdist entirely:
+  - `pyproject.toml`: `addopts` changed from `"-n auto --dist loadgroup"`
+    to `"-x --tb=short"`
+  - `requirements.txt`: removed `pytest-xdist[psutil]==3.5.*`
+  - 15 test files: removed `pytest.mark.xdist_group(...)` from
+    `pytestmark` lists
+  - `docs/agent/workflow.md`: updated xdist note to reflect serial
+    execution
+  - `docs/agent/vision/coding-standards.md`: replaced "Parallel
+    Execution (pytest-xdist)" section with "Test Execution" noting
+    serial mode
+  - `docs/agent/vision/nicegui-migration.md`: removed `xdist_group`
+    from preserved test semantics list
+
+  Kept as-is (correct independent of xdist):
+  - `test_participant_qos()` / `message_size_max=1400` — matches
+    production AvoidIPFragmentation profile
+  - QueryCondition patterns (INC-069) — better test practice regardless
+  - Zombie process guard in conftest — needed for subprocess tests
+  - All historical incidents (INC-051 through INC-081) — unchanged
+    as historical record
+- **Guideline:** Do not re-introduce pytest-xdist without first
+  solving DDS domain isolation at the transport level (e.g., unique
+  domain IDs per test file or SHMEM-only transport with per-worker
+  domain tags). The shared-medium nature of DDS UDPv4 discovery makes
+  process-level parallelism inherently unsafe for integration tests
+  that create real DDS participants.
+- **Date closed:** 2026-04-15

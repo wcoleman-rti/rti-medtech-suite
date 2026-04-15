@@ -26,7 +26,7 @@ import common
 import monitoring
 import pytest
 import rti.connextdds as dds
-from conftest import test_participant_qos, wait_for_reader_match
+from conftest import offset_domain, test_participant_qos, wait_for_reader_match
 from surgical_procedure.vitals_sim._alarm import AlarmEvaluator
 from surgical_procedure.vitals_sim._profiles import PROFILES, baroreceptor_reflex
 from surgical_procedure.vitals_sim._signal import SignalModel
@@ -426,6 +426,7 @@ class TestBedsideMonitorServiceIntegration:
             procedure_id="proc-001",
             patient_id="p1",
             device_id="bedside-001",
+            domain_id=offset_domain(10),
         )
         mon._start()
         yield mon
@@ -437,7 +438,7 @@ class TestBedsideMonitorServiceIntegration:
         p = test_participant_qos()
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
-        dp = dds.DomainParticipant(10, p)
+        dp = dds.DomainParticipant(offset_domain(10), p)
 
         provider = dds.QosProvider.default
         reader_qos = provider.datareader_qos_from_profile(
@@ -456,7 +457,7 @@ class TestBedsideMonitorServiceIntegration:
         p = test_participant_qos()
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
-        dp = dds.DomainParticipant(10, p)
+        dp = dds.DomainParticipant(offset_domain(10), p)
 
         provider = dds.QosProvider.default
         reader_qos = provider.datareader_qos_from_profile("TopicProfiles::WaveformData")
@@ -473,7 +474,7 @@ class TestBedsideMonitorServiceIntegration:
         p = test_participant_qos()
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
-        dp = dds.DomainParticipant(10, p)
+        dp = dds.DomainParticipant(offset_domain(10), p)
 
         provider = dds.QosProvider.default
         reader_qos = provider.datareader_qos_from_profile(
@@ -543,7 +544,7 @@ class TestBedsideMonitorServiceIntegration:
         p = test_participant_qos()
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
-        dp = dds.DomainParticipant(10, p)
+        dp = dds.DomainParticipant(offset_domain(10), p)
 
         provider = dds.QosProvider.default
         reader_qos = provider.datareader_qos_from_profile(

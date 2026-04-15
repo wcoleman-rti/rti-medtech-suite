@@ -29,7 +29,6 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.acceptance,
     pytest.mark.gui,
-    pytest.mark.xdist_group("acceptance_ux"),
 ]
 
 

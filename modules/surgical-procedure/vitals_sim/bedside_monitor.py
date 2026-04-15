@@ -56,6 +56,7 @@ class BedsideMonitorService(Service):
         device_id: str = "vital-mon-001",
         *,
         participant: dds.DomainParticipant | None = None,
+        domain_id: int | None = None,
         sim_seed: int | None = None,
         sim_profile: str = "stable",
     ) -> None:
@@ -80,8 +81,13 @@ class BedsideMonitorService(Service):
         if participant is None:
             initialize_connext()
             provider = dds.QosProvider.default
+            params = (
+                dds.DomainParticipantConfigParams(domain_id=domain_id)
+                if domain_id is not None
+                else dds.DomainParticipantConfigParams()
+            )
             self._participant = provider.create_participant_from_config(
-                names.CLINICAL_MONITOR
+                names.CLINICAL_MONITOR, params
             )
             partition = f"room/{room_id}/procedure/{procedure_id}"
             qos = self._participant.qos

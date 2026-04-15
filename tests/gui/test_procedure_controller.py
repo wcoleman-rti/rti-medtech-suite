@@ -21,7 +21,6 @@ pytestmark = [
     pytest.mark.gui,
     pytest.mark.integration,
     pytest.mark.orchestration,
-    pytest.mark.xdist_group("controller"),
 ]
 
 orch_names = app_names.MedtechEntityNames.OrchestrationParticipants

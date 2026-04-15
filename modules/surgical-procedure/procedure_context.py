@@ -53,6 +53,7 @@ class ProcedureContextService(Service):
         procedure_id: str,
         *,
         participant: dds.DomainParticipant | None = None,
+        domain_id: int | None = None,
     ) -> None:
         self._room_id = room_id
         self._state_val = ServiceState.STOPPED
@@ -62,8 +63,13 @@ class ProcedureContextService(Service):
         if participant is None:
             initialize_connext()
             provider = dds.QosProvider.default
+            params = (
+                dds.DomainParticipantConfigParams(domain_id=domain_id)
+                if domain_id is not None
+                else dds.DomainParticipantConfigParams()
+            )
             self._participant = provider.create_participant_from_config(
-                names.OPERATIONAL_PUB
+                names.OPERATIONAL_PUB, params
             )
             partition = f"room/{room_id}/procedure/{procedure_id}"
             qos = self._participant.qos

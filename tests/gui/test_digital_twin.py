@@ -33,7 +33,6 @@ from surgical_procedure.digital_twin import digital_twin as twin_module
 pytestmark = [
     pytest.mark.gui,
     pytest.mark.integration,
-    pytest.mark.xdist_group("digital_twin"),
 ]
 
 names = app_names.MedtechEntityNames.SurgicalParticipants

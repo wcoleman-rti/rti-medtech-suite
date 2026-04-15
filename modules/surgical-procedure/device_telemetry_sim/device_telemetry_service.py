@@ -76,6 +76,7 @@ class DeviceTelemetryService(Service):
         procedure_id: str,
         *,
         participant: dds.DomainParticipant | None = None,
+        domain_id: int | None = None,
         sim_seed: int | None = None,
         sim_profile: str = "stable",
         heartbeat_interval: float = 0.0,
@@ -110,8 +111,13 @@ class DeviceTelemetryService(Service):
         if participant is None:
             initialize_connext()
             provider = dds.QosProvider.default
+            params = (
+                dds.DomainParticipantConfigParams(domain_id=domain_id)
+                if domain_id is not None
+                else dds.DomainParticipantConfigParams()
+            )
             self._participant = provider.create_participant_from_config(
-                names.CLINICAL_DEVICE_GW
+                names.CLINICAL_DEVICE_GW, params
             )
             partition = f"room/{room_id}/procedure/{procedure_id}"
             qos = self._participant.qos

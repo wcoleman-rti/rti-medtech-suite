@@ -221,11 +221,11 @@ coding. It must NOT replace Command 1 at mandatory checkpoints.
 | `--tb=short` | Show concise tracebacks — enough to diagnose, not excessive |
 | `-q` | Quiet progress — summary line at the end |
 
-Note: `pyproject.toml` defines `addopts = "-n auto --dist loadgroup"`
-which enables parallel execution via pytest-xdist. These flags are
-always active and must not be overridden unless explicitly debugging
-an xdist-specific issue (in which case use `-o "addopts="` to disable
-temporarily, then restore before committing).
+Note: `pyproject.toml` defines `addopts = "-x --tb=short"` which
+applies the standard flags automatically. Tests run serially — 
+pytest-xdist was removed (see INC-082) because DDS's shared-medium
+discovery model caused persistent flaky failures under parallel
+execution that cost more rerun time than the parallelism saved.
 
 To run a single test file or test class during focused iteration:
 

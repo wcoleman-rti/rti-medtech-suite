@@ -17,7 +17,7 @@ import time
 import devices
 import pytest
 import rti.connextdds as dds
-from conftest import wait_for_data, wait_for_discovery
+from conftest import offset_domain, wait_for_data, wait_for_discovery
 from surgical_procedure.device_telemetry_sim._device_model import (
     DEVICE_PROFILES,
     DeviceFaultEvent,
@@ -178,7 +178,11 @@ class TestDeviceTelemetryPublished:
         _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
         gw = DeviceTelemetryService(
-            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+            domain_id=offset_domain(10),
+            room_id="OR-1",
+            procedure_id="proc-001",
+            sim_seed=42,
+            sim_profile="stable",
         )
         try:
             gw._start()
@@ -202,7 +206,11 @@ class TestDeviceTelemetryPublished:
         _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
         gw = DeviceTelemetryService(
-            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+            domain_id=offset_domain(10),
+            room_id="OR-1",
+            procedure_id="proc-001",
+            sim_seed=42,
+            sim_profile="stable",
         )
         try:
             gw._start()
@@ -227,7 +235,11 @@ class TestDeviceTelemetryPublished:
         _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
         gw = DeviceTelemetryService(
-            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+            domain_id=offset_domain(10),
+            room_id="OR-1",
+            procedure_id="proc-001",
+            sim_seed=42,
+            sim_profile="stable",
         )
         try:
             gw._start()
@@ -271,7 +283,11 @@ class TestWriteOnChange:
         )
 
         gw = DeviceTelemetryService(
-            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+            domain_id=offset_domain(10),
+            room_id="OR-1",
+            procedure_id="proc-001",
+            sim_seed=42,
+            sim_profile="stable",
         )
         try:
             gw._start()
@@ -303,7 +319,11 @@ class TestWriteOnChange:
         )
 
         gw = DeviceTelemetryService(
-            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+            domain_id=offset_domain(10),
+            room_id="OR-1",
+            procedure_id="proc-001",
+            sim_seed=42,
+            sim_profile="stable",
         )
         try:
             gw._start()
@@ -346,7 +366,11 @@ class TestWriteOnChange:
         )
 
         gw = DeviceTelemetryService(
-            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+            domain_id=offset_domain(10),
+            room_id="OR-1",
+            procedure_id="proc-001",
+            sim_seed=42,
+            sim_profile="stable",
         )
         try:
             gw._start()
@@ -383,7 +407,11 @@ class TestExclusiveOwnershipFailover:
         _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
         gw = DeviceTelemetryService(
-            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+            domain_id=offset_domain(10),
+            room_id="OR-1",
+            procedure_id="proc-001",
+            sim_seed=42,
+            sim_profile="stable",
         )
         try:
             gw._start()
@@ -400,7 +428,11 @@ class TestExclusiveOwnershipFailover:
         _env_override(monkeypatch, MEDTECH_SIM_SEED="42", MEDTECH_SIM_PROFILE="stable")
 
         gw = DeviceTelemetryService(
-            room_id="OR-1", procedure_id="proc-001", sim_seed=42, sim_profile="stable"
+            domain_id=offset_domain(10),
+            room_id="OR-1",
+            procedure_id="proc-001",
+            sim_seed=42,
+            sim_profile="stable",
         )
         try:
             gw._start()
@@ -531,10 +563,18 @@ class TestSeededReproducibility:
         _env_override(monkeypatch, MEDTECH_SIM_SEED="99", MEDTECH_SIM_PROFILE="stable")
 
         gw1 = DeviceTelemetryService(
-            room_id="OR-1", procedure_id="proc-001", sim_seed=99, sim_profile="stable"
+            domain_id=offset_domain(10),
+            room_id="OR-1",
+            procedure_id="proc-001",
+            sim_seed=99,
+            sim_profile="stable",
         )
         gw2 = DeviceTelemetryService(
-            room_id="OR-1", procedure_id="proc-001", sim_seed=99, sim_profile="stable"
+            domain_id=offset_domain(10),
+            room_id="OR-1",
+            procedure_id="proc-001",
+            sim_seed=99,
+            sim_profile="stable",
         )
         try:
             gw1._start()

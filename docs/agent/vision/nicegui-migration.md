@@ -510,13 +510,13 @@ Navigation follows three patterns:
 | Direction | Mechanism | Behavior |
 |-----------|-----------|----------|
 | **Hospital → Room** (downward) | Room cards on the dashboard with `open_in_new` icon | Opens room GUI in a new browser tab |
-| **Room ↔ Room** (horizontal, same level) | `medtech.gui.room_nav` shared module — floating nav pill with sibling buttons | Same-tab navigation via `ui.navigate.to(gui_url)` |
+| **Room ↔ Room** (horizontal, same level) | `surgical_procedure.room_nav` module — floating nav pill with sibling buttons | Same-tab navigation via `ui.navigate.to(gui_url)` |
 | **Room → Hospital** (upward) | **Not permitted** — close the browser tab | Room GUIs have no upward visibility to hospital-level infrastructure |
 
 **Room-level GUI self-sufficiency:** Each room GUI (controller, twin)
 renders a **self-contained page** with:
 - Its own header bar (RTI logo, title, theme toggle)
-- A floating nav pill (from `medtech.gui.room_nav`) showing sibling
+- A floating nav pill (from `surgical_procedure.room_nav`) showing sibling
   room GUIs discovered via `ServiceCatalog` on the Orchestration databus
 - Full theme and font support (each NiceGUI instance serves its own
   static assets)
@@ -527,9 +527,9 @@ endpoint URL for each GUI service. The hospital dashboard reads bridged
 **room cards** in the Room Overview view — one card per discovered room,
 each with an `open_in_new` button that opens the room GUI in a new tab.
 
-#### Room-Level Horizontal Navigation (`medtech.gui.room_nav`)
+#### Room-Level Horizontal Navigation (`surgical_procedure.room_nav`)
 
-The shared `medtech.gui.room_nav` module provides same-level navigation
+The `surgical_procedure.room_nav` module provides same-level navigation
 between room GUIs. It creates a **read-only Orchestration databus
 participant** that subscribes to `ServiceCatalog` filtered by the
 current `room_id`, then renders a floating nav pill with buttons for
@@ -875,7 +875,6 @@ def test_alert_filter(screen: Screen):
 - DDS `DataReader` injection for test isolation (unchanged — GUI constructors
   still accept pre-created readers)
 - `@gui`, `@dashboard`, `@unit`, `@integration` markers (unchanged)
-- `xdist_group` for test parallelism (unchanged)
 
 ---
 

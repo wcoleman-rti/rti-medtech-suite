@@ -789,22 +789,13 @@ time.sleep(0.5)
 assert len(isolated_reader.take()) == 0, "Data leaked across domains"
 ```
 
-#### Parallel Execution (pytest-xdist)
+#### Test Execution
 
-The test suite runs in parallel via `pytest-xdist` with
-`--dist loadgroup`. Tests that share DDS domain 11 (orchestration)
-must be grouped:
-
-```python
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.xdist_group("orch"),
-]
-```
-
-the Procedure DDS domain tests are safe for parallel execution because domain tags
-(`clinical`, `operational`, `control`) provide partition-level
-isolation. Tests on domain 0 or unique domains are also safe.
+The test suite runs serially (`addopts = "-x --tb=short"` in
+`pyproject.toml`). pytest-xdist was removed (see INC-082) because
+DDS's shared-medium discovery model caused persistent flaky failures
+under parallel execution that cost more rerun time than the
+parallelism saved.
 
 ---
 

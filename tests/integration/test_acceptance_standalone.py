@@ -27,7 +27,7 @@ from conftest import wait_for_data, wait_for_reader_match
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.acceptance,
-    pytest.mark.xdist_group("acceptance_standalone"),
+    pytest.mark.xdist_group("subprocess_dds"),
 ]
 
 PROCEDURE_DOMAIN_ID = 10

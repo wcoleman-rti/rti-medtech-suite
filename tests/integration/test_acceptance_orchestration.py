@@ -38,7 +38,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.orchestration,
     pytest.mark.acceptance,
-    pytest.mark.xdist_group("acceptance_orch"),
+    pytest.mark.xdist_group("subprocess_dds"),
 ]
 
 ORCHESTRATION_DOMAIN_ID = 11

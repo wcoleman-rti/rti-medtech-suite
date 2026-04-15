@@ -15,7 +15,7 @@ import asyncio
 import app_names
 import pytest
 import rti.connextdds as dds
-from conftest import test_participant_qos
+from conftest import offset_domain, test_participant_qos
 from medtech.dds import initialize_connext
 from medtech.service import ServiceState
 from surgical_procedure.camera_sim.camera_service import CameraService
@@ -49,7 +49,8 @@ def _create_xml_participant(config_name: str) -> dds.DomainParticipant:
     """Create a participant from XML config with partition set."""
     initialize_connext()
     provider = dds.QosProvider.default
-    p = provider.create_participant_from_config(config_name)
+    params = dds.DomainParticipantConfigParams(domain_id=offset_domain(10))
+    p = provider.create_participant_from_config(config_name, params)
     qos = p.qos
     qos.partition.name = [PARTITION]
     p.qos = qos
@@ -59,7 +60,7 @@ def _create_xml_participant(config_name: str) -> dds.DomainParticipant:
 def _bare_participant() -> dds.DomainParticipant:
     """Create a minimal DDS participant with no XML-defined entities."""
     qos = test_participant_qos()
-    return dds.DomainParticipant(0, qos)
+    return dds.DomainParticipant(offset_domain(0), qos)
 
 
 # ---------------------------------------------------------------------------

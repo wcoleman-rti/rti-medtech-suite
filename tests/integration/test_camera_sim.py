@@ -14,7 +14,7 @@ import time
 import imaging
 import pytest
 import rti.connextdds as dds
-from conftest import test_participant_qos, wait_for_reader_match
+from conftest import offset_domain, test_participant_qos, wait_for_reader_match
 from surgical_procedure.camera_sim.camera_service import CameraService
 
 CameraFrame = imaging.Imaging.CameraFrame
@@ -45,6 +45,7 @@ class TestCameraServiceUnit:
     def test_default_frame_rate(self):
         """Camera simulator defaults to 30 Hz."""
         sim = CameraService(
+            domain_id=offset_domain(10),
             room_id="OR-1",
             procedure_id="proc-001",
         )
@@ -54,6 +55,7 @@ class TestCameraServiceUnit:
     def test_custom_frame_rate(self):
         """Camera simulator accepts custom frame rate."""
         sim = CameraService(
+            domain_id=offset_domain(10),
             room_id="OR-1",
             procedure_id="proc-001",
             frame_rate_hz=15,
@@ -64,6 +66,7 @@ class TestCameraServiceUnit:
     def test_tick_returns_camera_frame(self):
         """tick() returns a CameraFrame with correct fields."""
         sim = CameraService(
+            domain_id=offset_domain(10),
             room_id="OR-1",
             procedure_id="proc-001",
             camera_id="cam-1",
@@ -82,6 +85,7 @@ class TestCameraServiceUnit:
     def test_tick_increments_sequence(self):
         """Successive tick() calls produce incrementing frame IDs."""
         sim = CameraService(
+            domain_id=offset_domain(10),
             room_id="OR-1",
             procedure_id="proc-001",
             camera_id="cam-1",
@@ -113,6 +117,7 @@ class TestCameraServiceIntegration:
     def camera(self):
         """Create a CameraService and start it."""
         sim = CameraService(
+            domain_id=offset_domain(10),
             room_id="OR-1",
             procedure_id="proc-001",
             camera_id="cam-int-1",
@@ -128,7 +133,7 @@ class TestCameraServiceIntegration:
         p = test_participant_qos()
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "operational"
-        dp = dds.DomainParticipant(10, p)
+        dp = dds.DomainParticipant(offset_domain(10), p)
 
         provider = dds.QosProvider.default
         reader_qos = provider.datareader_qos_from_profile("TopicProfiles::CameraFrame")

@@ -36,7 +36,7 @@ from rti.rpc import Requester
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.orchestration,
-    pytest.mark.xdist_group("orch_e2e"),
+    pytest.mark.xdist_group("subprocess_dds"),
 ]
 
 ORCHESTRATION_DOMAIN_ID = 11

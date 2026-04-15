@@ -25,7 +25,6 @@ pytestmark = [
     pytest.mark.gui,
     pytest.mark.integration,
     pytest.mark.dashboard,
-    pytest.mark.xdist_group("dashboard"),
 ]
 
 dash_names = app_names.MedtechEntityNames.HospitalDashboard

@@ -23,7 +23,7 @@ from conftest import wait_for_reader_match
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.xdist_group("multi_arm_isolation"),
+    pytest.mark.xdist_group("subprocess_dds"),
 ]
 
 PROCEDURE_DOMAIN_ID = 10

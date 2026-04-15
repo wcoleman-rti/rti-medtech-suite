@@ -21,7 +21,7 @@ profile = "black"
 line-length = 88
 
 [tool.pytest.ini_options]
-addopts = "-n auto --dist loadgroup"
+addopts = "-n 10 --dist loadgroup"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [

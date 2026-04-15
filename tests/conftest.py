@@ -3,6 +3,14 @@
 Provides reusable fixtures for creating DDS participants, writers, and readers
 with automatic cleanup. Uses domain 0 for test isolation (reserved for testing
 per vision/data-model.md). QoS profiles are loaded from NDDS_QOS_PROFILES.
+
+pytest-xdist domain isolation (INC-096):
+  Each xdist worker gets a unique domain-ID offset so DDS participants on
+  different workers never discover each other. Pure-DDS tests use
+  ``offset_domain(base_id)`` or the ``participant_factory`` fixture (which
+  applies the offset automatically). Subprocess tests that launch service
+  hosts with XML-configured domain IDs cannot be offset and are grouped
+  under ``xdist_group("subprocess_dds")`` to run on a single worker.
 """
 
 import os
@@ -12,6 +20,37 @@ import time
 
 import pytest
 import rti.connextdds as dds
+
+# -------------------------------------------------------------------
+# xdist domain-ID offset (INC-096)
+# -------------------------------------------------------------------
+
+
+def _xdist_domain_offset() -> int:
+    """Return a per-worker domain-ID offset for pytest-xdist isolation.
+
+    Serial runs (no xdist) return 0.  Worker ``gwN`` returns
+    ``(N + 1) * 21``.  The stride of 21 covers the widest domain-ID
+    span used in tests (0 through 20).  With ``-n 10``, the highest
+    offset domain is ``10 * 21 + 20 = 230``, safely below RTI
+    Connext's default max domain ID of 232.
+    """
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    if worker is None:
+        return 0
+    # worker id is "gw0", "gw1", ...
+    return (int(worker[2:]) + 1) * 21
+
+
+def offset_domain(base_id: int) -> int:
+    """Return ``base_id`` shifted by the current xdist worker offset.
+
+    Pure-DDS tests that create ``DomainParticipant`` directly should call
+    ``offset_domain(10)`` instead of hard-coding ``10``.  The
+    ``participant_factory`` fixture applies this automatically.
+    """
+    return base_id + _xdist_domain_offset()
+
 
 # -------------------------------------------------------------------
 # Zombie process guard
@@ -129,7 +168,7 @@ def participant_factory():
     participants = []
 
     def _create(domain_id=0, domain_tag=None, partition=None, qos=None):
-        p = _make_participant(domain_id, domain_tag, partition, qos)
+        p = _make_participant(offset_domain(domain_id), domain_tag, partition, qos)
         participants.append(p)
         return p
 
