@@ -63,7 +63,7 @@ This ensures:
 QoS and domain library XML files are loaded at runtime via the `NDDS_QOS_PROFILES` environment variable. This variable lists all XML files in dependency order (Snippets before Patterns, Patterns before Topics, etc.). Applications do not hardcode XML file paths.
 
 ```bash
-export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/RoomDatabuses.xml;interfaces/domains/HospitalDatabuses.xml;interfaces/domains/CloudDatabuses.xml"
+export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/RoomDatabuses.xml;interfaces/domains/HospitalDatabuses.xml;interfaces/domains/CloudDatabuses.xml;interfaces/participants/SurgicalParticipants.xml;interfaces/participants/OrchestrationParticipants.xml;interfaces/participants/HospitalParticipants.xml"
 ```
 
 Docker Compose sets this variable for all service containers. Local development sets it in the shell or via a wrapper script.

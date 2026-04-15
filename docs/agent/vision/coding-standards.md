@@ -369,11 +369,17 @@ modules/shared/
 │   ├── __init__.py              # Re-exports Service, ServiceState
 │   ├── service.py               # medtech.service
 │   ├── service_host.py          # medtech.service_host
-│   ├── dds.py                   # medtech.dds (was medtech_dds_init)
-│   ├── log.py                   # medtech.log (was medtech_logging)
-│   └── gui/                     # medtech.gui subpackage (was medtech_gui)
-│       ├── __init__.py
+│   ├── dds.py                   # medtech.dds
+│   ├── log.py                   # medtech.log
+│   ├── cli/                     # medtech.cli subpackage
+│   │   └── ...
+│   └── gui/                     # medtech.gui subpackage — tier-agnostic only
+│       ├── __init__.py          # Theme, widgets, backend base, colors, icons
+│       ├── _backend.py
+│       ├── _colors.py
+│       ├── _icons.py
 │       ├── _theme.py
+│       ├── _tokens.py
 │       └── _widgets.py
 ├── include/                     # Unified C++ include tree
 │   └── medtech/
@@ -386,6 +392,12 @@ modules/shared/
     └── service_host.cpp
 ```
 
+**Boundary rule:** `modules/shared/` must not contain application entry
+points or import from module packages (`hospital_dashboard`,
+`surgical_procedure`, `clinical_alerts`). Module-specific applications
+live in their respective module directories and are launched via
+`python -m <module>.<subpackage>`.
+
 **Install layout** (under `install/lib/python/site-packages/`):
 
 ```text
@@ -395,9 +407,15 @@ medtech/
 ├── service_host.py
 ├── dds.py
 ├── log.py
+├── cli/
+│   └── ...
 └── gui/
     ├── __init__.py
+    ├── _backend.py
+    ├── _colors.py
+    ├── _icons.py
     ├── _theme.py
+    ├── _tokens.py
     └── _widgets.py
 ```
 

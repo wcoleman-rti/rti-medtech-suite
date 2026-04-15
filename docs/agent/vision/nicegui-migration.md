@@ -604,7 +604,7 @@ no same-origin in-app navigation to room GUIs from the hospital level.
 - **`ui.timeline()`** — alert history timeline view
 - **`app.storage.tab`** — per-user filter state persistence across page reloads
 
-### Procedure Controller (`modules/hospital-dashboard/procedure_controller/`)
+### Procedure Controller (`modules/surgical-procedure/procedure_controller/`)
 
 | Current Component | NiceGUI Replacement |
 |-------------------|-------------------|

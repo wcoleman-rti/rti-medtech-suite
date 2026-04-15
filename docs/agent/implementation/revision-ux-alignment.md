@@ -1,11 +1,14 @@
 # Revision: UX Alignment
 
-**Goal:** Align the user experience across setup, launch, and interaction
-workflows with the design decisions documented in the UX audit. This
-revision touches the hospital dashboard (room-centric primary view),
-the Procedure Controller (room-deployed, procedure lifecycle workflow),
-room-level GUI navigation (`medtech.gui.room_nav`), and the simulation
-CLI (`medtech build --docker`, controller container deployment).
+**Goal:** Align the user experience and module organization with
+tier-separation boundaries. Steps UX.1–UX.6 address the hospital
+dashboard (room-centric primary view), Procedure Controller
+(room-deployed, procedure lifecycle workflow), room-level GUI
+navigation, and the simulation CLI. Steps UX.7–UX.10 eliminate
+remaining unified-app artifacts: relocating the Procedure Controller
+and room navigation to `modules/surgical-procedure/`, absorbing the
+SPA shell into the dashboard module, creating a proper Hospital
+participant library, and purging stale naming/config remnants.
 
 **Depends on:** Phase SIM (V1.4 — Distributed Simulation & CLI complete)
 **Blocks:** Nothing — UX improvement within existing architecture
@@ -337,3 +340,189 @@ sidebar navigation model that no longer applies.
 | All `test_hospital_dashboard.py` tests | Dashboard data display tests unaffected by nav model |
 | All `test_digital_twin.py` tests | Twin rendering tests unaffected |
 | All `test_procedure_controller.py` tests | Controller backend logic unaffected |
+
+---
+
+## Step UX.7 — Module Boundary Consolidation
+
+### Rationale
+
+The unified app placed the Procedure Controller under
+`modules/hospital-dashboard/` and the hospital dashboard entry point
+(`app.py`) in `modules/shared/medtech/gui/`. Both violate tier
+boundaries: the Procedure Controller is a room-tier app (Orchestration +
+Procedure databuses, deployed in per-room containers on
+`surgical-net + orchestration-net`), and the dashboard entry point is a
+hospital-tier application, not a shared utility. The room-level
+navigation module (`room_nav.py`) is likewise a room-tier component
+used exclusively by the controller and digital twin.
+
+### Work
+
+**Move `procedure_controller/` to `modules/surgical-procedure/`:**
+
+- Move `modules/hospital-dashboard/procedure_controller/` →
+  `modules/surgical-procedure/procedure_controller/`
+- Update all Python imports:
+  `hospital_dashboard.procedure_controller` →
+  `surgical_procedure.procedure_controller`
+- Update `modules/surgical-procedure/__init__.py` if needed
+- Update CMakeLists.txt install rules
+- Update Docker entry points and `docker-compose.yml` service commands
+- Update CLI container launch code in `_or.py`
+
+**Move `room_nav.py` to `modules/surgical-procedure/`:**
+
+- Move `modules/shared/medtech/gui/room_nav.py` →
+  `modules/surgical-procedure/room_nav.py`
+- Update imports in `controller.py` and `digital_twin.py`:
+  `from medtech.gui.room_nav import RoomNav` →
+  `from surgical_procedure.room_nav import RoomNav`
+- Remove `room_nav` from `medtech.gui` exports
+
+**Absorb `app.py` into `dashboard.py` — then delete `app.py`:**
+
+- Move SPA shell features from `modules/shared/medtech/gui/app.py`
+  into `modules/hospital-dashboard/dashboard/dashboard.py`:
+  - Health/readiness probe endpoints (`/health`, `/ready`)
+  - Navigation pill (static Dashboard button + theme toggles +
+    connection dot)
+  - `_page_title_for_path()` and active-nav highlighting
+- Update `dashboard_page()` / `main()` to include the shell
+- Delete `modules/shared/medtech/gui/app.py`
+- Update Dockerfile CMD:
+  `python -m medtech.gui.app` → `python -m hospital_dashboard.dashboard`
+- Update `docker-compose.yml` service command
+- Update `scripts/simulate_room.py` usage message
+
+**Update all test imports:**
+
+- Tests referencing `hospital_dashboard.procedure_controller` →
+  `surgical_procedure.procedure_controller`
+- Tests referencing `medtech.gui.app` → `hospital_dashboard.dashboard`
+- Tests referencing `medtech.gui.room_nav` → `surgical_procedure.room_nav`
+
+### Test Gate
+
+- [ ] `python -m hospital_dashboard.dashboard` launches the dashboard
+- [ ] `python -m surgical_procedure.procedure_controller` launches the controller
+- [ ] `python -m surgical_procedure.digital_twin` launches the twin
+- [ ] `from surgical_procedure.room_nav import RoomNav` succeeds
+- [ ] `from medtech.gui import init_theme` succeeds (shared still works)
+- [ ] `import medtech.gui.app` fails (`app.py` deleted)
+- [ ] `modules/shared/medtech/gui/` contains only tier-agnostic utilities
+  (`_theme.py`, `_widgets.py`, `_backend.py`, `_colors.py`, `_icons.py`,
+  `_tokens.py`, `__init__.py`)
+- [ ] Health/readiness probes respond on the dashboard app
+- [ ] All existing tests pass
+- [ ] Lint passes
+
+---
+
+## Step UX.8 — Hospital Participant Library
+
+### Work
+
+**Create `interfaces/participants/HospitalParticipants.xml`:**
+
+- Move the `HospitalDashboard` participant from
+  `OrchestrationParticipants.xml` to a new `HospitalParticipants.xml`
+- New file uses `<domain_participant_library name="HospitalParticipants">`
+- Participant keeps `domain_ref="Hospital::Integration"` and all existing
+  reader definitions unchanged
+
+**Create IDL module `HospitalParticipants`:**
+
+- In `interfaces/idl/app_names.idl`, replace the
+  `module HospitalDashboard` block (currently nested under
+  `OrchestrationParticipants` comments) with a proper top-level
+  `module HospitalParticipants`
+- Update the participant config constant:
+  `"OrchestrationParticipants::HospitalDashboard"` →
+  `"HospitalParticipants::HospitalDashboard"`
+- Update `dashboard.py` to use the new constant path
+
+**Fix `NDDS_QOS_PROFILES` everywhere:**
+
+- Add `HospitalParticipants.xml` to the profile list in:
+  - `setup.bash.in`
+  - `docker-compose.yml` (anchor)
+  - `docker/medtech-app.Dockerfile` (both stages — also adds the
+    missing `OrchestrationParticipants.xml`)
+  - `docker/runtime-python.Dockerfile` (if applicable)
+
+### Test Gate
+
+- [ ] `HospitalDashboard` participant loads from `HospitalParticipants.xml`
+- [ ] `OrchestrationParticipants.xml` no longer contains `HospitalDashboard`
+- [ ] IDL module `HospitalParticipants` generates correctly
+- [ ] `NDDS_QOS_PROFILES` includes all three participant XMLs in all
+  deployment contexts (local, Docker image, docker-compose)
+- [ ] QoS compatibility check (Gate 11) passes with the new file split
+- [ ] All existing tests pass
+- [ ] Lint passes
+
+---
+
+## Step UX.9 — Unified App Remnant Cleanup
+
+### Work
+
+**Remove `MEDTECH_GUI_MODE`:**
+
+- Delete the `MEDTECH_GUI_MODE` environment variable from
+  `docker-compose.yml`
+
+**Rename `test_unified_app.py`:**
+
+- Rename `tests/gui/test_unified_app.py` →
+  `tests/gui/test_hospital_dashboard_app.py`
+- Update docstring: remove "unified NiceGUI application" language
+- Adjust imports to reference `hospital_dashboard.dashboard` instead of
+  `medtech.gui.app`
+
+**Purge stale comments and docstrings:**
+
+- `docker/medtech-app.Dockerfile` line 53: remove "unified NiceGUI
+  application (all GUI modules)" comment
+- `docker-compose.yml` line 574: remove "replaced by unified
+  medtech-gui service" comment
+- `modules/shared/medtech/dds.py` docstring: remove "surgical procedure
+  module" language and `SurgicalParticipants.xml` reference — this is
+  a shared module used by all tiers
+- `README.md`: remove `medtech launch unified` reference
+
+### Test Gate
+
+- [ ] `MEDTECH_GUI_MODE` does not appear in any non-documentation file
+- [ ] No file under `modules/` or `docker/` contains the word "unified"
+  in comments (documentation files under `docs/` may retain historical
+  context)
+- [ ] `test_hospital_dashboard_app.py` passes under new name
+- [ ] All existing tests pass
+- [ ] Lint passes (including markdownlint)
+
+---
+
+## Step UX.10 — Regression & Vision Doc Alignment
+
+### Work
+
+- Run the full quality gate pipeline (`bash scripts/ci.sh`)
+- Verify end-to-end workflow (same as UX.6 but with new entry points)
+- Update `@acceptance` test if import paths changed
+
+### Test Gate
+
+- [ ] All `@gui` spec tests pass
+- [ ] All `@orchestration` spec tests pass
+- [ ] All `@cli` spec tests pass
+- [ ] **@smoke Tier 1:** `import hospital_dashboard.dashboard` succeeds;
+  `import surgical_procedure.procedure_controller` succeeds;
+  `import surgical_procedure.room_nav` succeeds;
+  `import medtech.gui.app` raises `ImportError`
+- [ ] **@smoke Tier 2:** All container startup tests pass
+- [ ] `@acceptance` test validates the composed end-to-end UX workflow
+- [ ] All existing tests pass
+- [ ] Lint passes (including markdownlint)
+- [ ] Performance benchmark passes against the Phase SIM baseline

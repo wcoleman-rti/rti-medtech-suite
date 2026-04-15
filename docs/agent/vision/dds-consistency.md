@@ -238,8 +238,18 @@ module MedtechEntityNames {
         // ... one constant per configured reader
     };
 
-    // --- Future participant libraries get their own module ---
-    // module HospitalParticipants { ... };
+    // --- OrchestrationParticipants library ---
+    module OrchestrationParticipants {
+        // Procedure Controller, RoomNav, etc.
+    };
+
+    // --- HospitalParticipants library ---
+    module HospitalParticipants {
+        const string HOSPITAL_DASHBOARD = "HospitalParticipants::HospitalDashboard";
+        // Reader names — find_datareader()
+        const string PROCEDURE_STATUS_READER      = "DashboardSubscriber::ProcedureStatusReader";
+        // ... one constant per configured reader
+    };
 };
 ```
 
@@ -285,13 +295,13 @@ partition is applied is acceptable for startup but should be minimized.
 
 Partition can also be **updated at runtime** if the application's context
 changes (e.g., moving a running service from one procedure to another on the
-Procedure DDS domain). Updating the partition on a live participant triggers
+Procedure domain). Updating the partition on a live participant triggers
 re-discovery with the new partition value — matched endpoints are torn down and
 must rediscover, so this should only be done when the operational context
 genuinely changes and the re-discovery overhead is acceptable.
 
-> **Orchestration databus exception:** DomainParticipant partitions on the
-> Orchestration databus are **static** — they encode orchestration
+> **Orchestration domain exception:** DomainParticipant partitions on the
+> Orchestration domain (Domain 11) are **static** — they encode orchestration
 > tier membership (`procedure`, `facility`, etc.) and must **never** be changed
 > at runtime. Tier membership is a deployment-time property; changing it on a
 > live participant would cause unnecessary re-discovery churn across all
@@ -717,12 +727,12 @@ consistent across C++ and Python and allows it to appear directly in DDS
 topic types (`ServiceStatus`), RPC interfaces (`ServiceHostControl`),
 and any future on-wire health or inter-service monitoring scenarios.
 
-See [data-model.md — the Orchestration databus](data-model.md) for the authoritative
+See [data-model.md — Domain 11](data-model.md) for the authoritative
 enum values and the IDL module structure.
 
 Every service exposes a pollable `state` property that returns the
 IDL-generated `Orchestration::ServiceState`. The Service Host reads
-this property and publishes `ServiceStatus` on the Orchestration databus.
+this property and publishes `ServiceStatus` on the Orchestration domain.
 The service itself manages its own state transitions.
 
 | State | Meaning | Typical transition |
@@ -801,7 +811,7 @@ class Service(ABC):
     @abstractmethod
     def state(self) -> ServiceState:
         """Current lifecycle state (IDL-generated enum). Polled by the
-        Service Host for status reporting on the Orchestration databus."""
+        Service Host for status reporting on the Orchestration domain."""
         ...
 ```
 
@@ -859,7 +869,7 @@ thin wrappers that register service entries and delegate to `make_service_host`.
    in the closure at registration time.
 
 2. **Domain-agnostic framework**: The generic `ServiceHost` creates an
-   Orchestration databus participant from XML configuration. It does **not**
+   Orchestration domain participant from XML configuration. It does **not**
    set partitions, domain tags, or any domain-specific QoS — those
    concerns belong to the concrete services or their domain participants.
 
@@ -900,7 +910,7 @@ down.
 | CLI arguments | **No** | Yes |
 | Config files / YAML / JSON | **No** | Yes |
 | UI input | **No** | Yes (GUI hosts) |
-| Orchestration databus commands | **No** (host handles RPC) | Yes |
+| Orchestration domain commands | **No** (host handles RPC) | Yes |
 
 This rule ensures services are deployment-agnostic — they can be tested
 in isolation, hosted in any process topology, or migrated between
@@ -1540,7 +1550,7 @@ These principles were validated against `rti-chatbot-mcp` guidance for
 RTI Routing Service 7.6.0:
 
 1. **One `domain_route` per bridge boundary.** The medtech suite has one
-   bridge boundary: Procedure databuses → Hospital Integration databus.
+   bridge boundary: Procedure domain → Hospital domain.
 2. **Named participants with semantic roles.** Input-side participants are
    named by their domain and tag (e.g., `procedure_control`,
    `procedure_clinical`, `procedure_operational`). The output-side
@@ -1553,8 +1563,8 @@ RTI Routing Service 7.6.0:
 4. **Explicit topic filters.** Only explicitly configured topics cross the
    bridge. Always exclude `rti/*` internal topics.
 5. **Domain tags on input participants.** Routing Service participants on
-   the Procedure DDS domain must be created with the correct domain tag.
-   Hospital Integration databus participants have no tag. See
+   the Procedure domain must be created with the correct domain tag.
+   Hospital domain participants have no tag. See
    [system-architecture.md — Domain Tag Participant Model](system-architecture.md).
 
 ### Partition Propagation
@@ -1574,7 +1584,7 @@ for the `<propagation_qos>` configuration.
 ### Health Monitoring
 
 - Enable `<administration>` and `<monitoring>` in the Routing Service XML.
-- Use the Room Observability databus for monitoring traffic,
+- Use the Room Observability domain (Domain 19) for monitoring traffic,
   consistent with the application observability strategy.
 - Set practical publication periods (status: 5 s, statistics: 1 s).
 - Monitor at service/session/route granularity.
