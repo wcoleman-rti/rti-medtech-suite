@@ -36,23 +36,44 @@ A multi-instance module — each running instance represents one operating room 
 
 ### Module 2: Hospital Dashboard
 
-A single facility-wide NiceGUI web application displaying real-time status across all active surgical procedures. Accessible from any browser on the hospital network at `http://medtech-gui:8080/dashboard`.
+A single facility-wide NiceGUI web application providing facility-level situational awareness. The primary view organizes information by **room** — each discovered room is rendered as a summary card showing deployment status, active procedure indicator, and high-level metrics. Users drill into room-specific views by opening the room's GUI in a **new browser tab** (the room GUI is served by the room-level container, not the hospital container). Accessible from any browser on the hospital network at `http://medtech-gui:8080/dashboard`.
 
 #### Sub-capabilities
 
 | Sub-capability | Description |
 |----------------|-------------|
-| **Procedure List** | Real-time list of all active procedures with status indicators (in-progress, completing, alert). Auto-discovers new procedures via DDS. |
-| **Vitals Overview** | Summarized vitals for each procedure/patient. Color-coded by severity. Click-to-expand for detail. |
+| **Room Overview** (primary view) | Room cards discovered via RS-bridged `ServiceCatalog`. Each card shows: room name, active procedure indicator (if any), active/running/total service counts, alert/warning count. Cards link to room-level GUIs (controller, twin, etc.) via `gui_url` properties — links open in a new browser tab with an `open_in_new` icon indicating cross-plane navigation. |
+| **Active Procedures** (secondary view) | Filtered view showing only rooms with an active procedure. Includes procedure type, surgeon, phase, patient, and elapsed time. Shortcut to the facility-wide alert/vitals picture without scanning empty rooms. |
+| **Vitals Overview** | Summarized vitals for each active procedure/patient. Color-coded by severity (warning: HR > 100, critical: HR > 120). Click-to-expand for detail. |
 | **Alert Feed** | Aggregated clinical alerts and alarms across all ORs. Filterable by severity, room, patient. |
 | **Robot Status** | Read-only view of robot state per OR (operational, paused, e-stop, disconnected). |
+| **Resource Panel** | OR, bed, equipment, and staff availability (V1.1 — `ResourceAvailability` topic). |
 
 #### Architecture
 
-- Subscribes to Hospital domain topics
-- Data arrives via Routing Service bridge from Procedure domain
-- Uses content-filtered topics to support per-room drill-down views
+- Subscribes to Hospital domain topics (Domain 20)
+- All room data arrives via Routing Service bridge from Procedure and Orchestration domains — the dashboard never joins a room-level domain directly
+- Room discovery uses RS-bridged `ServiceCatalog` (from Domain 11 via per-room MedtechBridge) — each `ServiceCatalog` entry carries `room_id` and `gui_url` properties
+- Uses content-filtered topics to support per-room drill-down views within the dashboard (vitals, alerts)
 - DDS reads run as asyncio coroutines via `background_tasks.create()` on the NiceGUI event loop; UI refreshes driven by `ui.timer()` and `@ui.refreshable`
+
+#### Navigation Model
+
+The medtech suite uses a **cross-plane, cross-origin** navigation model that reflects the layered deployment architecture:
+
+| Navigation | Mechanism | Icon |
+|------------|-----------|------|
+| **Hospital → Room** | New browser tab/window. Room card "Open" action links to room GUI URL discovered from `ServiceCatalog` `gui_url` property. | `open_in_new` (Material Icons) |
+| **Room → Hospital** | User closes the room tab or switches to the still-open hospital tab. No explicit "back" link. | — |
+| **Room ↔ Room (horizontal)** | Within a room tab, a shared nav pill shows sibling room-level GUIs (controller, twin, future services). Clicking a sibling navigates the current tab to that sibling's URL. Same-tab, potentially cross-origin (separate containers). | Standard nav pill buttons |
+
+**Horizontal room-nav implementation:** All room-level GUI services share a reusable navigation module (`medtech.gui.room_nav`) that:
+- Creates a single read-only Orchestration domain participant (subscribes to `ServiceCatalog` filtered by `room_id`)
+- Discovers sibling GUI URLs dynamically as services start/stop — no environment variable configuration
+- Renders a common floating nav pill with buttons for each discovered sibling GUI
+- Provides a visual `open_in_new`-annotated link back to the hospital dashboard URL
+
+This model is deployment-agnostic: it works identically whether GUIs run in Docker containers, on physical hosts in an OR, or in a mixed environment. Each GUI service only needs Orchestration domain network reachability to discover siblings.
 
 ### Module 3: Clinical Alerts & Decision Support
 
@@ -111,11 +132,21 @@ The full release version policy — including version increment rules, release c
 - **Reference-type lifecycle** — no `owns_participant` flag needed; DDS entities are reference types that self-clean when the last reference goes out of scope
 
 #### Procedure Controller
-- Surgeon-facing NiceGUI web application (`/controller`) for driving the procedure lifecycle: select patient, procedure type, equipment configuration, start procedure, monitor, stop
-- Room-level standalone application on Domain 11 (Orchestration, room-scoped)
+- Surgeon-facing NiceGUI web application (`/controller/{room_id}`) for driving the procedure lifecycle
+- **Room-deployed** standalone application — deployed in a per-room container alongside other room-level GUI services (digital twin, future camera display, etc.). The controller is **not** served by the hospital-level container.
+- Participates on the Orchestration domain (Domain 11, room-scoped) for RPC and status, and on the Procedure domain (read-only: `operational` for ProcedureStatus/ProcedureContext, `control` for RobotArmAssignment)
 - Issues service lifecycle commands via DDS RPC (`ServiceHostControl` interface) to targeted Service Hosts on the Orchestration domain
 - Subscribes to `ServiceCatalog` and `ServiceStatus` topics on the Orchestration domain for real-time visibility of host availability and service state
 - Reconstructs full orchestration state on restart via TRANSIENT_LOCAL status topics
+- **Procedure Lifecycle Workflow:**
+  1. User clicks "Start Procedure" on the room's controller page
+  2. UI shows discovered idle services (from `ServiceCatalog` where `procedure_id` is empty)
+  3. User selects services to deploy and clicks "Deploy" → controller sends `start_service` RPCs with a generated `procedure_id`
+  4. Services start, `ServiceStatus` updates flow in, `procedure_id` appears in re-published `ServiceCatalog`
+  5. User can add more services to a running procedure (same flow, same `procedure_id`)
+  6. User clicks "Stop Procedure" → controller sends `stop_service` to all services with that `procedure_id`
+- **One active procedure per room** — enforced by checking whether any `ServiceCatalog` entry for the room already has a non-empty `procedure_id`
+- Uses the shared `medtech.gui.room_nav` module for horizontal navigation to sibling room GUIs (digital twin, etc.)
 
 #### Service Host Framework
 - Distributed process that hosts and manages DDS services locally on behalf of the Procedure Controller
@@ -132,7 +163,8 @@ The full release version policy — including version increment rules, release c
 
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|
-| Procedure Controller (NiceGUI web app) | DDS RPC client (Modern C++ and Python), Orchestration-only participant (Domain 11, room-scoped) + Procedure operational read, asyncio integration |
+| Procedure Controller (NiceGUI web app) | DDS RPC client (Modern C++ and Python), Orchestration participant (Domain 11, room-scoped) + Procedure read-only participants (`operational` + `control`), asyncio integration |
+| Room-level GUI navigation (`medtech.gui.room_nav`) | Shared Orchestration read-only participant for dynamic sibling GUI discovery via `ServiceCatalog` `gui_url` properties |
 | Service Host framework | DDS RPC service, dual-mode service lifecycle, per-host unique service naming |
 | Orchestration domain | Dedicated domain for infrastructure control-plane, `Pattern.Status` for state topics, `Pattern.RPC` for command channel |
 | `ServiceCatalog` + `ServiceStatus` topics | TRANSIENT_LOCAL state reconstruction, write-on-change, liveliness-based host failure detection |
