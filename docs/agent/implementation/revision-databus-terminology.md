@@ -102,7 +102,7 @@ add a one-line annotation at the top of affected sections:
 
 ---
 
-## Step T.1 — Glossary & Conventions in Vision Documents
+## Step T.1 — Glossary & Conventions in Vision Documents ✅ `ae87cd0`
 
 ### Work
 
@@ -147,7 +147,7 @@ Numbering Guide) containing:
 
 ---
 
-## Step T.2 — Domain Library Restructure (XML)
+## Step T.2 — Domain Library Restructure (XML) ✅ `ae87cd0`
 
 ### Work
 
@@ -249,7 +249,7 @@ names. Affected files:
 
 ---
 
-## Step T.3a — Documentation Rename
+## Step T.3a — Documentation Rename ✅ `0359019`
 
 ### Work
 
@@ -306,7 +306,7 @@ numeric "Domain NN" references), plus project-root and module READMEs.
 
 ---
 
-## Step T.3b — Code & XML Comment Rename
+## Step T.3b — Code & XML Comment Rename ✅ `45aa175`
 
 ### Work
 
@@ -354,7 +354,7 @@ files** — specifically Python comments/docstrings and XML comments.
 
 ---
 
-## Step T.4 — Verification & Cleanup
+## Step T.4 — Verification & Cleanup ✅ `dc6e38f`
 
 ### Work
 
