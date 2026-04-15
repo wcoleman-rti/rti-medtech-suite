@@ -17,6 +17,22 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 **And** the underlying commands are printed to stdout before execution
 **And** the exit code reflects the build result
 
+### @simulation @cli — `medtech build --docker` builds Docker images
+
+**Given** the CMake build and install have completed (or `medtech build` runs them first)
+**When** the developer runs `medtech build --docker`
+**Then** the CLI runs `docker compose build` (or equivalent `docker build` commands for all project images)
+**And** each underlying command is printed to stdout before execution
+**And** the exit code reflects the Docker build result
+
+### @simulation @cli — `medtech build --all` runs CMake build, install, and Docker image build
+
+**Given** the Connext environment is sourced and CMake prerequisites are met
+**When** the developer runs `medtech build --all`
+**Then** the CLI runs the CMake build and install followed by the Docker image build
+**And** each underlying command is printed to stdout
+**And** the exit code reflects the combined result
+
 ---
 
 ## CLI Run Commands — Hospital
@@ -71,11 +87,12 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 **Given** a hospital is running
 **When** the developer runs `medtech run or --name OR-1`
 **Then** the CLI launches a room-gateway container (CDS base with co-located RS and Collector via `--network container:<OR-name>-gateway`) on the hospital's Docker networks
-**And** the CLI runs `docker run --rm -d` for each required Service Host container (clinical, operational, operator, robot) and a digital twin container
+**And** the CLI runs `docker run --rm -d` for each required Service Host container (clinical, operational, operator, robot), a Procedure Controller container, and a Digital Twin container
+**And** the Controller and Twin containers are attached to both `surgical-net` and `orchestration-net` (for Procedure domain data and `medtech.gui.room_nav` sibling discovery)
 **And** each `docker run` command is printed to stdout before execution
-**And** containers are attached to the hospital's Docker networks
+**And** the controller container is assigned a host port (auto-assigned from the hospital's controller port range)
 **And** the twin container is assigned a host port (auto-assigned from the hospital's twin port range)
-**And** the CLI prints a summary including the twin URL
+**And** the CLI prints a summary including the controller URL and twin URL
 
 ### @simulation @cli — `medtech run or` auto-generates name when omitted
 
@@ -120,7 +137,8 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 **Given** Docker images are built
 **When** the developer runs `medtech launch`
 **Then** the CLI executes `medtech run hospital` followed by `medtech run or --name OR-1` and `medtech run or --name OR-3`
-**And** the output includes a summary of all GUI URLs (dashboard, controller, per-OR twins)
+**And** the output prominently displays the hospital dashboard URL (`http://localhost:8080`) as the primary entry point
+**And** the output includes a summary table of all GUI URLs (dashboard, per-OR controllers, per-OR twins)
 
 ### @simulation @cli — `medtech launch multi-site` starts two hospitals with NAT
 
