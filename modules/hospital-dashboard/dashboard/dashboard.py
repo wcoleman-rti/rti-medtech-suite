@@ -1,6 +1,6 @@
 """Hospital Dashboard — NiceGUI web application for facility-wide monitoring.
 
-The dashboard subscribes to the Hospital domain and renders procedure status,
+The dashboard subscribes to the Hospital Integration databus and renders procedure status,
 patient vitals, clinical alerts, robot state, and resource availability in a
 browser-based UI.
 """

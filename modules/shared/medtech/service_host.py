@@ -235,7 +235,7 @@ class _ServiceSlot:
 class ServiceHost(Service):
     """Generic orchestration host managing services via RPC.
 
-    Creates an Orchestration domain participant, registers the RPC service,
+    Creates an Orchestration databus participant, registers the RPC service,
     publishes ServiceCatalog and ServiceStatus, and blocks in run().
     Configured via ServiceRegistryMap — the only variation point between
     robot, clinical, and operational service hosts.
@@ -265,7 +265,7 @@ class ServiceHost(Service):
         # gui_url cache: svc_id → url string (empty if not a GUI service)
         self._gui_urls: dict[str, str] = {}
 
-        # -- Create Orchestration domain participant from XML --
+        # -- Create Orchestration databus participant from XML --
         initialize_connext()
         provider = dds.QosProvider.default
         self._participant = provider.create_participant_from_config(

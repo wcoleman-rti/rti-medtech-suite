@@ -10,7 +10,7 @@ Tests the full multi-host orchestration lifecycle:
 3. Services reach RUNNING state
 4. Controller stops services; state returns to STOPPED
 5. Service Host crash → liveliness loss detection
-6. Orchestration failure does not disrupt Procedure domain data
+6. Orchestration failure does not disrupt Procedure DDS domain data
 7. Partition isolation: OR-1 host not discoverable by OR-3 controller
 """
 
@@ -198,7 +198,7 @@ def all_service_hosts():
 
 @pytest.fixture(scope="module")
 def orch_participant():
-    """Orchestration domain participant for E2E tests."""
+    """Orchestration databus participant for E2E tests."""
     qos = test_participant_qos()
     qos.partition.name = ["procedure"]
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
@@ -444,20 +444,20 @@ class TestOrchestrationFailureIsolation:
     """Scenario: Orchestration failure does not disrupt surgical data."""
 
     def test_procedure_data_unaffected_by_controller_crash(self, all_service_hosts):
-        """When a simulated Procedure Controller crashes, Procedure domain
+        """When a simulated Procedure Controller crashes, Procedure DDS domain
         data continues flowing.
 
         We simulate the controller by creating an Orchestration participant
         (like the Procedure Controller does), then close it abruptly, and
-        verify that Procedure domain writers/readers remain matched.
+        verify that Procedure DDS domain writers/readers remain matched.
         """
-        # Create a mock controller participant on the Orchestration domain
+        # Create a mock controller participant on the Orchestration databus
         ctrl_qos = test_participant_qos()
         ctrl_qos.partition.name = ["procedure"]
         ctrl_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, ctrl_qos)
         ctrl_dp.enable()
 
-        # Create Procedure domain participants (writer + reader)
+        # Create Procedure DDS domain participants (writer + reader)
         import surgery
 
         proc_part = "room/OR-E2E/procedure/proc-e2e"
@@ -486,19 +486,19 @@ class TestOrchestrationFailureIsolation:
         assert (
             writer.publication_matched_status.current_count > 0
             and reader.subscription_matched_status.current_count > 0
-        ), "Procedure domain writer/reader did not match"
+        ), "Procedure DDS domain writer/reader did not match"
 
         # "Crash" the controller — close abruptly
         ctrl_dp.close()
 
-        # Verify Procedure domain still works
+        # Verify Procedure DDS domain still works
         time.sleep(0.5)
         assert (
             writer.publication_matched_status.current_count > 0
-        ), "Procedure domain writer lost match after orchestration crash"
+        ), "Procedure DDS domain writer lost match after orchestration crash"
         assert (
             reader.subscription_matched_status.current_count > 0
-        ), "Procedure domain reader lost match after orchestration crash"
+        ), "Procedure DDS domain reader lost match after orchestration crash"
 
         proc_dp.close()
 
@@ -548,7 +548,7 @@ class TestStateReconstruction:
     TRANSIENT_LOCAL."""
 
     def test_late_joining_reader_receives_state(self, all_service_hosts):
-        """A new Orchestration domain reader receives TRANSIENT_LOCAL
+        """A new Orchestration databus reader receives TRANSIENT_LOCAL
         ServiceCatalog and ServiceStatus from running hosts."""
         qos = test_participant_qos()
         qos.partition.name = ["procedure"]

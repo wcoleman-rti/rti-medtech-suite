@@ -115,7 +115,7 @@ def standalone_services():
 
 @pytest.fixture(scope="module")
 def control_dp():
-    """Procedure domain participant with 'control' tag and matching partition."""
+    """Procedure DDS domain participant with 'control' tag and matching partition."""
     qos = dds.DomainParticipantQos()
     qos.property["dds.domain_participant.domain_tag"] = "control"
     qos.partition.name = [PARTITION]
@@ -127,7 +127,7 @@ def control_dp():
 
 @pytest.fixture(scope="module")
 def clinical_dp():
-    """Procedure domain participant with 'clinical' tag and matching partition."""
+    """Procedure DDS domain participant with 'clinical' tag and matching partition."""
     qos = dds.DomainParticipantQos()
     qos.property["dds.domain_participant.domain_tag"] = "clinical"
     qos.partition.name = [PARTITION]
@@ -146,7 +146,7 @@ class TestAcceptanceStandalone:
     """Standalone surgical-procedure workflow acceptance test."""
 
     def test_01_robot_controller_publishes_state(self, standalone_services, control_dp):
-        """RobotController publishes RobotState on the Procedure domain."""
+        """RobotController publishes RobotState on the Procedure DDS domain."""
         topic = dds.Topic(control_dp, "RobotState", surgery.Surgery.RobotState)
         rqos = dds.DataReaderQos()
         rqos.reliability.kind = dds.ReliabilityKind.RELIABLE

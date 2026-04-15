@@ -86,7 +86,7 @@ def _terminate_proc(proc, timeout=3):
 
 @pytest.fixture(scope="module")
 def control_dp():
-    """Procedure domain participant with 'control' tag."""
+    """Procedure DDS domain participant with 'control' tag."""
     qos = dds.DomainParticipantQos()
     qos.property["dds.domain_participant.domain_tag"] = "control"
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
@@ -144,7 +144,7 @@ class TestControlTagIsolation:
     """RobotArmAssignment on control tag is NOT discoverable by other tags."""
 
     def test_clinical_tag_cannot_discover_arm_assignment(self):
-        """A clinical-tag subscriber on the Procedure domain cannot discover
+        """A clinical-tag subscriber on the Procedure DDS domain cannot discover
         RobotArmAssignment published on the control tag."""
         qos = dds.DomainParticipantQos()
         qos.property["dds.domain_participant.domain_tag"] = "clinical"

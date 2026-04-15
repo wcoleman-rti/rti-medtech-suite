@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Partition Inspector — Active Partition Scanner.
 
-Joins the Procedure domain with a room/* wildcard partition, discovers
+Joins the Procedure DDS domain with a room/* wildcard partition, discovers
 all active partitions from endpoint builtin topics, and reports which
 entities are publishing on each.
 
@@ -127,7 +127,7 @@ def _print_partitions(partitions: dict[str, list[str]]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Scan active DDS partitions on the Procedure domain.",
+        description="Scan active DDS partitions on the Procedure DDS domain.",
     )
     parser.add_argument(
         "--watch",

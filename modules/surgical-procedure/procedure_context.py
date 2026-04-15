@@ -1,6 +1,6 @@
 """Procedure Context and Status publisher.
 
-Publishes ProcedureContext and ProcedureStatus on the Procedure domain
+Publishes ProcedureContext and ProcedureStatus on the Procedure DDS domain
 (operational tag) with State pattern QoS and TRANSIENT_LOCAL durability.
 
 The participant and all writers are created from XML configuration

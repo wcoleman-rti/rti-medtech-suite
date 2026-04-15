@@ -23,7 +23,7 @@ PatientVitals = monitoring.Monitoring.PatientVitals
 
 
 class TestDomainTagIsolation:
-    """Procedure domain tag isolation: control/clinical/operational."""
+    """Procedure DDS domain tag isolation: control/clinical/operational."""
 
     @pytest.mark.parametrize(
         "tag_a,tag_b",

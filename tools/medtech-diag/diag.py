@@ -213,7 +213,7 @@ def check_endpoints(
 
     total = len(publications) + len(subscriptions)
     if total == 0:
-        # Observability domain has no user endpoints (ML2.0 monitoring only)
+        # Room Observability databus has no user endpoints (ML2.0 monitoring only)
         if domain_name == "observability":
             return CheckResult(
                 name="endpoint_matching",

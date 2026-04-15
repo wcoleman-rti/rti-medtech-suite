@@ -168,7 +168,7 @@ class TestDomainParsing:
         assert "ClinicalAlert" in topics["Integration"]
 
     def test_observability_domain_excluded(self):
-        """Observability domain has no topics and should be absent."""
+        """Room Observability databus has no topics and should be absent."""
         domains_xmls = find_domain_library_xmls()
         topics = parse_domain_topics(domains_xmls)
         assert "Observability" not in topics

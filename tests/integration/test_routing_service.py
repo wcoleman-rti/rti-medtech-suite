@@ -4,7 +4,7 @@ Spec: common-behaviors.md — Routing Service
 Tags: @e2e @routing
 
 Tests that Routing Service bridges configured topics from the Procedure
-domain to the Hospital domain, does NOT bridge unconfigured topics, and
+domain to the Hospital Integration databus, does NOT bridge unconfigured topics, and
 preserves data integrity across the bridge.
 
 These tests exercise DDS bridging at the transport level. Since Routing
@@ -36,7 +36,7 @@ BRIDGED_TOPICS = {
     "RobotState",
 }
 
-# Topics that must NOT appear on the Hospital domain
+# Topics that must NOT appear on the Hospital Integration databus
 NON_BRIDGED_TOPICS = {
     "RobotCommand",
     "SafetyInterlock",
@@ -121,7 +121,7 @@ class TestRoutingServiceConfig:
                 did = p.find("domain_id")
                 assert (
                     did is not None and did.text.strip() == "10"
-                ), f"{name} should be on domain 10"
+                ), f"{name} should be on the Procedure DDS domain"
 
     def test_hospital_participant_on_domain_20(self):
         """Hospital participant uses domain_id 20 (integration)."""
@@ -358,14 +358,14 @@ class TestRoutingServiceConfig:
 
 
 class TestCrossDomainIsolation:
-    """Verify that Procedure and Hospital domains are isolated without RS.
+    """Verify that Procedure and Hospital Integration databuss are isolated without RS.
 
     These tests confirm the spec requirement that cross-domain data only
     flows through Routing Service — never via direct discovery.
     """
 
     def test_no_cross_domain_discovery(self, participant_factory):
-        """Procedure and Hospital domain participants do not discover
+        """Procedure and Hospital Integration databus participants do not discover
         each other (spec: common-behaviors.md — Domain Isolation)."""
         import time
 

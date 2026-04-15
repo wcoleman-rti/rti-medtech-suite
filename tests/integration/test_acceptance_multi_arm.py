@@ -7,7 +7,7 @@ Rule 8 acceptance test:
 1. Start two Robot Service Hosts (distinct ROBOT_IDs in same room)
 2. Issue start_service RPCs for arm-1 at LEFT and arm-2 at RIGHT
 3. Both arms reach OPERATIONAL with correct RobotArmAssignment data
-4. Both arms publish RobotState on the Procedure domain
+4. Both arms publish RobotState on the Procedure DDS domain
 5. Stop one arm → dispose() → remaining arm continues unaffected
 6. Fails if any component is absent or non-functional
 """
@@ -117,7 +117,7 @@ def _make_requester(participant, host_id):
 
 @pytest.fixture(scope="module")
 def orch_dp():
-    """Orchestration domain participant."""
+    """Orchestration databus participant."""
     qos = test_participant_qos()
     qos.partition.name = ["procedure"]
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
@@ -128,7 +128,7 @@ def orch_dp():
 
 @pytest.fixture(scope="module")
 def control_dp():
-    """Procedure domain participant with 'control' tag."""
+    """Procedure DDS domain participant with 'control' tag."""
     qos = test_participant_qos()
     qos.property["dds.domain_participant.domain_tag"] = "control"
     qos.partition.name = [PARTITION]
@@ -286,7 +286,7 @@ class TestAcceptanceMultiArm:
         ), f"Arm B never reached OPERATIONAL; last state: {final_state}"
 
     def test_03_both_arms_publish_robot_state(self, robot_hosts, state_reader):
-        """Both arms publish RobotState on the Procedure domain."""
+        """Both arms publish RobotState on the Procedure DDS domain."""
         wait_for_reader_match(state_reader, timeout_sec=10)
 
         deadline = time.time() + 15

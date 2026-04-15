@@ -1,6 +1,6 @@
 """Bedside monitor simulator — PatientVitals, WaveformData, AlarmMessages.
 
-Publishes on the Procedure domain (clinical tag) using:
+Publishes on the Procedure clinical databus using:
 - PatientVitals: periodic-snapshot at 1 Hz
 - WaveformData: continuous-stream at 50 Hz (10-sample ECG blocks at 500 Sa/s)
 - AlarmMessages: write-on-change (alarm state transitions only)

@@ -9,7 +9,7 @@ Tests that the Robot Service Host:
 - Starts/stops the RobotControllerService via RPC
 - Publishes ServiceStatus transitions (write-on-change)
 - Returns ALREADY_RUNNING / NOT_RUNNING on duplicate/invalid ops
-- Maintains Orchestration / Procedure domain isolation
+- Maintains Orchestration / Procedure DDS domain isolation
 """
 
 import os
@@ -97,7 +97,7 @@ def robot_service_host():
     ready = False
     try:
         # 30 s: allows for subprocess startup under CI load when concurrent
-        # all_service_hosts (orch_e2e group) competes for CPU on domain 11.
+        # all_service_hosts (orch_e2e group) competes for CPU on the Orchestration databus.
         ws.wait(dds.Duration(30))
         probe_reader.wait_for_historical_data(dds.Duration(15))
         ready = True
@@ -119,7 +119,7 @@ def robot_service_host():
 
 @pytest.fixture(scope="module")
 def orch_participant():
-    """Create a test participant on the Orchestration domain.
+    """Create a test participant on the Orchestration databus.
 
     Transport QoS matches BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation
     used by the XML-configured Orchestration participant.
@@ -135,7 +135,7 @@ def orch_participant():
 
 @pytest.fixture(scope="module")
 def catalog_reader(orch_participant):
-    """DataReader for ServiceCatalog on the Orchestration domain."""
+    """DataReader for ServiceCatalog on the Orchestration databus."""
     topic = dds.Topic(orch_participant, "ServiceCatalog", Orchestration.ServiceCatalog)
     sub = dds.Subscriber(orch_participant)
     rqos = dds.DataReaderQos()
@@ -150,7 +150,7 @@ def catalog_reader(orch_participant):
 
 @pytest.fixture(scope="module")
 def status_reader(orch_participant):
-    """DataReader for ServiceStatus on the Orchestration domain."""
+    """DataReader for ServiceStatus on the Orchestration databus."""
     topic = dds.Topic(orch_participant, "ServiceStatus", Orchestration.ServiceStatus)
     sub = dds.Subscriber(orch_participant)
     rqos = dds.DataReaderQos()
@@ -337,10 +337,10 @@ class TestRpcServiceControl:
 
 
 class TestDomainIsolation:
-    """Verify Orchestration domain is isolated from Procedure domain."""
+    """Verify Orchestration databus is isolated from Procedure DDS domain."""
 
     def test_orchestration_isolated_from_procedure(self, robot_service_host):
-        """A Procedure domain participant does not discover Orchestration
+        """A Procedure DDS domain participant does not discover Orchestration
         entities."""
         proc_qos = dds.DomainParticipant.default_participant_qos
         proc_qos.partition.name = [f"room/{ROOM_ID}/procedure/proc-test"]
@@ -348,8 +348,8 @@ class TestDomainIsolation:
         proc_participant.enable()
 
         try:
-            # Create a reader on the Procedure domain for ServiceCatalog topic
-            # — this topic should not exist on domain 10
+            # Create a reader on the Procedure DDS domain for ServiceCatalog topic
+            # — this topic should not exist on the Procedure DDS domain
             topic = dds.Topic(
                 proc_participant,
                 "ServiceCatalog",
@@ -364,7 +364,7 @@ class TestDomainIsolation:
             # Should receive nothing — domains are isolated
             assert not wait_for_data(
                 reader, timeout_sec=1
-            ), "Procedure domain received ServiceCatalog — isolation broken"
+            ), "Procedure DDS domain received ServiceCatalog — isolation broken"
             reader.close()
         finally:
             proc_participant.close()

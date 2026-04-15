@@ -1,6 +1,6 @@
 """Digital twin — NiceGUI web application for surgical robot 3D visualization.
 
-Subscribes to the Procedure domain (control tag) and renders a live 3D
+Subscribes to the Procedure control databus and renders a live 3D
 robot visualization in the browser.  Data reception uses rti.asyncio async
 generators so DDS reads never block the NiceGUI event loop.
 

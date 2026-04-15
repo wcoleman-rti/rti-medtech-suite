@@ -87,14 +87,14 @@ class TestObservabilityConfiguration:
         ), "collector-service must be defined in docker-compose.yml"
 
     def test_collector_service_observability_domain(self):
-        """Collector Service monitors Room Observability domain 19."""
+        """Collector Service monitors Room Observability databus 19."""
         content = _read_text("docker-compose.yml")
-        # Find the collector-service section and check for domain 19
+        # Find the collector-service section and check for the Room Observability databus
         cs_idx = content.index("collector-service:")
         cs_section = content[cs_idx : cs_idx + 1000]
         assert (
             'OBSERVABILITY_DOMAIN: "19"' in cs_section
-        ), "Collector Service must monitor Room Observability domain 19"
+        ), "Collector Service must monitor Room Observability databus 19"
 
     def test_prometheus_in_compose(self):
         """Docker Compose defines prometheus with observability profile."""
@@ -136,11 +136,11 @@ class TestMonitoringLibraryConfiguration:
         ), "Participants.xml must configure Monitoring Library 2.0"
 
     def test_observability_domain_is_19(self):
-        """Monitoring Library 2.0 uses domain 19 for Room Observability."""
+        """Monitoring Library 2.0 uses the Room Observability databus."""
         content = _read_text("interfaces/qos/Participants.xml")
         assert (
             "19" in content
-        ), "Room Observability domain (19) must appear in Participants.xml"
+        ), "Room Observability databus (19) must appear in Participants.xml"
 
     def test_collector_service_discovery_peers(self):
         """Collector Service has discovery peers pointing to CDS."""

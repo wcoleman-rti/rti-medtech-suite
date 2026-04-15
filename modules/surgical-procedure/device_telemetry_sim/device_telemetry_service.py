@@ -1,6 +1,6 @@
 """Device telemetry gateway — DeviceTelemetry publisher.
 
-Publishes DeviceTelemetry on the Procedure domain (clinical tag) using
+Publishes DeviceTelemetry on the Procedure clinical databus using
 the write-on-change publication model: samples are published only when
 device parameters change, faults occur, or mode transitions happen.
 

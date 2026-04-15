@@ -1,6 +1,6 @@
 """Camera simulator — CameraFrame publisher.
 
-Publishes CameraFrame on the Procedure domain (operational tag) using
+Publishes CameraFrame on the Procedure operational databus using
 Stream pattern QoS at a configured frame rate (default 30 Hz).
 
 Simulates frame metadata (camera ID, sequence number, timestamp,

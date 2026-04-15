@@ -98,7 +98,7 @@ def clinical_service_host():
 
 @pytest.fixture(scope="module")
 def orch_participant():
-    """Create a test participant on the Orchestration domain.
+    """Create a test participant on the Orchestration databus.
 
     Transport QoS matches BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation
     used by the XML-configured Orchestration participant.
@@ -113,7 +113,7 @@ def orch_participant():
 
 @pytest.fixture(scope="module")
 def catalog_reader(orch_participant):
-    """DataReader for ServiceCatalog on the Orchestration domain."""
+    """DataReader for ServiceCatalog on the Orchestration databus."""
     topic = dds.Topic(orch_participant, "ServiceCatalog", Orchestration.ServiceCatalog)
     sub = dds.Subscriber(orch_participant)
     rqos = dds.DataReaderQos()
@@ -128,7 +128,7 @@ def catalog_reader(orch_participant):
 
 @pytest.fixture(scope="module")
 def status_reader(orch_participant):
-    """DataReader for ServiceStatus on the Orchestration domain."""
+    """DataReader for ServiceStatus on the Orchestration databus."""
     topic = dds.Topic(orch_participant, "ServiceStatus", Orchestration.ServiceStatus)
     sub = dds.Subscriber(orch_participant)
     rqos = dds.DataReaderQos()

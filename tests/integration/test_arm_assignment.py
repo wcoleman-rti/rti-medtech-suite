@@ -74,7 +74,7 @@ def _terminate_proc(proc, timeout=3):
 
 @pytest.fixture(scope="module")
 def control_dp():
-    """Procedure domain participant with 'control' tag and matching partition."""
+    """Procedure DDS domain participant with 'control' tag and matching partition."""
     qos = dds.DomainParticipantQos()
     qos.property["dds.domain_participant.domain_tag"] = "control"
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"

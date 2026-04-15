@@ -6,7 +6,7 @@ Tags: @integration @orchestration @acceptance
 Rule 8 acceptance test:
 1. Procedure Controller starts all services on all hosts via RPC
 2. Operator Console sends a robot command → RobotController moves → RobotState updates
-3. BedsideMonitor publishes vitals → subscriber receives on Procedure domain
+3. BedsideMonitor publishes vitals → subscriber receives on Procedure DDS domain
 4. Procedure Controller stops all services → all states return to STOPPED
 
 Fails if any component is missing or non-functional.
@@ -171,7 +171,7 @@ def all_hosts():
 
 @pytest.fixture(scope="module")
 def orch_dp():
-    """Orchestration domain participant."""
+    """Orchestration databus participant."""
     qos = test_participant_qos()
     qos.partition.name = ["procedure"]
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
@@ -196,7 +196,7 @@ def status_reader(orch_dp):
 
 @pytest.fixture(scope="module")
 def control_dp():
-    """Procedure domain participant with 'control' tag."""
+    """Procedure DDS domain participant with 'control' tag."""
     qos = dds.DomainParticipantQos()
     qos.property["dds.domain_participant.domain_tag"] = "control"
     qos.partition.name = [PARTITION]
@@ -208,7 +208,7 @@ def control_dp():
 
 @pytest.fixture(scope="module")
 def clinical_dp():
-    """Procedure domain participant with 'clinical' tag."""
+    """Procedure DDS domain participant with 'clinical' tag."""
     qos = dds.DomainParticipantQos()
     qos.property["dds.domain_participant.domain_tag"] = "clinical"
     qos.partition.name = [PARTITION]
@@ -270,10 +270,10 @@ class TestAcceptanceOrchestration:
     def test_02_robot_state_updates_on_command(self, all_hosts, control_dp):
         """Operator Console sends RobotCommand → RobotState updates.
 
-        Verifies data flows on the Procedure domain while services
+        Verifies data flows on the Procedure DDS domain while services
         are orchestrated.
         """
-        # Subscribe to RobotState on the Procedure domain
+        # Subscribe to RobotState on the Procedure DDS domain
         topic = dds.Topic(control_dp, "RobotState", surgery.Surgery.RobotState)
         rqos = dds.DataReaderQos()
         rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
@@ -291,10 +291,10 @@ class TestAcceptanceOrchestration:
         reader.close()
 
     def test_03_vitals_data_flows(self, all_hosts, clinical_dp):
-        """BedsideMonitor publishes PatientVitals on the Procedure domain.
+        """BedsideMonitor publishes PatientVitals on the Procedure DDS domain.
 
         Verifies the clinical service is producing data through the
-        Procedure domain data plane.
+        Procedure DDS domain data plane.
         """
         topic = dds.Topic(clinical_dp, "PatientVitals", Monitoring.PatientVitals)
         rqos = dds.DataReaderQos()

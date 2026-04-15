@@ -1,6 +1,6 @@
 """Operator console simulator — OperatorInput, RobotCommand, SafetyInterlock.
 
-Publishes simulated joystick/haptic input on the Procedure domain
+Publishes simulated joystick/haptic input on the Procedure DDS domain
 (control tag) using the ControlOperator participant. Sends an initial
 RobotCommand to transition the robot from IDLE to OPERATIONAL, then
 continuously publishes OperatorInput with sinusoidal motion.

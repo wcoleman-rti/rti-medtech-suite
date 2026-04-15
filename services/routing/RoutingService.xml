@@ -4,7 +4,7 @@
 
     Bridges selected topics from the Procedure databuses and
     Orchestration databus to the Hospital Integration databus.
-    Three input participants cover the three Procedure domain tags
+    Three input participants cover the three Procedure databuses
     (control, clinical, operational). A fourth input participant reads
     ServiceCatalog from Orchestration. One output participant publishes
     on the Hospital Integration databus (no tag).

@@ -22,7 +22,7 @@ import xml.etree.ElementTree as ET
 
 import rti.connextdds as dds
 
-# Domain names that make up the Procedure domain (domain ID 10).
+# Domain names that make up the Procedure DDS domain (domain ID 10).
 PROCEDURE_DOMAINS = frozenset(
     {"Procedure_control", "Procedure_clinical", "Procedure_operational"}
 )
@@ -264,7 +264,7 @@ def check_all(provider, domains_xml_paths, verbose=False):
     pass_count = 0
     fail_count = 0
 
-    # Within Procedure domain
+    # Within Procedure DDS domain
     for topic in sorted(procedure_topics):
         profile = "Topics::ProcedureTopics"
         w_qos = provider.set_topic_datawriter_qos(profile, topic)
@@ -277,7 +277,7 @@ def check_all(provider, domains_xml_paths, verbose=False):
         else:
             pass_count += 1
 
-    # Within Hospital domain (native topics only)
+    # Within Hospital Integration databus (native topics only)
     for topic in sorted(hospital_topics - bridged):
         profile = "Topics::HospitalTopics"
         w_qos = provider.set_topic_datawriter_qos(profile, topic)

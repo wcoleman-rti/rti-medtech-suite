@@ -51,7 +51,7 @@ class Service(ABC):
         """Current lifecycle state (IDL-generated enum).
 
         Polled by the Service Host for status reporting on the
-        Orchestration domain.
+        Orchestration databus.
         """
         ...
 

@@ -275,7 +275,7 @@ def rpc_requester(orch_participant):
 
 @pytest.fixture(scope="module")
 def control_dp():
-    """Procedure domain participant with control tag matching arm partition."""
+    """Procedure DDS domain participant with control tag matching arm partition."""
     qos = dds.DomainParticipantQos()
     qos.property["dds.domain_participant.domain_tag"] = "control"
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
