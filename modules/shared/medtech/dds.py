@@ -1,11 +1,12 @@
-"""DDS initialization for the surgical procedure module.
+"""DDS initialization for the medtech suite.
 
 Performs the mandatory pre-participant initialization sequence defined in
 vision/data-model.md: XTypes compliance mask, type registration, and
 participant creation from XML via the default QosProvider.
 
 Participants are created using create_participant_from_config() which reads
-named participant definitions from SurgicalParticipants.xml. DataWriters
+named participant definitions from SurgicalParticipants.xml,
+OrchestrationParticipants.xml, and HospitalParticipants.xml. DataWriters
 and DataReaders are then looked up by entity name using find_datawriter()
 and find_datareader().
 """

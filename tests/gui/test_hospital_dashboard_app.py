@@ -1,11 +1,11 @@
-"""Tests for the unified NiceGUI application — Step N.6 + Step M.0 test gate.
+"""Tests for the hospital dashboard NiceGUI application.
 
 Covers:
 - Health and readiness probe endpoints
 - GuiBackend registry and readiness tracking
-- SPA shell page structure (header + drawer + sub_pages)
+- SPA shell page structure (nav pill + sub_pages)
 - GuiBackend self-registration lifecycle hooks
-- SPA navigation: active-nav highlighting, breadcrumb, dynamic sidebar
+- SPA navigation: active-nav highlighting, page title
 - Page title helper function
 
 Spec: nicegui-migration.md — Page Routing, SPA Navigation, Health & Readiness Probes

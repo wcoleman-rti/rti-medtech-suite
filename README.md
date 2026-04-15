@@ -82,9 +82,6 @@ medtech stop
 # Multi-site NAT-isolated simulation (2 hospitals, 2 ORs each)
 medtech launch multi-site
 
-# Monolithic GUI (pre-V1.4 style — all modules in one process)
-medtech launch unified
-
 # List all available scenarios
 medtech launch --list
 ```

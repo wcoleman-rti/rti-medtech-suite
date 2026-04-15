@@ -42,8 +42,8 @@ participant library, and purging stale naming/config remnants.
 | UX.5 | Procedure Lifecycle Workflow | ✅ Complete | `6d2092e` |
 | UX.6 | Regression & Acceptance | ✅ Complete | `8f2c893` |
 | UX.7 | Module Boundary Consolidation | ✅ Complete | `04a19d3` |
-| UX.8 | Hospital Participant Library | ✅ Complete | `pending` |
-| UX.9 | Unified App Remnant Cleanup | ⬜ Not started | — |
+| UX.8 | Hospital Participant Library | ✅ Complete | `9506926` |
+| UX.9 | Unified App Remnant Cleanup | ✅ Complete | `pending` |
 | UX.10 | Regression & Vision Doc Alignment | ⬜ Not started | — |
 
 **Test results at UX.6 gate:** 666 tests passing, 12/12 CI gates green.
@@ -487,7 +487,7 @@ used exclusively by the controller and digital twin.
 
 ---
 
-## Step UX.9 — Unified App Remnant Cleanup
+## Step UX.9 — Unified App Remnant Cleanup ✅
 
 ### Work
 
@@ -517,13 +517,13 @@ used exclusively by the controller and digital twin.
 
 ### Test Gate
 
-- [ ] `MEDTECH_GUI_MODE` does not appear in any non-documentation file
-- [ ] No file under `modules/` or `docker/` contains the word "unified"
+- [x] `MEDTECH_GUI_MODE` does not appear in any non-documentation file
+- [x] No file under `modules/` or `docker/` contains the word "unified"
   in comments (documentation files under `docs/` may retain historical
   context)
-- [ ] `test_hospital_dashboard_app.py` passes under new name
-- [ ] All existing tests pass
-- [ ] Lint passes (including markdownlint)
+- [x] `test_hospital_dashboard_app.py` passes under new name
+- [x] All existing tests pass
+- [x] Lint passes (including markdownlint)
 
 ---
 
