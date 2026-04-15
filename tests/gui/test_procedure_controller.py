@@ -233,6 +233,11 @@ def _patch_ui(monkeypatch: pytest.MonkeyPatch, recorder: Recorder) -> None:
         "notify",
         lambda *args, **kwargs: None,
     )
+    monkeypatch.setattr(
+        controller_module.ui,
+        "checkbox",
+        lambda *args, **kwargs: recorder.record("checkbox", *args, **kwargs),
+    )
 
 
 def _make_injected_readers(participant_factory):
@@ -386,7 +391,11 @@ class TestControllerPage:
             "backend",
             SimpleNamespace(
                 hosts={"host-1"},
-                catalogs={("host-1", "svc-1"): SimpleNamespace(display_name="Svc One")},
+                catalogs={
+                    ("host-1", "svc-1"): SimpleNamespace(
+                        display_name="Svc One", properties=[]
+                    )
+                },
                 service_states={
                     ("host-1", "svc-1"): SimpleNamespace(
                         state=Orchestration.ServiceState.RUNNING
@@ -398,9 +407,14 @@ class TestControllerPage:
                     mode="hosts",
                     selected_host_id=None,
                     selected_service_key=None,
+                    room_filter=None,
+                    procedure_filter=None,
+                    service_filter="ALL",
                 ),
                 _services_by_host=lambda: {
-                    "host-1": {"svc-1": SimpleNamespace(display_name="Svc One")}
+                    "host-1": {
+                        "svc-1": SimpleNamespace(display_name="Svc One", properties=[])
+                    }
                 },
                 _diag_log=[],
                 show_hosts_view=lambda: None,
@@ -414,6 +428,7 @@ class TestControllerPage:
                 health_selected=lambda: None,
                 start_selected=lambda: None,
                 stop_selected=lambda: None,
+                active_procedure_id="",
             ),
         )
 
@@ -440,7 +455,11 @@ class TestControllerPage:
             "backend",
             SimpleNamespace(
                 hosts={"host-1"},
-                catalogs={("host-1", "svc-1"): SimpleNamespace(display_name="Svc One")},
+                catalogs={
+                    ("host-1", "svc-1"): SimpleNamespace(
+                        display_name="Svc One", properties=[]
+                    )
+                },
                 service_states={
                     ("host-1", "svc-1"): SimpleNamespace(
                         state=Orchestration.ServiceState.RUNNING
@@ -452,9 +471,14 @@ class TestControllerPage:
                     mode="hosts",
                     selected_host_id="host-1",
                     selected_service_key=("host-1", "svc-1"),
+                    room_filter=None,
+                    procedure_filter=None,
+                    service_filter="ALL",
                 ),
                 _services_by_host=lambda: {
-                    "host-1": {"svc-1": SimpleNamespace(display_name="Svc One")}
+                    "host-1": {
+                        "svc-1": SimpleNamespace(display_name="Svc One", properties=[])
+                    }
                 },
                 _diag_log=[],
                 show_hosts_view=lambda: None,
@@ -468,6 +492,7 @@ class TestControllerPage:
                 health_selected=lambda: None,
                 start_selected=lambda: None,
                 stop_selected=lambda: None,
+                active_procedure_id="",
             ),
         )
 
@@ -476,3 +501,280 @@ class TestControllerPage:
     def test_constants_remain_available(self):
         assert ICONS["dashboard"] == "space_dashboard"
         assert BRAND_COLORS["blue"] == "#004A8A"
+
+
+# ---------------------------------------------------------------------------
+# Helpers for procedure lifecycle tests
+# ---------------------------------------------------------------------------
+
+
+def _make_prop(name: str, current_value: str = "") -> SimpleNamespace:
+    """Create a fake PropertyDescriptor."""
+    return SimpleNamespace(
+        name=name,
+        current_value=current_value,
+        default_value="",
+        description="",
+        required=False,
+    )
+
+
+def _make_catalog(
+    host_id: str,
+    service_id: str,
+    *,
+    room_id: str = "",
+    procedure_id: str = "",
+    display_name: str = "",
+) -> SimpleNamespace:
+    """Create a fake ServiceCatalog with optional properties."""
+    props = []
+    if room_id:
+        props.append(_make_prop("room_id", room_id))
+    if procedure_id:
+        props.append(_make_prop("procedure_id", procedure_id))
+    return SimpleNamespace(
+        host_id=host_id,
+        service_id=service_id,
+        display_name=display_name or service_id,
+        properties=props,
+    )
+
+
+class TestProcedureLifecycle:
+    """Tests for UX.5 — Procedure Lifecycle Workflow."""
+
+    def test_active_procedure_id_empty_when_no_procedure(self, participant_factory):
+        readers = _make_injected_readers(participant_factory)
+        b = controller_module.ControllerBackend(**readers, room_id="OR-1")
+        b._catalogs = {
+            ("h1", "s1"): _make_catalog("h1", "s1", room_id="OR-1"),
+        }
+        assert b.active_procedure_id == ""
+        asyncio.run(b.close())
+
+    def test_active_procedure_id_returns_id_when_active(self, participant_factory):
+        readers = _make_injected_readers(participant_factory)
+        b = controller_module.ControllerBackend(**readers, room_id="OR-1")
+        b._catalogs = {
+            ("h1", "s1"): _make_catalog(
+                "h1", "s1", room_id="OR-1", procedure_id="OR-1-123"
+            ),
+        }
+        assert b.active_procedure_id == "OR-1-123"
+        asyncio.run(b.close())
+
+    def test_start_procedure_disabled_when_active(self, participant_factory):
+        """'Start Procedure' should be disabled (no button) when procedure active."""
+        readers = _make_injected_readers(participant_factory)
+        b = controller_module.ControllerBackend(**readers, room_id="OR-1")
+        b._catalogs = {
+            ("h1", "s1"): _make_catalog(
+                "h1", "s1", room_id="OR-1", procedure_id="OR-1-100"
+            ),
+        }
+        # active_procedure_id being non-empty is what hides Start Procedure
+        assert b.active_procedure_id != ""
+        asyncio.run(b.close())
+
+    def test_idle_services_returns_services_without_procedure(
+        self, participant_factory
+    ):
+        readers = _make_injected_readers(participant_factory)
+        b = controller_module.ControllerBackend(**readers, room_id="OR-1")
+        b._catalogs = {
+            ("h1", "s1"): _make_catalog(
+                "h1", "s1", room_id="OR-1", procedure_id="OR-1-100"
+            ),
+            ("h1", "s2"): _make_catalog("h1", "s2", room_id="OR-1"),
+            ("h2", "s3"): _make_catalog("h2", "s3", room_id="OR-1"),
+        }
+        idle = b.idle_services()
+        idle_keys = [key for key, _ in idle]
+        assert ("h1", "s2") in idle_keys
+        assert ("h2", "s3") in idle_keys
+        assert ("h1", "s1") not in idle_keys
+        asyncio.run(b.close())
+
+    def test_start_procedure_sends_rpcs_with_procedure_id(
+        self, participant_factory, monkeypatch
+    ):
+        readers = _make_injected_readers(participant_factory)
+        b = controller_module.ControllerBackend(**readers, room_id="OR-1")
+
+        rpc_calls: list[tuple[str, Any, str]] = []
+
+        async def _fake_rpc(host_id, call, op_name):
+            rpc_calls.append((host_id, call, op_name))
+
+        monkeypatch.setattr(b, "_do_rpc", _fake_rpc)
+
+        asyncio.run(b.start_procedure([("h1", "s1"), ("h2", "s2")], "OR-1-42"))
+        assert len(rpc_calls) == 2
+        assert rpc_calls[0][0] == "h1"
+        assert rpc_calls[0][2] == "start_service"
+        assert rpc_calls[1][0] == "h2"
+        asyncio.run(b.close())
+
+    def test_procedure_services_returns_active_services(self, participant_factory):
+        readers = _make_injected_readers(participant_factory)
+        b = controller_module.ControllerBackend(**readers, room_id="OR-1")
+        b._catalogs = {
+            ("h1", "s1"): _make_catalog(
+                "h1", "s1", room_id="OR-1", procedure_id="OR-1-100"
+            ),
+            ("h1", "s2"): _make_catalog("h1", "s2", room_id="OR-1"),
+            ("h2", "s3"): _make_catalog(
+                "h2", "s3", room_id="OR-1", procedure_id="OR-1-100"
+            ),
+        }
+        proc_svcs = b.procedure_services()
+        proc_keys = [key for key, _ in proc_svcs]
+        assert ("h1", "s1") in proc_keys
+        assert ("h2", "s3") in proc_keys
+        assert ("h1", "s2") not in proc_keys
+        asyncio.run(b.close())
+
+    def test_add_to_procedure_uses_active_id(self, participant_factory, monkeypatch):
+        readers = _make_injected_readers(participant_factory)
+        b = controller_module.ControllerBackend(**readers, room_id="OR-1")
+        b._catalogs = {
+            ("h1", "s1"): _make_catalog(
+                "h1", "s1", room_id="OR-1", procedure_id="OR-1-100"
+            ),
+        }
+
+        rpc_calls: list[tuple[str, Any, str]] = []
+
+        async def _fake_rpc(host_id, call, op_name):
+            rpc_calls.append((host_id, call, op_name))
+
+        monkeypatch.setattr(b, "_do_rpc", _fake_rpc)
+
+        asyncio.run(b.add_to_procedure([("h2", "s2")]))
+        assert len(rpc_calls) == 1
+        assert rpc_calls[0][0] == "h2"
+        assert rpc_calls[0][2] == "start_service"
+        asyncio.run(b.close())
+
+    def test_stop_procedure_stops_all_active_services(
+        self, participant_factory, monkeypatch
+    ):
+        readers = _make_injected_readers(participant_factory)
+        b = controller_module.ControllerBackend(**readers, room_id="OR-1")
+        b._catalogs = {
+            ("h1", "s1"): _make_catalog(
+                "h1", "s1", room_id="OR-1", procedure_id="OR-1-100"
+            ),
+            ("h2", "s2"): _make_catalog(
+                "h2", "s2", room_id="OR-1", procedure_id="OR-1-100"
+            ),
+            ("h3", "s3"): _make_catalog("h3", "s3", room_id="OR-1"),
+        }
+
+        stopped: list[tuple[str, str]] = []
+
+        async def _fake_stop(host_id, service_id):
+            stopped.append((host_id, service_id))
+
+        monkeypatch.setattr(b, "stop_service", _fake_stop)
+
+        asyncio.run(b.stop_procedure())
+        assert ("h1", "s1") in stopped
+        assert ("h2", "s2") in stopped
+        assert ("h3", "s3") not in stopped
+        asyncio.run(b.close())
+
+    def test_cleared_procedure_id_shows_no_active(self, participant_factory):
+        """After stopping, cleared procedure_id → no active procedure."""
+        readers = _make_injected_readers(participant_factory)
+        b = controller_module.ControllerBackend(**readers, room_id="OR-1")
+        b._catalogs = {
+            ("h1", "s1"): _make_catalog("h1", "s1", room_id="OR-1"),
+        }
+        # No procedure_id set → no active procedure
+        assert b.active_procedure_id == ""
+        asyncio.run(b.close())
+
+    def test_procedure_state_reconstructed_from_catalogs(self, participant_factory):
+        """On restart, TRANSIENT_LOCAL catalogs with procedure_id reconstruct state."""
+        readers = _make_injected_readers(participant_factory)
+        b = controller_module.ControllerBackend(**readers, room_id="OR-1")
+        # Simulate receiving catalogs with existing procedure_id (TRANSIENT_LOCAL)
+        b._update_catalog(
+            SimpleNamespace(
+                host_id="h1",
+                service_id="s1",
+                display_name="Svc1",
+                properties=[
+                    _make_prop("room_id", "OR-1"),
+                    _make_prop("procedure_id", "OR-1-999"),
+                ],
+            )
+        )
+        assert b.active_procedure_id == "OR-1-999"
+        assert len(b.procedure_services()) == 1
+        asyncio.run(b.close())
+
+    def test_generate_procedure_id_format(self, participant_factory):
+        readers = _make_injected_readers(participant_factory)
+        b = controller_module.ControllerBackend(**readers, room_id="OR-1")
+        pid = b.generate_procedure_id()
+        assert pid.startswith("OR-1-")
+        assert len(pid) > len("OR-1-")
+        asyncio.run(b.close())
+
+    def test_procedure_bar_rendered_in_ui(self, monkeypatch):
+        """Procedure action bar is rendered as part of controller UI."""
+        recorder = Recorder()
+        _patch_ui(monkeypatch, recorder)
+        monkeypatch.setattr(controller_module, "init_theme", lambda **kwargs: None)
+        monkeypatch.setattr(
+            controller_module.ui,
+            "checkbox",
+            lambda *args, **kwargs: recorder.record("checkbox", *args, **kwargs),
+        )
+        mock_backend = SimpleNamespace(
+            hosts={"host-1"},
+            catalogs={
+                ("host-1", "svc-1"): SimpleNamespace(
+                    display_name="Svc One", properties=[]
+                )
+            },
+            service_states={},
+            view_mode="hosts",
+            status_message="OK",
+            _view=SimpleNamespace(
+                mode="hosts",
+                selected_host_id=None,
+                selected_service_key=None,
+                room_filter=None,
+                procedure_filter=None,
+                service_filter="ALL",
+            ),
+            _services_by_host=lambda: {
+                "host-1": {
+                    "svc-1": SimpleNamespace(display_name="Svc One", properties=[])
+                }
+            },
+            _diag_log=[],
+            show_hosts_view=lambda: None,
+            show_services_view=lambda: None,
+            show_diagnostics_view=lambda: None,
+            select_host=lambda host_id: None,
+            select_service=lambda host_id, service_id: None,
+            toggle_service_selection=lambda host_id, service_id: None,
+            running_service_count=lambda: 0,
+            active_procedure_id="",
+        )
+        monkeypatch.setattr(controller_module, "backend", mock_backend)
+        monkeypatch.setattr(controller_module, "_current_backend", lambda: mock_backend)
+
+        controller_module.controller_content()
+
+        labels = [
+            args[0]
+            for kind, args, kwargs, _ in recorder.calls
+            if kind == "label" and args
+        ]
+        assert "No active procedure" in labels

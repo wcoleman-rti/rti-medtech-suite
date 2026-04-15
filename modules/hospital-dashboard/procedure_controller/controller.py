@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
@@ -206,6 +207,83 @@ class ControllerBackend(GuiBackend):
             if pid:
                 procs.add(pid)
         return sorted(procs)
+
+    # --- Procedure lifecycle ---------------------------------------------------
+
+    @property
+    def active_procedure_id(self) -> str:
+        """Return the active procedure_id for this room, or '' if none."""
+        for catalog in self._catalogs.values():
+            rid = _catalog_property(catalog, "room_id")
+            if rid and rid != self._room_id:
+                continue
+            pid = _catalog_property(catalog, "procedure_id")
+            if pid:
+                return pid
+        return ""
+
+    def idle_services(
+        self,
+    ) -> list[tuple[tuple[str, str], Orchestration.ServiceCatalog]]:
+        """Services in this room with empty procedure_id (available for deployment)."""
+        items: list[tuple[tuple[str, str], Orchestration.ServiceCatalog]] = []
+        for key, catalog in self._catalogs.items():
+            rid = _catalog_property(catalog, "room_id")
+            if rid and rid != self._room_id:
+                continue
+            pid = _catalog_property(catalog, "procedure_id")
+            if not pid:
+                items.append((key, catalog))
+        return sorted(items)
+
+    def procedure_services(
+        self,
+    ) -> list[tuple[tuple[str, str], Orchestration.ServiceCatalog]]:
+        """Services currently deployed in the active procedure."""
+        active = self.active_procedure_id
+        if not active:
+            return []
+        items: list[tuple[tuple[str, str], Orchestration.ServiceCatalog]] = []
+        for key, catalog in self._catalogs.items():
+            pid = _catalog_property(catalog, "procedure_id")
+            if pid == active:
+                items.append((key, catalog))
+        return sorted(items)
+
+    def generate_procedure_id(self) -> str:
+        """Generate a unique procedure_id: ``<room_id>-<epoch_ms>``."""
+        return f"{self._room_id}-{int(time.time() * 1000)}"
+
+    async def start_procedure(
+        self,
+        service_keys: list[tuple[str, str]],
+        procedure_id: str,
+    ) -> None:
+        """Start a new procedure: send start_service RPCs with procedure_id."""
+        for host_id, service_id in service_keys:
+            props: list[tuple[str, str]] = [("procedure_id", procedure_id)]
+            await self._do_rpc(
+                host_id, _make_start_call(service_id, props), "start_service"
+            )
+
+    async def add_to_procedure(
+        self,
+        service_keys: list[tuple[str, str]],
+    ) -> None:
+        """Add services to the active procedure."""
+        active = self.active_procedure_id
+        if not active:
+            return
+        for host_id, service_id in service_keys:
+            props: list[tuple[str, str]] = [("procedure_id", active)]
+            await self._do_rpc(
+                host_id, _make_start_call(service_id, props), "start_service"
+            )
+
+    async def stop_procedure(self) -> None:
+        """Stop all services in the active procedure."""
+        for (host_id, service_id), _catalog in self.procedure_services():
+            await self.stop_service(host_id, service_id)
 
     def set_room_filter(self, room_id: str | None) -> None:
         """Set the room filter (None = all rooms)."""
@@ -798,8 +876,12 @@ def controller_content() -> None:
 def _render_controller_ui(current_backend: ControllerBackend) -> None:
     """Shared controller UI rendering for both singleton and per-room backends."""
 
+    # Mutable state for the "Start Procedure" selection dialog.
+    _selected_for_procedure: set[tuple[str, str]] = set()
+
     def refresh_ui() -> None:
         render_summary_cards.refresh()
+        render_procedure_bar.refresh()
         render_main_view.refresh()
 
     def _set_hosts_view() -> None:
@@ -853,8 +935,16 @@ def _render_controller_ui(current_backend: ControllerBackend) -> None:
         else:
             _render_host_grid(current_backend, refresh_ui)
 
+    @ui.refreshable
+    def render_procedure_bar() -> None:
+        _render_procedure_action_bar(
+            current_backend, _selected_for_procedure, refresh_ui
+        )
+
     with ui.column().classes("w-full gap-4 p-4"):
         render_summary_cards()
+
+        render_procedure_bar()
 
         status_label = ui.label(current_backend.status_message).classes(
             "type-body-sm text-gray-500"
@@ -881,6 +971,7 @@ def _render_controller_ui(current_backend: ControllerBackend) -> None:
                 "selected_svc": current_backend._view.selected_service_key,
                 "status_msg": current_backend.status_message,
                 "diag_count": len(current_backend._diag_log),
+                "active_proc": current_backend.active_procedure_id,
             }
 
         def _check_and_refresh() -> None:
@@ -890,9 +981,155 @@ def _render_controller_ui(current_backend: ControllerBackend) -> None:
             _last_snapshot["snap"] = snap
             status_label.set_text(current_backend.status_message)
             render_summary_cards.refresh()
+            render_procedure_bar.refresh()
             render_main_view.refresh()
 
         ui.timer(_UI_REFRESH_INTERVAL, _check_and_refresh)
+
+
+def _render_procedure_action_bar(
+    current_backend: ControllerBackend,
+    selected_for_procedure: set[tuple[str, str]],
+    refresh_ui: Any,
+) -> None:
+    """Procedure lifecycle bar: Start / Add Services / Stop Procedure."""
+    active = current_backend.active_procedure_id
+
+    if active:
+        # Active procedure indicator + Add Services + Stop Procedure
+        proc_services = current_backend.procedure_services()
+        with (
+            ui.card()
+            .classes("w-full rounded-lg p-4")
+            .style(
+                f"background: {_hex_to_rgba(BRAND_COLORS['green'], OPACITY['card_fill'])};"
+                f" box-shadow: 0 2px 8px rgba(0,0,0,{OPACITY['shadow']});"
+            )
+        ):
+            with ui.row().classes("w-full items-center justify-between"):
+                with ui.row().classes("items-center gap-3"):
+                    ui.icon(ICONS["check"], color=BRAND_COLORS["green"]).classes(
+                        "text-3xl"
+                    )
+                    with ui.column().classes("gap-0"):
+                        ui.label("Active Procedure").classes("type-label text-gray-500")
+                        ui.label(active).classes("type-h3 brand-heading mono")
+                    ui.badge(
+                        f"{len(proc_services)} service(s)",
+                        color=BRAND_COLORS["blue"],
+                    ).props("rounded").classes("text-sm")
+                with ui.row().classes("gap-2"):
+
+                    async def _add_services() -> None:
+                        _open_service_selection_dialog(
+                            current_backend,
+                            selected_for_procedure,
+                            refresh_ui,
+                            mode="add",
+                        )
+
+                    async def _stop_proc() -> None:
+                        await current_backend.stop_procedure()
+                        refresh_ui()
+
+                    ui.button("Add Services", icon=ICONS["start_all"]).props(
+                        "unelevated color=primary"
+                    ).on("click", _add_services)
+                    ui.button("Stop Procedure", icon=ICONS["stop_all"]).props(
+                        "unelevated color=negative"
+                    ).on("click", _stop_proc)
+    else:
+        # No active procedure — show Start Procedure button
+        with (
+            ui.card()
+            .classes("w-full rounded-lg p-4")
+            .style(
+                f"background: {_hex_to_rgba(BRAND_COLORS['blue'], OPACITY['card_fill'])};"
+                f" box-shadow: 0 2px 8px rgba(0,0,0,{OPACITY['shadow']});"
+            )
+        ):
+            with ui.row().classes("w-full items-center justify-between"):
+                with ui.row().classes("items-center gap-3"):
+                    ui.icon(ICONS["service"], color=BRAND_COLORS["blue"]).classes(
+                        "text-3xl"
+                    )
+                    ui.label("No active procedure").classes(
+                        "type-body-lg text-gray-500"
+                    )
+
+                def _start_proc() -> None:
+                    _open_service_selection_dialog(
+                        current_backend,
+                        selected_for_procedure,
+                        refresh_ui,
+                        mode="start",
+                    )
+
+                ui.button("Start Procedure", icon=ICONS["play"]).props(
+                    "unelevated color=primary"
+                ).on("click", _start_proc)
+
+
+def _open_service_selection_dialog(
+    current_backend: ControllerBackend,
+    selected_for_procedure: set[tuple[str, str]],
+    refresh_ui: Any,
+    *,
+    mode: str,
+) -> None:
+    """Open a dialog to select idle services for start/add procedure."""
+    idle = current_backend.idle_services()
+    selected_for_procedure.clear()
+
+    async def _deploy() -> None:
+        keys = list(selected_for_procedure)
+        if not keys:
+            dlg.close()
+            return
+        if mode == "start":
+            proc_id = current_backend.generate_procedure_id()
+            await current_backend.start_procedure(keys, proc_id)
+        else:
+            await current_backend.add_to_procedure(keys)
+        selected_for_procedure.clear()
+        dlg.close()
+        refresh_ui()
+
+    label = "Start Procedure" if mode == "start" else "Add to Procedure"
+    with (
+        ui.dialog() as dlg,
+        ui.card()
+        .classes("min-w-[28rem] rounded-lg p-6 glass-panel")
+        .style("box-shadow: 0 4px 24px rgba(0,0,0,0.25);"),
+    ):
+        ui.label(label).classes("type-h2 brand-heading")
+        ui.label("Select services to deploy").classes("type-body-sm text-gray-500")
+        ui.separator()
+        if idle:
+            for (host_id, service_id), catalog in idle:
+                display = getattr(catalog, "display_name", "") or service_id
+
+                def _toggle(
+                    checked: bool, hid: str = host_id, sid: str = service_id
+                ) -> None:
+                    if checked:
+                        selected_for_procedure.add((hid, sid))
+                    else:
+                        selected_for_procedure.discard((hid, sid))
+
+                with ui.row().classes("items-center gap-2"):
+                    ui.checkbox(
+                        f"{display} ({host_id})",
+                        on_change=lambda e, t=_toggle: t(e.value),
+                    )
+        else:
+            ui.label("No idle services available.").classes(
+                "type-body-sm text-gray-500 italic"
+            )
+        with ui.row().classes("w-full justify-end gap-2 mt-4"):
+            ui.button("Cancel", on_click=dlg.close).props("flat")
+            ui.button("Deploy", on_click=_deploy).props("unelevated color=primary")
+    dlg.open()
 
 
 def _render_summary_card(
