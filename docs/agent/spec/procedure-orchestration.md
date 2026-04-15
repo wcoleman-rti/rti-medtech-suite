@@ -38,7 +38,7 @@ as partition strings.
 | Well-known property key — procedure context | `procedure_id` |
 | Well-known property key — GUI endpoint URL | `gui_url` |
 | Service Host liveliness lease | 2 s (host failure detection via liveliness) |
-| Procedure Controller domains | Orchestration + Hospital |
+| Procedure Controller domains | Orchestration + Procedure (`operational` read-only, `control` read-only) |
 | Orchestration → Procedure domain isolation | Complete — orchestration failure must not disrupt surgical data |
 | Service context injection | All context via constructor/setter — never environment variables |
 | RPC operations | `start_service`, `stop_service`, `update_service`, `get_capabilities`, `get_health` |

@@ -389,7 +389,7 @@ In practice, not every process needs all three tags:
 | Procedure context + status publisher (standalone) | 1 (+1 Observability) | Procedure `operational` |
 | Device telemetry gateway (standalone) | 1 (+1 Observability) | Procedure `clinical` |
 | Digital twin display | 1 (+1 Observability) | Procedure `control` |
-| **Procedure Controller** | 1 Orchestration (+1 Observability) | Orchestration domain (Domain 11, room-scoped) |
+| **Procedure Controller** | 1 Orchestration + 2 Procedure read-only (+1 Observability) | Orchestration domain (Domain 11, room-scoped) + Procedure `operational` (read-only: ProcedureStatus, ProcedureContext) + Procedure `control` (read-only: RobotArmAssignment) |
 | **Routing Service** (per-room MedtechBridge) | **5** (+1 Observability) | `control` + `clinical` + `operational` (3 on Domain 10) + 1 on Domain 11 (ServiceCatalog extraction) + 1 on Domain 20 (Hospital output, no tag) |
 
 Application logging uses the **RTI Connext Logging API** (`rti::config::Logger` / `rti.connextdds.Logger`), with log messages forwarded to Collector Service via Monitoring Library 2.0. See [technology.md — Logging Standard](technology.md) for details.
