@@ -47,6 +47,56 @@ Domain IDs use a **decade-offset** scheme: the tens digit encodes the deployment
 > 15 = Orchestration, 20 = Observability) are superseded by this scheme. All XML
 > configurations, participant definitions, and RS routes must be updated.
 
+### Databus Terminology
+
+A **databus** is a logical data space identified by a `(domain_id, domain_tag)`
+pair. All DomainParticipants that share both values are on the same databus.
+Per RTI guidance: "A databus provides a virtual data space where applications
+can share data."
+
+| Term | Definition | Example |
+|------|-----------|---------|
+| **Databus** | A logical data space identified by a `(domain_id, domain_tag)` pair. All DomainParticipants that share both values are on the same databus. | Procedure control databus = Domain 10 + tag `control` |
+| **DDS domain** | The native Connext isolation boundary identified solely by `domain_id`. In this project every DDS domain contains one or more databuses distinguished by domain tags. | Domain 10 (Procedure) |
+| **Visibility plane** | A partition within a databus. Partitions restrict which writers and readers can match within the same databus. They do **not** constitute separate databuses. | `procedure` partition within the Orchestration databus |
+| **Domain library** | An XML `<domain_library>` element grouping related `<domain>` definitions by deployment level. | `Room` library containing Procedure, Orchestration, and Room Observability domains |
+
+**Named Databuses:**
+
+| Databus | Domain ID | Domain Tag | Library |
+|---------|-----------|------------|---------|
+| Procedure control | 10 | `control` | `Room` |
+| Procedure clinical | 10 | `clinical` | `Room` |
+| Procedure operational | 10 | `operational` | `Room` |
+| Orchestration | 11 | *(none)* | `Room` |
+| Room Observability | 19 | *(none)* | `Room` |
+| Hospital Integration | 20 | *(none)* | `Hospital` |
+| Hospital Observability | 29 | *(none)* | `Hospital` |
+| Cloud / Enterprise (V3.0) | 30 | *(none)* | `Cloud` |
+
+**No-Numeric-ID Rule:** Numeric domain IDs (e.g., "Domain 10", "domain 20")
+may appear in exactly these canonical locations:
+
+1. `vision/data-model.md` § Domain Definitions (headings + tables)
+2. `spec/` scenario tables where a domain ID is the *subject under test*
+3. `implementation/` phase files where the work item explicitly changes
+   a `domain_id` attribute
+4. Implemented XML files (`RoomDatabuses.xml`, `HospitalDatabuses.xml`,
+   `CloudDatabuses.xml`, `RoutingService.xml`,
+   `CloudDiscoveryService.xml`, etc.)
+5. Test fixtures that programmatically create DomainParticipants
+   (e.g., `PROCEDURE_DOMAIN_ID = 10` constants in integration tests)
+6. Application / tool code that must pass a numeric `domain_id` to the
+   DDS API (e.g., `partition-inspector.py`)
+
+Everywhere else — vision prose, spec narrative, implementation descriptions,
+code comments, commit messages — use the **semantic databus name** (e.g.,
+"Procedure control databus", "Hospital Integration databus").
+
+> **Note:** DDS XML element names (`<domain>`, `domain_ref`, `domain_id`,
+> `<domain_participant>`) remain as-is — these are DDS API terms. "Databus"
+> is used in documentation, comments, and architectural discussion.
+
 ---
 
 ## Layered Databus

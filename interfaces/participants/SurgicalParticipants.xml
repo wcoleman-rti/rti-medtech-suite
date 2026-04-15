@@ -33,7 +33,7 @@
             Used by: procedure context publisher, camera simulator
         -->
         <domain_participant name="OperationalPub"
-                            domain_ref="MedtechDomains::Procedure_operational">
+                            domain_ref="Room::Procedure_operational">
             <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
@@ -88,7 +88,7 @@
             Used by: robot controller (C++)
         -->
         <domain_participant name="ControlRobot"
-                            domain_ref="MedtechDomains::Procedure_control">
+                            domain_ref="Room::Procedure_control">
             <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
@@ -159,7 +159,7 @@
             Used by: operator console simulator
         -->
         <domain_participant name="ControlOperator"
-                            domain_ref="MedtechDomains::Procedure_control">
+                            domain_ref="Room::Procedure_control">
             <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
@@ -203,7 +203,7 @@
             Used by: patient vitals simulator, alarm evaluator
         -->
         <domain_participant name="ClinicalMonitor"
-                            domain_ref="MedtechDomains::Procedure_clinical">
+                            domain_ref="Room::Procedure_clinical">
             <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
@@ -247,7 +247,7 @@
             Used by: device telemetry simulators (pump, anesthesia machine)
         -->
         <domain_participant name="ClinicalDeviceGateway"
-                            domain_ref="MedtechDomains::Procedure_clinical">
+                            domain_ref="Room::Procedure_clinical">
             <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
@@ -275,7 +275,7 @@
             Used by: digital twin NiceGUI web application
         -->
         <domain_participant name="ControlDigitalTwin"
-                            domain_ref="MedtechDomains::Procedure_control">
+                            domain_ref="Room::Procedure_control">
             <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
@@ -322,12 +322,12 @@
 
         <!--
             ProcedureController_ProcedureControl — Procedure Controller's
-            control-tag participant on the Procedure domain (Domain 10).
+            control-tag participant on the Procedure control databus.
             Subscribes: RobotArmAssignment
             Used by: Procedure Controller (hospital-dashboard)
         -->
         <domain_participant name="ProcedureController_ProcedureControl"
-                            domain_ref="MedtechDomains::Procedure_control">
+                            domain_ref="Room::Procedure_control">
             <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>
@@ -350,12 +350,12 @@
 
         <!--
             ProcedureController_Procedure_Operational — Controller's read-only
-            view of procedure metadata (operational tag, Domain 10).
+            view of procedure metadata (Procedure operational databus).
             Used by: Procedure Controller (hospital-dashboard)
             Reads: ProcedureStatus, ProcedureContext
         -->
         <domain_participant name="ProcedureController_Procedure_Operational"
-                            domain_ref="MedtechDomains::Procedure_operational">
+                            domain_ref="Room::Procedure_operational">
             <domain_participant_qos base_name="Participants::Transport">
                 <property>
                     <value>

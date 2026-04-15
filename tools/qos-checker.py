@@ -209,50 +209,55 @@ def format_qos_summary(qos, kind="writer"):
 # --- Domain XML parsing ---
 
 
-def parse_domain_topics(domains_xml_path):
-    """Parse Domains.xml and return {domain_name: [topic_names]}.
+def parse_domain_topics(domains_xml_paths):
+    """Parse domain library XMLs and return {domain_name: [topic_names]}.
 
     Skips domains with no topics (e.g. Observability).
     """
-    tree = ET.parse(domains_xml_path)
-    root = tree.getroot()
     result = {}
-    for domain_lib in root.iter("domain_library"):
-        for domain in domain_lib.findall("domain"):
-            name = domain.get("name")
-            topics = [t.get("name") for t in domain.findall("topic")]
-            if topics:
-                result[name] = topics
+    for xml_path in domains_xml_paths:
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+        for domain_lib in root.iter("domain_library"):
+            for domain in domain_lib.findall("domain"):
+                name = domain.get("name")
+                topics = [t.get("name") for t in domain.findall("topic")]
+                if topics:
+                    result[name] = topics
     return result
 
 
-def find_domains_xml():
-    """Locate Domains.xml from the NDDS_QOS_PROFILES environment variable."""
+_DOMAIN_LIB_SUFFIXES = ("RoomDatabuses.xml", "HospitalDatabuses.xml", "CloudDatabuses.xml")
+
+
+def find_domain_library_xmls():
+    """Locate domain library XMLs from the NDDS_QOS_PROFILES environment variable."""
     profiles = os.environ.get("NDDS_QOS_PROFILES", "")
+    found = []
     for path in profiles.split(";"):
         path = path.strip()
-        if path.endswith("Domains.xml") and os.path.isfile(path):
-            return path
-    return None
+        if any(path.endswith(s) for s in _DOMAIN_LIB_SUFFIXES) and os.path.isfile(path):
+            found.append(path)
+    return found if found else None
 
 
 # --- Main check logic ---
 
 
-def check_all(provider, domains_xml_path, verbose=False):
+def check_all(provider, domains_xml_paths, verbose=False):
     """Check RxO compatibility for all topic pairs.
 
     Returns (results, pass_count, fail_count).
     Each result is (context_label, writer_qos, reader_qos, errors).
     """
-    domain_topics = parse_domain_topics(domains_xml_path)
+    domain_topics = parse_domain_topics(domains_xml_paths)
 
     procedure_topics = set()
     for dname in PROCEDURE_DOMAINS:
         if dname in domain_topics:
             procedure_topics.update(domain_topics[dname])
 
-    hospital_topics = set(domain_topics.get("Hospital", []))
+    hospital_topics = set(domain_topics.get("Integration", []))
     bridged = procedure_topics & hospital_topics
 
     results = []
@@ -310,16 +315,16 @@ def main():
     )
     args = parser.parse_args()
 
-    domains_xml = find_domains_xml()
-    if not domains_xml:
+    domains_xmls = find_domain_library_xmls()
+    if not domains_xmls:
         print(
-            "ERROR: Cannot find Domains.xml in NDDS_QOS_PROFILES",
+            "ERROR: Cannot find domain library XMLs in NDDS_QOS_PROFILES",
             file=sys.stderr,
         )
         sys.exit(2)
 
     provider = dds.QosProvider.default
-    results, pass_count, fail_count = check_all(provider, domains_xml, args.verbose)
+    results, pass_count, fail_count = check_all(provider, domains_xmls, args.verbose)
 
     for context, w_qos, r_qos, errors in results:
         if errors:

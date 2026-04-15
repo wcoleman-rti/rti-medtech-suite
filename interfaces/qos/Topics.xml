@@ -21,7 +21,7 @@
         <qos_profile name="ResourceAvailability" base_name="Patterns::State"/>
         <qos_profile name="CameraConfig" base_name="Patterns::State"/>
 
-        <!-- Orchestration domain topics -->
+        <!-- Orchestration databus topics -->
         <qos_profile name="ServiceCatalog" base_name="Patterns::State">
             <base_name>
                 <element>Snippets::LivelinessStandard</element>
@@ -30,7 +30,7 @@
 
         <qos_profile name="ServiceStatus" base_name="Patterns::State"/>
 
-        <!-- Multi-arm Procedure domain topics -->
+        <!-- Multi-arm Procedure control databus topics -->
         <qos_profile name="RobotArmAssignment" base_name="Patterns::State"/>
 
         <!-- Topics with additional tuning (deadline, lifespan, liveliness) -->
@@ -179,7 +179,7 @@
     <qos_library name="Topics">
 
         <!--
-            ProcedureTopics: topic-filter-bound QoS for Procedure domain (Domain 10).
+            ProcedureTopics: topic-filter-bound QoS for Procedure databuses.
         -->
         <qos_profile name="ProcedureTopics">
             <datawriter_qos topic_filter="OperatorInput" base_name="TopicProfiles::OperatorInput"/>
@@ -211,7 +211,7 @@
         </qos_profile>
 
         <!--
-            HospitalTopics: topic-filter-bound QoS for Hospital domain (Domain 20).
+            HospitalTopics: topic-filter-bound QoS for Hospital Integration databus.
         -->
         <qos_profile name="HospitalTopics">
             <datawriter_qos topic_filter="ClinicalAlert" base_name="TopicProfiles::ClinicalAlert"/>
@@ -220,7 +220,7 @@
             <datareader_qos topic_filter="RiskScore" base_name="TopicProfiles::RiskScore"/>
             <datawriter_qos topic_filter="ResourceAvailability" base_name="TopicProfiles::ResourceAvailability"/>
             <datareader_qos topic_filter="ResourceAvailability" base_name="TopicProfiles::ResourceAvailability"/>
-            <!-- Bridged topics from Procedure domain — Routing Service writes, apps read -->
+            <!-- Bridged topics from Procedure databuses — Routing Service writes, apps read -->
             <datawriter_qos topic_filter="ProcedureStatus" base_name="TopicProfiles::ProcedureStatus"/>
             <datareader_qos topic_filter="ProcedureStatus" base_name="TopicProfiles::ProcedureStatus"/>
             <datawriter_qos topic_filter="ProcedureContext" base_name="TopicProfiles::ProcedureContext"/>
@@ -236,7 +236,7 @@
         </qos_profile>
 
         <!--
-            GuiProcedureTopics: downsampled QoS for GUI readers on Procedure domain.
+            GuiProcedureTopics: downsampled QoS for GUI readers on Procedure databuses.
         -->
         <qos_profile name="GuiProcedureTopics">
             <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::GuiRobotState"/>
@@ -253,7 +253,7 @@
         </qos_profile>
 
         <!--
-            GuiHospitalTopics: downsampled QoS for GUI readers on Hospital domain.
+            GuiHospitalTopics: downsampled QoS for GUI readers on Hospital Integration databus.
         -->
         <qos_profile name="GuiHospitalTopics">
             <datareader_qos topic_filter="ClinicalAlert" base_name="TopicProfiles::GuiClinicalAlert"/>
@@ -268,7 +268,7 @@
         </qos_profile>
 
         <!--
-            OrchestrationTopics: topic-filter-bound QoS for Orchestration domain (Domain 11).
+            OrchestrationTopics: topic-filter-bound QoS for Orchestration databus.
         -->
         <qos_profile name="OrchestrationTopics">
             <datawriter_qos topic_filter="ServiceCatalog" base_name="TopicProfiles::ServiceCatalog"/>

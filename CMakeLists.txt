@@ -81,7 +81,9 @@ install(FILES
 )
 
 install(FILES
-    interfaces/domains/Domains.xml
+    interfaces/domains/RoomDatabuses.xml
+    interfaces/domains/HospitalDatabuses.xml
+    interfaces/domains/CloudDatabuses.xml
     DESTINATION share/domains
 )
 install(FILES

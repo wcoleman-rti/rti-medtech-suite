@@ -63,7 +63,7 @@ This ensures:
 QoS and domain library XML files are loaded at runtime via the `NDDS_QOS_PROFILES` environment variable. This variable lists all XML files in dependency order (Snippets before Patterns, Patterns before Topics, etc.). Applications do not hardcode XML file paths.
 
 ```bash
-export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/Domains.xml"
+export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/RoomDatabuses.xml;interfaces/domains/HospitalDatabuses.xml;interfaces/domains/CloudDatabuses.xml"
 ```
 
 Docker Compose sets this variable for all service containers. Local development sets it in the shell or via a wrapper script.
@@ -209,12 +209,22 @@ Domain IDs follow the **decade-offset** scheme defined in
 tens digit = deployment level, units digit = function class.
 Domain 0 is reserved for prototyping/testing.
 
+In this project, a **databus** is a logical data space identified by a
+`(domain_id, domain_tag)` pair. Each heading below defines one DDS domain;
+where domain tags subdivide a DDS domain, each tag creates a distinct databus.
+See [system-architecture.md — Databus Terminology](system-architecture.md) for
+the full glossary and named databuses table.
+
 **Domain Naming Rule:** Numeric domain IDs are defined **exactly once** — in the
 headings below (e.g., "Domain 10 — Procedure") and in the corresponding
-`<domain>` element in `Domains.xml`. Every other document, code comment,
-spec scenario, implementation step, and log message must reference a domain
-by **name only** (e.g., "Procedure domain", "Hospital domain", "Room Observability domain").
-If a domain ID changes, only this section and `Domains.xml` require an update.
+`<domain>` elements in the domain library XML files (`RoomDatabuses.xml`,
+`HospitalDatabuses.xml`, `CloudDatabuses.xml`). Every other document, code
+comment, spec scenario, implementation step, and log message must reference a
+domain by **semantic databus name** (e.g., "Procedure control databus",
+"Hospital Integration databus") or **domain name** (e.g., "Procedure domain").
+If a domain ID changes, only this section and the domain library XML files
+require an update. See the No-Numeric-ID Rule in
+[system-architecture.md — Databus Terminology](system-architecture.md).
 
 ### Domain 10 — Procedure
 
@@ -405,7 +415,7 @@ the full forwarding configuration.
 - **Safety** — temporarily increasing telemetry verbosity for debugging must not affect discovery, deadline enforcement, or sample delivery on Domains 10 or 11.
 - **Isolation** — Collector Service only needs to join the Observability domain. It does not participate in application domains, reducing its attack surface and resource footprint.
 
-The Room Observability domain has **no domain tags** and **no application-defined topics**. Monitoring Library 2.0 creates its internal telemetry topics, publishers, and subscribers automatically — no XML topic or endpoint definitions are needed in `Domains.xml`.
+The Room Observability domain has **no domain tags** and **no application-defined topics**. Monitoring Library 2.0 creates its internal telemetry topics, publishers, and subscribers automatically — no XML topic or endpoint definitions are needed in the domain library XML files.
 
 #### Configuration
 

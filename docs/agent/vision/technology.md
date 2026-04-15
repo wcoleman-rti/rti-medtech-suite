@@ -519,7 +519,7 @@ install/
 │   └── hospital.py                   #   Hospital module types
 ├── share/
 │   ├── qos/                          # Snippets.xml, Patterns.xml, Topics.xml, Participants.xml
-│   ├── domains/                      # Domains.xml
+│   ├── domains/                      # RoomDatabuses.xml, HospitalDatabuses.xml, CloudDatabuses.xml
 │   └── routing/                      # Routing Service XML configs
 ├── etc/
 │   ├── clinical-alerts/              # ClinicalAlerts engine runtime config (thresholds, rules)
@@ -554,7 +554,9 @@ export NDDS_QOS_PROFILES="$_DIR/share/qos/Snippets.xml;\
 $_DIR/share/qos/Patterns.xml;\
 $_DIR/share/qos/Topics.xml;\
 $_DIR/share/qos/Participants.xml;\
-$_DIR/share/domains/Domains.xml"
+$_DIR/share/domains/RoomDatabuses.xml;\
+$_DIR/share/domains/HospitalDatabuses.xml;\
+$_DIR/share/domains/CloudDatabuses.xml"
 
 # Runtime configuration root
 export MEDTECH_CONFIG_DIR="$_DIR/etc"
@@ -608,7 +610,7 @@ FROM runtime-cpp
 COPY --from=builder /opt/medtech /opt/medtech
 ENV PATH="/opt/medtech/bin:$PATH"
 ENV LD_LIBRARY_PATH="/opt/medtech/lib:$LD_LIBRARY_PATH"
-ENV NDDS_QOS_PROFILES="/opt/medtech/share/qos/Snippets.xml;/opt/medtech/share/qos/Patterns.xml;/opt/medtech/share/qos/Topics.xml;/opt/medtech/share/qos/Participants.xml;/opt/medtech/share/domains/Domains.xml"
+ENV NDDS_QOS_PROFILES="/opt/medtech/share/qos/Snippets.xml;/opt/medtech/share/qos/Patterns.xml;/opt/medtech/share/qos/Topics.xml;/opt/medtech/share/qos/Participants.xml;/opt/medtech/share/domains/RoomDatabuses.xml;/opt/medtech/share/domains/HospitalDatabuses.xml;/opt/medtech/share/domains/CloudDatabuses.xml"
 ENV MEDTECH_CONFIG_DIR="/opt/medtech/etc"
 ```
 

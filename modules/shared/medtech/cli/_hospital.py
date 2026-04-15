@@ -35,7 +35,9 @@ _MEDTECH_ENV: dict[str, str] = {
         "/opt/medtech/share/qos/Patterns.xml;"
         "/opt/medtech/share/qos/Topics.xml;"
         "/opt/medtech/share/qos/Participants.xml;"
-        "/opt/medtech/share/domains/Domains.xml;"
+        "/opt/medtech/share/domains/RoomDatabuses.xml;"
+        "/opt/medtech/share/domains/HospitalDatabuses.xml;"
+        "/opt/medtech/share/domains/CloudDatabuses.xml;"
         "/opt/medtech/share/participants/SurgicalParticipants.xml;"
         "/opt/medtech/share/participants/OrchestrationParticipants.xml"
     ),

@@ -2,8 +2,8 @@
 <!--
     Orchestration Module — Participant Library
 
-    Defines named participant configurations for the Orchestration domain
-    (Domain 11). No domain tags. Partition is set programmatically after
+    Defines named participant configurations for the Orchestration databus.
+    No domain tags. Partition is set programmatically after
     participant creation (room/<room_id> or "unassigned").
 
     Participant library naming:
@@ -18,13 +18,13 @@
     <domain_participant_library name="OrchestrationParticipants">
 
         <!--
-            Orchestration — Service Host participant on the Orchestration domain.
+            Orchestration — Service Host participant on the Orchestration databus.
             Publishes: ServiceCatalog, ServiceStatus
             Subscribes: (none via pub/sub — RPC handled by generated entities)
             RPC: ServiceHostControl service endpoint
         -->
         <domain_participant name="Orchestration"
-                            domain_ref="MedtechDomains::Orchestration">
+                            domain_ref="Room::Orchestration">
             <domain_participant_qos base_name="Participants::Transport"/>
 
             <publisher name="OrchestrationPublisher">
@@ -55,12 +55,12 @@
         </domain_participant>
 
         <!--
-            ProcedureController_Orchestration — Controller's Orchestration domain
+            ProcedureController_Orchestration — Controller's Orchestration databus
             participant. Subscribes to ServiceCatalog and ServiceStatus.
             RPC: ServiceHostControl client endpoint.
         -->
         <domain_participant name="ProcedureController_Orchestration"
-                            domain_ref="MedtechDomains::Orchestration">
+                            domain_ref="Room::Orchestration">
             <domain_participant_qos base_name="Participants::Transport"/>
 
             <subscriber name="ControllerOrchSubscriber">
@@ -78,18 +78,18 @@
         </domain_participant>
 
         <!--
-            HospitalDashboard — Dashboard's Hospital domain participant.
+            HospitalDashboard — Dashboard's Hospital Integration databus participant.
             Read-only subscriber for facility-wide monitoring.
             Subscribes to all bridged topics + native Hospital topics.
             Uses GuiHospitalTopics QoS for downsampled display rates.
         -->
         <domain_participant name="HospitalDashboard"
-                            domain_ref="MedtechDomains::Hospital">
+                            domain_ref="Hospital::Integration">
             <domain_participant_qos base_name="Participants::Transport"/>
 
             <subscriber name="DashboardSubscriber">
 
-                <!-- Bridged topics from Procedure domain -->
+                <!-- Bridged topics from Procedure databuses -->
                 <data_reader name="ProcedureStatusReader"
                              topic_ref="ProcedureStatus">
                     <datareader_qos base_name="TopicProfiles::GuiProcedureStatus"/>
@@ -120,7 +120,7 @@
                     <datareader_qos base_name="TopicProfiles::GuiRobotState"/>
                 </data_reader>
 
-                <!-- Native Hospital domain topics -->
+                <!-- Native Hospital Integration databus topics -->
                 <data_reader name="ClinicalAlertReader"
                              topic_ref="ClinicalAlert">
                     <datareader_qos base_name="TopicProfiles::GuiClinicalAlert"/>
@@ -131,7 +131,7 @@
                     <datareader_qos base_name="TopicProfiles::GuiResourceAvailability"/>
                 </data_reader>
 
-                <!-- ServiceCatalog bridged from Domain 11 via Routing Service -->
+                <!-- ServiceCatalog bridged from Orchestration databus via Routing Service -->
                 <data_reader name="ServiceCatalogReader"
                              topic_ref="ServiceCatalog">
                     <datareader_qos base_name="TopicProfiles::ServiceCatalog"/>

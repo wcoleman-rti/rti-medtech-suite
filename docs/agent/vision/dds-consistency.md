@@ -336,7 +336,7 @@ the `NDDS_QOS_PROFILES` environment variable. This variable lists all XML
 files in dependency order. It must be set before any Connext API call:
 
 ```bash
-export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/Domains.xml"
+export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/RoomDatabuses.xml;interfaces/domains/HospitalDatabuses.xml;interfaces/domains/CloudDatabuses.xml"
 ```
 
 `setup.bash` and Docker Compose set this automatically. If
@@ -1500,7 +1500,7 @@ validated against `rti-chatbot-mcp` RTI best-practice guidance.
 | AP-2 | **Programmatic QoS (setter APIs)** | Configuration drift across modules/languages; rebuild required for tuning; inconsistent cross-language behavior; hidden defaults. | XML QoS profiles via default `QosProvider`. **Exceptions:** XTypes compliance mask, participant partition (see §1). |
 | AP-10 | **DDS entities in public class APIs** | Leaks middleware abstractions into domain interfaces; couples callers to DDS imports; makes testing harder. | Encapsulate all DDS entities as private members. Public interface uses domain types only (see §3). |
 | AP-3 | **`DynamicData` / `DynamicType` in application code** | Runtime field-name errors (stringly-typed); no compile-time safety; weaker IDE support; higher runtime overhead; fragile refactoring. | IDL-generated types (`rtiddsgen`). DynamicData permitted only in developer tools (`tools/`) and test utilities. |
-| AP-4 | **Hardcoded domain IDs in source code** | Deployment collisions; recompilation for environment changes; test contamination; hidden assumptions. | Domain IDs live exclusively in `Domains.xml` and [data-model.md](data-model.md). Code references domains by name (e.g., "Procedure domain"). |
+| AP-4 | **Hardcoded domain IDs in source code** | Deployment collisions; recompilation for environment changes; test contamination; hidden assumptions. | Domain IDs live exclusively in the domain library XML files (`RoomDatabuses.xml`, `HospitalDatabuses.xml`, `CloudDatabuses.xml`) and [data-model.md](data-model.md). Code references databuses by semantic name (e.g., "Procedure control databus"). |
 | AP-5 | **Unguarded DDS writes on the Qt UI event loop** | Frozen UI; jittery UX; deadlocks; priority inversion; unbounded latency from reliable writes or resource-limit pressure. | Polling `read()`/`take()` is always safe on the UI thread. `write()` is safe **only** for writers configured with `Snippets::NonBlockingWrite`. All other writes: delegate to worker thread or `GuardCondition` (see §5). Non-GUI services: DDS I/O is permitted on any application thread including the `run()` thread. |
 | AP-6 | **`print()` / `printf` / `std::cout` for logging** | No integration with Connext verbosity categories; blocking console I/O; interleaved unstructured output; dangerous in listener/internal-thread contexts. | RTI Connext Logging API for middleware-level logging. Application-level logging uses the project’s approved logging interface — see [technology.md — Logging Standard](technology.md) for the authoritative logging guidance. No `print()` / `printf` / `std::cout` in production code. |
 | AP-7 | **Hardcoded XML file paths in application code** | Breaks install-tree portability; couples code to file layout; prevents `NDDS_QOS_PROFILES`-based loading. | Use default `QosProvider` which loads from `NDDS_QOS_PROFILES`. See [data-model.md — QoS XML Loading](data-model.md). |
@@ -1594,7 +1594,8 @@ consistency with the existing system:
 - [ ] Add corresponding `const string` entries in `interfaces/idl/app_names.idl`
       for the participant config name and every writer/reader entity name
 - [ ] Ensure the participant references only domains/topics defined in
-      `interfaces/domains/Domains.xml`
+      `interfaces/domains/RoomDatabuses.xml`, `interfaces/domains/HospitalDatabuses.xml`,
+      `interfaces/domains/CloudDatabuses.xml`
 - [ ] Set the domain tag in the participant QoS XML (`<discovery><domain_tag>`)
       — never in application code
 - [ ] Verify transport configuration: participant references `Participants::Transport`

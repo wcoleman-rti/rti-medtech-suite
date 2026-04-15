@@ -16,7 +16,7 @@ set(_DOM_DIR "${CMAKE_SOURCE_DIR}/interfaces/domains")
 set(_PAR_DIR "${CMAKE_SOURCE_DIR}/interfaces/participants")
 set_tests_properties(qos_loading PROPERTIES
     ENVIRONMENT_MODIFICATION
-        "NDDS_QOS_PROFILES=set:${_QOS_DIR}/Snippets.xml\;${_QOS_DIR}/Patterns.xml\;${_QOS_DIR}/Topics.xml\;${_QOS_DIR}/Participants.xml\;${_DOM_DIR}/Domains.xml\;${_PAR_DIR}/SurgicalParticipants.xml;MEDTECH_APP_NAME=set:test_qos_loading;PARTITION=set:"
+        "NDDS_QOS_PROFILES=set:${_QOS_DIR}/Snippets.xml\;${_QOS_DIR}/Patterns.xml\;${_QOS_DIR}/Topics.xml\;${_QOS_DIR}/Participants.xml\;${_DOM_DIR}/RoomDatabuses.xml\;${_DOM_DIR}/HospitalDatabuses.xml\;${_DOM_DIR}/CloudDatabuses.xml\;${_PAR_DIR}/SurgicalParticipants.xml;MEDTECH_APP_NAME=set:test_qos_loading;PARTITION=set:"
 )
 
 # --- Robot controller state machine unit tests ---

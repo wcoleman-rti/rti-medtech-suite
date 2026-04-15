@@ -31,7 +31,7 @@ COPY --from=builder /opt/medtech/share/ /opt/medtech/share/
 
 ENV PATH="/opt/medtech/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/opt/medtech/lib:${LD_LIBRARY_PATH}"
-ENV NDDS_QOS_PROFILES="/opt/medtech/share/qos/Snippets.xml;/opt/medtech/share/qos/Patterns.xml;/opt/medtech/share/qos/Topics.xml;/opt/medtech/share/qos/Participants.xml;/opt/medtech/share/domains/Domains.xml;/opt/medtech/share/participants/SurgicalParticipants.xml"
+ENV NDDS_QOS_PROFILES="/opt/medtech/share/qos/Snippets.xml;/opt/medtech/share/qos/Patterns.xml;/opt/medtech/share/qos/Topics.xml;/opt/medtech/share/qos/Participants.xml;/opt/medtech/share/domains/RoomDatabuses.xml;/opt/medtech/share/domains/HospitalDatabuses.xml;/opt/medtech/share/domains/CloudDatabuses.xml;/opt/medtech/share/participants/SurgicalParticipants.xml"
 ENV MEDTECH_CONFIG_DIR="/opt/medtech/etc"
 
 WORKDIR /opt/medtech
@@ -43,7 +43,7 @@ COPY --from=builder /opt/medtech/lib/python/ /opt/medtech/lib/python/
 COPY --from=builder /opt/medtech/share/ /opt/medtech/share/
 
 ENV PYTHONPATH="/opt/medtech/lib/python/site-packages"
-ENV NDDS_QOS_PROFILES="/opt/medtech/share/qos/Snippets.xml;/opt/medtech/share/qos/Patterns.xml;/opt/medtech/share/qos/Topics.xml;/opt/medtech/share/qos/Participants.xml;/opt/medtech/share/domains/Domains.xml;/opt/medtech/share/participants/SurgicalParticipants.xml"
+ENV NDDS_QOS_PROFILES="/opt/medtech/share/qos/Snippets.xml;/opt/medtech/share/qos/Patterns.xml;/opt/medtech/share/qos/Topics.xml;/opt/medtech/share/qos/Participants.xml;/opt/medtech/share/domains/RoomDatabuses.xml;/opt/medtech/share/domains/HospitalDatabuses.xml;/opt/medtech/share/domains/CloudDatabuses.xml;/opt/medtech/share/participants/SurgicalParticipants.xml"
 ENV MEDTECH_CONFIG_DIR="/opt/medtech/etc"
 
 # Health check: liveness probe via the FastAPI /health endpoint

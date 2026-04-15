@@ -30,7 +30,7 @@ check_deadline = _mod.check_deadline
 check_ownership = _mod.check_ownership
 check_liveliness = _mod.check_liveliness
 check_all = _mod.check_all
-find_domains_xml = _mod.find_domains_xml
+find_domain_library_xmls = _mod.find_domain_library_xmls
 parse_domain_topics = _mod.parse_domain_topics
 
 
@@ -146,27 +146,31 @@ class TestCheckRxo:
 
 
 class TestDomainParsing:
-    def test_find_domains_xml(self):
-        xml = find_domains_xml()
-        assert xml is not None
-        assert xml.endswith("Domains.xml")
-        assert os.path.isfile(xml)
+    def test_find_domain_library_xmls(self):
+        xmls = find_domain_library_xmls()
+        assert xmls is not None
+        assert len(xmls) >= 2
+        suffixes = {os.path.basename(x) for x in xmls}
+        assert "RoomDatabuses.xml" in suffixes
+        assert "HospitalDatabuses.xml" in suffixes
+        for x in xmls:
+            assert os.path.isfile(x)
 
     def test_parse_domain_topics(self):
-        domains_xml = find_domains_xml()
-        topics = parse_domain_topics(domains_xml)
+        domains_xmls = find_domain_library_xmls()
+        topics = parse_domain_topics(domains_xmls)
         assert "Procedure_control" in topics
         assert "Procedure_clinical" in topics
         assert "Procedure_operational" in topics
-        assert "Hospital" in topics
+        assert "Integration" in topics
         assert "RobotCommand" in topics["Procedure_control"]
         assert "PatientVitals" in topics["Procedure_clinical"]
-        assert "ClinicalAlert" in topics["Hospital"]
+        assert "ClinicalAlert" in topics["Integration"]
 
     def test_observability_domain_excluded(self):
         """Observability domain has no topics and should be absent."""
-        domains_xml = find_domains_xml()
-        topics = parse_domain_topics(domains_xml)
+        domains_xmls = find_domain_library_xmls()
+        topics = parse_domain_topics(domains_xmls)
         assert "Observability" not in topics
 
 
@@ -176,14 +180,14 @@ class TestDomainParsing:
 class TestFullCheck:
     def test_all_topics_compatible(self, provider):
         """All project QoS topic pairs should be RxO compatible."""
-        domains_xml = find_domains_xml()
-        results, pass_count, fail_count = check_all(provider, domains_xml)
+        domains_xmls = find_domain_library_xmls()
+        results, pass_count, fail_count = check_all(provider, domains_xmls)
         assert fail_count == 0
         assert pass_count > 0
 
     def test_covers_procedure_topics(self, provider):
-        domains_xml = find_domains_xml()
-        results, _, _ = check_all(provider, domains_xml)
+        domains_xmls = find_domain_library_xmls()
+        results, _, _ = check_all(provider, domains_xmls)
         contexts = [r[0] for r in results]
         assert any("Procedure/RobotCommand" in c for c in contexts)
         assert any("Procedure/PatientVitals" in c for c in contexts)
@@ -191,15 +195,15 @@ class TestFullCheck:
         assert any("Procedure/OperatorInput" in c for c in contexts)
 
     def test_covers_hospital_native_topics(self, provider):
-        domains_xml = find_domains_xml()
-        results, _, _ = check_all(provider, domains_xml)
+        domains_xmls = find_domain_library_xmls()
+        results, _, _ = check_all(provider, domains_xmls)
         contexts = [r[0] for r in results]
         assert any("Hospital/ClinicalAlert" in c for c in contexts)
         assert any("Hospital/RiskScore" in c for c in contexts)
 
     def test_covers_bridged_topics(self, provider):
-        domains_xml = find_domains_xml()
-        results, _, _ = check_all(provider, domains_xml)
+        domains_xmls = find_domain_library_xmls()
+        results, _, _ = check_all(provider, domains_xmls)
         contexts = [r[0] for r in results]
         assert any("Bridged(PatientVitals)" in c for c in contexts)
         assert any("Bridged(RobotState)" in c for c in contexts)
