@@ -26,7 +26,8 @@ Phases are grouped by release milestone. All phases within a milestone must be c
 > **Implementation order:** Execute phases in **milestone order**, which now
 > matches phase numbering: V1.0 phases (1–5) → V1.1 phase (6) →
 > V1.2 phase (20) → V1.3 phase (UI-M) → V1.4 phase (SIM) →
-> V2.0 phases (7–14) → V2.1 phase (21) → V3.0 phases (15–19).
+> V1.5 revision (UX) → V2.0 phases (7–14) → V2.1 phase (21) →
+> V3.0 phases (15–19).
 
 ```
 ── V1.0.0 ──────────────────────────────────────────────────────────────────
@@ -78,6 +79,10 @@ Phase SIM: Distributed Simulation     (depends on: Phase UI-M)
     ├──► Revision: Domain ID Migration (depends on: Phase SIM;
     │        prerequisite for V2.0 — aligns domain IDs, RS routes,
     │        and controller plane with decade-offset architecture)
+
+── V1.5.0 ──────────────────────────────────────────────────────────────────────
+
+Revision: UX Alignment                (depends on: Phase SIM)
 
 ── V2.0.0 ──────────────────────────────────────────────────────────────────
 
@@ -190,6 +195,12 @@ After all V1.0.0 phases (1–5, plus 3–4) are complete, a **final regression g
 | [phase-simulation-cli.md](phase-simulation-cli.md) | Phase UI-M (V1.3) | `medtech` CLI (click-based), split-GUI Docker topology (pure `docker run`), multi-hospital NAT isolation (per-hospital subnets, privileged NAT routers, shared wan-net), unified `--name` / `--hospital` flags, `medtech run hospital` / `medtech run or`, `medtech launch multi-site`, `medtech status --topology`, optional DockGraph sidecar, auto-name generation, simulation scenarios |
 
 > **Prerequisite:** Phase SIM requires [spec/simulation-cli.md](../spec/simulation-cli.md) to be operator-approved before implementation begins.
+
+### V1.5.0 — UX Alignment
+
+| Phase | Depends On | Key Deliverables |
+|-------|------------|------------------|
+| [revision-ux-alignment.md](revision-ux-alignment.md) | Phase SIM (V1.4) | Room-centric hospital dashboard (room cards, active procedure indicator, service counts, gui_url action links), room-deployed Procedure Controller (per-room container, dual-homed surgical+orchestration), procedure lifecycle workflow (start/add/stop procedure, one-per-room constraint), `medtech.gui.room_nav` module (shared Orchestration participant for sibling GUI discovery, floating nav pill), `medtech build --docker`/`--all`, cross-plane navigation with `open_in_new` icon |
 
 ### V2.0.0 Phases (planned)
 

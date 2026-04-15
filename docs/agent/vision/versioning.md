@@ -110,6 +110,22 @@ A version may only be cut when **all** of the following are true:
 
 ---
 
+### V1.5.0 — UX Alignment
+
+**Implementation phases:** Revision: UX Alignment
+
+**Theme:** Align user experience across setup, launch, and interaction workflows. Room-centric hospital dashboard, room-deployed Procedure Controller, procedure lifecycle workflow, and shared room-level GUI navigation.
+
+| Module / Capability | Features |
+|---------------------|----------|
+| Hospital Dashboard (room-centric) | Primary view: room cards with active procedure indicator, service counts, alert counts, `gui_url` action links opening new browser tab with `open_in_new` icon. Secondary view: active procedures filter. |
+| Procedure Controller (room-deployed) | Per-room container (dual-homed `surgical-net` + `orchestration-net`), own host port, serves controller SPA independently of hospital container |
+| Procedure Lifecycle Workflow | Start Procedure → select idle services → Deploy → Add Services → Stop Procedure; one active procedure per room; procedure state reconstruction on restart via TRANSIENT_LOCAL |
+| Room-level GUI navigation | `medtech.gui.room_nav` module: shared Orchestration read-only participant for dynamic sibling GUI discovery via `ServiceCatalog` `gui_url` properties; floating nav pill with sibling buttons; hospital dashboard link with `open_in_new` icon |
+| CLI enhancements | `medtech build --docker`, `medtech build --all`; `medtech run or` launches controller container alongside twin; `medtech launch` output emphasizes dashboard as primary entry point |
+
+---
+
 ### V2.0.0 — Security & Hospital Integration Gateways
 
 **Implementation phases:** 7 (Security), plus new gateway modules (Phases 8–13)
