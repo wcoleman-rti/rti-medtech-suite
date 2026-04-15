@@ -259,7 +259,7 @@ CLI (`medtech build --docker`, controller container deployment).
   4. Click room GUI link → new tab opens room controller
   5. In controller: Start Procedure → select services → Deploy
   6. Nav pill → click Twin → navigates to twin in same tab
-  7. Nav pill → click Dashboard → opens hospital tab
+  7. Close room tab → return to hospital dashboard
   8. Hospital dashboard → room card shows active procedure indicator
   9. `medtech stop` — clean teardown
 - Write `@acceptance` test that programmatically validates the above
@@ -273,3 +273,58 @@ CLI (`medtech build --docker`, controller container deployment).
 - [ ] All existing tests pass
 - [ ] Lint passes (including markdownlint)
 - [ ] Performance benchmark passes against the Phase SIM baseline
+
+---
+
+## Tests to Rewrite or Remove
+
+The following existing tests verify behavior that is superseded by V1.5.0.
+They should be **removed or replaced** during the implementation steps above.
+Do not preserve these tests as-is — they validate the old unified-app /
+sidebar navigation model that no longer applies.
+
+### `tests/gui/test_unified_app.py`
+
+| Test | Reason | Action | Step |
+|------|--------|--------|------|
+| `TestShellPage::test_shell_page_registers_sub_pages` | Asserts `/controller/{room_id}` and `/twin/{room_id}` in hospital app sub_pages — those routes move to room containers | **Rewrite**: hospital app sub_pages should only contain `/dashboard` (and `/alerts` when added) | UX.2 |
+| `TestShellPage::test_shell_page_sub_pages_use_content_functions` | Imports `controller_content_for_room` and `twin_content` and asserts they're in hospital app routes | **Rewrite**: only `dashboard_content` should remain in hospital app routes | UX.2 |
+| `TestShellPage::test_shell_page_nav_pill_has_static_buttons` | Asserts ≥2 static nav buttons (Dashboard + Controller) | **Rewrite**: only 1 static button (Dashboard) in hospital app; Controller moves to room nav | UX.3 |
+| `TestDiscoveredRooms` (entire class: 3 tests) | Tests `_discovered_rooms()` via `ControllerBackend` — discovery moves to `DashboardBackend` reading bridged `ServiceCatalog` on Domain 20 | **Rewrite**: new discovery tests should use `DashboardBackend` directly | UX.3 |
+| `TestPageTitleForPath::test_controller_path` | `/controller/OR-1` path won't exist in hospital app | **Move**: to room-level app test suite | UX.2 |
+| `TestPageTitleForPath::test_twin_with_room_id` | `/twin/OR-1` path won't exist in hospital app | **Move**: to room-level app test suite | UX.2 |
+| `TestPageTitleForPath::test_twin_with_different_room_id` | Same as above | **Move**: to room-level app test suite | UX.2 |
+| `TestMainUsesRoot::test_main_calls_ui_run_with_root` | Mocks controller backend factory that will no longer exist in hospital app | **Adjust**: remove controller/twin mock patching | UX.2 |
+
+### `tests/integration/test_cli_launch.py`
+
+| Test | Reason | Action | Step |
+|------|--------|--------|------|
+| `TestLaunchUnified::test_starts_unified` | Tests `medtech launch unified` — command removed | **Remove** | UX.1 |
+
+### `tests/integration/test_cli_split_gui.py`
+
+| Test | Reason | Action | Step |
+|------|--------|--------|------|
+| `TestGuiModeEnvVar::test_default_gui_mode_is_unified` | `MEDTECH_GUI_MODE` env var removed — no unified fallback | **Remove** | UX.2 |
+| `TestGuiModeEnvVar::test_controller_dashboard_mode` | Same — env var removed | **Remove** | UX.2 |
+| `TestDockerComposeGuiMode::test_compose_has_gui_mode` | Asserts `MEDTECH_GUI_MODE` in docker-compose.yml — env var removed | **Remove** | UX.2 |
+
+### `tests/integration/test_cli_acceptance_sim.py`
+
+| Test | Reason | Action | Step |
+|------|--------|--------|------|
+| `test_launch_unified` | Tests `medtech launch unified` — command removed | **Remove** | UX.1 |
+
+### Tests to Keep (no changes needed)
+
+| Test | Why |
+|------|-----|
+| `TestStaticNavItems::test_controller_is_per_room_not_static` | Already asserts controller is excluded from static nav — still valid |
+| `TestStaticNavItems::test_static_nav_count` | Asserts 1 static nav item — still valid |
+| `TestDigitalTwinGuiUrl` (2 tests) | Tests `gui_url` construction from env vars — still valid for room containers |
+| `TestDigitalTwinMain` (2 tests) | Tests `MEDTECH_GUI_EXTERNAL_URL` handling — still valid |
+| All `TestGuiBackend*` tests | Backend lifecycle contract unchanged |
+| All `test_hospital_dashboard.py` tests | Dashboard data display tests unaffected by nav model |
+| All `test_digital_twin.py` tests | Twin rendering tests unaffected |
+| All `test_procedure_controller.py` tests | Controller backend logic unaffected |
