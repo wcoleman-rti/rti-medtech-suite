@@ -1,8 +1,8 @@
 # Spec: Hospital Dashboard Module
 
-Behavioral specifications for the facility-wide NiceGUI web dashboard that displays real-time procedure status, patient vitals, alerts, and robot state across all active surgical rooms.
+Behavioral specifications for the facility-wide NiceGUI web dashboard that provides hospital-level situational awareness. The primary view organizes information by **room** — each active room is displayed as a summary card with deployment status, procedure indicator, and aggregate metrics. Users drill into room-specific views (controller, digital twin, etc.) by opening the room's GUI in a **new browser tab** (room GUIs are served by per-room containers, not the hospital container).
 
-The dashboard subscribes to the Hospital domain. All data arrives via Routing Service from the Procedure domain.
+The dashboard subscribes to the Hospital domain (Domain 20). All room data arrives via Routing Service from the Procedure and Orchestration domains. Room discovery uses RS-bridged `ServiceCatalog` from Domain 11.
 
 ---
 
@@ -10,6 +10,8 @@ The dashboard subscribes to the Hospital domain. All data arrives via Routing Se
 
 | Requirement | Value |
 |-------------|-------|
+| Room discovery source | RS-bridged `ServiceCatalog` from Domain 11 via per-room MedtechBridge — `room_id` and `gui_url` properties |
+| Cross-plane navigation icon | `open_in_new` (Material Icons) on all links that open a new browser tab |
 | New CRITICAL alert maximum display latency | ≤ 2 s from DDS publication |
 | Vitals HR warning color threshold | HR > 100 bpm (yellow/amber) |
 | Vitals HR critical color threshold | HR > 120 bpm (red) |
@@ -22,6 +24,75 @@ The dashboard subscribes to the Hospital domain. All data arrives via Routing Se
 | Routing Service recovery | Dashboard resumes live display within initialization time budget after RS restart |
 
 *This table must be updated whenever a concrete value in the scenarios below is added or changed.*
+
+---
+
+## Room Overview (primary view)
+
+### Scenario: Dashboard displays discovered rooms as cards `@e2e` `@gui`
+
+**Given** the hospital dashboard is running and subscribed to RS-bridged `ServiceCatalog` on the Hospital domain
+**And** two rooms have active Service Hosts (OR-1 and OR-3)
+**When** `ServiceCatalog` samples with `room_id` properties arrive via Routing Service
+**Then** the dashboard displays a room card for each discovered room
+**And** each card shows the room name (e.g., "OR-1")
+
+### Scenario: Room card shows active procedure indicator `@e2e` `@gui`
+
+**Given** the dashboard is displaying room cards for OR-1 and OR-3
+**And** OR-1 has services deployed with a non-empty `procedure_id` in their `ServiceCatalog` entries
+**And** OR-3 has no active procedure (`procedure_id` is empty for all its services)
+**When** the room cards are rendered
+**Then** OR-1's card shows an active procedure indicator (e.g., procedure type, phase badge)
+**And** OR-3's card shows an idle/no-procedure state
+
+### Scenario: Room card shows aggregate service metrics `@e2e` `@gui`
+
+**Given** the dashboard is displaying a room card for OR-1
+**And** OR-1 has 6 services in its `ServiceCatalog` and 4 are in `RUNNING` state
+**When** `ServiceStatus` samples arrive via Routing Service
+**Then** the room card shows service counts (e.g., "4/6 running")
+
+### Scenario: Room card shows alert/warning count `@e2e` `@gui`
+
+**Given** the dashboard is displaying room cards
+**And** OR-1 has 2 active CRITICAL alerts and 1 WARNING alert
+**When** alert data arrives via Routing Service
+**Then** OR-1's room card shows the alert/warning counts with appropriate severity colors
+
+### Scenario: New room appears automatically `@e2e` `@gui`
+
+**Given** the dashboard is displaying room cards for OR-1 and OR-3
+**When** a new OR (OR-5) is deployed and its `ServiceCatalog` entries arrive via Routing Service
+**Then** a new room card for OR-5 appears without requiring manual refresh
+
+### Scenario: Room card links to room-level GUIs in new browser tab `@e2e` `@gui`
+
+**Given** the dashboard is displaying a room card for OR-1
+**And** OR-1's `ServiceCatalog` entries include `gui_url` properties (e.g., controller at `http://localhost:8091/controller/OR-1`, twin at `http://localhost:8081/twin/OR-1`)
+**When** the user views OR-1's room card
+**Then** the card shows action links/buttons for each discovered GUI (e.g., "Controller", "Twin")
+**And** each link includes the `open_in_new` icon (Material Icons) indicating a new tab/window will open
+**And** clicking a link opens the GUI URL in a new browser tab
+
+### Scenario: Room card without running GUIs shows no action links `@e2e` `@gui`
+
+**Given** the dashboard is displaying a room card for OR-1
+**And** OR-1's `ServiceCatalog` entries have no `gui_url` properties (GUI services not yet started)
+**When** the room card is rendered
+**Then** no GUI action links are shown for OR-1
+
+---
+
+## Active Procedures (secondary view)
+
+### Scenario: Active Procedures view filters to rooms with running procedures `@e2e` `@gui`
+
+**Given** the dashboard has discovered rooms OR-1, OR-3, and OR-5
+**And** OR-1 and OR-3 have active procedures, OR-5 is idle
+**When** the user switches to the "Active Procedures" view
+**Then** only OR-1 and OR-3 are displayed
+**And** each entry shows room, patient, procedure type, surgeon, phase, and elapsed time
 
 ---
 
