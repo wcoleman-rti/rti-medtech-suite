@@ -2827,3 +2827,36 @@ after closure. They form the project's decision log.
 - **Resolution:** All additional files updated and verified via full CI (647
   tests passing, 12/12 gates).
 - **Date closed:** 2026-04-14
+
+## INC-092: Bulk sed rename produced text artifacts in docs
+
+- **Status:** Closed
+- **Severity:** Low
+- **Category:** Discovery
+- **Date opened:** 2026-04-15
+- **Phase/Step:** Revision: Databus Terminology Alignment / Steps T.3a–T.3b
+- **Documents involved:** `implementation/revision-databus-terminology.md`
+- **Description:** The bulk `sed` rename in steps T.3a (38 markdown files) and
+  T.3b (32 code/XML files) produced three classes of text artifacts:
+  1. **"databuss" typo** (12 occurrences) — `sed 's/domains/databuses/g'`
+     pattern also transformed partial-word matches like "domains" at end of
+     compound replacements, yielding "databuss" instead of "databuses".
+  2. **Doubled-name patterns** (9 occurrences) — e.g.,
+     `Hospital Integration databus (Hospital Integration databus)`. The
+     original text was `Hospital domain (Domain 20)` and two sed passes
+     (one replacing the name, one replacing the parenthetical) each produced
+     the new name, creating a redundant double.
+  3. **Stale mixed terminology** (4 occurrences) — e.g.,
+     `Hospital integration domain (Hospital Integration databus)` where the
+     parenthetical was updated but the preceding text was not.
+  All were cosmetic defects in documentation — no code, XML, or test impact.
+- **Guideline:** Bulk `sed` renames across natural-language prose are
+  error-prone. For future terminology revisions: (a) use targeted
+  `replace_string_in_file` / `multi_replace_string_in_file` instead of
+  piped `sed` where feasible, (b) run post-rename grep sweeps for
+  common artifact patterns (doubled names, typos), (c) on WSL `/mnt/c/`
+  prefer VS Code edit APIs over `sed` to avoid the "overwrite unsaved
+  changes" dialog caused by slow cross-filesystem file watcher
+  notifications.
+- **Resolution:** All 25 occurrences fixed in commit `350d430`.
+- **Date closed:** 2026-04-15
