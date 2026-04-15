@@ -119,6 +119,14 @@ code patterns, consult these additional resources (in priority order):
 
 - **One step at a time.** Complete the current implementation step's
   test gate before starting the next step.
+- **Smoke tests on every step.** Before marking a step's test gate
+  green, verify all `@smoke` tests pass. Tier 1 (host-side) catches
+  import errors, missing routes, and broken CLI commands. Tier 2
+  (container-side) catches container startup crashes, missing
+  packages, wrong entrypoints, and unreachable URLs. Together these
+  cover the failures most likely to block the operator's manual
+  validation after a phase completes. A step that passes its
+  functional gate but fails smoke tests is incomplete.
 - **Commit at each test gate.** When a step's test gate is green,
   commit the work with a message referencing the phase and step
   (e.g., `phase-1: step 1.3 — QoS profiles and topic bindings`).
@@ -457,6 +465,7 @@ or at any point to catch compliance drift.
 | Gate | Check |
 |------|-------|
 | **Tests** | Full test suite passes. Zero failures, zero skips, zero expected-failures. |
+| **Smoke** | All `@smoke` tests pass — **Tier 1 (host):** every application entry point imports without error, expected routes are registered, CLI commands are reachable (no Docker needed). **Tier 2 (container):** each application container starts without crash, health probe responds within timeout, expected URL is reachable via port mapping (single `docker run` + probe, no composed system). Smoke tests must pass **at every step**, not just at phase completion. |
 | **Build** | Clean build from scratch (`cmake --build` from empty build dir for C++; `pip install` + import check for Python). |
 | **Install** | `cmake --install build` succeeds. Install tree contains all expected artifacts. `source install/setup.bash` sets all runtime env vars correctly. |
 | **Lint** | `markdownlint` passes on all `README.md` files under `modules/` and `services/` with zero errors and zero warnings. |

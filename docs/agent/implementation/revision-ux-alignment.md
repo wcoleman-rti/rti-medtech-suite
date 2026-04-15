@@ -48,6 +48,7 @@ CLI (`medtech build --docker`, controller container deployment).
 - [ ] `medtech build --docker --help` prints usage
 - [ ] `medtech build --all` runs CMake then Docker builds
 - [ ] `medtech build` (no flags) continues to run CMake only (backward compat)
+- [ ] **@smoke Tier 1:** `medtech build --help` exits 0 and lists `--docker` and `--all` flags
 - [ ] All existing tests pass
 - [ ] Lint passes
 
@@ -94,6 +95,10 @@ CLI (`medtech build --docker`, controller container deployment).
 - [ ] `medtech-gui` serves only the hospital dashboard (no controller routes)
 - [ ] `medtech launch` output shows dashboard URL prominently, includes per-OR controller URLs
 - [ ] `medtech stop` removes controller containers
+- [ ] **@smoke Tier 1:** `import medtech.gui.app` succeeds; registered sub_pages contain `/dashboard` only (no `/controller`, no `/twin`)
+- [ ] **@smoke Tier 1:** `from hospital_dashboard.procedure_controller import controller` succeeds
+- [ ] **@smoke Tier 2:** Hospital dashboard container starts; `GET /health` returns 200 within 30 s
+- [ ] **@smoke Tier 2:** Controller container starts with `ROOM_ID=OR-1`; `GET /health` returns 200 within 30 s
 - [ ] All existing tests pass
 - [ ] Lint passes
 
@@ -139,6 +144,8 @@ CLI (`medtech build --docker`, controller container deployment).
 - [ ] Existing vitals, alert, robot, resource panels still render
 - [ ] All existing dashboard spec tests pass (may need adaptation for
       new primary view structure)
+- [ ] **@smoke Tier 1:** Hospital dashboard entry point imports without error; `/dashboard` route is registered
+- [ ] **@smoke Tier 2:** Hospital dashboard container starts; `GET /health` returns 200; dashboard URL is reachable
 - [ ] All existing tests pass
 - [ ] Lint passes
 
@@ -269,6 +276,8 @@ CLI (`medtech build --docker`, controller container deployment).
 - [ ] All `@gui` spec tests pass for Room Overview scenarios
 - [ ] All `@orchestration` spec tests pass for Procedure Lifecycle scenarios
 - [ ] All `@cli` spec tests pass for updated build/run/launch
+- [ ] **@smoke Tier 1:** All entry point import tests pass (hospital app, controller, twin, CLI)
+- [ ] **@smoke Tier 2:** All container startup tests pass (hospital, controller, twin, C++ runtime)
 - [ ] `@acceptance` test validates the composed end-to-end UX workflow
 - [ ] All existing tests pass
 - [ ] Lint passes (including markdownlint)

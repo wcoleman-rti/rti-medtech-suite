@@ -31,6 +31,8 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 | Cloud Discovery Service unavailability | Application starts successfully; logs WARNING; discovers when Cloud Discovery Service becomes available |
 | Write-on-change publication model | Topics designated write-on-change publish only on state transitions; absence of samples is normal (liveliness detects writer health) |
 | Continuous-stream publication model | Topics designated continuous-stream publish at their configured fixed rate regardless of value change |
+| Smoke — Tier 1 (host) | Every GUI entry point (`medtech.gui.app`, `hospital_dashboard.procedure_controller`, `surgical_procedure.digital_twin`) and CLI entry point (`medtech`) imports without error, registers expected routes, and exposes expected commands. No DDS, no Docker. |
+| Smoke — Tier 2 (container) | Every application container (`medtech-gui`, per-room controller, per-room twin) starts without crash, health probe (`GET /health`) returns 200 within 30 s, and the expected URL is reachable via Docker port mapping. Single container, no composed system. |
 
 *This table must be updated whenever a concrete value in the scenarios below is added or changed.*
 
@@ -361,6 +363,102 @@ Requirements **not** subject to the 10× multiplier:
 > response) describe the production target. Docker CI must validate functional correctness
 > and ordering — not bare-metal latency. The 10× multiplier prevents false failures in CI
 > while preserving the production values as the documented requirement.
+
+---
+
+## Startup Smoke Tests
+
+These scenarios verify that every process can start and serve — the
+prerequisite for any manual or automated validation. Failures here are
+the most common blocker after a phase implementation. Smoke tests are
+split into two tiers: Tier 1 runs on the host with no infrastructure;
+Tier 2 runs a single container with no inter-service dependencies.
+
+### Tier 1 — Host-Side (no Docker, no DDS)
+
+### Scenario: Hospital dashboard entry point imports without error `@smoke` `@gui`
+
+**Given** the Python environment is activated (`source .venv/bin/activate`)
+**When** `python -c "import medtech.gui.app"` is executed
+**Then** the process exits with code 0
+**And** no `ImportError`, `ModuleNotFoundError`, or `AttributeError` is raised
+
+### Scenario: Hospital dashboard registers expected routes `@smoke` `@gui`
+
+**Given** the hospital dashboard app module is imported
+**When** the registered `ui.sub_pages()` route map is inspected
+**Then** `/dashboard` is present as a route
+**And** `/controller` and `/twin` are NOT present (those belong to room containers)
+
+### Scenario: Procedure Controller entry point imports without error `@smoke` `@gui`
+
+**Given** the Python environment is activated
+**When** `python -c "from hospital_dashboard.procedure_controller import controller"` is executed
+**Then** the process exits with code 0
+
+### Scenario: Digital Twin entry point imports without error `@smoke` `@gui`
+
+**Given** the Python environment is activated
+**When** `python -c "from surgical_procedure.digital_twin import digital_twin"` is executed
+**Then** the process exits with code 0
+
+### Scenario: CLI entry point is reachable `@smoke` `@cli`
+
+**Given** the Python environment is activated
+**When** `medtech --help` is executed
+**Then** the process exits with code 0
+**And** the output includes `build`, `launch`, `run`, `stop`, and `status` subcommands
+
+### Scenario: CLI subcommands are reachable `@smoke` `@cli`
+
+**Given** the Python environment is activated
+**When** each of `medtech build --help`, `medtech launch --help`, `medtech run --help`, `medtech stop --help`, and `medtech status --help` is executed
+**Then** each process exits with code 0
+**And** each prints usage information
+
+### Scenario: Health probe endpoint is registered `@smoke` `@gui`
+
+**Given** the hospital dashboard app module is imported
+**When** the FastAPI routes are inspected
+**Then** a `GET /health` route exists
+**And** a `GET /ready` route exists
+
+### Tier 2 — Container-Side (single container, no composed system)
+
+### Scenario: Hospital dashboard container starts and serves health probe `@smoke` `@gui` `@deployment`
+
+**Given** the `medtech/app-python` Docker image is built
+**When** a container is started with the hospital dashboard entry point and port 8080 exposed
+**Then** the container does not exit with a non-zero code within 30 seconds
+**And** `GET http://localhost:8080/health` returns HTTP 200 within 30 seconds
+
+### Scenario: Room controller container starts and serves health probe `@smoke` `@gui` `@deployment`
+
+**Given** the `medtech/app-python` Docker image is built
+**When** a container is started with the Procedure Controller entry point, `ROOM_ID=OR-1`, and an exposed port
+**Then** the container does not exit with a non-zero code within 30 seconds
+**And** `GET http://localhost:<port>/health` returns HTTP 200 within 30 seconds
+
+### Scenario: Room twin container starts and serves health probe `@smoke` `@gui` `@deployment`
+
+**Given** the `medtech/app-python` Docker image is built
+**When** a container is started with the Digital Twin entry point, `ROOM_ID=OR-1`, and an exposed port
+**Then** the container does not exit with a non-zero code within 30 seconds
+**And** `GET http://localhost:<port>/health` returns HTTP 200 within 30 seconds
+
+### Scenario: C++ runtime container starts without library errors `@smoke` `@deployment`
+
+**Given** the `medtech/app-cpp` Docker image is built
+**When** `docker run --rm medtech/app-cpp /opt/medtech/bin/robot-controller --version` is executed
+**Then** the process exits with code 0
+**And** no `GLIBCXX` or shared library errors appear in stderr
+
+### Scenario: CLI commands are reachable inside Python container `@smoke` `@cli` `@deployment`
+
+**Given** the `medtech/app-python` Docker image is built
+**When** `docker run --rm medtech/app-python medtech --help` is executed
+**Then** the process exits with code 0
+**And** the output includes the expected subcommands
 
 ---
 
