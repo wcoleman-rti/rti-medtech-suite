@@ -290,7 +290,6 @@ medtech stop
 |----------|-------------|
 | `distributed` (default) | Single unnamed hospital, split GUI, 2 ORs |
 | `multi-site` | 2 named hospitals with NAT isolation, 2 ORs each |
-| `unified` | Monolithic GUI (pre-V1.4 behavior), 2 ORs — no separate twin containers |
 | `minimal` | Single OR, split GUI, no observability stack |
 
 **Implementation phase:** Phase SIM (Distributed Simulation & CLI).

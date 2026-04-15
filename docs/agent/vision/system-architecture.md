@@ -428,7 +428,7 @@ topics published by hospital-level applications that have no room-level counterp
 - From Domain 10 (`control` tag): `RobotState` (read-only, for dashboard display)
 - From Domain 10 (`clinical` tag): `PatientVitals`, `AlarmMessages`, device telemetry
 - From Domain 10 (`operational` tag): `ProcedureStatus`, `ProcedureContext`
-- From Domain 11: `ServiceCatalog` (room/GUI discovery for the dashboard sidebar)
+- From Domain 11: `ServiceCatalog` (room/GUI discovery for the dashboard room cards)
 
 **Hospital-native topics** (published directly on Domain 20):
 - `ClinicalAlert` — computed by the ClinicalAlerts engine from bridged vitals
@@ -1066,16 +1066,10 @@ unset, the service falls back to its container-internal address.
 **Dynamic room addition:** The developer adds ORs at any time via
 `medtech run or --name OR-5` (or `medtech run or --name OR-5 --hospital hospital-a`
 for named hospitals). New containers join the existing Docker networks,
-discover CDS, and auto-register in the Procedure Controller sidebar via
-`ServiceCatalog`. When `--name` is omitted, the CLI auto-generates a
+discover CDS, and appear automatically in the hospital dashboard room cards via
+bridged `ServiceCatalog`. When `--name` is omitted, the CLI auto-generates a
 unique name (e.g., `OR-1`, `OR-2`). No compose override files or
 template generation is required.
-
-**Unified-GUI fallback:** `medtech launch unified` (or
-`docker compose --profile unified-gui up`) deploys a single
-`medtech-gui` container running all GUI modules in-process (the pre-V1.4
-monolithic behavior). This profile is retained for environments where
-split-GUI port mapping is impractical.
 
 **Topology visualization:** `medtech status --topology` renders an ASCII
 tree of running containers grouped by Docker network (see
@@ -1216,7 +1210,7 @@ cross-level gateway** between room-level domains and the Hospital integration do
 It bridges:
 - Domain 10 → Domain 20: `ProcedureStatus`, `ProcedureContext`, patient vitals, alarm messages, device telemetry
 - Domain 10 (`control` tag) → Domain 20: `RobotState` (read-only, for dashboard display)
-- Domain 11 → Domain 20: `ServiceCatalog` (room/GUI discovery for the dashboard sidebar)
+- Domain 11 → Domain 20: `ServiceCatalog` (room/GUI discovery for the dashboard room cards)
 
 For the `control`-tag bridge, Routing Service creates a DomainParticipant on Domain 10
 with the `control` domain tag (configured in its participant XML) in order to subscribe

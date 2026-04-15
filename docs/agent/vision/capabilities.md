@@ -396,7 +396,6 @@ single entry point for build, launch, and dynamic scaling.
 #### Simulation Scenarios
 - `distributed` (default) — single unnamed hospital, split GUI, 2 ORs
 - `multi-site` — 2 named hospitals with NAT isolation, 2 ORs each
-- `unified` — monolithic GUI (pre-V1.4 behavior)
 - `minimal` — single OR, split GUI, no local visualization (Collector Service still runs)
 
 | Module / Capability | Connext Features Demonstrated |
