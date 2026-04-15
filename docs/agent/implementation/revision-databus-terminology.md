@@ -67,12 +67,30 @@ exactly **4 canonical locations**:
 2. `spec/` scenario tables where a domain ID is the *subject under test*
 3. `implementation/` phase files where the work item explicitly changes
    a `domain_id` attribute
-4. Implemented XML files (`Domains.xml`, `RoutingService.xml`, etc.)
+4. Implemented XML files (`RoomDatabuses.xml`, `HospitalDatabuses.xml`,
+   `CloudDatabuses.xml`, `RoutingService.xml`,
+   `CloudDiscoveryService.xml`, etc.)
+5. Test fixtures that programmatically create DomainParticipants
+   (e.g., `PROCEDURE_DOMAIN_ID = 10` constants in integration tests)
+6. Application / tool code that must pass a numeric `domain_id` to the
+   DDS API (e.g., `partition-inspector.py`)
 
 Everywhere else — vision prose, spec narrative, implementation
 descriptions, code comments, commit messages — use the **semantic
 databus name** (e.g., "Procedure control databus", "Hospital
 Integration databus").
+
+### Historical-Record Policy
+
+`incidents.md` and completed revision phase files (e.g.,
+`revision-domain-id-migration.md`) are **append-only historical
+records**. Old terminology in these files is not updated. Instead,
+add a one-line annotation at the top of affected sections:
+
+> **Terminology note:** This entry uses pre-V1.4.x terminology.
+> "Procedure domain" → "Procedure control/clinical/operational
+> databus"; "Hospital domain" → "Hospital Integration databus";
+> `MedtechDomains` → `Room`/`Hospital`/`Cloud` libraries.
 
 ---
 
@@ -176,9 +194,45 @@ Ensure `NDDS_QOS_PROFILES` loads all three new XML files in place of
 the old single `Domains.xml`. The load order does not matter for domain
 libraries.
 
-**e) Update `RoutingService.xml`** domain-related comments (the RS uses
-inline `<domain_id>` elements, not `domain_ref`, so the library split
-does not affect its runtime behavior — only comments need updating).
+**e) Update XML comments across all interface and service files:**
+
+Not just `RoutingService.xml` — every XML file that contains "X domain
+(Domain NN)" comment patterns must be updated to use semantic databus
+names. Affected files:
+
+- `services/routing/RoutingService.xml` — header block, participant
+  comments, session comments (RS uses inline `<domain_id>` elements,
+  not `domain_ref`, so only comments change)
+- `interfaces/qos/Topics.xml` — `ProcedureTopics`, `HospitalTopics`,
+  `OrchestrationTopics`, `GuiProcedureTopics`, `GuiHospitalTopics`
+  section comments (~8 occurrences)
+- `interfaces/participants/SurgicalParticipants.xml` — participant
+  block comments
+- `interfaces/participants/OrchestrationParticipants.xml` — header,
+  participant block comments, inline entity comments
+
+**f) Update build system `Domains.xml` references:**
+
+| File | Change |
+|------|--------|
+| `CMakeLists.txt` (line ~84) | Replace single `Domains.xml` install entry with the three new filenames |
+| `tests/qos/CMakeLists.txt` (line ~19) | Update `NDDS_QOS_PROFILES` env to list all three files instead of `Domains.xml` |
+
+**g) Update Docker & deployment `Domains.xml` references:**
+
+| File | Change |
+|------|--------|
+| `docker-compose.yml` (line ~13) | Update `NDDS_QOS_PROFILES` env value |
+| `docker/medtech-app.Dockerfile` (lines ~34, ~46) | Update `NDDS_QOS_PROFILES` ENV in both build stages |
+| `setup.bash.in` (line ~33) | Replace single `Domains.xml` path with three new file paths |
+
+**h) Update tools & CLI code that locate `Domains.xml` by filename:**
+
+| File | Change |
+|------|--------|
+| `tools/qos-checker.py` | Update `_find_domains_xml()` to locate any of the three new files (or all domain library XMLs); update docstring and error message |
+| `tests/tools/test_qos_checker.py` | Update assertion that checks for `Domains.xml` filename |
+| `modules/shared/medtech/cli/_hospital.py` | Update hardcoded `Domains.xml` path in `NDDS_QOS_PROFILES` construction |
 
 ### Test Gate
 
@@ -190,14 +244,18 @@ does not affect its runtime behavior — only comments need updating).
 - [ ] Grep gate: no `MedtechDomains` string remains in any file under
       `interfaces/` or `services/`
 - [ ] Grep gate: no `domain_ref` references the old library name
+- [ ] Grep gate: no file outside `docs/agent/` and `.git/` contains the
+      string `Domains.xml` (filename fully retired)
 
 ---
 
-## Step T.3 — Documentation Rename
+## Step T.3a — Documentation Rename
 
 ### Work
 
-Bulk rename across all Markdown files under `docs/agent/`:
+Bulk rename across all Markdown files under `docs/agent/` **and**
+project-root documentation (`README.md`,
+`modules/surgical-procedure/README.md`, etc.):
 
 | Old Pattern | New Pattern |
 |-------------|-------------|
@@ -212,20 +270,29 @@ Bulk rename across all Markdown files under `docs/agent/`:
 | "Cloud domain" / "Enterprise domain" | "Cloud Enterprise databus" |
 | "Domain 10" / "Domain 11" / "Domain 20" etc. in prose | Semantic databus name (per No-Numeric-ID Rule) |
 
+In addition, update **`Domains.xml` filename references** in vision and
+spec documents to reflect the new filenames:
+
+| File | Change |
+|------|--------|
+| `vision/technology.md` (directory tree, `setup.bash` snippet, Dockerfile ENV) | `Domains.xml` → list of 3 new filenames |
+| `vision/data-model.md` (NDDS_QOS_PROFILES example, Domain Naming Rule) | `Domains.xml` → new filenames; update rule to say "domain library XML files" |
+| `vision/dds-consistency.md` (NDDS_QOS_PROFILES example, AP-4 antipattern) | `Domains.xml` → new filenames; AP-4 guidance: "Domain IDs live exclusively in the domain library XML files and data-model.md. Code references databuses by semantic name." |
+| `modules/surgical-procedure/README.md` (install tree table) | `share/domains/Domains.xml` → list of 3 new files |
+
 **Exclusions — do NOT rename:**
 
 - DDS API terms: `DomainParticipant`, `domain_id`, `domain_ref`,
   `<domain>`, `domain_tag`, `<domain_library>`, `domain_participant_qos`
-- `Domains.xml` filename references (these become historical after T.2;
-  update to new filenames instead)
-- Headings in `data-model.md` § Domain Definitions (these are the
-  canonical ID locations)
-- The `MedtechDomains` string in `revision-domain-id-migration.md`
-  (historical record of completed revision)
+- Historical records: `incidents.md` entries and
+  `revision-domain-id-migration.md` are frozen per the Historical-Record
+  Policy. Add terminology annotations instead of rewriting.
+- Headings in `data-model.md` § Domain Definitions (canonical ID
+  locations)
 
-**Scope:** All files under `docs/agent/` (~34 files, ~446 occurrences
-of architectural "X domain" patterns, ~150 occurrences of numeric
-"Domain NN" references).
+**Scope:** All Markdown files under `docs/agent/` (~34 files, ~446
+occurrences of architectural "X domain" patterns, ~150 occurrences of
+numeric "Domain NN" references), plus project-root and module READMEs.
 
 ### Test Gate
 
@@ -235,7 +302,55 @@ of architectural "X domain" patterns, ~150 occurrences of numeric
 - [ ] Grep gate: `grep -rn "Hospital domain\b" docs/agent/` returns
       zero hits (same exclusions)
 - [ ] Grep gate: `grep -rn "Domain 10\|Domain 11\|Domain 19\|Domain 20\|Domain 29" docs/agent/`
-      returns hits only in the 4 canonical locations
+      returns hits only in the canonical locations
+
+---
+
+## Step T.3b — Code & XML Comment Rename
+
+### Work
+
+Apply the same terminology rename patterns from T.3a to **non-Markdown
+files** — specifically Python comments/docstrings and XML comments.
+
+**Python files** (`modules/`, `tools/`, `scripts/`, `tests/`):
+
+| File | Example hit | Change |
+|------|------------|--------|
+| `modules/surgical-procedure/digital_twin/digital_twin.py` | `"Subscribes to the Procedure domain (control tag)"` | → `"Subscribes to the Procedure control databus"` |
+| `modules/surgical-procedure/camera_sim/camera_simulator.py` | `"Publishes CameraFrame on the Procedure domain (operational tag)"` | → `"…on the Procedure operational databus"` |
+| `modules/surgical-procedure/vitals_sim/bedside_monitor.py` | `"Publishes on the Procedure domain (clinical tag)"` | → `"…on the Procedure clinical databus"` |
+| `modules/surgical-procedure/procedure_context_service.py` | `"Publishes … on the Procedure domain"` | → `"…on the Procedure operational databus"` |
+| `scripts/simulate_room.py` | `"Domain 10 → 20 bridge"` | → `"Procedure → Hospital Integration bridge"` |
+| `tools/qos-checker.py` | `"Within Procedure domain"`, `"Within Hospital domain"` | → databus names |
+| `tools/partition-inspector.py` | `"Scan active DDS partitions on the Procedure domain"` | → `"…on the Procedure DDS domain"` |
+| `tools/medtech-diag/diag.py` | `"On the observability domain"` | → `"On the Room Observability databus"` |
+| `tests/integration/test_routing_service.py` | `"Hospital domain"`, `"domain 10"` | → databus names |
+| `tests/integration/test_observability.py` | `"Room Observability domain 19"`, `"domain 19"` | → `"Room Observability databus"` |
+| `tests/integration/test_robot_service_host.py` | `"domain 11"`, `"domain 10"` | → databus names |
+| `tests/tools/test_qos_checker.py` | `"Observability domain"` | → `"Observability databus"` |
+
+**Exclusions — do NOT rename in code:**
+
+- Domain ID constants used as DDS API arguments
+  (e.g., `PROCEDURE_DOMAIN_ID = 10`) — these are canonical location 5
+- DDS API identifiers (`domain_id`, `DomainParticipant`, etc.)
+- String literals that are part of runtime behavior (error messages
+  containing `"Domains.xml"` are updated in T.2h, not here)
+- Test assertion strings that verify numeric domain IDs in XML output
+  — these test DDS configuration correctness
+
+### Test Gate
+
+- [ ] All existing tests pass (`bash scripts/ci.sh`)
+- [ ] Grep gate: `grep -rn "Procedure domain" --include='*.py'` returns
+      zero hits outside DDS API contexts
+- [ ] Grep gate: `grep -rn "Hospital domain" --include='*.py'` returns
+      zero hits outside DDS API contexts
+- [ ] Grep gate: `grep -rn '"Domain 10\|Domain 11\|Domain 19\|Domain 20' --include='*.py'`
+      returns zero hits outside test fixture constants and DDS API calls
+- [ ] Grep gate: `grep -rn "Procedure domain\|Hospital domain\|Orchestration domain" --include='*.xml'`
+      returns zero hits in XML comments (excluding historical/disabled blocks)
 
 ---
 
@@ -244,17 +359,27 @@ of architectural "X domain" patterns, ~150 occurrences of numeric
 ### Work
 
 - Run the full test suite (`bash scripts/ci.sh`) end-to-end.
-- Run the grep gates from Steps T.2 and T.3 as a final check.
-- Update `docs/agent/implementation/README.md` if any phase files
-  reference old `MedtechDomains::` names (only
-  `revision-domain-id-migration.md` should, as historical record).
-- Verify that `incidents.md` references to `MedtechDomains` are updated
-  (there is at least one at line ~2685).
+- Run **all** grep gates from Steps T.2, T.3a, and T.3b as a final check.
+- Add Historical-Record Policy annotations to:
+  - `incidents.md` — add a terminology note before any section that
+    references `MedtechDomains` or old "X domain" terminology
+    (at minimum, the entry near line ~2685)
+  - `revision-domain-id-migration.md` — add a single annotation at the
+    top of the file noting that it uses pre-V1.4.x terminology
+- Verify `docs/agent/implementation/README.md` — only
+  `revision-domain-id-migration.md` should reference `MedtechDomains`
+  (as historical record).
+- Verify `dds-consistency.md` AP-4 row references updated filenames and
+  "semantic databus name" (not "Procedure domain").
 
 ### Test Gate
 
 - [ ] Full CI pass: `bash scripts/ci.sh`
-- [ ] All grep gates from T.2 and T.3 pass
+- [ ] All grep gates from T.2, T.3a, and T.3b pass
 - [ ] No file under `interfaces/` contains the string `MedtechDomains`
 - [ ] No file under `docs/agent/` contains "X domain" (for any databus
-      name X) outside explicitly excluded contexts
+      name X) outside explicitly excluded contexts and historical records
+- [ ] `grep -rn 'Domains\.xml' --include='*.py' --include='*.xml' --include='*.yml' --include='*.cmake' --include='Dockerfile' --include='*.sh' --include='*.in'`
+      returns zero hits outside `.git/`
+- [ ] `grep -rn 'MedtechDomains' .` returns hits only in `.git/`,
+      `incidents.md`, and `revision-domain-id-migration.md`
