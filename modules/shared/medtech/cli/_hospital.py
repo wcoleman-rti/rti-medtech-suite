@@ -39,7 +39,8 @@ _MEDTECH_ENV: dict[str, str] = {
         "/opt/medtech/share/domains/HospitalDatabuses.xml;"
         "/opt/medtech/share/domains/CloudDatabuses.xml;"
         "/opt/medtech/share/participants/SurgicalParticipants.xml;"
-        "/opt/medtech/share/participants/OrchestrationParticipants.xml"
+        "/opt/medtech/share/participants/OrchestrationParticipants.xml;"
+        "/opt/medtech/share/participants/HospitalParticipants.xml"
     ),
     "MEDTECH_TRANSPORT_PROFILE": "Docker",
     "PYTHONPATH": "/opt/medtech/lib/python/site-packages",

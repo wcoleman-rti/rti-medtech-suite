@@ -96,69 +96,6 @@
             </subscriber>
         </domain_participant>
 
-        <!--
-            HospitalDashboard — Dashboard's Hospital Integration databus participant.
-            Read-only subscriber for facility-wide monitoring.
-            Subscribes to all bridged topics + native Hospital topics.
-            Uses GuiHospitalTopics QoS for downsampled display rates.
-        -->
-        <domain_participant name="HospitalDashboard"
-                            domain_ref="Hospital::Integration">
-            <domain_participant_qos base_name="Participants::Transport"/>
-
-            <subscriber name="DashboardSubscriber">
-
-                <!-- Bridged topics from Procedure databuses -->
-                <data_reader name="ProcedureStatusReader"
-                             topic_ref="ProcedureStatus">
-                    <datareader_qos base_name="TopicProfiles::GuiProcedureStatus"/>
-                </data_reader>
-
-                <data_reader name="ProcedureContextReader"
-                             topic_ref="ProcedureContext">
-                    <datareader_qos base_name="TopicProfiles::GuiProcedureContext"/>
-                </data_reader>
-
-                <data_reader name="PatientVitalsReader"
-                             topic_ref="PatientVitals">
-                    <datareader_qos base_name="TopicProfiles::GuiPatientVitals"/>
-                </data_reader>
-
-                <data_reader name="AlarmMessagesReader"
-                             topic_ref="AlarmMessages">
-                    <datareader_qos base_name="TopicProfiles::GuiAlarmMessages"/>
-                </data_reader>
-
-                <data_reader name="DeviceTelemetryReader"
-                             topic_ref="DeviceTelemetry">
-                    <datareader_qos base_name="TopicProfiles::GuiDeviceTelemetry"/>
-                </data_reader>
-
-                <data_reader name="RobotStateReader"
-                             topic_ref="RobotState">
-                    <datareader_qos base_name="TopicProfiles::GuiRobotState"/>
-                </data_reader>
-
-                <!-- Native Hospital Integration databus topics -->
-                <data_reader name="ClinicalAlertReader"
-                             topic_ref="ClinicalAlert">
-                    <datareader_qos base_name="TopicProfiles::GuiClinicalAlert"/>
-                </data_reader>
-
-                <data_reader name="ResourceAvailabilityReader"
-                             topic_ref="ResourceAvailability">
-                    <datareader_qos base_name="TopicProfiles::GuiResourceAvailability"/>
-                </data_reader>
-
-                <!-- ServiceCatalog bridged from Orchestration databus via Routing Service -->
-                <data_reader name="ServiceCatalogReader"
-                             topic_ref="ServiceCatalog">
-                    <datareader_qos base_name="TopicProfiles::ServiceCatalog"/>
-                </data_reader>
-
-            </subscriber>
-        </domain_participant>
-
     </domain_participant_library>
 
 </dds>

@@ -41,8 +41,8 @@ participant library, and purging stale naming/config remnants.
 | UX.4 | Room-Level GUI Navigation | ✅ Complete | `5779550` |
 | UX.5 | Procedure Lifecycle Workflow | ✅ Complete | `6d2092e` |
 | UX.6 | Regression & Acceptance | ✅ Complete | `8f2c893` |
-| UX.7 | Module Boundary Consolidation | ✅ Complete | `pending` |
-| UX.8 | Hospital Participant Library | ⬜ Not started | — |
+| UX.7 | Module Boundary Consolidation | ✅ Complete | `04a19d3` |
+| UX.8 | Hospital Participant Library | ✅ Complete | `pending` |
 | UX.9 | Unified App Remnant Cleanup | ⬜ Not started | — |
 | UX.10 | Regression & Vision Doc Alignment | ⬜ Not started | — |
 
@@ -442,7 +442,7 @@ used exclusively by the controller and digital twin.
 
 ---
 
-## Step UX.8 — Hospital Participant Library
+## Step UX.8 — Hospital Participant Library ✅
 
 ### Work
 
@@ -476,14 +476,14 @@ used exclusively by the controller and digital twin.
 
 ### Test Gate
 
-- [ ] `HospitalDashboard` participant loads from `HospitalParticipants.xml`
-- [ ] `OrchestrationParticipants.xml` no longer contains `HospitalDashboard`
-- [ ] IDL module `HospitalParticipants` generates correctly
-- [ ] `NDDS_QOS_PROFILES` includes all three participant XMLs in all
+- [x] `HospitalDashboard` participant loads from `HospitalParticipants.xml`
+- [x] `OrchestrationParticipants.xml` no longer contains `HospitalDashboard`
+- [x] IDL module `HospitalParticipants` generates correctly
+- [x] `NDDS_QOS_PROFILES` includes all three participant XMLs in all
   deployment contexts (local, Docker image, docker-compose)
-- [ ] QoS compatibility check (Gate 11) passes with the new file split
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] QoS compatibility check (Gate 11) passes with the new file split
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 

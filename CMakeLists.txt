@@ -89,6 +89,7 @@ install(FILES
 install(FILES
     interfaces/participants/SurgicalParticipants.xml
     interfaces/participants/OrchestrationParticipants.xml
+    interfaces/participants/HospitalParticipants.xml
     DESTINATION share/participants
 )
 

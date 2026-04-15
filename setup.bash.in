@@ -34,7 +34,8 @@ $_DIR/share/domains/RoomDatabuses.xml;\
 $_DIR/share/domains/HospitalDatabuses.xml;\
 $_DIR/share/domains/CloudDatabuses.xml;\
 $_DIR/share/participants/SurgicalParticipants.xml;\
-$_DIR/share/participants/OrchestrationParticipants.xml"
+$_DIR/share/participants/OrchestrationParticipants.xml;\
+$_DIR/share/participants/HospitalParticipants.xml"
 
 # Runtime configuration root
 export MEDTECH_CONFIG_DIR="$_DIR/etc"

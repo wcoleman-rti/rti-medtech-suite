@@ -10,7 +10,7 @@
 #   - RTI license file: set RTI_LICENSE_FILE in .env (see .env.example)
 
 x-medtech-env: &medtech-env
-  NDDS_QOS_PROFILES: "/opt/medtech/share/qos/Snippets.xml;/opt/medtech/share/qos/Patterns.xml;/opt/medtech/share/qos/Topics.xml;/opt/medtech/share/qos/Participants.xml;/opt/medtech/share/domains/RoomDatabuses.xml;/opt/medtech/share/domains/HospitalDatabuses.xml;/opt/medtech/share/domains/CloudDatabuses.xml;/opt/medtech/share/participants/SurgicalParticipants.xml;/opt/medtech/share/participants/OrchestrationParticipants.xml"
+  NDDS_QOS_PROFILES: "/opt/medtech/share/qos/Snippets.xml;/opt/medtech/share/qos/Patterns.xml;/opt/medtech/share/qos/Topics.xml;/opt/medtech/share/qos/Participants.xml;/opt/medtech/share/domains/RoomDatabuses.xml;/opt/medtech/share/domains/HospitalDatabuses.xml;/opt/medtech/share/domains/CloudDatabuses.xml;/opt/medtech/share/participants/SurgicalParticipants.xml;/opt/medtech/share/participants/OrchestrationParticipants.xml;/opt/medtech/share/participants/HospitalParticipants.xml"
   MEDTECH_TRANSPORT_PROFILE: "Docker"
   NDDS_DISCOVERY_PEERS: "rtps@udpv4://cloud-discovery-service:7400"
   PYTHONPATH: "/opt/medtech/lib/python/site-packages"

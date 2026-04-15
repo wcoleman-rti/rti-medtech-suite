@@ -90,11 +90,11 @@ module MedtechEntityNames {
         const string SERVICE_CATALOG_READER  = "RoomNavSubscriber::ServiceCatalogReader";
     };
 
-    // --- HospitalDashboard participant (in OrchestrationParticipants library) ---
+    // --- HospitalDashboard participant (in HospitalParticipants library) ---
     module HospitalDashboard {
 
         // Participant config name — create_participant_from_config()
-        const string HOSPITAL_DASHBOARD = "OrchestrationParticipants::HospitalDashboard";
+        const string HOSPITAL_DASHBOARD = "HospitalParticipants::HospitalDashboard";
 
         // Reader names — find_datareader()
         const string PROCEDURE_STATUS_READER      = "DashboardSubscriber::ProcedureStatusReader";
