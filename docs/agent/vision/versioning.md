@@ -132,7 +132,7 @@ capabilities.
 | Hospital Dashboard (room-centric) | Primary view: room cards with active procedure indicator, service counts, alert counts, `gui_url` action links opening new browser tab with `open_in_new` icon. Secondary view: active procedures filter. |
 | Procedure Controller (room-deployed) | Per-room container (dual-homed `surgical-net` + `orchestration-net`), own host port, serves controller SPA independently of hospital container |
 | Procedure Lifecycle Workflow | Start Procedure → select idle services → Deploy → Add Services → Stop Procedure; one active procedure per room; procedure state reconstruction on restart via TRANSIENT_LOCAL |
-| Room-level GUI navigation | `medtech.gui.room_nav` module: shared Orchestration read-only participant for dynamic sibling GUI discovery via `ServiceCatalog` `gui_url` properties; floating nav pill with sibling buttons; hospital dashboard link with `open_in_new` icon |
+| Room-level GUI navigation | `medtech.gui.room_nav` module: shared Orchestration read-only participant for dynamic sibling GUI discovery via `ServiceCatalog` `gui_url` properties; floating nav pill with sibling buttons; no upward link to hospital dashboard (room GUIs have visibility at and below their level only) |
 | CLI enhancements | `medtech build --docker`, `medtech build --all`; `medtech run or` launches controller container alongside twin; `medtech launch` output emphasizes dashboard as primary entry point |
 
 ---

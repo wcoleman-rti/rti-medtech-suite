@@ -276,14 +276,22 @@ these are already calibrated for the right verbosity level.
    executing test commands in a terminal tool. Tests have their own
    internal timeouts. Prematurely killing a test run wastes time and
    requires a re-run.
-2. **No output pipes.** Run test commands bare — no `| tail`, no
-   `| grep`, no `2>&1 | head`. The full output must be visible for
-   diagnosis if a test fails.
+2. **No output pipes or redirects.** Run test commands bare — no
+   `| tail`, no `| grep`, no `2>&1 | head`, no `> file`, no
+   `>> file`, no `2>/dev/null`. In particular, `bash scripts/ci.sh`
+   must never have its output piped or redirected under any
+   circumstances. The full output must be visible for diagnosis if
+   a test fails.
 3. **One run is authoritative.** If a test command exits 0, the gate
    is passed. Do not re-run "to be sure." If it exits non-zero, the
    gate is failed — diagnose and fix, do not re-run hoping for a
-   different result (if flakiness is suspected, that is a separate
-   issue to investigate and fix, not to retry past).
+   different result. **Flaky tests are blocking failures.** If a
+   test failure is suspected to be flaky (non-deterministic,
+   environment-dependent, timing-sensitive), the agent must either
+   resolve the root cause or escalate to the operator for a
+   decision. Declaring a failure "flaky" and proceeding is
+   prohibited — every non-zero exit from `ci.sh` must be resolved
+   or block on operator input.
 4. **Environment sourcing.** Commands 2 and 3 require
    `source install/setup.bash` once per terminal session. This sets
    `NDDS_QOS_PROFILES`, `LD_LIBRARY_PATH`, `PYTHONPATH`, and
