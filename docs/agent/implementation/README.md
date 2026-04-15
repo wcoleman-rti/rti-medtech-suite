@@ -143,7 +143,7 @@ If an implementation session is interrupted, use this checklist to resume:
 | [revision-dds-consistency.md](revision-dds-consistency.md) | DDS Consistency Alignment | Phase 1, Phase 2 Steps 2.1–2.2 | `app_names.idl` entity name constants, `dds_init.py` relocation, retrofit generated constants, architecture audit, expanded CI anti-pattern checks, `@consistency` spec tests |
 | [phase-2-surgical.md](phase-2-surgical.md) | Surgical Procedure | Phase 1, Revision | Robot sim, vitals sim (simulation model with scenario profiles), camera sim, procedure context, device telemetry (write-on-change), digital twin display, partition isolation, diagnostic tools (medtech-diag, partition-inspector) |
 | [revision-docker-build-workflow.md](revision-docker-build-workflow.md) | Docker Build Workflow | Phase 1 | Multi-stage Dockerfile, in-container compilation, compose update, CI Docker gates, doc guardrails |
-| [phase-5-orchestration.md](phase-5-orchestration.md) | Procedure Orchestration | Phase 2 | IDL breaking changes (Foxglove translatability: `Timestamp_t`, `ImageFormat` enum, `CameraFrame` streamlined), `medtech::Service` interface (C++ / Python ABC), dual-mode participant, Service Host framework (C++ and Python), Procedure Controller GUI (NiceGUI), Orchestration databus (Orchestration databus), `ServiceHostControl` DDS RPC, `ServiceCatalog` + `ServiceStatus` pub/sub, `@orchestration` test coverage |
+| [phase-5-orchestration.md](phase-5-orchestration.md) | Procedure Orchestration | Phase 2 | IDL breaking changes (Foxglove translatability: `Timestamp_t`, `ImageFormat` enum, `CameraFrame` streamlined), `medtech::Service` interface (C++ / Python ABC), dual-mode participant, Service Host framework (C++ and Python), Procedure Controller GUI (NiceGUI), Orchestration databus, `ServiceHostControl` DDS RPC, `ServiceCatalog` + `ServiceStatus` pub/sub, `@orchestration` test coverage |
 | [revision-shared-package-consolidation.md](revision-shared-package-consolidation.md) | Shared Package Consolidation | Phase 5 Steps 5.1–5.6 | Unify `medtech_dds_init`, `medtech_logging`, `medtech_gui` into single `medtech` namespace package; consolidate C++ include/src; update all imports and CMake rules |
 | [phase-3-dashboard.md](phase-3-dashboard.md) | Hospital Dashboard | Phase 5 | NiceGUI web application, Routing Service config, multi-OR aggregation, alert feed, robot status — services implement `medtech::Service` |
 | [phase-4-alerts.md](phase-4-alerts.md) | Clinical Alerts & Decision Support | Phase 5, Phase 3 Step 3.1 | Risk scoring engine, alert generation, cross-domain subscription, configurable thresholds — service implements `medtech::Service` |
@@ -160,7 +160,7 @@ After all V1.0.0 phases (1–5, plus 3–4) are complete, a **final regression g
 - [ ] All spec scenarios from all five phases pass simultaneously in the Docker Compose environment
 - [ ] All `@orchestration` spec scenarios pass
 - [ ] Procedure Controller discovers, starts, stops, and monitors services across all three Service Host types
-- [ ] Orchestration databus is fully isolated from Procedure and Hospital Integration databuss
+- [ ] Orchestration databus is fully isolated from Procedure and Hospital Integration databuses
 - [ ] No open incidents in `docs/agent/incidents.md`
 - [ ] All module/service READMEs pass markdownlint and section-order lint
 - [ ] Performance benchmark passes against the Phase 5 baseline

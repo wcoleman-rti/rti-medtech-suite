@@ -1255,7 +1255,7 @@ same network namespace. Configuration and deployment details are in
 
 Each room deploys its own Routing Service instance (the **MedtechBridge**), attached to
 `surgical-net`, `orchestration-net`, and `hospital-net` (tri-homed). It is the **sole
-cross-level gateway** between room-level domains and the Hospital integration domain.
+cross-level gateway** between room-level databuses and the Hospital Integration databus.
 
 It bridges:
 - Domain 10 → Domain 20: `ProcedureStatus`, `ProcedureContext`, patient vitals, alarm messages, device telemetry

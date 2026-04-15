@@ -2,7 +2,7 @@
 
 Behavioral specifications for the V1.0 Procedure Orchestration milestone:
 the `medtech::Service` interface, dual-mode participant pattern, Service
-Host framework, Procedure Controller GUI, Orchestration databus (Orchestration databus)
+Host framework, Procedure Controller GUI, Orchestration databus
 communication, and DDS RPC lifecycle management.
 
 The Orchestration databus uses **no Publisher/Subscriber partitions** and no
@@ -367,7 +367,7 @@ is added or changed.*
 
 ### Scenario: Orchestration databus is isolated from the Procedure databuses `@integration` `@orchestration` `@isolation`
 
-**Given** a participant on the Orchestration databus (Orchestration databus)
+**Given** a participant on the Orchestration databus
 **And** a participant on the Procedure DDS domain (the Procedure DDS domain, any tag)
 **When** both are running
 **Then** they do not discover each other

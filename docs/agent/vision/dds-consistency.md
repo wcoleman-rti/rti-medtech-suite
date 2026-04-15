@@ -291,7 +291,7 @@ must rediscover, so this should only be done when the operational context
 genuinely changes and the re-discovery overhead is acceptable.
 
 > **Orchestration databus exception:** DomainParticipant partitions on the
-> Orchestration databus (Orchestration databus) are **static** — they encode orchestration
+> Orchestration databus are **static** — they encode orchestration
 > tier membership (`procedure`, `facility`, etc.) and must **never** be changed
 > at runtime. Tier membership is a deployment-time property; changing it on a
 > live participant would cause unnecessary re-discovery churn across all
@@ -1574,7 +1574,7 @@ for the `<propagation_qos>` configuration.
 ### Health Monitoring
 
 - Enable `<administration>` and `<monitoring>` in the Routing Service XML.
-- Use the Room Observability databus (Room Observability databus) for monitoring traffic,
+- Use the Room Observability databus for monitoring traffic,
   consistent with the application observability strategy.
 - Set practical publication periods (status: 5 s, statistics: 1 s).
 - Monitor at service/session/route granularity.

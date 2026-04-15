@@ -2,7 +2,7 @@
 
 Behavioral specifications for the facility-wide NiceGUI web dashboard that provides hospital-level situational awareness. The primary view organizes information by **room** — each active room is displayed as a summary card with deployment status, procedure indicator, and aggregate metrics. Users drill into room-specific views (controller, digital twin, etc.) by opening the room's GUI in a **new browser tab** (room GUIs are served by per-room containers, not the hospital container).
 
-The dashboard subscribes to the Hospital Integration databus (Hospital Integration databus). All room data arrives via Routing Service from the Procedure and Orchestration databuss. Room discovery uses RS-bridged `ServiceCatalog` from the Orchestration databus.
+The dashboard subscribes to the Hospital Integration databus. All room data arrives via Routing Service from the Procedure and Orchestration databuses. Room discovery uses RS-bridged `ServiceCatalog` from the Orchestration databus.
 
 ---
 

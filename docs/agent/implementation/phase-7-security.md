@@ -112,7 +112,7 @@
 3. **Verify secure-to-secure relay.** Data is decrypted from Procedure DDS domain, re-encrypted for Hospital Integration databus.
 
 **Test gate:**
-- [ ] `routing-service` authenticates on both Procedure and Hospital Integration databuss
+- [ ] `routing-service` authenticates on both Procedure and Hospital Integration databuses
 - [ ] Bridged topics arrive correctly on Hospital Integration databus
 - [ ] DataWriter creation on Procedure DDS domain is denied for `routing-service`
 - [ ] DataReader creation on Hospital Integration databus is denied for `routing-service`

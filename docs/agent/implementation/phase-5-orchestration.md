@@ -326,7 +326,7 @@ contribution to that gate:
 - [x] All V1.0 spec scenarios from Phases 1–2 still pass (no regressions)
 - [x] Full Docker Compose environment runs end-to-end: standalone deployment + orchestrated deployment
 - [x] Procedure Controller discovers, starts, stops, and monitors services across all three Service Host types
-- [x] Orchestration databus is fully isolated from Procedure and Hospital Integration databuss
+- [x] Orchestration databus is fully isolated from Procedure and Hospital Integration databuses
 - [x] All module READMEs pass lint
 - [x] Performance benchmark passes against Phase 5 baseline
 - [ ] No open incidents in `docs/agent/incidents.md` *(INC-041, INC-042 remain open — Phase 2 discovery issues, not Phase 5 blockers)*

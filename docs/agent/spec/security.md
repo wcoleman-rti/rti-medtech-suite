@@ -235,7 +235,7 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 `@security` `@integration` `@routing`
 
 **Given** a Routing Service instance configured with an identity certificate not signed by the Identity CA
-**When** the Routing Service attempts to create DomainParticipants on the Procedure and Hospital Integration databuss
+**When** the Routing Service attempts to create DomainParticipants on the Procedure and Hospital Integration databuses
 **Then** both DomainParticipant creations fail; no bridging occurs
 
 ---

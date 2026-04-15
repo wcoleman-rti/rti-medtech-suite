@@ -52,7 +52,7 @@ A single facility-wide NiceGUI web application providing facility-level situatio
 #### Architecture
 
 - Subscribes to Hospital Integration databus topics (Hospital Integration databus)
-- All room data arrives via Routing Service bridge from Procedure and Orchestration databuss — the dashboard never joins a room-level domain directly
+- All room data arrives via Routing Service bridge from Procedure and Orchestration databuses — the dashboard never joins a room-level domain directly
 - Room discovery uses RS-bridged `ServiceCatalog` (from the Orchestration databus via per-room MedtechBridge) — each `ServiceCatalog` entry carries `room_id` and `gui_url` properties
 - Uses content-filtered topics to support per-room drill-down views within the dashboard (vitals, alerts)
 - DDS reads run as asyncio coroutines via `background_tasks.create()` on the NiceGUI event loop; UI refreshes driven by `ui.timer()` and `@ui.refreshable`
@@ -94,7 +94,7 @@ A Clinical Decision Support (ClinicalAlerts module) engine that subscribes to pa
 
 | Feature | Where Exercised |
 |---------|-----------------|
-| Multi-domain isolation | Procedure DDS domain vs Hospital integration domain (Hospital Integration databus) vs Orchestration databus (Orchestration databus) |
+| Multi-domain isolation | Procedure DDS domain vs Hospital Integration databus vs Orchestration databus |
 | Domain tags (risk-class) | `control` vs `clinical` vs `operational` within Procedure DDS domain |
 | Domain partitions | Room/procedure isolation across surgical instances; wildcard matching for aggregation |
 | Real-time deterministic streaming | Robot teleop, waveforms, camera frames |
@@ -178,7 +178,7 @@ The full release version policy — including version increment rules, release c
 
 Additive within the V1 milestone. No structural changes to V1.0 modules.
 
-- **RTI Recording Service** — passive multi-domain capture of all DDS traffic across Procedure, Hospital, and Orchestration databuss. Recording Service operates as a multi-domain subscriber, joining the Procedure DDS domain (all domain tags), the Hospital Integration databus, and the Orchestration databus simultaneously. A single Recording Service instance captures the complete system state.
+- **RTI Recording Service** — passive multi-domain capture of all DDS traffic across Procedure, Hospital, and Orchestration databuses. Recording Service operates as a multi-domain subscriber, joining the Procedure DDS domain (all domain tags), the Hospital Integration databus, and the Orchestration databus simultaneously. A single Recording Service instance captures the complete system state.
 - **RTI Replay Service** — deterministic replay into subscriber applications for training, incident review, and regression testing
 - `@recording` and `@replay` spec scenarios added to cover capture completeness and replay fidelity
 - **Resource Status** — `ResourceAvailability` topic on the Hospital Integration databus: OR, bed, equipment,
