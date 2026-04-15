@@ -2929,7 +2929,7 @@ after closure. They form the project's decision log.
 
 ## INC-095: Spec and vision docs contain stale import paths after UX.7–UX.10
 
-- **Status:** Open
+- **Status:** Closed
 - **Category:** Doc Consistency
 - **Date opened:** 2026-04-15
 - **Phase/Step:** Revision: UX Alignment / Step UX.10
@@ -2955,8 +2955,19 @@ after closure. They form the project's decision log.
      approval per workflow.md Section 1)
   2. Add a "V1.5.0 path changes" annotation at the top of affected
      docs noting the rename
-- **Resolution:** Pending user approval to update docs/agent content.
-- **Date closed:** —
+- **Resolution:** Resolution 1 adopted (user approved). Updated all
+  stale import paths in the 6 affected spec/vision docs:
+  - `spec/common-behaviors.md`: 3 references updated
+  - `spec/nicegui-migration.md`: 1 reference updated
+  - `spec/procedure-orchestration.md`: 1 reference updated
+  - `spec/simulation-cli.md`: 1 reference updated
+  - `vision/nicegui-migration.md`: 5 references updated (done in INC-096 commit)
+  - `vision/system-architecture.md`: 4 references updated
+- **Guideline:** When moving modules between packages, update all
+  forward-looking references in spec/vision docs in the same commit.
+  Historical/completed step descriptions in phase/revision files
+  should retain original paths for traceability.
+- **Date closed:** 2026-04-15
 
 ---
 

@@ -258,7 +258,7 @@ integration, multi-client behavior, theming, and DDS event loop unification.
 ### Scenario: Room-level nav pill discovers sibling GUIs `@gui` `@ui-modernization`
 
 **Given** a room GUI (e.g., Procedure Controller for OR-1) is open in its own browser tab
-**And** the `medtech.gui.room_nav` module has created a read-only Orchestration participant
+**And** the `surgical_procedure.room_nav` module has created a read-only Orchestration participant
 **When** a sibling service in the same room publishes a `ServiceCatalog` sample with `gui_url`
 **Then** a new button appears in the floating nav pill within 5 seconds
 **And** clicking the button navigates to the sibling's `gui_url` in the same tab

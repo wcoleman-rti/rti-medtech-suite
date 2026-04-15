@@ -31,7 +31,7 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 | Cloud Discovery Service unavailability | Application starts successfully; logs WARNING; discovers when Cloud Discovery Service becomes available |
 | Write-on-change publication model | Topics designated write-on-change publish only on state transitions; absence of samples is normal (liveliness detects writer health) |
 | Continuous-stream publication model | Topics designated continuous-stream publish at their configured fixed rate regardless of value change |
-| Smoke — Tier 1 (host) | Every GUI entry point (`medtech.gui.app`, `hospital_dashboard.procedure_controller`, `surgical_procedure.digital_twin`) and CLI entry point (`medtech`) imports without error, registers expected routes, and exposes expected commands. No DDS, no Docker. |
+| Smoke — Tier 1 (host) | Every GUI entry point (`hospital_dashboard.dashboard`, `surgical_procedure.procedure_controller`, `surgical_procedure.digital_twin`) and CLI entry point (`medtech`) imports without error, registers expected routes, and exposes expected commands. No DDS, no Docker. |
 | Smoke — Tier 2 (container) | Every application container (`medtech-gui`, per-room controller, per-room twin) starts without crash, health probe (`GET /health`) returns 200 within 30 s, and the expected URL is reachable via Docker port mapping. Single container, no composed system. |
 
 *This table must be updated whenever a concrete value in the scenarios below is added or changed.*
@@ -379,7 +379,7 @@ Tier 2 runs a single container with no inter-service dependencies.
 ### Scenario: Hospital dashboard entry point imports without error `@smoke` `@gui`
 
 **Given** the Python environment is activated (`source .venv/bin/activate`)
-**When** `python -c "import medtech.gui.app"` is executed
+**When** `python -c "import hospital_dashboard.dashboard"` is executed
 **Then** the process exits with code 0
 **And** no `ImportError`, `ModuleNotFoundError`, or `AttributeError` is raised
 
@@ -393,7 +393,7 @@ Tier 2 runs a single container with no inter-service dependencies.
 ### Scenario: Procedure Controller entry point imports without error `@smoke` `@gui`
 
 **Given** the Python environment is activated
-**When** `python -c "from hospital_dashboard.procedure_controller import controller"` is executed
+**When** `python -c "from surgical_procedure.procedure_controller import controller"` is executed
 **Then** the process exits with code 0
 
 ### Scenario: Digital Twin entry point imports without error `@smoke` `@gui`

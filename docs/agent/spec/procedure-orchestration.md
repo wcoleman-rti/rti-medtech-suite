@@ -334,7 +334,7 @@ is added or changed.*
 ### Scenario: Room GUI nav pill discovers sibling GUIs via ServiceCatalog `@integration` `@orchestration` `@gui`
 
 **Given** a room-level GUI (e.g., Procedure Controller for OR-1) is running
-**And** the shared `medtech.gui.room_nav` module has a read-only Orchestration databus participant
+**And** the `surgical_procedure.room_nav` module has a read-only Orchestration databus participant
 **When** sibling GUI services (e.g., Digital Twin for OR-1) publish `ServiceCatalog` entries with `gui_url` properties
 **Then** the nav pill renders buttons for each discovered sibling GUI
 **And** button labels reflect the service display name

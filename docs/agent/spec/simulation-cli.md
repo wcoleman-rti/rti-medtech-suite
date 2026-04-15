@@ -88,7 +88,7 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 **When** the developer runs `medtech run or --name OR-1`
 **Then** the CLI launches a room-gateway container (CDS base with co-located RS and Collector via `--network container:<OR-name>-gateway`) on the hospital's Docker networks
 **And** the CLI runs `docker run --rm -d` for each required Service Host container (clinical, operational, operator, robot), a Procedure Controller container, and a Digital Twin container
-**And** the Controller and Twin containers are attached to both `surgical-net` and `orchestration-net` (for Procedure DDS domain data and `medtech.gui.room_nav` sibling discovery)
+**And** the Controller and Twin containers are attached to both `surgical-net` and `orchestration-net` (for Procedure DDS domain data and `surgical_procedure.room_nav` sibling discovery)
 **And** each `docker run` command is printed to stdout before execution
 **And** the controller container is assigned a host port (auto-assigned from the hospital's controller port range)
 **And** the twin container is assigned a host port (auto-assigned from the hospital's twin port range)
