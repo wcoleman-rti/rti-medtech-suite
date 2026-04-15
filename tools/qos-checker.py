@@ -227,7 +227,11 @@ def parse_domain_topics(domains_xml_paths):
     return result
 
 
-_DOMAIN_LIB_SUFFIXES = ("RoomDatabuses.xml", "HospitalDatabuses.xml", "CloudDatabuses.xml")
+_DOMAIN_LIB_SUFFIXES = (
+    "RoomDatabuses.xml",
+    "HospitalDatabuses.xml",
+    "CloudDatabuses.xml",
+)
 
 
 def find_domain_library_xmls():

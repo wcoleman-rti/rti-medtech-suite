@@ -99,5 +99,6 @@ module MedtechEntityNames {
         const string ROBOT_STATE_READER           = "DashboardSubscriber::RobotStateReader";
         const string CLINICAL_ALERT_READER        = "DashboardSubscriber::ClinicalAlertReader";
         const string RESOURCE_AVAILABILITY_READER = "DashboardSubscriber::ResourceAvailabilityReader";
+        const string SERVICE_CATALOG_READER       = "DashboardSubscriber::ServiceCatalogReader";
     };
 };

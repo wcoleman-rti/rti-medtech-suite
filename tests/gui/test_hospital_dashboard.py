@@ -14,6 +14,7 @@ import app_names
 import clinical_alerts
 import hospital
 import monitoring
+import orchestration
 import pytest
 import rti.connextdds as dds
 import surgery
@@ -227,6 +228,9 @@ def _make_injected_readers(participant_factory):
         "resource_availability_reader": _reader(
             hospital.Hospital.ResourceAvailability, "ResourceAvailability"
         ),
+        "service_catalog_reader": _reader(
+            orchestration.Orchestration.ServiceCatalog, "ServiceCatalog"
+        ),
     }
 
 
@@ -316,7 +320,7 @@ class TestDashboardBackend:
         )
 
         asyncio.run(backend.start())
-        assert len(scheduled) == 8
+        assert len(scheduled) == 9
         asyncio.run(backend.close())
 
 
@@ -389,6 +393,7 @@ class TestDashboardPage:
                     )
                 ],
                 resources={},
+                rooms={},
                 severity_filter="ALL",
                 room_filter="ALL",
                 filtered_alerts=lambda: [
@@ -408,7 +413,6 @@ class TestDashboardPage:
 
         kinds = [call[0] for call in recorder.calls]
         assert "header" in kinds
-        assert "splitter" in kinds
         assert "tab_panels" in kinds
         assert "scroll_area" in kinds
         assert "select" in kinds
@@ -672,6 +676,7 @@ class TestResourcePanel:
                 procedures={},
                 alerts=[],
                 resources={"OR-4": rp},
+                rooms={},
                 severity_filter="ALL",
                 room_filter="ALL",
                 filtered_alerts=lambda: [],
@@ -826,6 +831,7 @@ class TestDDSBurstResponsiveness:
             backend._receive_robot_state,
             backend._receive_clinical_alerts,
             backend._receive_resource_availability,
+            backend._receive_service_catalog,
             backend._monitor_robot_liveliness,
         ]
 
@@ -902,4 +908,132 @@ class TestDDSBurstResponsiveness:
         assert len(backend.resources) == 5
 
         monkeypatch.undo()
+        asyncio.run(backend.close())
+
+
+# ---------------------------------------------------------------------------
+# Room Card aggregation from ServiceCatalog (Step UX.3)
+# ---------------------------------------------------------------------------
+
+
+class TestRoomCards:
+    """Room card aggregation from ServiceCatalog samples."""
+
+    def test_service_catalog_creates_room(self, participant_factory):
+        """A ServiceCatalog with room_id property creates a RoomEntry."""
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+        backend.update_service_catalog(
+            SimpleNamespace(
+                host_id="host-1",
+                service_id="svc-1",
+                display_name="Robot Arm",
+                properties=[
+                    SimpleNamespace(name="room_id", current_value="OR-1"),
+                ],
+            )
+        )
+        assert "OR-1" in backend.rooms
+        assert backend.rooms["OR-1"].service_total == 1
+        asyncio.run(backend.close())
+
+    def test_room_shows_procedure_indicator(self, participant_factory):
+        """Room with procedure_id property shows active procedure."""
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+        backend.update_service_catalog(
+            SimpleNamespace(
+                host_id="host-1",
+                service_id="svc-1",
+                display_name="Robot Arm",
+                properties=[
+                    SimpleNamespace(name="room_id", current_value="OR-1"),
+                    SimpleNamespace(name="procedure_id", current_value="proc-100"),
+                ],
+            )
+        )
+        assert backend.rooms["OR-1"].procedure_id == "proc-100"
+        asyncio.run(backend.close())
+
+    def test_room_aggregates_service_counts(self, participant_factory):
+        """Multiple services in the same room increment service_total."""
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+        for i in range(3):
+            backend.update_service_catalog(
+                SimpleNamespace(
+                    host_id=f"host-{i}",
+                    service_id=f"svc-{i}",
+                    display_name=f"Service {i}",
+                    properties=[
+                        SimpleNamespace(name="room_id", current_value="OR-2"),
+                    ],
+                )
+            )
+        assert backend.rooms["OR-2"].service_total == 3
+        asyncio.run(backend.close())
+
+    def test_room_collects_gui_urls(self, participant_factory):
+        """Room card collects gui_url entries for action links."""
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+        backend.update_service_catalog(
+            SimpleNamespace(
+                host_id="host-1",
+                service_id="twin-svc",
+                display_name="Digital Twin",
+                properties=[
+                    SimpleNamespace(name="room_id", current_value="OR-1"),
+                    SimpleNamespace(name="gui_url", current_value="http://twin:8081"),
+                ],
+            )
+        )
+        assert "Digital Twin" in backend.rooms["OR-1"].gui_urls
+        assert backend.rooms["OR-1"].gui_urls["Digital Twin"] == "http://twin:8081"
+        asyncio.run(backend.close())
+
+    def test_new_rooms_auto_appear(self, participant_factory):
+        """New rooms auto-appear as ServiceCatalog samples arrive."""
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+        assert len(backend.rooms) == 0
+        backend.update_service_catalog(
+            SimpleNamespace(
+                host_id="h1",
+                service_id="s1",
+                display_name="Svc",
+                properties=[
+                    SimpleNamespace(name="room_id", current_value="OR-A"),
+                ],
+            )
+        )
+        assert len(backend.rooms) == 1
+        backend.update_service_catalog(
+            SimpleNamespace(
+                host_id="h2",
+                service_id="s2",
+                display_name="Svc2",
+                properties=[
+                    SimpleNamespace(name="room_id", current_value="OR-B"),
+                ],
+            )
+        )
+        assert len(backend.rooms) == 2
+        asyncio.run(backend.close())
+
+    def test_room_without_gui_url_has_empty_links(self, participant_factory):
+        """Room card without gui_url entries has no action links."""
+        readers = _make_injected_readers(participant_factory)
+        backend = dashboard_module.DashboardBackend(**readers)
+        backend.update_service_catalog(
+            SimpleNamespace(
+                host_id="h1",
+                service_id="s1",
+                display_name="Robot Arm",
+                properties=[
+                    SimpleNamespace(name="room_id", current_value="OR-1"),
+                ],
+            )
+        )
+        assert len(backend.rooms["OR-1"].gui_urls) == 0
         asyncio.run(backend.close())
