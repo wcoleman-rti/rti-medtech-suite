@@ -324,7 +324,7 @@ def or_cmd(
     _start_service_container(
         name=ctrl_name,
         image="medtech/app-python",
-        command=["python", "-m", "hospital_dashboard.procedure_controller"],
+        command=["python", "-m", "surgical_procedure.procedure_controller"],
         networks=[target["nets"]["surgical"], target["nets"]["orchestration"]],
         extra_env={
             "ROOM_ID": or_name,

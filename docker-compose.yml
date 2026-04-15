@@ -383,7 +383,7 @@ services:
   medtech-gui:
     image: medtech/app-python
     container_name: medtech-gui
-    # CMD default in Dockerfile: python -m medtech.gui.app
+    # CMD default in Dockerfile: python -m hospital_dashboard.dashboard
     environment:
       <<: *medtech-env
       MEDTECH_NICEGUI_STORAGE_SECRET: "${MEDTECH_NICEGUI_STORAGE_SECRET:-changeme-set-in-env}"

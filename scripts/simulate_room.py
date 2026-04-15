@@ -222,9 +222,9 @@ def main() -> None:
             print("     Use --no-bridge to suppress this warning.")
 
     print(f"\n  {len(procs)} processes running. Press Ctrl-C to stop all.\n")
-    print("  Launch the GUI in another terminal:")
-    print("    python -m medtech.gui.app\n")
-    print("  Then click 'Start All' in the Controller view.\n")
+    print("  Launch the dashboard in another terminal:")
+    print("    python -m hospital_dashboard.dashboard\n")
+    print("  Then open http://localhost:8080 in a browser.\n")
 
     # ── Wait / signal handling ──────────────────────────────────────
     shutdown = False

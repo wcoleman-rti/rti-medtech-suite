@@ -112,7 +112,7 @@ HOST_ID=operational-host-or1 ROOM_ID=OR-1 PROCEDURE_ID=proc-001 \
     python -m surgical_procedure.operational_service_host
 
 # Then use the Procedure Controller to start/stop services via RPC
-python -m hospital_dashboard.procedure_controller
+ROOM_ID=OR-1 python -m surgical_procedure.procedure_controller
 ```
 
 #### Standalone mode (development)

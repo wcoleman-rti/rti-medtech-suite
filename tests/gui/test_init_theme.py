@@ -800,7 +800,7 @@ class TestSemanticTypeScale:
         """Controller module uses no arbitrary Tailwind font-size classes on labels."""
         import inspect
 
-        from hospital_dashboard.procedure_controller import controller as ctrl_mod
+        from surgical_procedure.procedure_controller import controller as ctrl_mod
 
         source = inspect.getsource(ctrl_mod)
         for pattern in [

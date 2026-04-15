@@ -1224,7 +1224,7 @@ def main() -> None:
     favicon_path = _resource_dir() / "images" / "favicon.ico"
 
     # Room navigation pill — discovers sibling GUIs in this room
-    from medtech.gui.room_nav import RoomNav
+    from surgical_procedure.room_nav import RoomNav
 
     _room_nav_instance = RoomNav(room_id)
     from nicegui import app as nicegui_app

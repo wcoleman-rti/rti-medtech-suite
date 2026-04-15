@@ -2,7 +2,7 @@
 
 Usage::
 
-    ROOM_ID=OR-1 python -m hospital_dashboard.procedure_controller
+    ROOM_ID=OR-1 python -m surgical_procedure.procedure_controller
 """
 
 from __future__ import annotations

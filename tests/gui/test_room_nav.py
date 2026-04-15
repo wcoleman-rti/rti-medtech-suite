@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from medtech.gui.room_nav import RoomNav
+from surgical_procedure.room_nav import RoomNav
 
 pytestmark = [pytest.mark.gui, pytest.mark.unit]
 

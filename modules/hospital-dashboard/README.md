@@ -2,13 +2,15 @@
 
 ## Overview
 
-The hospital dashboard module provides the **Procedure Controller**, a
-PySide6 GUI application that acts as the central control plane for the
-medtech suite. It discovers Service Hosts, displays their capabilities
-and service states, and issues start/stop commands via DDS RPC.
+The hospital dashboard module provides the **Hospital Dashboard**, a
+NiceGUI web application that presents a facility-wide view of active
+operating rooms, running procedures, and clinical alerts. It subscribes
+to the Hospital Integration databus and renders room cards as the
+primary view, with drill-down panels for vitals, alerts, robot status,
+and resource availability.
 
-The Procedure Controller does **not** host any surgical services — it is
-a pure consumer and orchestrator. It creates three DomainParticipants:
+The Procedure Controller has been relocated to the
+`modules/surgical-procedure/` module — it is a room-tier component.
 
 | Participant      | Domain                         | Role                                                            |
 | ---------------- | ------------------------------ | --------------------------------------------------------------- |
@@ -38,11 +40,8 @@ source install/setup.bash
 ### Run
 
 ```bash
-# Set the operating room to control
-export ROOM_ID=OR-1
-
-# Launch the Procedure Controller
-python -m hospital_dashboard.procedure_controller
+# Launch the Hospital Dashboard
+python -m hospital_dashboard.dashboard
 ```
 
 The GUI window shows two tables (Service Hosts, Service States) and four

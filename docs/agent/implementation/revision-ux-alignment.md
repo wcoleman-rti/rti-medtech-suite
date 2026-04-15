@@ -41,7 +41,7 @@ participant library, and purging stale naming/config remnants.
 | UX.4 | Room-Level GUI Navigation | ✅ Complete | `5779550` |
 | UX.5 | Procedure Lifecycle Workflow | ✅ Complete | `6d2092e` |
 | UX.6 | Regression & Acceptance | ✅ Complete | `8f2c893` |
-| UX.7 | Module Boundary Consolidation | ⬜ Not started | — |
+| UX.7 | Module Boundary Consolidation | ✅ Complete | `pending` |
 | UX.8 | Hospital Participant Library | ⬜ Not started | — |
 | UX.9 | Unified App Remnant Cleanup | ⬜ Not started | — |
 | UX.10 | Regression & Vision Doc Alignment | ⬜ Not started | — |
@@ -366,7 +366,7 @@ sidebar navigation model that no longer applies.
 
 ---
 
-## Step UX.7 — Module Boundary Consolidation
+## Step UX.7 — Module Boundary Consolidation ✅
 
 ### Rationale
 
@@ -427,18 +427,18 @@ used exclusively by the controller and digital twin.
 
 ### Test Gate
 
-- [ ] `python -m hospital_dashboard.dashboard` launches the dashboard
-- [ ] `python -m surgical_procedure.procedure_controller` launches the controller
-- [ ] `python -m surgical_procedure.digital_twin` launches the twin
-- [ ] `from surgical_procedure.room_nav import RoomNav` succeeds
-- [ ] `from medtech.gui import init_theme` succeeds (shared still works)
-- [ ] `import medtech.gui.app` fails (`app.py` deleted)
-- [ ] `modules/shared/medtech/gui/` contains only tier-agnostic utilities
+- [x] `python -m hospital_dashboard.dashboard` launches the dashboard
+- [x] `python -m surgical_procedure.procedure_controller` launches the controller
+- [x] `python -m surgical_procedure.digital_twin` launches the twin
+- [x] `from surgical_procedure.room_nav import RoomNav` succeeds
+- [x] `from medtech.gui import init_theme` succeeds (shared still works)
+- [x] `import medtech.gui.app` fails (`app.py` deleted)
+- [x] `modules/shared/medtech/gui/` contains only tier-agnostic utilities
   (`_theme.py`, `_widgets.py`, `_backend.py`, `_colors.py`, `_icons.py`,
   `_tokens.py`, `__init__.py`)
-- [ ] Health/readiness probes respond on the dashboard app
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] Health/readiness probes respond on the dashboard app
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 

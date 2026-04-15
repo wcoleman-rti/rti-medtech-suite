@@ -22,8 +22,8 @@ from types import SimpleNamespace
 
 import pytest
 import rti.connextdds as dds
-from hospital_dashboard.procedure_controller import controller as controller_module
 from orchestration import Orchestration
+from surgical_procedure.procedure_controller import controller as controller_module
 
 pytestmark = [
     pytest.mark.integration,
@@ -223,7 +223,7 @@ class TestAcceptanceUXWorkflow:
 
     def test_room_nav_sibling_discovery(self, participant_factory):
         """Room nav discovers sibling GUIs from ServiceCatalog."""
-        from medtech.gui.room_nav import RoomNav
+        from surgical_procedure.room_nav import RoomNav
 
         readers = _make_injected_readers(participant_factory)
         catalog_reader = readers["catalog_reader"]

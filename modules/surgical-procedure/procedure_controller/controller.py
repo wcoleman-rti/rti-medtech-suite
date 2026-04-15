@@ -1696,7 +1696,7 @@ def main() -> None:
 
     room_id = os.environ.get("ROOM_ID", "")
     if room_id:
-        from medtech.gui.room_nav import RoomNav
+        from surgical_procedure.room_nav import RoomNav
 
         _room_nav_instance = RoomNav(room_id)
         from nicegui import app as nicegui_app

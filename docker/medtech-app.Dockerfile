@@ -50,7 +50,7 @@ ENV MEDTECH_CONFIG_DIR="/opt/medtech/etc"
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Default: launch the unified NiceGUI application (all GUI modules)
-CMD ["python", "-m", "medtech.gui.app"]
+# Default: launch the hospital dashboard web application
+CMD ["python", "-m", "hospital_dashboard.dashboard"]
 
 WORKDIR /opt/medtech

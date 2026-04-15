@@ -59,12 +59,11 @@ class TestArmStateTracking:
 
     @pytest.fixture()
     def backend(self):
-        from hospital_dashboard.procedure_controller import (
-            controller as controller_module,
-        )
-
         # Create a minimal backend with injected readers (no real DDS)
         from medtech.dds import initialize_connext
+        from surgical_procedure.procedure_controller import (
+            controller as controller_module,
+        )
 
         initialize_connext()
         dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID)

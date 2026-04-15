@@ -229,7 +229,7 @@ class TestBackendsReady:
 
     def test_true_when_registry_empty(self) -> None:
         """No backends → ready (vacuously)."""
-        from medtech.gui.app import _backends_ready
+        from hospital_dashboard.dashboard.dashboard import _backends_ready
 
         assert _backends_ready() is True
 
@@ -239,7 +239,7 @@ class TestBackendsReady:
         """Returns False if any registered backend has not marked ready."""
         monkeypatch.setattr("nicegui.app.on_startup", lambda fn: None)
         monkeypatch.setattr("nicegui.app.on_shutdown", lambda fn: None)
-        from medtech.gui.app import _backends_ready
+        from hospital_dashboard.dashboard.dashboard import _backends_ready
 
         class PendingBackend(GuiBackend):
             @property
@@ -261,7 +261,7 @@ class TestBackendsReady:
         """Returns True when every registered backend has marked ready."""
         monkeypatch.setattr("nicegui.app.on_startup", lambda fn: None)
         monkeypatch.setattr("nicegui.app.on_shutdown", lambda fn: None)
-        from medtech.gui.app import _backends_ready
+        from hospital_dashboard.dashboard.dashboard import _backends_ready
 
         class ReadyBackend(GuiBackend):
             @property
@@ -284,7 +284,7 @@ class TestBackendsReady:
         """Returns False when at least one backend is not yet ready."""
         monkeypatch.setattr("nicegui.app.on_startup", lambda fn: None)
         monkeypatch.setattr("nicegui.app.on_shutdown", lambda fn: None)
-        from medtech.gui.app import _backends_ready
+        from hospital_dashboard.dashboard.dashboard import _backends_ready
 
         class MixedBackend(GuiBackend):
             @property
@@ -313,7 +313,7 @@ class TestHealthProbe:
 
     def test_health_returns_200(self) -> None:
         """health() returns HTTP 200."""
-        from medtech.gui.app import health
+        from hospital_dashboard.dashboard.dashboard import health
 
         response = asyncio.run(health())
         assert response.status_code == 200
@@ -322,7 +322,7 @@ class TestHealthProbe:
         """health() response body contains {'status': 'ok'}."""
         import json
 
-        from medtech.gui.app import health
+        from hospital_dashboard.dashboard.dashboard import health
 
         response = asyncio.run(health())
         body = json.loads(response.body)
@@ -340,7 +340,7 @@ class TestReadinessProbe:
 
     def test_ready_200_when_no_backends(self) -> None:
         """Returns 200 when no backends are registered (vacuously ready)."""
-        from medtech.gui.app import ready
+        from hospital_dashboard.dashboard.dashboard import ready
 
         response = asyncio.run(ready())
         assert response.status_code == 200
@@ -351,7 +351,7 @@ class TestReadinessProbe:
         """Returns 503 when a registered backend has not marked ready."""
         monkeypatch.setattr("nicegui.app.on_startup", lambda fn: None)
         monkeypatch.setattr("nicegui.app.on_shutdown", lambda fn: None)
-        from medtech.gui.app import ready
+        from hospital_dashboard.dashboard.dashboard import ready
 
         class SlowBackend(GuiBackend):
             @property
@@ -376,7 +376,7 @@ class TestReadinessProbe:
 
         monkeypatch.setattr("nicegui.app.on_startup", lambda fn: None)
         monkeypatch.setattr("nicegui.app.on_shutdown", lambda fn: None)
-        from medtech.gui.app import ready
+        from hospital_dashboard.dashboard.dashboard import ready
 
         class UnreadyBackend(GuiBackend):
             @property
@@ -402,7 +402,7 @@ class TestReadinessProbe:
 
         monkeypatch.setattr("nicegui.app.on_startup", lambda fn: None)
         monkeypatch.setattr("nicegui.app.on_shutdown", lambda fn: None)
-        from medtech.gui.app import ready
+        from hospital_dashboard.dashboard.dashboard import ready
 
         class InstantBackend(GuiBackend):
             @property
@@ -433,7 +433,7 @@ class TestShellPage:
 
     def _patch_shell(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         """Patch all NiceGUI widgets used by shell_page() and return call log."""
-        import medtech.gui.app as app_module
+        import hospital_dashboard.dashboard.dashboard as app_module
 
         log: dict[str, list[Any]] = {
             "row": [],
@@ -511,7 +511,7 @@ class TestShellPage:
 
     def test_shell_page_creates_nav_pill(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """shell_page() creates a ui.row for the floating navigation pill."""
-        import medtech.gui.app as app_module
+        import hospital_dashboard.dashboard.dashboard as app_module
 
         log = self._patch_shell(monkeypatch)
         app_module.shell_page()
@@ -521,7 +521,7 @@ class TestShellPage:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """shell_page() does not create ui.header or ui.left_drawer."""
-        import medtech.gui.app as app_module
+        import hospital_dashboard.dashboard.dashboard as app_module
 
         self._patch_shell(monkeypatch)
         # Also patch header/left_drawer to detect if they're called
@@ -545,7 +545,7 @@ class TestShellPage:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """shell_page() calls ui.sub_pages() with dashboard-only route dict."""
-        import medtech.gui.app as app_module
+        import hospital_dashboard.dashboard.dashboard as app_module
 
         log = self._patch_shell(monkeypatch)
         app_module.shell_page()
@@ -561,7 +561,7 @@ class TestShellPage:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """sub_pages routes point to the content-only builder functions."""
-        import medtech.gui.app as app_module
+        import hospital_dashboard.dashboard.dashboard as app_module
         from hospital_dashboard.dashboard.dashboard import dashboard_content
 
         log = self._patch_shell(monkeypatch)
@@ -574,7 +574,7 @@ class TestShellPage:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Navigation pill contains a Dashboard button."""
-        import medtech.gui.app as app_module
+        import hospital_dashboard.dashboard.dashboard as app_module
 
         log = self._patch_shell(monkeypatch)
         app_module.shell_page()
@@ -584,7 +584,7 @@ class TestShellPage:
 
     def test_shell_page_root_redirect(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Root '/' route redirects to '/dashboard' via sub_pages."""
-        import medtech.gui.app as app_module
+        import hospital_dashboard.dashboard.dashboard as app_module
 
         log = self._patch_shell(monkeypatch)
         app_module.shell_page()
@@ -602,17 +602,17 @@ class TestPageTitleForPath:
     """_page_title_for_path() returns correct breadcrumb titles."""
 
     def test_dashboard_path(self) -> None:
-        from medtech.gui.app import _page_title_for_path
+        from hospital_dashboard.dashboard.dashboard import _page_title_for_path
 
         assert _page_title_for_path("/dashboard") == "Dashboard"
 
     def test_unknown_path_returns_home(self) -> None:
-        from medtech.gui.app import _page_title_for_path
+        from hospital_dashboard.dashboard.dashboard import _page_title_for_path
 
         assert _page_title_for_path("/unknown") == "Home"
 
     def test_root_returns_home(self) -> None:
-        from medtech.gui.app import _page_title_for_path
+        from hospital_dashboard.dashboard.dashboard import _page_title_for_path
 
         assert _page_title_for_path("/") == "Home"
 
@@ -626,19 +626,19 @@ class TestStaticNavItems:
     """_STATIC_NAV_ITEMS contains the expected Tier 1 navigation entries."""
 
     def test_static_nav_has_dashboard(self) -> None:
-        from medtech.gui.app import _STATIC_NAV_ITEMS
+        from hospital_dashboard.dashboard.dashboard import _STATIC_NAV_ITEMS
 
         paths = [item[0] for item in _STATIC_NAV_ITEMS]
         assert "/dashboard" in paths
 
     def test_controller_is_per_room_not_static(self) -> None:
-        from medtech.gui.app import _STATIC_NAV_ITEMS
+        from hospital_dashboard.dashboard.dashboard import _STATIC_NAV_ITEMS
 
         paths = [item[0] for item in _STATIC_NAV_ITEMS]
         assert "/controller" not in paths
 
     def test_static_nav_count(self) -> None:
-        from medtech.gui.app import _STATIC_NAV_ITEMS
+        from hospital_dashboard.dashboard.dashboard import _STATIC_NAV_ITEMS
 
         assert len(_STATIC_NAV_ITEMS) == 1
 
@@ -653,7 +653,7 @@ class TestMainUsesRoot:
 
     def test_main_calls_ui_run_with_root(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """ui.run() is called with root=shell_page."""
-        import medtech.gui.app as app_module
+        import hospital_dashboard.dashboard.dashboard as app_module
 
         run_calls: list[dict[str, Any]] = []
 
@@ -747,7 +747,7 @@ class TestGuiBackendLifecycleHooks:
         # Verify that app.py does not contain explicit start() calls
         import inspect
 
-        import medtech.gui.app as app_module
+        import hospital_dashboard.dashboard.dashboard as app_module
 
         source = inspect.getsource(app_module.main)
         assert "start()" not in source, (
