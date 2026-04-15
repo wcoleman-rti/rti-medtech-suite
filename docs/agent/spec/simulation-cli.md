@@ -88,7 +88,7 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 **When** the developer runs `medtech run or --name OR-1`
 **Then** the CLI launches a room-gateway container (CDS base with co-located RS and Collector via `--network container:<OR-name>-gateway`) on the hospital's Docker networks
 **And** the CLI runs `docker run --rm -d` for each required Service Host container (clinical, operational, operator, robot), a Procedure Controller container, and a Digital Twin container
-**And** the Controller and Twin containers are attached to both `surgical-net` and `orchestration-net` (for Procedure domain data and `medtech.gui.room_nav` sibling discovery)
+**And** the Controller and Twin containers are attached to both `surgical-net` and `orchestration-net` (for Procedure DDS domain data and `medtech.gui.room_nav` sibling discovery)
 **And** each `docker run` command is printed to stdout before execution
 **And** the controller container is assigned a host port (auto-assigned from the hospital's controller port range)
 **And** the twin container is assigned a host port (auto-assigned from the hospital's twin port range)
@@ -215,7 +215,7 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 
 **Given** infrastructure is running and the hospital dashboard is loaded
 **And** the developer runs `medtech run or --name OR-5`
-**When** the new per-room Routing Service bridges `ServiceCatalog` from Domain 11 to Domain 20
+**When** the new per-room Routing Service bridges `ServiceCatalog` from the Orchestration databus to the Hospital Integration databus
 **Then** a new room card for OR-5 appears in the dashboard Room Overview
 **And** the card shows the room's `gui_url` with an `open_in_new` button
 

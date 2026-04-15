@@ -11,7 +11,7 @@ control-tag Routing Service bridge.
 implementation begins. All teleoperation data paths require Connext
 Security Plugins for authentication and topic-level access control.
 
-All scenarios assume the Procedure domain `control` tag and partition
+All scenarios assume the Procedure control databus and partition
 `room/<room_id>/procedure/<procedure_id>` unless stated otherwise.
 
 ---
@@ -38,7 +38,7 @@ All scenarios assume the Procedure domain `control` tag and partition
 | ControlAuthority states | `LOCAL_ACTIVE`, `REMOTE_ACTIVE`, `FAILOVER_PENDING`, `RECLAIM_PENDING`, `NO_OPERATOR` |
 | Safe-hold scope | Per-procedure (not per-arm) — all arms enter safe-hold simultaneously |
 | Routing Service control-tag bridge | Separate `domain_route` with dedicated `control`-tag participants, isolated from observational bridge |
-| Hospital domain tag re-evaluation | Required before V2.1 implementation — determine if Hospital domain needs a `control` tag |
+| Hospital Integration databus tag re-evaluation | Required before V2.1 implementation — determine if Hospital Integration databus needs a `control` tag |
 
 *This table must be updated whenever a concrete value in the scenarios below is added or changed.*
 
@@ -84,15 +84,15 @@ All scenarios assume the Procedure domain `control` tag and partition
 
 ### Scenario: Routing Service lowers ownership strength for hospital route `@integration` `@teleop` `@routing`
 
-**Given** a hospital console publishes `OperatorInput` on the Hospital domain with the console's native strength (200)
-**When** Routing Service bridges the `OperatorInput` samples to the Procedure domain `control` tag
+**Given** a hospital console publishes `OperatorInput` on the Hospital Integration databus with the console's native strength (200)
+**When** Routing Service bridges the `OperatorInput` samples to the Procedure control databus
 **Then** the Routing Service output DataWriter publishes with ownership strength 100
 **And** the console application itself is unmodified — strength lowering is a Routing Service QoS transformation
 
 ### Scenario: Routing Service lowers ownership strength for cloud route `@integration` `@teleop` `@routing`
 
 **Given** a cloud console publishes `OperatorInput` on the Cloud domain with the console's native strength (200)
-**When** WAN Routing Service bridges the `OperatorInput` samples to the Procedure domain `control` tag
+**When** WAN Routing Service bridges the `OperatorInput` samples to the Procedure control databus
 **Then** the Routing Service output DataWriter publishes with ownership strength 50
 **And** the console application itself is unmodified
 
@@ -111,7 +111,7 @@ All scenarios assume the Procedure domain `control` tag and partition
   2. Control-tag bridge (Hospital → Procedure `control`, new V2.1 route)
 **When** the observational bridge experiences a fault (e.g., session error, restart)
 **Then** the control-tag bridge continues operating without interruption
-**And** `OperatorInput` samples continue flowing from the remote console to the Procedure domain
+**And** `OperatorInput` samples continue flowing from the remote console to the Procedure DDS domain
 
 ### Scenario: Control-tag route uses dedicated participants `@integration` `@teleop` `@routing`
 
@@ -119,7 +119,7 @@ All scenarios assume the Procedure domain `control` tag and partition
 **When** the route creates its DomainParticipants
 **Then** the Procedure-side participant carries the `control` domain tag
 **And** this participant is separate from the observational bridge's participants
-**And** the participants discover only `control`-tag endpoints on the Procedure domain
+**And** the participants discover only `control`-tag endpoints on the Procedure DDS domain
 
 ---
 
@@ -315,7 +315,7 @@ All scenarios assume the Procedure domain `control` tag and partition
 **Given** the Routing Service configuration for the teleoperation control-tag bridge
 **When** the domain route is created
 **Then** the Procedure-side DomainParticipant is configured with the `control` domain tag
-**And** the Hospital-side DomainParticipant is configured for the Hospital domain
+**And** the Hospital-side DomainParticipant is configured for the Hospital Integration databus
 **And** both participants are in the correct partition for the procedure
 
 ### Scenario: Control-tag route bridges only OperatorInput `@integration` `@teleop` `@routing`

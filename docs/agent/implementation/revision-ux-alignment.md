@@ -109,7 +109,7 @@ CLI (`medtech build --docker`, controller container deployment).
 ### Work
 
 - **Rewrite hospital dashboard primary view as room cards:**
-  - Subscribe to RS-bridged `ServiceCatalog` on Domain 20 (already
+  - Subscribe to RS-bridged `ServiceCatalog` on the Hospital Integration databus (already
     delivered by per-room MedtechBridge) to discover rooms and their
     GUI URLs
   - Render room cards as the primary view: room name, active procedure
@@ -156,8 +156,8 @@ CLI (`medtech build --docker`, controller container deployment).
 ### Work
 
 - **Author `modules/shared/medtech/gui/room_nav.py`:**
-  - Creates a single read-only Orchestration domain participant
-    (Domain 11, `procedure` tier partition)
+  - Creates a single read-only Orchestration databus participant
+    (the Orchestration databus, `procedure` tier partition)
   - Subscribes to `ServiceCatalog` topic
   - Filters by `room_id` matching the current room (passed as
     constructor parameter)
@@ -299,7 +299,7 @@ sidebar navigation model that no longer applies.
 | `TestShellPage::test_shell_page_registers_sub_pages` | Asserts `/controller/{room_id}` and `/twin/{room_id}` in hospital app sub_pages — those routes move to room containers | **Rewrite**: hospital app sub_pages should only contain `/dashboard` (and `/alerts` when added) | UX.2 |
 | `TestShellPage::test_shell_page_sub_pages_use_content_functions` | Imports `controller_content_for_room` and `twin_content` and asserts they're in hospital app routes | **Rewrite**: only `dashboard_content` should remain in hospital app routes | UX.2 |
 | `TestShellPage::test_shell_page_nav_pill_has_static_buttons` | Asserts ≥2 static nav buttons (Dashboard + Controller) | **Rewrite**: only 1 static button (Dashboard) in hospital app; Controller moves to room nav | UX.3 |
-| `TestDiscoveredRooms` (entire class: 3 tests) | Tests `_discovered_rooms()` via `ControllerBackend` — discovery moves to `DashboardBackend` reading bridged `ServiceCatalog` on Domain 20 | **Rewrite**: new discovery tests should use `DashboardBackend` directly | UX.3 |
+| `TestDiscoveredRooms` (entire class: 3 tests) | Tests `_discovered_rooms()` via `ControllerBackend` — discovery moves to `DashboardBackend` reading bridged `ServiceCatalog` on the Hospital Integration databus | **Rewrite**: new discovery tests should use `DashboardBackend` directly | UX.3 |
 | `TestPageTitleForPath::test_controller_path` | `/controller/OR-1` path won't exist in hospital app | **Move**: to room-level app test suite | UX.2 |
 | `TestPageTitleForPath::test_twin_with_room_id` | `/twin/OR-1` path won't exist in hospital app | **Move**: to room-level app test suite | UX.2 |
 | `TestPageTitleForPath::test_twin_with_different_room_id` | Same as above | **Move**: to room-level app test suite | UX.2 |

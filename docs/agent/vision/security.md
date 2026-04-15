@@ -27,7 +27,7 @@ Two kinds of trust boundaries exist within the medtech suite:
 | Boundary Type | Instances | Description |
 |---------------|-----------|-------------|
 | **Domain Trust Boundary** | Procedure, Hospital, Observability | Separates authorized domain members from unauthorized outsiders. Crossing requires valid credentials (PKI certs + permissions grant, or PSK passphrase). |
-| **Topic Trust Boundary** | Per-topic within each domain (reinforced by domain tags in the Procedure domain) | Separates authorized topic publishers/subscribers from unauthorized domain insiders. Crossing requires topic-level permissions grant. |
+| **Topic Trust Boundary** | Per-topic within each domain (reinforced by domain tags in the Procedure DDS domain) | Separates authorized topic publishers/subscribers from unauthorized domain insiders. Crossing requires topic-level permissions grant. |
 
 ### Attacker Roles
 
@@ -35,7 +35,7 @@ Two kinds of trust boundaries exist within the medtech suite:
 |---------------|-------------|-----------------------|
 | **Domain Outsider** | Actor with physical/network access to the DDS network but no valid domain credentials. | Rogue device plugged into the OR network; container on the Docker network without valid certs or PSK. |
 | **Domain Insider** | Actor with stolen or compromised credentials that grant domain join, but targets resources outside their authorized scope. | Compromised camera-sim container attempts to inject RobotCommand messages on the `control` tag. |
-| **Topic Outsider** | Actor authorized to join the domain but not authorized to publish/subscribe to the target topic. | Hospital-dashboard participant (authorized on Hospital domain) attempts to subscribe to `RobotCommand` on the Procedure domain. |
+| **Topic Outsider** | Actor authorized to join the domain but not authorized to publish/subscribe to the target topic. | Hospital-dashboard participant (authorized on Hospital Integration databus) attempts to subscribe to `RobotCommand` on the Procedure DDS domain. |
 | **Topic Insider** | Actor authorized to interact with a topic who impersonates another authorized participant or exceeds their pub/sub direction. | Compromised bedside-monitor (authorized to publish `PatientVitals`) attempts to publish `RobotCommand` using stolen robot-controller credentials. |
 
 ### Threat Matrix
@@ -47,7 +47,7 @@ The table below maps each STRIDE category to concrete medtech suite threats and 
 | **S** — Spoofing | Impersonate a legitimate participant | Domain | Attacker publishes `RobotCommand` as `robot-controller` | PKI mutual authentication (`enable_join_access_control=TRUE`); unique per-participant identity certificates |
 | **S** — Spoofing | Impersonate a specific data source within a topic | Topic | Domain insider publishes fake `RobotState` from a non-robot-controller identity | Origin authentication (`ENCRYPT_WITH_ORIGIN_AUTHENTICATION` on `control`-tag `metadata_protection_kind`); per-participant receiver-specific MACs |
 | **T** — Tampering | Modify in-flight control commands | Domain / Topic | Man-in-the-middle alters `RobotCommand` payload between operator and robot | `data_protection_kind=ENCRYPT` + `metadata_protection_kind=ENCRYPT_WITH_ORIGIN_AUTHENTICATION` on `control`-tag topics |
-| **T** — Tampering | Modify discovery information to corrupt topic matching | Domain | Attacker injects malicious discovery data to redirect subscriptions | `discovery_protection_kind=ENCRYPT` on Procedure and Hospital domains; PSK protection on bootstrap traffic |
+| **T** — Tampering | Modify discovery information to corrupt topic matching | Domain | Attacker injects malicious discovery data to redirect subscriptions | `discovery_protection_kind=ENCRYPT` on Procedure and Hospital Integration databuss; PSK protection on bootstrap traffic |
 | **R** — Repudiation | Deny having issued a safety interlock release | Topic | Operator claims they did not issue the interlock-clear command | Origin authentication on `SafetyInterlock` topic; Connext Logging API captures all security events, forwarded to Grafana Loki via Monitoring Library 2.0 and Collector Service |
 | **I** — Information Disclosure | Eavesdrop on patient vitals | Topic | Network sniffer captures `PatientVitals` PHI data | `data_protection_kind=ENCRYPT` on `clinical`-tag topics; `metadata_protection_kind=ENCRYPT` prevents topic name leakage |
 | **I** — Information Disclosure | Discover system topology | Domain | Attacker reads unprotected discovery traffic to enumerate participants and topics | `discovery_protection_kind=ENCRYPT` encrypts endpoint announcements |
@@ -174,9 +174,9 @@ For zero-message-loss passphrase rotation, use the `dds.sec.crypto.rtps_psk_secr
 
 ```
 interfaces/security/psk/
-├── procedure_domain_psk.txt          # Primary PSK passphrase for Procedure domain
+├── procedure_domain_psk.txt          # Primary PSK passphrase for Procedure DDS domain
 ├── procedure_domain_psk_extra.txt    # Transition PSK (used during rotation only)
-├── hospital_domain_psk.txt           # Primary PSK passphrase for Hospital domain
+├── hospital_domain_psk.txt           # Primary PSK passphrase for Hospital Integration databus
 └── hospital_domain_psk_extra.txt     # Transition PSK (used during rotation only)
 ```
 
@@ -230,9 +230,9 @@ Governance documents define **how** each domain is protected — join policy, di
 
 ```
 interfaces/security/governance/
-├── Governance_Procedure.xml          # Procedure domain governance (source)
+├── Governance_Procedure.xml          # Procedure DDS domain governance (source)
 ├── Governance_Procedure_signed.p7s   # Signed — referenced by participants
-├── Governance_Hospital.xml           # Hospital domain governance (source)
+├── Governance_Hospital.xml           # Hospital Integration databus governance (source)
 ├── Governance_Hospital_signed.p7s    # Signed — referenced by participants
 ├── Governance_Observability.xml      # Observability domain governance (source)
 └── Governance_Observability_signed.p7s # Signed — referenced by Monitoring Library 2.0 dedicated participants
@@ -242,7 +242,7 @@ One governance document per functional domain. Routing Service participants refe
 
 ### Procedure Domain Governance
 
-The Procedure domain uses domain tags for risk-class isolation. Governance reinforces domain tags with cryptographic protection aligned to risk classification:
+The Procedure DDS domain uses domain tags for risk-class isolation. Governance reinforces domain tags with cryptographic protection aligned to risk classification:
 
 | Domain Tag | Risk Class | `data_protection_kind` | `metadata_protection_kind` | Rationale |
 |------------|-----------|----------------------|---------------------------|-----------|
@@ -254,9 +254,9 @@ The Procedure domain uses domain tags for risk-class isolation. Governance reinf
 >
 > Because governance `topic_access_rules` within a single `domain_rule` cannot differentiate protection by domain tag — they match by topic expression only — `Governance_Procedure.xml` **must** contain **three separate `<domain_rule>` entries**, one per domain tag:
 >
-> 1. A `<domain_rule>` selecting `<tag>control</tag>` on the Procedure domain ID, with `topic_access_rules` specifying `ENCRYPT` / `ENCRYPT_WITH_ORIGIN_AUTHENTICATION` for control-tag topics.
-> 2. A `<domain_rule>` selecting `<tag>clinical</tag>` on the Procedure domain ID, with `topic_access_rules` specifying `ENCRYPT` / `ENCRYPT` for clinical-tag topics.
-> 3. A `<domain_rule>` selecting `<tag>operational</tag>` on the Procedure domain ID, with `topic_access_rules` specifying `SIGN` / `SIGN` for operational-tag topics.
+> 1. A `<domain_rule>` selecting `<tag>control</tag>` on the Procedure DDS domain ID, with `topic_access_rules` specifying `ENCRYPT` / `ENCRYPT_WITH_ORIGIN_AUTHENTICATION` for control-tag topics.
+> 2. A `<domain_rule>` selecting `<tag>clinical</tag>` on the Procedure DDS domain ID, with `topic_access_rules` specifying `ENCRYPT` / `ENCRYPT` for clinical-tag topics.
+> 3. A `<domain_rule>` selecting `<tag>operational</tag>` on the Procedure DDS domain ID, with `topic_access_rules` specifying `SIGN` / `SIGN` for operational-tag topics.
 >
 > A single `<domain_rule>` with `<tag_expression>*</tag_expression>` would apply the **same** topic protection to all three tags, defeating risk-class isolation. Each rule must explicitly select its tag via `<tag>` or `<tag_expression>`. Topic rules are processed top-to-bottom within the matched `domain_rule`; the first matching `topic_rule` applies.
 
@@ -264,7 +264,7 @@ The Procedure domain uses domain tags for risk-class isolation. Governance reinf
 
 | Element | Value | Rationale |
 |---------|-------|-----------|
-| `allow_unauthenticated_participants` | `FALSE` | Default deny — no anonymous participants on the Procedure domain |
+| `allow_unauthenticated_participants` | `FALSE` | Default deny — no anonymous participants on the Procedure DDS domain |
 | `enable_join_access_control` | `TRUE` | Permissions must grant domain join |
 | `discovery_protection_kind` | `ENCRYPT` | Endpoint announcements are encrypted — prevents topology reconnaissance |
 | `liveliness_protection_kind` | `SIGN` | Liveliness messages are integrity-protected |
@@ -308,7 +308,7 @@ This override does not affect `ProcedureContext` or `ProcedureStatus`, which rem
 
 ### Hospital Domain Governance
 
-The Hospital domain has no domain tags. All topics receive uniform protection:
+The Hospital Integration databus has no domain tags. All topics receive uniform protection:
 
 | Element | Value | Rationale |
 |---------|-------|-----------|
@@ -319,11 +319,11 @@ The Hospital domain has no domain tags. All topics receive uniform protection:
 | `rtps_protection_kind` | `SIGN` | RTPS-level integrity |
 | `enable_key_revision` | `TRUE` | Required for dynamic CRL revocation. Default in 7.6.0 but set explicitly. |
 
-**Per-topic protection** (uniform for all Hospital domain topics):
+**Per-topic protection** (uniform for all Hospital Integration databus topics):
 
 | Setting | Value | Rationale |
 |---------|-------|-----------|
-| `data_protection_kind` | `ENCRYPT` | All Hospital domain data contains PHI (patient vitals, risk scores, alerts, resource status) |
+| `data_protection_kind` | `ENCRYPT` | All Hospital Integration databus data contains PHI (patient vitals, risk scores, alerts, resource status) |
 | `metadata_protection_kind` | `ENCRYPT` | Submessage metadata encrypted |
 | `enable_discovery_protection` | `TRUE` | — |
 | `enable_read_access_control` | `TRUE` | — |
@@ -443,7 +443,7 @@ The table below shows the topic-level grants for each participant role. **P** = 
 
 ### Partition-Aware Permissions
 
-Procedure domain participants are partition-scoped to their room/procedure context. Permissions use wildcard partition expressions to grant access without enumerating every room:
+Procedure DDS domain participants are partition-scoped to their room/procedure context. Permissions use wildcard partition expressions to grant access without enumerating every room:
 
 ```xml
 <publish>
@@ -522,8 +522,8 @@ Origin authentication MACs increase message size. To avoid IP fragmentation on s
 
 Security adds approximately **3× discovery traffic** per pair of DomainParticipants (authentication handshake + key exchange). For the medtech suite's ~11 participants across 3 functional domains:
 
-- Procedure domain: ~8 participants → additional ~84 key exchanges (8 × 7 / 2 × 3)
-- Hospital domain: ~5 participants → additional ~30 key exchanges
+- Procedure DDS domain: ~8 participants → additional ~84 key exchanges (8 × 7 / 2 × 3)
+- Hospital Integration databus: ~5 participants → additional ~30 key exchanges
 - Observability domain: ~11 participants (Monitoring Library 2.0 dedicated participants) → additional ~165 key exchanges
 
 This is well within normal capacity for a Docker-based deployment but must be accounted for in startup timing and Docker health-check grace periods.
@@ -553,11 +553,11 @@ When generating governance XML, use `must_interpret="false"` on elements that ma
 
 ## Routing Service Security
 
-Routing Service is the trust boundary between the Procedure domain and the Hospital domain. It must be authenticated and authorized on both sides.
+Routing Service is the trust boundary between the Procedure DDS domain and the Hospital Integration databus. It must be authenticated and authorized on both sides.
 
 ### Identity
 
-Routing Service receives a single identity certificate (`CN=routing-service/<instance>`) but creates **4 DomainParticipants** (3 on the Procedure domain, 1 on the Hospital domain). All 4 participants share the same identity certificate and private key. Each participant independently authenticates with its peers. Each participant references the governance document appropriate to its domain:
+Routing Service receives a single identity certificate (`CN=routing-service/<instance>`) but creates **4 DomainParticipants** (3 on the Procedure DDS domain, 1 on the Hospital Integration databus). All 4 participants share the same identity certificate and private key. Each participant independently authenticates with its peers. Each participant references the governance document appropriate to its domain:
 
 > **Trade-off — single identity across trust zones:** Using one certificate for all 4 Routing Service participants is functionally valid in Connext 7.6.0 (multiple DomainParticipants in the same process may share the same cert/key). The accepted consequences are: (1) revocation or renewal affects all 4 participants atomically, (2) audit trails cannot distinguish which internal RS participant performed a given action, (3) all 4 participants share one cryptographic identity across different domains and tags. For production deployments with strict regulatory auditability requirements, consider separate certificates per Routing Service DomainParticipant (or at minimum, per domain).
 
@@ -571,16 +571,16 @@ Routing Service receives a single identity certificate (`CN=routing-service/<ins
 ### Permissions
 
 Routing Service permissions grant:
-- **Subscribe** on Procedure domain for each bridged topic on its respective tag (see [Permission Grants — Procedure Domain](#procedure-domain-by-tag))
-- **Publish** on Hospital domain for the bridged topics (see [Permission Grants — Hospital Domain](#hospital-domain))
-- **No publish** on the Procedure domain — Routing Service is strictly one-way (Procedure → Hospital)
-- **No subscribe** on the Hospital domain — data does not flow back
+- **Subscribe** on Procedure DDS domain for each bridged topic on its respective tag (see [Permission Grants — Procedure Domain](#procedure-domain-by-tag))
+- **Publish** on Hospital Integration databus for the bridged topics (see [Permission Grants — Hospital Domain](#hospital-domain))
+- **No publish** on the Procedure DDS domain — Routing Service is strictly one-way (Procedure → Hospital)
+- **No subscribe** on the Hospital Integration databus — data does not flow back
 
 This enforces the architectural invariant: data flows from Procedure → Hospital via Routing Service, never the reverse.
 
 ### Secure-to-Secure Bridge
 
-All 4 Routing Service participants are fully authenticated participants on their respective domains. The bridge operates as a secure-to-secure relay — data is decrypted from the Procedure domain side, re-encrypted for the Hospital domain side, and published with Routing Service's own identity. The Hospital domain subscriber sees Routing Service as the origin (not the original Procedure domain publisher).
+All 4 Routing Service participants are fully authenticated participants on their respective domains. The bridge operates as a secure-to-secure relay — data is decrypted from the Procedure databuses side, re-encrypted for the Hospital Integration databus side, and published with Routing Service's own identity. The Hospital Integration databus subscriber sees Routing Service as the origin (not the original Procedure DDS domain publisher).
 
 ---
 
@@ -658,7 +658,7 @@ All security artifacts are referenced from participant QoS XML via the standard 
 </domain_participant_qos>
 ```
 
-The `com.rti.serv.secure.cryptography.max_receiver_specific_macs` property is required **only** for participants on domains where `_WITH_ORIGIN_AUTHENTICATION` governance rules apply (`control`-tag topics on the Procedure domain). Participants that do not participate in origin-authenticated topics (e.g., hospital-dashboard, resource-sim) may omit this property.
+The `com.rti.serv.secure.cryptography.max_receiver_specific_macs` property is required **only** for participants on domains where `_WITH_ORIGIN_AUTHENTICATION` governance rules apply (`control`-tag topics on the Procedure DDS domain). Participants that do not participate in origin-authenticated topics (e.g., hospital-dashboard, resource-sim) may omit this property.
 
 The `${MEDTECH_SECURITY_DIR}` environment variable points to `interfaces/security/` in the install tree. `setup.bash` exports this variable alongside the existing `MEDTECH_CONFIG_DIR` and `NDDS_QOS_PROFILES`.
 
@@ -695,9 +695,9 @@ interfaces/security/
 ├── crl/
 │   └── crl.pem                      # Certificate Revocation List
 ├── psk/
-│   ├── procedure_domain_psk.txt     # Primary PSK passphrase (Procedure domain)
+│   ├── procedure_domain_psk.txt     # Primary PSK passphrase (Procedure DDS domain)
 │   ├── procedure_domain_psk_extra.txt  # Transition PSK (rotation only)
-│   ├── hospital_domain_psk.txt      # Primary PSK passphrase (Hospital domain)
+│   ├── hospital_domain_psk.txt      # Primary PSK passphrase (Hospital Integration databus)
 │   └── hospital_domain_psk_extra.txt   # Transition PSK (rotation only)
 ├── governance/
 │   ├── Governance_Procedure.xml
@@ -874,8 +874,8 @@ install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/permissions/
 | `clinical`-tag metadata protection | `ENCRYPT` |
 | `operational`-tag data protection | `SIGN` |
 | `operational`-tag metadata protection | `SIGN` |
-| Hospital domain data protection | `ENCRYPT` |
-| Hospital domain metadata protection | `ENCRYPT` |
+| Hospital Integration databus data protection | `ENCRYPT` |
+| Hospital Integration databus metadata protection | `ENCRYPT` |
 | Discovery protection (Procedure, Hospital) | `ENCRYPT` |
 | Discovery protection (Observability) | `SIGN` |
 | Observability domain data protection | `ENCRYPT` |

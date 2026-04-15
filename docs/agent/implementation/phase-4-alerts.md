@@ -14,7 +14,7 @@
 > **Parallelism note:** Steps 4.1–4.3 (ClinicalAlerts engine skeleton, risk scoring, alert generation)
 > do not require Routing Service and can proceed independently of Phase 3 Step 3.1.
 > Step 4.4 onward requires Phase 3 Step 3.1 to be complete (Routing Service running and
-> bridging Procedure → Hospital domain topics).
+> bridging Procedure → Hospital Integration databus topics).
 
 ---
 
@@ -23,15 +23,15 @@
 ### Work
 
 - Create ClinicalAlerts engine application (Python) in `modules/clinical-alerts/`
-- Implement DomainParticipant on the Hospital domain
+- Implement DomainParticipant on the Hospital Integration databus
 - QoS is loaded automatically via the default QosProvider (`NDDS_QOS_PROFILES`)
-- Subscribe to `PatientVitals` and `ProcedureContext` (bridged from the Procedure domain via Routing Service)
-- Publish `RiskScore` and `ClinicalAlert` on the Hospital domain
+- Subscribe to `PatientVitals` and `ProcedureContext` (bridged from the Procedure databuses via Routing Service)
+- Publish `RiskScore` and `ClinicalAlert` on the Hospital Integration databus
 - Configuration loading: read risk thresholds and alert rules from config file (YAML or JSON)
 
 ### Test Gate
 
-- [ ] ClinicalAlerts engine starts and creates DDS participant on the Hospital domain
+- [ ] ClinicalAlerts engine starts and creates DDS participant on the Hospital Integration databus
 - [ ] Engine subscribes to vitals and procedure context
 - [ ] Engine creates publishers for `RiskScore` and `ClinicalAlert`
 - [ ] Configuration file is loaded and thresholds are applied
@@ -86,7 +86,7 @@
 
 - Verify ClinicalAlerts engine receives vitals and context via Routing Service
 - Implement content-filtered topic for patient-set narrowing
-- Verify end-to-end flow: bedside monitor → Procedure domain → Routing Service → Hospital domain → ClinicalAlerts engine
+- Verify end-to-end flow: bedside monitor → Procedure databuses → Routing Service → Hospital Integration databus → ClinicalAlerts engine
 
 ### Test Gate (spec: clinical-alerts.md — Cross-Domain Subscription)
 
@@ -159,7 +159,7 @@
 
 - Run the performance benchmark harness with the complete V1.0.0 Docker Compose environment (2 surgical instances + Routing Service + Dashboard + ClinicalAlerts engine + observability stack): `python tests/performance/benchmark.py --record --phase phase-4`
 - Compare against the Phase 3 baseline — verify no regressions from adding the ClinicalAlerts engine
-- The ClinicalAlerts engine adds Hospital domain subscribers and publishers (`RiskScore`, `ClinicalAlert`); verify participant count and endpoint count changes are reflected
+- The ClinicalAlerts engine adds Hospital Integration databus subscribers and publishers (`RiskScore`, `ClinicalAlert`); verify participant count and endpoint count changes are reflected
 - If `R1` or `R2` differ from Phase 3 baseline (expected — new participants), verify the change is justified and record the updated baseline
 - Commit `tests/performance/baselines/phase-4.json` alongside the Phase 4 completion commit
 - Also record the V1.0.0 release baseline: `python tests/performance/benchmark.py --record --phase v1.0.0`

@@ -2,7 +2,7 @@
 
 Behavioral specifications for the facility-wide NiceGUI web dashboard that provides hospital-level situational awareness. The primary view organizes information by **room** — each active room is displayed as a summary card with deployment status, procedure indicator, and aggregate metrics. Users drill into room-specific views (controller, digital twin, etc.) by opening the room's GUI in a **new browser tab** (room GUIs are served by per-room containers, not the hospital container).
 
-The dashboard subscribes to the Hospital domain (Domain 20). All room data arrives via Routing Service from the Procedure and Orchestration domains. Room discovery uses RS-bridged `ServiceCatalog` from Domain 11.
+The dashboard subscribes to the Hospital Integration databus (Hospital Integration databus). All room data arrives via Routing Service from the Procedure and Orchestration databuss. Room discovery uses RS-bridged `ServiceCatalog` from the Orchestration databus.
 
 ---
 
@@ -10,7 +10,7 @@ The dashboard subscribes to the Hospital domain (Domain 20). All room data arriv
 
 | Requirement | Value |
 |-------------|-------|
-| Room discovery source | RS-bridged `ServiceCatalog` from Domain 11 via per-room MedtechBridge — `room_id` and `gui_url` properties |
+| Room discovery source | RS-bridged `ServiceCatalog` from the Orchestration databus via per-room MedtechBridge — `room_id` and `gui_url` properties |
 | Cross-plane navigation icon | `open_in_new` (Material Icons) on all links that open a new browser tab |
 | New CRITICAL alert maximum display latency | ≤ 2 s from DDS publication |
 | Vitals HR warning color threshold | HR > 100 bpm (yellow/amber) |
@@ -31,7 +31,7 @@ The dashboard subscribes to the Hospital domain (Domain 20). All room data arriv
 
 ### Scenario: Dashboard displays discovered rooms as cards `@e2e` `@gui`
 
-**Given** the hospital dashboard is running and subscribed to RS-bridged `ServiceCatalog` on the Hospital domain
+**Given** the hospital dashboard is running and subscribed to RS-bridged `ServiceCatalog` on the Hospital Integration databus
 **And** two rooms have active Service Hosts (OR-1 and OR-3)
 **When** `ServiceCatalog` samples with `room_id` properties arrive via Routing Service
 **Then** the dashboard displays a room card for each discovered room
@@ -100,7 +100,7 @@ The dashboard subscribes to the Hospital domain (Domain 20). All room data arriv
 
 ### Scenario: Dashboard displays all active procedures `@e2e` `@gui`
 
-**Given** the hospital dashboard is running and subscribed to `ProcedureStatus` on the Hospital domain
+**Given** the hospital dashboard is running and subscribed to `ProcedureStatus` on the Hospital Integration databus
 **And** two surgical procedure instances are active (OR-1 and OR-3)
 **When** both procedures publish `ProcedureStatus` via Routing Service
 **Then** the dashboard displays both procedures in the procedure list
@@ -125,9 +125,9 @@ The dashboard subscribes to the Hospital domain (Domain 20). All room data arriv
 
 ### Scenario: Dashboard shows summarized vitals per procedure `@e2e` `@gui`
 
-**Given** the dashboard is subscribed to vitals summary data on the Hospital domain
+**Given** the dashboard is subscribed to vitals summary data on the Hospital Integration databus
 **And** two procedures are active with patients
-**When** vitals data is bridged from the Procedure domain via Routing Service
+**When** vitals data is bridged from the Procedure databuses via Routing Service
 **Then** each procedure row in the dashboard shows current HR, SpO2, and BP for its patient
 
 ### Scenario: Vitals are color-coded by severity `@e2e` `@gui`
@@ -141,7 +141,7 @@ The dashboard subscribes to the Hospital domain (Domain 20). All room data arriv
 ### Scenario: Dashboard receives vitals on startup via durability `@e2e` `@durability`
 
 **Given** surgical procedures have been publishing vitals for several minutes
-**When** the hospital dashboard starts and joins the Hospital domain
+**When** the hospital dashboard starts and joins the Hospital Integration databus
 **Then** the dashboard immediately displays current vitals for all active patients
 **And** does not show a blank or "waiting for data" state for already-active procedures
 
@@ -151,7 +151,7 @@ The dashboard subscribes to the Hospital domain (Domain 20). All room data arriv
 
 ### Scenario: Alerts from all ORs appear in unified alert feed `@e2e` `@gui`
 
-**Given** the dashboard is subscribed to `ClinicalAlert` on the Hospital domain
+**Given** the dashboard is subscribed to `ClinicalAlert` on the Hospital Integration databus
 **When** alerts are generated for patients in OR-1 and OR-3
 **Then** all alerts appear in the centralized alert feed
 **And** each alert shows severity, category, room, patient, and message
@@ -172,7 +172,7 @@ The dashboard subscribes to the Hospital domain (Domain 20). All room data arriv
 ### Scenario: New alerts appear in real-time `@e2e` `@gui`
 
 **Given** the dashboard alert feed is visible
-**When** a new CRITICAL alert is published on the Hospital domain
+**When** a new CRITICAL alert is published on the Hospital Integration databus
 **Then** the alert appears in the feed within 2 seconds of publication
 **And** the new alert is visually distinguished (e.g., highlight, animation)
 
@@ -182,7 +182,7 @@ The dashboard subscribes to the Hospital domain (Domain 20). All room data arriv
 
 ### Scenario: Dashboard shows robot state per OR `@e2e` `@gui`
 
-**Given** the dashboard receives `RobotState` (read-only, bridged from the Procedure domain (`control` tag) via Routing Service)
+**Given** the dashboard receives `RobotState` (read-only, bridged from the Procedure control databus via Routing Service)
 **When** a robot in OR-3 is in OPERATIONAL mode
 **Then** the dashboard shows OR-3's robot status as "Operational" with a green indicator
 
@@ -205,7 +205,7 @@ The dashboard subscribes to the Hospital domain (Domain 20). All room data arriv
 
 ### Scenario: Dashboard displays current resource availability `@e2e` `@gui`
 
-**Given** the hospital dashboard is subscribed to `ResourceAvailability` on the Hospital domain
+**Given** the hospital dashboard is subscribed to `ResourceAvailability` on the Hospital Integration databus
 **And** the resource status simulator is publishing availability for ORs, beds, and staff
 **When** the dashboard is running
 **Then** the dashboard displays a resource panel showing each resource's name, kind, availability status, and location
@@ -219,7 +219,7 @@ The dashboard subscribes to the Hospital domain (Domain 20). All room data arriv
 ### Scenario: Dashboard receives resource state on startup via durability `@e2e` `@durability`
 
 **Given** the resource status simulator has been publishing `ResourceAvailability` with TRANSIENT_LOCAL durability
-**When** the hospital dashboard starts and joins the Hospital domain
+**When** the hospital dashboard starts and joins the Hospital Integration databus
 **Then** the dashboard immediately displays current resource availability for all published resources
 
 ---
@@ -248,7 +248,7 @@ The dashboard subscribes to the Hospital domain (Domain 20). All room data arriv
 
 ### Scenario: Dashboard reaches operational state within time budget `@e2e` `@performance`
 
-**Given** the Hospital domain, Routing Service bridge, and all active procedure instances are running
+**Given** the Hospital Integration databus, Routing Service bridge, and all active procedure instances are running
 **When** the hospital dashboard process starts
 **Then** all DomainParticipant endpoints have matched within 15 s of start
 **And** current `ProcedureStatus`, `PatientVitals`, `ClinicalAlert`, and `RobotState` data is displayed within 15 s (received via TRANSIENT_LOCAL durability or active bridging)

@@ -13,7 +13,7 @@ the Procedure Controller and digital twin display.
 - [vision/capabilities.md — V1.2.0](../vision/capabilities.md)
 - [vision/data-model.md — `Surgery::RobotArmAssignment`](../vision/data-model.md)
 - [vision/data-model.md — `ArmAssignmentState`, `TablePosition`, `MAX_ARM_COUNT`](../vision/data-model.md)
-- [vision/data-model.md — Domain 11 DomainParticipant partition scheme](../vision/data-model.md)
+- [vision/data-model.md — the Orchestration databus DomainParticipant partition scheme](../vision/data-model.md)
 - [vision/data-model.md — Well-known `ServiceCatalog` property keys](../vision/data-model.md)
 - [vision/system-architecture.md — Procedure Controller participant model](../vision/system-architecture.md)
 - [vision/system-architecture.md — Orchestration Partition Strategy](../vision/system-architecture.md)
@@ -35,23 +35,23 @@ complete before Step 20.4.
 
 #### Tier partitions (all service hosts + Procedure Controller)
 
-- Set DomainParticipant partition `procedure` on the Orchestration domain
+- Set DomainParticipant partition `procedure` on the Orchestration databus
   participant for **all** service hosts at startup, immediately after
   `create_participant_from_config()` and before `enable()`:
   - `RobotServiceHost` (C++)
   - `ClinicalServiceHost`, `OperationalServiceHost`, `OperatorServiceHost`
     (Python)
 - Set DomainParticipant partition `procedure` on the Procedure Controller's
-  Orchestration domain participant at startup
+  Orchestration databus participant at startup
 - No partition changes at runtime — tier is a static deployment-time property
 - Remove any existing test assertions that check for `room/OR-1` or
-  `room/OR-3` partition isolation on the Orchestration domain; replace with
+  `room/OR-3` partition isolation on the Orchestration databus; replace with
   the tier-level isolation check (see Test Gate below)
 
 #### `room_id` in ServiceCatalog (static host context)
 
 - Each service host reads its `ROOM_ID` environment variable (already
-  available — used today for the Hospital domain participant) and, for
+  available — used today for the Hospital Integration databus participant) and, for
   each `ServiceCatalog` instance it publishes, includes a `PropertyDescriptor`
   with `name = "room_id"` and `current_value = <room_id>`
 - The property is published with the initial `ServiceCatalog` write at
@@ -103,9 +103,9 @@ complete before Step 20.4.
 
 ### Test Gate
 
-- [x] All service host Orchestration domain participants start with
+- [x] All service host Orchestration databus participants start with
       DomainParticipant partition `procedure`
-- [x] Procedure Controller Orchestration domain participant starts with
+- [x] Procedure Controller Orchestration databus participant starts with
       DomainParticipant partition `procedure`
 - [x] A participant with DomainParticipant partition `facility` does NOT
       discover any `procedure`-tier service host or the Procedure Controller
@@ -190,7 +190,7 @@ complete before Step 20.4.
 
 - Add a new participant profile `Participant::ProcedureController_ProcedureControl`
   to `interfaces/participants/Participants.xml`:
-  - Domain: Procedure domain (Domain 10)
+  - Domain: Procedure DDS domain
   - Domain tag: `control`
   - Contained entities: `RobotArmAssignment` DataReader
   - Same transport profile as other `control`-tag participants
@@ -199,9 +199,9 @@ complete before Step 20.4.
   [dds-consistency.md §1 Step 2](../vision/dds-consistency.md)
 - Update the Procedure Controller's startup sequence to create 3
   DomainParticipants:
-  1. Orchestration domain (existing)
-  2. Procedure domain `control` tag (new)
-  3. Hospital domain (existing)
+  1. Orchestration databus (existing)
+  2. Procedure control databus (new)
+  3. Hospital Integration databus (existing)
 - Verify the new participant discovers `control`-tag publishers but not
   `clinical`/`operational`-tag publishers
 
@@ -221,7 +221,7 @@ complete before Step 20.4.
 ### Work
 
 - Extend the robot arm service (C++ `RobotControllerService`) to publish
-  `RobotArmAssignment` on the Procedure domain `control` tag:
+  `RobotArmAssignment` on the Procedure control databus:
   - Accept `table_position` as a configuration parameter (passed from
     Service Host via `start_service` RPC config)
   - On startup: publish `RobotArmAssignment(status = ASSIGNED, table_position = <configured>)`
@@ -352,8 +352,8 @@ complete before Step 20.4.
 - Author `@isolation` tests:
   - `RobotArmAssignment` on `control` tag is NOT discoverable by
     `clinical` or `operational` tag subscribers
-  - Orchestration domain failure does not disrupt `RobotArmAssignment`
-    data flow on the Procedure domain
+  - Orchestration databus failure does not disrupt `RobotArmAssignment`
+    data flow on the Procedure DDS domain
 - Author correlation tests:
   - `robot_id` correlates `RobotArmAssignment` with `RobotState` and
     `RobotCommand`

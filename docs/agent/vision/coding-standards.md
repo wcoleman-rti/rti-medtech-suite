@@ -784,7 +784,7 @@ pytestmark = [
 ]
 ```
 
-Domain 10 tests are safe for parallel execution because domain tags
+the Procedure DDS domain tests are safe for parallel execution because domain tags
 (`clinical`, `operational`, `control`) provide partition-level
 isolation. Tests on domain 0 or unique domains are also safe.
 

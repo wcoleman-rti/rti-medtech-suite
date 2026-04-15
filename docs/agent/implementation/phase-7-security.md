@@ -37,13 +37,13 @@
 
 **Work:** Author the three governance XML files and sign them with the Permissions CA.
 
-1. **Author `Governance_Procedure.xml`.** Implement the Procedure domain governance from [vision/security.md — Procedure Domain Governance](../vision/security.md#procedure-domain-governance). **This file must contain three separate `<domain_rule>` entries** — one per domain tag (`control`, `clinical`, `operational`) — because `topic_access_rules` within a single `domain_rule` cannot differentiate protection by domain tag. Each `domain_rule` selects its tag via `<tag>` and contains the tag-appropriate `topic_access_rules`:
+1. **Author `Governance_Procedure.xml`.** Implement the Procedure DDS domain governance from [vision/security.md — Procedure Domain Governance](../vision/security.md#procedure-domain-governance). **This file must contain three separate `<domain_rule>` entries** — one per domain tag (`control`, `clinical`, `operational`) — because `topic_access_rules` within a single `domain_rule` cannot differentiate protection by domain tag. Each `domain_rule` selects its tag via `<tag>` and contains the tag-appropriate `topic_access_rules`:
    - Shared domain-level settings (all three rules): `allow_unauthenticated_participants=FALSE`, `enable_join_access_control=TRUE`, `discovery_protection_kind=ENCRYPT`, `liveliness_protection_kind=SIGN`, `rtps_protection_kind=SIGN`, `rtps_psk_protection_kind=SIGN`, `enable_key_revision=TRUE`
    - `control` tag rule: `ENCRYPT` data / `ENCRYPT_WITH_ORIGIN_AUTHENTICATION` metadata
    - `clinical` tag rule: `ENCRYPT` / `ENCRYPT`
    - `operational` tag rule: `SIGN` / `SIGN`
    - All topic rules: `enable_discovery_protection=TRUE`, `enable_read_access_control=TRUE`, `enable_write_access_control=TRUE`
-2. **Author `Governance_Hospital.xml`.** Implement the Hospital domain governance table from [vision/security.md — Hospital Domain Governance](../vision/security.md#hospital-domain-governance). Include `enable_key_revision=TRUE`.
+2. **Author `Governance_Hospital.xml`.** Implement the Hospital Integration databus governance table from [vision/security.md — Hospital Domain Governance](../vision/security.md#hospital-domain-governance). Include `enable_key_revision=TRUE`.
 3. **Author `Governance_Observability.xml`.** Implement the Observability domain governance table from [vision/security.md — Observability Domain Governance](../vision/security.md#observability-domain-governance). Include `enable_key_revision=TRUE`.
 4. **Wire CMake signing for governance.**** Add `interfaces/security/CMakeLists.txt` with `add_custom_command` targets that call `openssl smime -sign` on each governance XML, as described in [vision/security.md — PKCS#7 Signing — CMake + OpenSSL](../vision/security.md#pkcs7-signing--cmake--openssl). `find_package(OpenSSL)` must be called **after** `find_package(RTIConnextDDS)` to prefer the RTI-provided `FindOpenSSL.cmake` module, which can locate the OpenSSL bundled with the Connext host target installation.
 5. **Verify build-time signing.** Run `cmake --build` and confirm the `.p7s` files are produced in the build tree. Edit a governance XML and rebuild — the `.p7s` must regenerate.
@@ -109,13 +109,13 @@
    - Each references the governance document for its domain
    - All share the `routing-service` identity certificate
 2. **Verify one-way bridge enforcement.** Routing Service can subscribe on Procedure and publish on Hospital, but cannot publish on Procedure or subscribe on Hospital.
-3. **Verify secure-to-secure relay.** Data is decrypted from Procedure domain, re-encrypted for Hospital domain.
+3. **Verify secure-to-secure relay.** Data is decrypted from Procedure DDS domain, re-encrypted for Hospital Integration databus.
 
 **Test gate:**
-- [ ] `routing-service` authenticates on both Procedure and Hospital domains
-- [ ] Bridged topics arrive correctly on Hospital domain
-- [ ] DataWriter creation on Procedure domain is denied for `routing-service`
-- [ ] DataReader creation on Hospital domain is denied for `routing-service`
+- [ ] `routing-service` authenticates on both Procedure and Hospital Integration databuss
+- [ ] Bridged topics arrive correctly on Hospital Integration databus
+- [ ] DataWriter creation on Procedure DDS domain is denied for `routing-service`
+- [ ] DataReader creation on Hospital Integration databus is denied for `routing-service`
 
 ---
 

@@ -238,7 +238,7 @@ integration, multi-client behavior, theming, and DDS event loop unification.
 ### Scenario: Discovered room appears as room card on dashboard `@gui` `@ui-modernization`
 
 **Given** the hospital dashboard Room Overview is displayed with no active rooms
-**When** a per-room Routing Service bridges a `ServiceCatalog` sample with `gui_url = "http://localhost:8091/controller/OR-3"` to Domain 20
+**When** a per-room Routing Service bridges a `ServiceCatalog` sample with `gui_url = "http://localhost:8091/controller/OR-3"` to the Hospital Integration databus
 **Then** a new room card appears in the Room Overview within 5 seconds
 **And** the card shows the room's `room_id` (e.g., "OR-3") and aggregated status
 

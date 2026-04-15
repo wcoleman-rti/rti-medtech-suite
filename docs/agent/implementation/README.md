@@ -42,7 +42,7 @@ Phase 1: Foundation
     │        └──► Phase 5: Procedure Orchestration + IDL Breaking Changes
     │                  (Foxglove translatability, Timestamp_t, ImageFormat enum)
     │                  Service interface, dual-mode services, Service Host,
-    │                  Procedure Controller, Orchestration domain, DDS RPC
+    │                  Procedure Controller, Orchestration databus, DDS RPC
     │                  │
     │                  ├──► Revision: Shared Package Consolidation
     │                  │        (depends on Phase 5 Steps 5.1–5.6;
@@ -143,7 +143,7 @@ If an implementation session is interrupted, use this checklist to resume:
 | [revision-dds-consistency.md](revision-dds-consistency.md) | DDS Consistency Alignment | Phase 1, Phase 2 Steps 2.1–2.2 | `app_names.idl` entity name constants, `dds_init.py` relocation, retrofit generated constants, architecture audit, expanded CI anti-pattern checks, `@consistency` spec tests |
 | [phase-2-surgical.md](phase-2-surgical.md) | Surgical Procedure | Phase 1, Revision | Robot sim, vitals sim (simulation model with scenario profiles), camera sim, procedure context, device telemetry (write-on-change), digital twin display, partition isolation, diagnostic tools (medtech-diag, partition-inspector) |
 | [revision-docker-build-workflow.md](revision-docker-build-workflow.md) | Docker Build Workflow | Phase 1 | Multi-stage Dockerfile, in-container compilation, compose update, CI Docker gates, doc guardrails |
-| [phase-5-orchestration.md](phase-5-orchestration.md) | Procedure Orchestration | Phase 2 | IDL breaking changes (Foxglove translatability: `Timestamp_t`, `ImageFormat` enum, `CameraFrame` streamlined), `medtech::Service` interface (C++ / Python ABC), dual-mode participant, Service Host framework (C++ and Python), Procedure Controller GUI (NiceGUI), Orchestration domain (Domain 11), `ServiceHostControl` DDS RPC, `ServiceCatalog` + `ServiceStatus` pub/sub, `@orchestration` test coverage |
+| [phase-5-orchestration.md](phase-5-orchestration.md) | Procedure Orchestration | Phase 2 | IDL breaking changes (Foxglove translatability: `Timestamp_t`, `ImageFormat` enum, `CameraFrame` streamlined), `medtech::Service` interface (C++ / Python ABC), dual-mode participant, Service Host framework (C++ and Python), Procedure Controller GUI (NiceGUI), Orchestration databus (Orchestration databus), `ServiceHostControl` DDS RPC, `ServiceCatalog` + `ServiceStatus` pub/sub, `@orchestration` test coverage |
 | [revision-shared-package-consolidation.md](revision-shared-package-consolidation.md) | Shared Package Consolidation | Phase 5 Steps 5.1–5.6 | Unify `medtech_dds_init`, `medtech_logging`, `medtech_gui` into single `medtech` namespace package; consolidate C++ include/src; update all imports and CMake rules |
 | [phase-3-dashboard.md](phase-3-dashboard.md) | Hospital Dashboard | Phase 5 | NiceGUI web application, Routing Service config, multi-OR aggregation, alert feed, robot status — services implement `medtech::Service` |
 | [phase-4-alerts.md](phase-4-alerts.md) | Clinical Alerts & Decision Support | Phase 5, Phase 3 Step 3.1 | Risk scoring engine, alert generation, cross-domain subscription, configurable thresholds — service implements `medtech::Service` |
@@ -160,7 +160,7 @@ After all V1.0.0 phases (1–5, plus 3–4) are complete, a **final regression g
 - [ ] All spec scenarios from all five phases pass simultaneously in the Docker Compose environment
 - [ ] All `@orchestration` spec scenarios pass
 - [ ] Procedure Controller discovers, starts, stops, and monitors services across all three Service Host types
-- [ ] Orchestration domain is fully isolated from Procedure and Hospital domains
+- [ ] Orchestration databus is fully isolated from Procedure and Hospital Integration databuss
 - [ ] No open incidents in `docs/agent/incidents.md`
 - [ ] All module/service READMEs pass markdownlint and section-order lint
 - [ ] Performance benchmark passes against the Phase 5 baseline
@@ -237,4 +237,4 @@ After all V1.0.0 phases (1–5, plus 3–4) are complete, a **final regression g
 | Phase 16: PACS / Imaging Gateway *(file not yet authored)* | Phase 6 | DICOM bridge sim, image metadata state, frame stream |
 | Phase 17: Inter-OR / WAN Bridging *(file not yet authored)* | Phases 1–7 | Routing Service WAN config, inter-facility domain bridging |
 | Phase 18: ClinicalAlerts High Availability *(file not yet authored)* | Phase 4 | Primary/backup ClinicalAlerts engine, Cloud Discovery Service HA, multi-segment discovery |
-| Phase 19: Cloud Command Center *(file not yet authored)* | Phase 17 | Cloud/Enterprise domain, WAN Routing Service (Real-Time WAN Transport — `UDPv4_WAN`), Connext Security Plugins on WAN, Cloud Discovery Service cross-site, Command Center dashboard, facility-level partitions, `FacilityStatus`/`AggregatedAlerts`/`ResourceUtilization`/`OperationalKPIs` topics |
+| Phase 19: Cloud Command Center *(file not yet authored)* | Phase 17 | Cloud/Cloud Enterprise databus, WAN Routing Service (Real-Time WAN Transport — `UDPv4_WAN`), Connext Security Plugins on WAN, Cloud Discovery Service cross-site, Command Center dashboard, facility-level partitions, `FacilityStatus`/`AggregatedAlerts`/`ResourceUtilization`/`OperationalKPIs` topics |

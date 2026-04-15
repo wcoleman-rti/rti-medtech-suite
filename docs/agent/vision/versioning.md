@@ -47,10 +47,10 @@ A version may only be cut when **all** of the following are true:
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|
 | Surgical Procedure (multi-instance) | Domain tags, domain partitions, `control`/`clinical`/`operational` QoS patterns, exclusive ownership failover |
-| Procedure Orchestration | DDS RPC, Orchestration domain, `medtech::Service` interface, dual-mode services, Service Host framework |
-| Hospital Dashboard (NiceGUI) | Hospital integration domain (Domain 20) subscription, TRANSIENT_LOCAL late-join, content-filtered topics, asyncio DDS integration |
+| Procedure Orchestration | DDS RPC, Orchestration databus, `medtech::Service` interface, dual-mode services, Service Host framework |
+| Hospital Dashboard (NiceGUI) | Hospital integration domain (Hospital Integration databus) subscription, TRANSIENT_LOCAL late-join, content-filtered topics, asyncio DDS integration |
 | Clinical Alerts & Decision Support | Risk scoring, alert generation, cross-domain subscription via Routing Service |
-| Routing Service | Per-room MedtechBridge: Domain 10+11 → Domain 20, selective topic bridging, multiple sessions by traffic class |
+| Routing Service | Per-room MedtechBridge: Procedure + Orchestration → Hospital Integration, selective topic bridging, multiple sessions by traffic class |
 | Cloud Discovery Service | Multicast-free discovery on `hospital-net` and `orchestration-net` |
 | CMake unified build | C++17, Python, rtiddsgen C++11/Python, `RTIConnextDDS::cpp2_api`, build-dir generated code |
 
@@ -62,7 +62,7 @@ A version may only be cut when **all** of the following are true:
 
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|
-| RTI Recording Service | Passive multi-domain capture of all DDS traffic (including Orchestration domain) |
+| RTI Recording Service | Passive multi-domain capture of all DDS traffic (including Orchestration databus) |
 | RTI Replay Service | Deterministic replay into subscriber applications |
 | Recording Service integration tests | `@recording` and `@replay` spec scenarios |
 
@@ -77,7 +77,7 @@ A version may only be cut when **all** of the following are true:
 | `RobotArmAssignment` topic | Write-on-change state with `dispose()` for instance removal, TRANSIENT_LOCAL for late-joining controllers |
 | Multi-arm lifecycle | Keyed instances per `robot_id`, liveliness-based arm health detection |
 | Table position assignment | Spatial assignment as DDS state data, correlated with `RobotState` via shared `robot_id` key |
-| Procedure Controller expansion | Room-level Orchestration-only participant (Domain 11) |
+| Procedure Controller expansion | Room-level Orchestration-only participant (Orchestration databus) |
 | Digital twin enhancement | Table layout visualization with per-arm status indicators |
 
 ---
@@ -181,7 +181,7 @@ capabilities.
 | ClinicalAlerts High Availability | Primary/backup ClinicalAlerts engine pair, automatic failover |
 | Multi-Segment Deployment | Per-segment ClinicalAlerts engine deployment; Cloud Discovery Service multi-initial-peer HA |
 | Cross-Platform Support | Windows, macOS, QNX build/runtime; platform-specific setup scripts; parameterized Connext architecture |
-| Cloud Command Center | Cloud/Enterprise domain (3rd databus layer); WAN Routing Service (Real-Time WAN Transport — `UDPv4_WAN`); Cloud Discovery Service for cross-site discovery; Connext Security Plugins on all WAN connections; Command Center dashboard; facility-level partitions; enterprise-wide aggregation; central Collector Service aggregating per-hospital Collectors → Prometheus → Grafana Loki → Grafana |
+| Cloud Command Center | Cloud/Cloud Enterprise databus (3rd databus layer); WAN Routing Service (Real-Time WAN Transport — `UDPv4_WAN`); Cloud Discovery Service for cross-site discovery; Connext Security Plugins on all WAN connections; Command Center dashboard; facility-level partitions; enterprise-wide aggregation; central Collector Service aggregating per-hospital Collectors → Prometheus → Grafana Loki → Grafana |
 | Connext Runtime MCP Server | Cloud-deployed MCP server querying per-hospital Collector Service instances; AI-agent-powered frontend for natural-language DDS system health queries, participant topology, QoS compliance, and cross-hospital diagnostics |
 
 ---

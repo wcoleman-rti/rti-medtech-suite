@@ -2,8 +2,8 @@
 
 **Goal:** Introduce the service-oriented orchestration layer: the
 `medtech::Service` interface, dual-mode participant pattern, Service Host
-framework, Procedure Controller GUI, and the Orchestration domain
-(Domain 11) with DDS RPC and pub/sub state distribution.
+framework, Procedure Controller GUI, and the Orchestration databus
+(Orchestration databus) with DDS RPC and pub/sub state distribution.
 
 **Depends on:** Phases 1–2 (Foundation + Surgical Procedure complete)
 **Blocks:** Phase 3 (Hospital Dashboard), Phase 4 (Clinical Alerts)
@@ -12,7 +12,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 **Vision references:**
 - [vision/capabilities.md — V1.0.0](../vision/capabilities.md)
 - [vision/system-architecture.md — Orchestration Domain](../vision/system-architecture.md)
-- [vision/data-model.md — Domain 11](../vision/data-model.md)
+- [vision/data-model.md — the Orchestration databus](../vision/data-model.md)
 - [vision/dds-consistency.md — §3 Service Interface, Dual-Mode Participant](../vision/dds-consistency.md)
 - [vision/coding-standards.md](../vision/coding-standards.md)
 
@@ -36,13 +36,13 @@ framework, Procedure Controller GUI, and the Orchestration domain
   - `HealthReport` struct: alive flag, summary, diagnostics
   - `@service("DDS") interface ServiceHostControl`: `start_service`, `stop_service`, `update_service`, `get_capabilities`, `get_health`
 - Add `connextdds_rtiddsgen_run()` calls for C++11 and Python code generation of the orchestration IDL
-- Add Domain 11 definition to `interfaces/domains/Domains.xml` with no domain tag
+- Add the Orchestration databus definition to `interfaces/domains/RoomDatabuses.xml;interfaces/domains/HospitalDatabuses.xml;interfaces/domains/CloudDatabuses.xml` with no domain tag
 - Author `Pattern.RPC` QoS profile in `interfaces/qos/Patterns.xml`: RELIABLE, KEEP_ALL, appropriate history depth
 - Author `Pattern.Status` QoS profile (if not already covered by existing `Patterns::State`): TRANSIENT_LOCAL, RELIABLE, KEEP_LAST 1, liveliness 2 s
 - Author topic-specific profiles for `ServiceCatalog` and `ServiceStatus` in `interfaces/qos/TopicProfiles.xml` inheriting from the appropriate pattern
 - Add orchestration participant profiles to `interfaces/participants/Participants.xml`:
-  - `Participant::Orchestration` — Domain 11, no domain tag, with contained entities for `ServiceCatalog` writer/reader, `ServiceStatus` writer/reader, and `ServiceHostControl` RPC endpoints
-  - `Participant::ProcedureController_Orchestration` — controller's Orchestration domain participant (RPC client + status subscriber)
+  - `Participant::Orchestration` — the Orchestration databus, no domain tag, with contained entities for `ServiceCatalog` writer/reader, `ServiceStatus` writer/reader, and `ServiceHostControl` RPC endpoints
+  - `Participant::ProcedureController_Orchestration` — controller's Orchestration databus participant (RPC client + status subscriber)
   - ~~`Participant::ProcedureController_Hospital`~~ — *removed by `revision-domain-id-migration`; controller is Orchestration-only per system-architecture.md*
 - Add orchestration entity name constants to `interfaces/idl/app_names/app_names.idl` per the naming convention in [dds-consistency.md §1 Step 2](../vision/dds-consistency.md)
 - Verify generated code compiles (C++) and imports (Python)
@@ -52,7 +52,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - [x] `cmake --build build` succeeds with orchestration IDL generated
 - [x] C++ can `#include <orchestration/Orchestration.hpp>` and reference `Orchestration::ServiceState`
 - [x] Python can `from orchestration import Orchestration` and reference all enum values
-- [x] Domain 11 is present in the installed `Domains.xml`
+- [x] the Orchestration databus is present in the installed `Domains.xml`
 - [x] `Pattern.RPC` and orchestration topic profiles are present in installed QoS XML
 - [x] QoS compatibility checker (`tools/qos-checker.py`) passes with the new profiles
 - [x] `bash scripts/ci.sh --lint` passes
@@ -154,9 +154,9 @@ framework, Procedure Controller GUI, and the Orchestration domain
 ### Work
 
 - Author the Robot Service Host (`modules/surgical-procedure/src/robot_service_host.cpp`):
-  - Creates an Orchestration domain participant from `Participant::Orchestration` XML config
-  - Creates a Procedure domain `control`-tag participant for the hosted `RobotController`
-  - Registers `ServiceHostControl/<host_id>` RPC service on the Orchestration domain
+  - Creates an Orchestration databus participant from `Participant::Orchestration` XML config
+  - Creates a Procedure control databus participant for the hosted `RobotController`
+  - Registers `ServiceHostControl/<host_id>` RPC service on the Orchestration databus
   - Publishes `ServiceCatalog` (TRANSIENT_LOCAL, liveliness 2 s)
   - Polls `RobotController::state()` and publishes `ServiceStatus` (write-on-change)
   - Implements `start_service`: constructs `RobotController` in hosted mode, spawns `run()` on a dedicated thread
@@ -169,7 +169,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 ### Test Gate
 
-- [x] Robot Service Host starts and publishes `ServiceCatalog` on the Orchestration domain
+- [x] Robot Service Host starts and publishes `ServiceCatalog` on the Orchestration databus
 - [x] `ServiceHostControl` RPC is addressable at `ServiceHostControl/<host_id>`
 - [x] `start_service` RPC creates and starts `RobotController` in hosted mode
 - [x] `ServiceStatus` transitions (`STOPPED` → `STARTING` → `RUNNING`) are published
@@ -177,7 +177,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - [x] `ALREADY_RUNNING` returned on duplicate start
 - [x] `NOT_RUNNING` returned on stopping a non-running service
 - [x] Liveliness lost detected when Service Host process is killed (within 2 s)
-- [x] Orchestration domain is isolated from Procedure domain (no cross-domain discovery)
+- [x] Orchestration databus is isolated from Procedure DDS domain (no cross-domain discovery)
 - [x] `bash scripts/ci.sh` passes
 
 ---
@@ -217,13 +217,13 @@ framework, Procedure Controller GUI, and the Orchestration domain
 ### Work
 
 - Author the Procedure Controller NiceGUI application (`modules/hospital-dashboard/procedure_controller/controller.py`):
-  - Creates one participant on the Orchestration domain (`Participant::ProcedureController_Orchestration`)
-  - ~~Creates one participant on the Hospital domain~~ — *removed by `revision-domain-id-migration`; replaced by Domain 10 operational read*
-  - Subscribes to `ServiceCatalog` and `ServiceStatus` on the Orchestration domain
+  - Creates one participant on the Orchestration databus (`Participant::ProcedureController_Orchestration`)
+  - ~~Creates one participant on the Hospital Integration databus~~ — *removed by `revision-domain-id-migration`; replaced by the Procedure DDS domain operational read*
+  - Subscribes to `ServiceCatalog` and `ServiceStatus` on the Orchestration databus
   - Displays available Service Hosts and their service states
   - Provides UI controls to: select a host, start a service, stop a service, view capabilities/health
   - Issues RPC commands via `ServiceHostControl` client stubs
-  - Reads procedure context from the Procedure domain (`operational` tag, read-only — per `revision-domain-id-migration`)
+  - Reads procedure context from the Procedure databuses (`operational` tag, read-only — per `revision-domain-id-migration`)
   - Uses `background_tasks.create()` / asyncio for DDS data reception per [dds-consistency.md §5](../vision/dds-consistency.md)
   - Writes on the asyncio event loop use `NonBlockingWrite` QoS snippet per vision policy
 - Apply shared GUI design standard: RTI Blue header, Roboto fonts, NiceGUI theme
@@ -235,9 +235,9 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - [x] Procedure Controller displays service states (ServiceStatus rendered)
 - [x] `start_service` RPC issued from GUI results in service starting on target host
 - [x] `stop_service` RPC issued from GUI results in service stopping
-- [x] ~~Controller is read-only on Hospital domain~~ — *superseded by `revision-domain-id-migration` (controller drops Hospital participant entirely)*
+- [x] ~~Controller is read-only on Hospital Integration databus~~ — *superseded by `revision-domain-id-migration` (controller drops Hospital participant entirely)*
 - [x] Controller restart reconstructs state from TRANSIENT_LOCAL (within 15 s)
-- [x] ~~Controller does not join Procedure domain~~ — *superseded by `revision-domain-id-migration` (controller gains a Domain 10 operational read participant)*
+- [x] ~~Controller does not join Procedure DDS domain~~ — *superseded by `revision-domain-id-migration` (controller gains a the Procedure DDS domain operational read participant)*
 - [x] GUI remains responsive during concurrent data arrival
 - [x] `bash scripts/ci.sh` passes
 
@@ -254,18 +254,18 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - Author integration tests covering the full lifecycle:
   1. Controller discovers all four Service Hosts
   2. Controller starts services on each host via RPC
-  3. Services reach `RUNNING` state, surgical data flows on Procedure domain
+  3. Services reach `RUNNING` state, surgical data flows on Procedure DDS domain
   4. Controller stops services; state returns to `STOPPED`
   5. Controller restarts and reconstructs state from TRANSIENT_LOCAL
   6. Service Host crash: controller detects liveliness loss
-  7. Orchestration failure does not disrupt running Procedure domain data
+  7. Orchestration failure does not disrupt running Procedure DDS domain data
 - Verify all existing V1.0 scenarios still pass in standalone mode alongside the new orchestration deployment
 - Verify all `@orchestration` spec scenarios pass
 - **`@acceptance` test (Rule 8):** Author an acceptance test that exercises
   the orchestrated surgical workflow end-to-end:
   1. Procedure Controller starts all services on all hosts via RPC
   2. Operator Console sends a robot command → RobotController moves → RobotState updates
-  3. BedsideMonitor publishes vitals → subscriber receives on Procedure domain
+  3. BedsideMonitor publishes vitals → subscriber receives on Procedure DDS domain
   4. Procedure Controller stops all services → all states return to STOPPED
   - The test must fail if any component is missing or non-functional.
 - **`@acceptance` test (Phase 2 retroactive — Rule 8):** Author an acceptance
@@ -282,7 +282,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 - [x] Full Docker Compose orchestration scenario runs end-to-end
 - [x] All `@orchestration` spec scenarios pass
 - [x] All V1.0 spec scenarios pass (zero regressions)
-- [x] Orchestration domain isolation verified (no cross-domain data leakage)
+- [x] Orchestration databus isolation verified (no cross-domain data leakage)
 - [x] Service Host crash → liveliness lost detected within 2 s
 - [x] Procedure Controller crash → surgical data unaffected
 - [x] `@acceptance` orchestration workflow test passes
@@ -297,7 +297,7 @@ framework, Procedure Controller GUI, and the Orchestration domain
 
 - Author `modules/surgical-procedure/README.md` updates (or new Service Host READMEs) per [vision/documentation.md](../vision/documentation.md):
   - Required seven sections (Overview, Quick Start, Architecture, Configuration Reference, Testing, Going Further)
-  - DDS Entities table documenting all Orchestration domain participants, writers, readers, RPC endpoints
+  - DDS Entities table documenting all Orchestration databus participants, writers, readers, RPC endpoints
   - Threading model description for each Service Host type
   - Environment Variables table
 - Update project root `README.md` if needed to reference V1.0 orchestration capabilities
@@ -326,7 +326,7 @@ contribution to that gate:
 - [x] All V1.0 spec scenarios from Phases 1–2 still pass (no regressions)
 - [x] Full Docker Compose environment runs end-to-end: standalone deployment + orchestrated deployment
 - [x] Procedure Controller discovers, starts, stops, and monitors services across all three Service Host types
-- [x] Orchestration domain is fully isolated from Procedure and Hospital domains
+- [x] Orchestration databus is fully isolated from Procedure and Hospital Integration databuss
 - [x] All module READMEs pass lint
 - [x] Performance benchmark passes against Phase 5 baseline
 - [ ] No open incidents in `docs/agent/incidents.md` *(INC-041, INC-042 remain open — Phase 2 discovery issues, not Phase 5 blockers)*

@@ -43,26 +43,26 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 
 ---
 
-## Robot Teleop & Control (Procedure domain — `control` tag)
+## Robot Teleop & Control (Procedure DDS domain — `control` tag)
 
 ### Scenario: Operator input reaches robot controller within deadline `@integration` `@streaming`
 
-**Given** an operator console publishing `OperatorInput` on the Procedure domain (`control` tag) with the `TopicProfiles::OperatorInput` QoS profile (Stream pattern + DeadlineOperatorInput + LifespanOperatorInput)
-**And** a robot controller subscribing to `OperatorInput` on the Procedure domain (`control` tag) in the same partition with the same `TopicProfiles::OperatorInput` QoS profile
+**Given** an operator console publishing `OperatorInput` on the Procedure control databus with the `TopicProfiles::OperatorInput` QoS profile (Stream pattern + DeadlineOperatorInput + LifespanOperatorInput)
+**And** a robot controller subscribing to `OperatorInput` on the Procedure control databus in the same partition with the same `TopicProfiles::OperatorInput` QoS profile
 **When** the operator publishes a control input sample
 **Then** the robot controller receives the sample within 4 ms of publication
 **And** the 4 ms threshold is enforced by DDS Deadline QoS (not only measured by the test harness) — a `REQUESTED_DEADLINE_MISSED` status on the reader indicates a stream interruption
 
 ### Scenario: Robot state is published at configured rate `@integration`
 
-**Given** a robot controller publishing `RobotState` on the Procedure domain (`control` tag) with `State` QoS
+**Given** a robot controller publishing `RobotState` on the Procedure control databus with `State` QoS
 **When** the robot is operational
 **Then** `RobotState` samples are published at 100 Hz (one sample every 10 ms)
 **And** each sample contains the current joint positions, operational mode, and error state
 
 ### Scenario: Safety interlock halts robot on violation `@integration`
 
-**Given** a robot controller subscribed to `SafetyInterlock` on the Procedure domain (`control` tag)
+**Given** a robot controller subscribed to `SafetyInterlock` on the Procedure control databus
 **And** the robot is in operational mode
 **When** a `SafetyInterlock` sample with `interlock_active = true` is received
 **Then** the robot transitions to a safe-stopped state within 40 ms of receiving the interlock sample
@@ -83,18 +83,18 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 
 ---
 
-## Patient Vitals (Procedure domain — `clinical` tag)
+## Patient Vitals (Procedure DDS domain — `clinical` tag)
 
 ### Scenario: Vitals snapshot is published periodically `@integration`
 
-**Given** a bedside monitor simulator publishing `PatientVitals` on the Procedure domain (`clinical` tag) with `State` QoS
+**Given** a bedside monitor simulator publishing `PatientVitals` on the Procedure clinical databus with `State` QoS
 **When** the simulation is running
 **Then** `PatientVitals` samples are published at 1 Hz (one sample per second)
 **And** each sample contains measurements for HR, SpO2, BP, temperature, and respiratory rate
 
 ### Scenario: Waveform data streams at configured frequency `@integration` `@streaming`
 
-**Given** a bedside monitor simulator publishing `WaveformData` on the Procedure domain (`clinical` tag) with `Stream` QoS
+**Given** a bedside monitor simulator publishing `WaveformData` on the Procedure clinical databus with `Stream` QoS
 **When** ECG waveform generation is active
 **Then** waveform sample blocks are published at 50 Hz
 **And** each block contains 10 samples (ECG sampled at 500 Sa/s)
@@ -114,16 +114,16 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 ### Scenario: Late-joining subscriber receives current vitals `@integration` `@durability`
 
 **Given** a bedside monitor has been publishing `PatientVitals` with TRANSIENT_LOCAL durability
-**When** a new subscriber joins the Procedure domain in the same partition
+**When** a new subscriber joins the Procedure DDS domain in the same partition
 **Then** the subscriber immediately receives the most recent `PatientVitals` sample without waiting for the next publication cycle
 
 ---
 
-## Camera Feed (Procedure domain — `operational` tag)
+## Camera Feed (Procedure DDS domain — `operational` tag)
 
 ### Scenario: Camera frame metadata is published at configured rate `@integration` `@streaming`
 
-**Given** a camera simulator publishing `CameraFrame` on the Procedure domain (`operational` tag) with `Stream` QoS
+**Given** a camera simulator publishing `CameraFrame` on the Procedure operational databus with `Stream` QoS
 **When** the camera is active
 **Then** `CameraFrame` samples are published at 30 Hz
 **And** each sample contains camera ID, frame sequence number, timestamp, resolution, and image reference
@@ -137,7 +137,7 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 
 ---
 
-## Procedure Context (Procedure domain — `operational` tag)
+## Procedure Context (Procedure DDS domain — `operational` tag)
 
 ### Scenario: Procedure context is published at startup `@integration`
 
@@ -148,7 +148,7 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 ### Scenario: Procedure context is durable for late joiners `@integration` `@durability`
 
 **Given** a `ProcedureContext` sample has been published with TRANSIENT_LOCAL durability
-**When** a new subscriber joins the Procedure domain in the same partition after the initial publication
+**When** a new subscriber joins the Procedure DDS domain in the same partition after the initial publication
 **Then** the subscriber receives the `ProcedureContext` sample immediately
 
 ### Scenario: Procedure context update reflects changes `@integration`
@@ -160,7 +160,7 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 
 ### Scenario: Procedure status is published and durable `@integration` `@durability`
 
-**Given** a surgical procedure instance publishing `ProcedureStatus` on the Procedure domain (`operational` tag) with `State` QoS
+**Given** a surgical procedure instance publishing `ProcedureStatus` on the Procedure operational databus with `State` QoS
 **When** the procedure is active
 **Then** `ProcedureStatus` samples are published with the current running status (in-progress, completing, alert)
 **And** a late-joining subscriber receives the most recent `ProcedureStatus` immediately via TRANSIENT_LOCAL durability
@@ -174,7 +174,7 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 
 ---
 
-## Device Telemetry (Procedure domain — `clinical` tag)
+## Device Telemetry (Procedure DDS domain — `clinical` tag)
 
 ### Scenario: Device telemetry is published for each simulated device `@integration`
 
@@ -195,23 +195,23 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 
 ---
 
-## Digital Twin Display (Procedure domain — `control` tag)
+## Digital Twin Display (Procedure DDS domain — `control` tag)
 
 ### Scenario: Digital twin renders current robot state `@integration` `@gui`
 
-**Given** a digital twin display subscribed to `RobotState` on the Procedure domain (`control` tag) in the same partition as the robot controller
+**Given** a digital twin display subscribed to `RobotState` on the Procedure control databus in the same partition as the robot controller
 **When** the robot controller publishes a `RobotState` sample
 **Then** the display updates the 2D robot visualization to reflect the current joint positions, tool-tip location, and operational mode
 
 ### Scenario: Digital twin displays active command `@integration` `@gui`
 
-**Given** a digital twin display subscribed to `RobotCommand` on the Procedure domain (`control` tag)
+**Given** a digital twin display subscribed to `RobotCommand` on the Procedure control databus
 **When** a `RobotCommand` sample is received
 **Then** the display renders the active command as a visual annotation (target position, motion trajectory indicator)
 
 ### Scenario: Digital twin shows safety interlock status `@integration` `@gui`
 
-**Given** a digital twin display subscribed to `SafetyInterlock` on the Procedure domain (`control` tag)
+**Given** a digital twin display subscribed to `SafetyInterlock` on the Procedure control databus
 **When** a `SafetyInterlock` sample with `interlock_active = true` is received
 **Then** the display renders a prominent interlock indicator (red overlay, status text)
 **And** the robot visualization shows the arm in its safe-stopped pose
@@ -227,7 +227,7 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 ### Scenario: Digital twin receives state on late join `@integration` `@durability` `@gui`
 
 **Given** a robot controller has been publishing `RobotState` with TRANSIENT_LOCAL durability
-**When** the digital twin display starts and joins the Procedure domain in the same partition
+**When** the digital twin display starts and joins the Procedure DDS domain in the same partition
 **Then** the display immediately receives the most recent `RobotState` sample
 **And** the robot visualization renders in the correct pose without waiting for the next publication cycle
 

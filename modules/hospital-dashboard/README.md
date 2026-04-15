@@ -10,11 +10,11 @@ and service states, and issues start/stop commands via DDS RPC.
 The Procedure Controller does **not** host any surgical services — it is
 a pure consumer and orchestrator. It creates three DomainParticipants:
 
-| Participant      | Domain              | Role                                                            |
-| ---------------- | ------------------- | --------------------------------------------------------------- |
-| Orchestration    | 15 (no domain tags) | Subscribe to ServiceCatalog + ServiceStatus; issue RPC commands |
-| ProcedureControl | 10 (`control` tag)  | Subscribe to RobotArmAssignment for arm tracking (V1.2)         |
-| Hospital         | Hospital domain     | Read-only subscriber for scheduling context                     |
+| Participant      | Domain                         | Role                                                            |
+| ---------------- | ------------------------------ | --------------------------------------------------------------- |
+| Orchestration    | 15 (no domain tags)            | Subscribe to ServiceCatalog + ServiceStatus; issue RPC commands |
+| ProcedureControl | 10 (`control` tag)             | Subscribe to RobotArmAssignment for arm tracking (V1.2)         |
+| Hospital         | Hospital Integration databus   | Read-only subscriber for scheduling context                     |
 
 ### Connext Features Used
 

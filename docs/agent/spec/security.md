@@ -19,7 +19,7 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 | `clinical`-tag metadata protection | `ENCRYPT` | vision/security.md — Procedure Domain Governance |
 | `operational`-tag data protection | `SIGN` | vision/security.md — Procedure Domain Governance |
 | `operational`-tag metadata protection | `SIGN` | vision/security.md — Procedure Domain Governance |
-| Hospital domain data/metadata protection | `ENCRYPT` / `ENCRYPT` | vision/security.md — Hospital Domain Governance |
+| Hospital Integration databus data/metadata protection | `ENCRYPT` / `ENCRYPT` | vision/security.md — Hospital Domain Governance |
 | Observability domain data/metadata protection | `ENCRYPT` / `SIGN` | vision/security.md — Observability Domain Governance |
 
 | CRL revocation effective within | 60 s of CRL file update | vision/security.md — Certificate Revocation |
@@ -34,21 +34,21 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 
 ## Authentication
 
-### Scenario: Authenticated participant joins the Procedure domain
+### Scenario: Authenticated participant joins the Procedure DDS domain
 
 `@security` `@integration`
 
-**Given** a participant with a valid identity certificate signed by the Identity CA, and a permissions document granting domain join on the Procedure domain
-**When** the participant creates a DomainParticipant on the Procedure domain
-**Then** the DomainParticipant is created successfully, and the participant completes mutual authentication with other Procedure domain participants
+**Given** a participant with a valid identity certificate signed by the Identity CA, and a permissions document granting domain join on the Procedure DDS domain
+**When** the participant creates a DomainParticipant on the Procedure DDS domain
+**Then** the DomainParticipant is created successfully, and the participant completes mutual authentication with other Procedure DDS domain participants
 
-### Scenario: Unauthenticated participant is rejected from the Procedure domain
+### Scenario: Unauthenticated participant is rejected from the Procedure databuses
 
 `@security` `@integration`
 
 **Given** a participant with no identity certificate (or an unsigned/self-signed certificate not chained to the Identity CA)
-**When** the participant attempts to create a DomainParticipant on the Procedure domain
-**Then** DomainParticipant creation fails, and no data is exchanged with other Procedure domain participants
+**When** the participant attempts to create a DomainParticipant on the Procedure DDS domain
+**Then** DomainParticipant creation fails, and no data is exchanged with other Procedure DDS domain participants
 
 ### Scenario: Participant with expired certificate is rejected
 
@@ -102,13 +102,13 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 **When** a `bedside-monitor` publishes `PatientVitals` samples
 **Then** the `resource-sim` receives zero samples on `PatientVitals` (DataReader creation fails or receives no matched data)
 
-### Scenario: Dashboard participant is read-only across all Hospital domain topics
+### Scenario: Dashboard participant is read-only across all Hospital Integration databus topics
 
 `@security` `@integration`
 
-**Given** a `hospital-dashboard` participant whose permissions grant only subscribe on Hospital domain topics
-**When** the `hospital-dashboard` attempts to create a DataWriter for any Hospital domain topic
-**Then** DataWriter creation fails for every Hospital domain topic
+**Given** a `hospital-dashboard` participant whose permissions grant only subscribe on Hospital Integration databus topics
+**When** the `hospital-dashboard` attempts to create a DataWriter for any Hospital Integration databus topic
+**Then** DataWriter creation fails for every Hospital Integration databus topic
 
 ### Scenario: Default deny rule blocks unlisted topics
 
@@ -126,7 +126,7 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 
 `@security` `@integration`
 
-**Given** the Procedure domain governance specifies `data_protection_kind=ENCRYPT` for `control`-tag topics
+**Given** the Procedure DDS domain governance specifies `data_protection_kind=ENCRYPT` for `control`-tag topics
 **When** a `robot-controller` publishes a `RobotState` sample
 **Then** the RTPS payload on the wire is encrypted (not readable by a passive network observer), and an authorized subscriber decrypts and receives the sample correctly
 
@@ -134,7 +134,7 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 
 `@security` `@integration`
 
-**Given** the Procedure domain governance specifies `data_protection_kind=ENCRYPT` for `clinical`-tag topics
+**Given** the Procedure DDS domain governance specifies `data_protection_kind=ENCRYPT` for `clinical`-tag topics
 **When** a `bedside-monitor` publishes a `PatientVitals` sample
 **Then** the RTPS payload on the wire is encrypted, and an authorized subscriber decrypts and receives the sample correctly
 
@@ -142,7 +142,7 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 
 `@security` `@integration`
 
-**Given** the Procedure domain governance specifies `data_protection_kind=SIGN` for `operational`-tag topics
+**Given** the Procedure DDS domain governance specifies `data_protection_kind=SIGN` for `operational`-tag topics
 **When** a `camera-sim` publishes a `CameraFrame` sample
 **Then** the RTPS payload on the wire is integrity-protected (signed) but readable by a passive observer, and an authorized subscriber verifies integrity and receives the sample
 
@@ -162,7 +162,7 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 
 `@security` `@integration`
 
-**Given** the Procedure domain governance specifies `metadata_protection_kind=ENCRYPT_WITH_ORIGIN_AUTHENTICATION` for `RobotCommand`, and `max_receiver_specific_macs=16` is set on all control-tag participants
+**Given** the Procedure DDS domain governance specifies `metadata_protection_kind=ENCRYPT_WITH_ORIGIN_AUTHENTICATION` for `RobotCommand`, and `max_receiver_specific_macs=16` is set on all control-tag participants
 **When** a `robot-controller` receives a `RobotCommand` sample
 **Then** the `robot-controller` can verify the sample originated from the specific DomainParticipant that published it (receiver-specific MAC validation succeeds)
 
@@ -178,7 +178,7 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 
 `@security` `@integration`
 
-**Given** the Procedure domain governance specifies `metadata_protection_kind=SIGN` (without `_WITH_ORIGIN_AUTHENTICATION`) for `operational`-tag topics
+**Given** the Procedure DDS domain governance specifies `metadata_protection_kind=SIGN` (without `_WITH_ORIGIN_AUTHENTICATION`) for `operational`-tag topics
 **When** a `camera-sim` publishes a `CameraFrame` sample
 **Then** no receiver-specific MACs are included in the message (origin authentication overhead is avoided for high-bandwidth operational data)
 
@@ -190,23 +190,23 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 
 `@security` `@integration`
 
-**Given** the Procedure domain governance sets `enable_join_access_control=TRUE`
-**When** a participant whose permissions do not include a domain-join grant for the Procedure domain attempts to create a DomainParticipant
+**Given** the Procedure DDS domain governance sets `enable_join_access_control=TRUE`
+**When** a participant whose permissions do not include a domain-join grant for the Procedure DDS domain attempts to create a DomainParticipant
 **Then** DomainParticipant creation fails
 
-### Scenario: Discovery traffic is encrypted on the Procedure domain
+### Scenario: Discovery traffic is encrypted on the Procedure DDS domain
 
 `@security` `@integration`
 
-**Given** the Procedure domain governance sets `discovery_protection_kind=ENCRYPT`
-**When** two authenticated participants discover each other on the Procedure domain
+**Given** the Procedure DDS domain governance sets `discovery_protection_kind=ENCRYPT`
+**When** two authenticated participants discover each other on the Procedure DDS domain
 **Then** endpoint announcement traffic is encrypted on the wire (not readable by a passive observer without domain keys)
 
 ### Scenario: PSK protection covers bootstrap discovery
 
 `@security` `@integration`
 
-**Given** the Procedure domain governance sets `rtps_psk_protection_kind=SIGN`
+**Given** the Procedure DDS domain governance sets `rtps_psk_protection_kind=SIGN`
 **When** a new participant begins the initial discovery handshake before PKI authentication completes
 **Then** the bootstrap RTPS messages are integrity-protected by the PSK, and a domain outsider without the PSK cannot inject discovery traffic
 
@@ -218,16 +218,16 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 
 `@security` `@integration` `@routing`
 
-**Given** a `routing-service` participant with a valid identity certificate and permissions granting subscribe on Procedure domain topics (`RobotState`, `PatientVitals`, `AlarmMessages`, `DeviceTelemetry`, `ProcedureContext`, `ProcedureStatus`) and publish on the corresponding Hospital domain topics
-**When** data is published on the Procedure domain
-**Then** the `routing-service` subscribes, decrypts, re-encrypts, and publishes the data on the Hospital domain; Hospital domain subscribers receive the data
+**Given** a `routing-service` participant with a valid identity certificate and permissions granting subscribe on Procedure DDS domain topics (`RobotState`, `PatientVitals`, `AlarmMessages`, `DeviceTelemetry`, `ProcedureContext`, `ProcedureStatus`) and publish on the corresponding Hospital Integration databus topics
+**When** data is published on the Procedure DDS domain
+**Then** the `routing-service` subscribes, decrypts, re-encrypts, and publishes the data on the Hospital Integration databus; Hospital Integration databus subscribers receive the data
 
-### Scenario: Routing Service cannot publish back to the Procedure domain
+### Scenario: Routing Service cannot publish back to the Procedure DDS domain
 
 `@security` `@integration` `@routing`
 
-**Given** the `routing-service` permissions grant **no publish** on any Procedure domain topic
-**When** the `routing-service` attempts to create a DataWriter on a Procedure domain topic
+**Given** the `routing-service` permissions grant **no publish** on any Procedure DDS domain topic
+**When** the `routing-service` attempts to create a DataWriter on a Procedure DDS domain topic
 **Then** DataWriter creation fails — data flow is strictly Procedure → Hospital
 
 ### Scenario: Routing Service with invalid certificate is rejected
@@ -235,7 +235,7 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 `@security` `@integration` `@routing`
 
 **Given** a Routing Service instance configured with an identity certificate not signed by the Identity CA
-**When** the Routing Service attempts to create DomainParticipants on the Procedure and Hospital domains
+**When** the Routing Service attempts to create DomainParticipants on the Procedure and Hospital Integration databuss
 **Then** both DomainParticipant creations fail; no bridging occurs
 
 ---
@@ -262,7 +262,7 @@ All scenarios are tagged `@security` and require Connext Security Plugins, gover
 
 `@security` `@integration`
 
-**Given** all Procedure domain PSK participants are using passphrase file `procedure_domain_psk.txt` with passphrase ID `1`
+**Given** all Procedure DDS domain PSK participants are using passphrase file `procedure_domain_psk.txt` with passphrase ID `1`
 **When** the passphrase file is updated to contain a new passphrase with ID `2` (following the primary+extra rotation pattern described in vision/security.md)
 **Then** within `files_poll_interval` seconds, all participants load the new passphrase and continue communicating without message loss
 

@@ -19,7 +19,7 @@ All scenarios assume the Foxglove Bridge plugins (`libmedtech_foxglove_transf.so
 | MCAP storage — required metadata per sample | Reception timestamp, valid-data flag (for Replay compatibility) |
 | Live pipeline | Routing Service: DDS input → Transformation → Adapter (WebSocket) → Foxglove Studio |
 | Offline pipeline | Recording Service: DDS subscriber → Transformation → Storage (MCAP) → `.mcap` file |
-| Concurrent operation | Both pipelines may run simultaneously over the same Procedure domain data |
+| Concurrent operation | Both pipelines may run simultaneously over the same Procedure DDS domain data |
 
 *This table must be updated whenever a concrete value in the scenarios below is added or changed.*
 
@@ -30,7 +30,7 @@ All scenarios assume the Foxglove Bridge plugins (`libmedtech_foxglove_transf.so
 ### Scenario: RobotState is transformed to foxglove JointStates `@integration` `@foxglove`
 
 **Given** the Transformation plugin is loaded in a Routing Service route with `mapping=joint_states`
-**And** a `Surgery::RobotState` sample is published on the Procedure domain with `joints` containing 6 `JointState` entries (named `joint_1`…`joint_6` with known position, velocity, and effort values)
+**And** a `Surgery::RobotState` sample is published on the Procedure DDS domain with `joints` containing 6 `JointState` entries (named `joint_1`…`joint_6` with known position, velocity, and effort values)
 **When** the transformation processes the sample
 **Then** the output is a `foxglove::JointStates` sample containing 6 `foxglove::JointState` entries with matching `name`, `position`, `velocity`, and `effort` values
 **And** the `timestamp` field is populated from the input sample's `SampleInfo.source_timestamp`
@@ -94,14 +94,14 @@ All scenarios assume the Foxglove Bridge plugins (`libmedtech_foxglove_transf.so
 **Given** Routing Service is configured with the Transformation plugin and the WebSocket Adapter plugin
 **And** topic routes for `RobotStateToJointStates`, `RobotStateToToolPose`, `RobotFrameTransformToFoxglove`, and `CameraFrameToCompressedImage` are active
 **And** the Adapter plugin's `FoxgloveWebSocketConnection` is configured with a valid WebSocket endpoint
-**When** publishers on the Procedure domain publish `RobotState`, `RobotFrameTransform`, and `CameraFrame`
+**When** publishers on the Procedure DDS domain publish `RobotState`, `RobotFrameTransform`, and `CameraFrame`
 **Then** the Adapter plugin's `DynamicDataStreamWriter::write()` receives transformed Foxglove-native DynamicData for each configured route
 **And** the data is serialized and forwarded to the Foxglove Studio live WebSocket connection
 
 ### Scenario: Routing Service does not bridge unconfigured Procedure topics to Foxglove `@e2e` `@foxglove` `@routing`
 
 **Given** Routing Service is configured with Foxglove Bridge routes for `RobotState`, `RobotFrameTransform`, and `CameraFrame` only
-**When** a publisher on the Procedure domain publishes `OperatorInput`, `SafetyInterlock`, `WaveformData`, or `PatientVitals`
+**When** a publisher on the Procedure DDS domain publishes `OperatorInput`, `SafetyInterlock`, `WaveformData`, or `PatientVitals`
 **Then** none of these topics reach the Adapter plugin's WebSocket output
 **And** Foxglove Studio does not receive data for any unconfigured topic
 
@@ -113,7 +113,7 @@ All scenarios assume the Foxglove Bridge plugins (`libmedtech_foxglove_transf.so
 
 **Given** Recording Service is configured with the Transformation plugin and the MCAP Storage plugin
 **And** the Storage plugin's `mcap.filename` property is set to a valid output path
-**And** Recording Service is subscribing to `RobotState`, `RobotFrameTransform`, and `CameraFrame` on the Procedure domain
+**And** Recording Service is subscribing to `RobotState`, `RobotFrameTransform`, and `CameraFrame` on the Procedure DDS domain
 **When** publishers produce samples on these topics for 10 seconds
 **Then** the Storage plugin's `DynamicDataStorageStreamWriter::store()` receives transformed Foxglove-native DynamicData for each subscribed topic
 **And** the resulting `.mcap` file contains channels corresponding to the Foxglove output types (`foxglove::JointStates`, `foxglove::FrameTransforms`, `foxglove::CompressedImage`, `foxglove::PoseInFrame`)
@@ -128,7 +128,7 @@ All scenarios assume the Foxglove Bridge plugins (`libmedtech_foxglove_transf.so
 
 **Given** Routing Service is running with the Transformation + Adapter plugin pipeline (live visualization)
 **And** Recording Service is running with the Transformation + Storage plugin pipeline (MCAP recording)
-**And** both services subscribe to the same Procedure domain topics
+**And** both services subscribe to the same Procedure DDS domain topics
 **When** publishers produce `RobotState` and `CameraFrame` samples for 10 seconds
 **Then** the Adapter plugin's WebSocket output receives transformed samples in real time
 **And** the Storage plugin's MCAP file accumulates transformed samples concurrently

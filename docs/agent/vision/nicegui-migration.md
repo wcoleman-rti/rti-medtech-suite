@@ -147,7 +147,7 @@ Like `Service`, `GuiBackend` is a **pure skeleton** — all abstract, no
 domain logic. It does not own a participant, create DDS resources, or
 provide helper methods. Each concrete backend is free to create as many
 participants as it needs (e.g., the Procedure Controller may need both
-Hospital and Orchestration domain participants).
+Hospital and Orchestration databus participants).
 
 Unlike `Service`, `GuiBackend` provides **minimal NiceGUI lifecycle wiring**
 in its `__init__`: it registers `app.on_startup(self.start)` and
@@ -168,15 +168,15 @@ hook automatically.
 > GUI backends join only the domain(s) at their deployment level:
 >
 > - **Hospital Dashboard** (`medtech-gui` on `hospital-net`) — one participant
->   on Domain 20 (Hospital integration). Receives all data via per-room RS bridge.
+>   on the Hospital Integration databus (Hospital integration). Receives all data via per-room RS bridge.
 > - **Procedure Controller** (`medtech-controller` on `orchestration-net`) — one
->   participant on Domain 11 (Orchestration, room-scoped). Room-level deployment.
+>   participant on the Orchestration databus (Orchestration, room-scoped). Room-level deployment.
 > - **Digital Twin** (`medtech-twin` on `surgical-net`) — one participant on
->   Domain 10 (`control` tag). Room-level deployment.
+>   the Procedure DDS domain (`control` tag). Room-level deployment.
 >
 > No GUI backend spans deployment levels. The dashboard does NOT join
 > orchestration or procedure domains — it discovers rooms and services via
-> `ServiceCatalog` data bridged from Domain 11 → Domain 20 by the per-room
+> `ServiceCatalog` data bridged from Orchestration databus → Hospital Integration databus by the per-room
 > Routing Service.
 
 | Aspect | `Service` (orchestration) | `GuiBackend` (NiceGUI) |
@@ -446,12 +446,12 @@ they are not merged into a single SPA.
 | Route | Module | Notes |
 |-------|--------|-------|
 | `/` | Landing / redirect to dashboard | |
-| `/dashboard` | Hospital Dashboard | Domain 20 — procedure overview, vitals, alerts |
+| `/dashboard` | Hospital Dashboard | the Hospital Integration databus — procedure overview, vitals, alerts |
 | `/alerts` | Clinical Alerts Dashboard | (new — visual frontend for alerts engine) |
 
 The dashboard app uses `ui.sub_pages()` for SPA-style client-side routing between
 its own pages. Room-level GUIs (controller, twin) are discovered via
-`ServiceCatalog` data bridged from Domain 11 → Domain 20 by the per-room Routing
+`ServiceCatalog` data bridged from Orchestration databus → Hospital Integration databus by the per-room Routing
 Service. They are always opened in **new browser tabs** (cross-origin navigation)
 because they run on different hosts/networks.
 
@@ -459,8 +459,8 @@ because they run on different hosts/networks.
 
 | App | Container | Network | Route | Domain |
 |-----|-----------|---------|-------|--------|
-| Procedure Controller | `medtech-controller-<room>` | `orchestration-net` | `/controller` | Domain 11 |
-| Digital Twin | `medtech-twin-<room>` | `surgical-net` | `/twin` | Domain 10 (`control` tag) |
+| Procedure Controller | `medtech-controller-<room>` | `orchestration-net` | `/controller` | the Orchestration databus |
+| Digital Twin | `medtech-twin-<room>` | `surgical-net` | `/twin` | the Procedure DDS domain (`control` tag) |
 
 Each room-level app is a self-contained NiceGUI instance with its own header
 bar, theme, and static assets. The controller and twin run as `@ui.page()`
@@ -517,20 +517,20 @@ Navigation follows three patterns:
 renders a **self-contained page** with:
 - Its own header bar (RTI logo, title, theme toggle)
 - A floating nav pill (from `medtech.gui.room_nav`) showing sibling
-  room GUIs discovered via `ServiceCatalog` on the Orchestration domain
+  room GUIs discovered via `ServiceCatalog` on the Orchestration databus
 - Full theme and font support (each NiceGUI instance serves its own
   static assets)
 
 The `gui_url` property in `ServiceCatalog` provides the full HTTP
 endpoint URL for each GUI service. The hospital dashboard reads bridged
-`ServiceCatalog` data (Domain 11 → 20 via per-room RS) and renders
+`ServiceCatalog` data (the Orchestration databus → 20 via per-room RS) and renders
 **room cards** in the Room Overview view — one card per discovered room,
 each with an `open_in_new` button that opens the room GUI in a new tab.
 
 #### Room-Level Horizontal Navigation (`medtech.gui.room_nav`)
 
 The shared `medtech.gui.room_nav` module provides same-level navigation
-between room GUIs. It creates a **read-only Orchestration domain
+between room GUIs. It creates a **read-only Orchestration databus
 participant** that subscribes to `ServiceCatalog` filtered by the
 current `room_id`, then renders a floating nav pill with buttons for
 each discovered sibling GUI service in the same room.
@@ -557,8 +557,8 @@ configuration changes.
 #### Hospital Dashboard Room Discovery
 
 The hospital dashboard discovers rooms via **bridged `ServiceCatalog`**
-data (Domain 11 → Domain 20 via per-room RS). The `DashboardBackend`
-subscribes to `ServiceCatalog` on Domain 20 and extracts `room_id` and
+data (Orchestration databus → Hospital Integration databus via per-room RS). The `DashboardBackend`
+subscribes to `ServiceCatalog` on the Hospital Integration databus and extracts `room_id` and
 `gui_url` properties. The Room Overview view renders one card per
 discovered room, showing room status, active procedure info, and an
 `open_in_new` button to open the room GUI in a new browser tab.

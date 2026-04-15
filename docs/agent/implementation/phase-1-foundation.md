@@ -103,7 +103,7 @@
 - Author the domain library XML under `interfaces/domains/` with the same schema declaration
 - Configure `NDDS_QOS_PROFILES` environment variable to load all XML files in dependency order at runtime. This is the mechanism by which applications discover QoS profiles — no application code hardcodes XML file paths:
   ```bash
-  export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/Domains.xml"
+  export NDDS_QOS_PROFILES="interfaces/qos/Snippets.xml;interfaces/qos/Patterns.xml;interfaces/qos/Topics.xml;interfaces/qos/Participants.xml;interfaces/domains/RoomDatabuses.xml;interfaces/domains/HospitalDatabuses.xml;interfaces/domains/CloudDatabuses.xml"
   ```
 - All applications must use the default QosProvider:
   - C++: `dds::core::QosProvider::Default()`
@@ -128,7 +128,7 @@
 - Submit the following artifacts to `rti-chatbot-mcp` for design review per [workflow.md](../workflow.md) Section 8:
   - All IDL type definitions under `interfaces/idl/`
   - QoS XML hierarchy (`Snippets.xml`, `Patterns.xml`, `Topics.xml`, `Participants.xml`)
-  - Domain library XML (`interfaces/domains/Domains.xml`)
+  - Domain library XML (`interfaces/domains/RoomDatabuses.xml;interfaces/domains/HospitalDatabuses.xml;interfaces/domains/CloudDatabuses.xml`)
   - Publication model assignments from `vision/data-model.md`
 - Review focus areas:
   - QoS compatibility across all writer/reader profile pairs (RxO policy matching)
@@ -173,7 +173,7 @@
   - Store Collector Service configuration, Prometheus scrape config, and Grafana dashboard JSON under `services/observability/`
 - Add **Cloud Discovery Service** container using the official RTI Docker Hub image `rticom/cloud-discovery-service` (see [system-architecture.md](../vision/system-architecture.md) — Docker Hub Image Policy):
   - Attach to `hospital-net` (primary) and `surgical-net` (allows all participants direct discovery access)
-  - Configure the listening port (default 7400) and the domains it serves (the Procedure domain and the Hospital domain)
+  - Configure the listening port (default 7400) and the domains it serves (the Procedure DDS domain and the Hospital Integration databus)
   - Store Cloud Discovery Service configuration under `services/cloud-discovery-service/`
   - Define a health check: TCP port check on port 7400 (`test: ["CMD", "nc", "-z", "localhost", "7400"]`)
   - All other application and infrastructure containers must declare `depends_on: cloud-discovery-service: condition: service_healthy` so Cloud Discovery Service starts first (see [system-architecture.md](../vision/system-architecture.md) — Docker Compose Service Startup Ordering)
@@ -209,7 +209,7 @@
 - Implement tests for **common-behaviors.md** specs that can run with the foundation:
   - Partition isolation (same partition matches, different partition doesn't)
   - Wildcard partition aggregation
-  - Domain isolation (Procedure domain vs Hospital domain — no cross-talk)
+  - Domain isolation (Procedure DDS domain vs Hospital Integration databus — no cross-talk)
   - QoS enforcement: deadline missed, liveliness lost, lifespan expiry, KEEP_LAST behavior
   - Durability: TRANSIENT_LOCAL late joiner, VOLATILE no history
   - Exclusive ownership: higher strength preferred, failover on liveliness loss, primary reclaim

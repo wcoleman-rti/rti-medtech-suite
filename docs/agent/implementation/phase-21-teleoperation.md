@@ -31,13 +31,13 @@ authentication and topic-level access control.
   [system-architecture.md — Hospital Domain Tag Re-Evaluation](../vision/system-architecture.md):
   the reverse data path (Hospital → Procedure) makes Hospital-domain
   participants **actors** rather than observers
-- Evaluate whether the Hospital domain needs a `control` tag for the
+- Evaluate whether the Hospital Integration databus needs a `control` tag for the
   remote operator's outbound `OperatorInput` data path:
-  - Option A: Add a `control` domain tag to the Hospital domain — remote
+  - Option A: Add a `control` domain tag to the Hospital Integration databus — remote
     operator console publishes on Hospital `control`, RS bridges to
     Procedure `control`
-  - Option B: No tag on Hospital domain — remote operator console
-    publishes on the flat Hospital domain, RS bridges to Procedure
+  - Option B: No tag on Hospital Integration databus — remote operator console
+    publishes on the flat Hospital Integration databus, RS bridges to Procedure
     `control` using a separate `domain_route` with a `control`-tagged
     Procedure-side participant
 - Document the decision in `vision/system-architecture.md` (requires
@@ -49,7 +49,7 @@ authentication and topic-level access control.
 ### Test Gate
 
 - [ ] Decision documented and approved in `system-architecture.md`
-- [ ] `Domains.xml` updated if Hospital domain tag added
+- [ ] `Domains.xml` updated if Hospital Integration databus tag added
 - [ ] `bash scripts/ci.sh --lint` passes
 
 ---
@@ -201,7 +201,7 @@ authentication and topic-level access control.
   data path (Hospital → Procedure `control`):
   - **Separate `domain_route`** from the existing observational bridge
   - Procedure-side DomainParticipant: `control` domain tag
-  - Hospital-side DomainParticipant: Hospital domain (tag per Step 21.1
+  - Hospital-side DomainParticipant: Hospital Integration databus (tag per Step 21.1
     decision)
   - Route only `OperatorInput` topic
   - Output DataWriter QoS: `ExclusiveOwnership` with strength **100**

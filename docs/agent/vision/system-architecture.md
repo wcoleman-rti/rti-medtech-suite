@@ -59,7 +59,7 @@ can share data."
 | **Databus** | A logical data space identified by a `(domain_id, domain_tag)` pair. All DomainParticipants that share both values are on the same databus. | Procedure control databus = Domain 10 + tag `control` |
 | **DDS domain** | The native Connext isolation boundary identified solely by `domain_id`. In this project every DDS domain contains one or more databuses distinguished by domain tags. | Domain 10 (Procedure) |
 | **Visibility plane** | A partition within a databus. Partitions restrict which writers and readers can match within the same databus. They do **not** constitute separate databuses. | `procedure` partition within the Orchestration databus |
-| **Domain library** | An XML `<domain_library>` element grouping related `<domain>` definitions by deployment level. | `Room` library containing Procedure, Orchestration, and Room Observability domains |
+| **Domain library** | An XML `<domain_library>` element grouping related `<domain>` definitions by deployment level. | `Room` library containing Procedure, Orchestration, and Room Observability databuss |
 
 **Named Databuses:**
 
@@ -419,7 +419,7 @@ Data streams that cross a risk class boundary must not share a domain tag.
 
 ### Domain Tag Participant Model
 
-A DomainParticipant can have at most **one domain tag**. Because the Procedure domain uses
+A DomainParticipant can have at most **one domain tag**. Because the Procedure DDS domain uses
 three domain tags (`control`, `clinical`, `operational`), a surgical procedure instance that
 needs to interact with all three risk classes must create **three separate DomainParticipants**
 — one per tag — all on the same domain ID.
@@ -429,22 +429,22 @@ In practice, not every process needs all three tags:
 | Process | DomainParticipants | Domain Tags / Domains |
 |---------|--------------------|-------------|
 | Robot controller (standalone) | 1 (+1 Observability) | Procedure `control` |
-| Robot Service Host | 1 Orchestration + 1 Procedure `control` (+1 Observability) | Orchestration domain + Procedure `control` |
+| Robot Service Host | 1 Orchestration + 1 Procedure `control` (+1 Observability) | Orchestration databus + Procedure `control` |
 | Operator console sim (standalone) | 1 (+1 Observability) | Procedure `control` |
-| Operator Service Host | 1 Orchestration + 1 Procedure `control` (+1 Observability) | Orchestration domain + Procedure `control` |
+| Operator Service Host | 1 Orchestration + 1 Procedure `control` (+1 Observability) | Orchestration databus + Procedure `control` |
 | Bedside monitor / vitals sim (standalone) | 1 (+1 Observability) | Procedure `clinical` |
-| Clinical Service Host | 1 Orchestration + 1 Procedure `clinical` (+1 Observability) | Orchestration domain + Procedure `clinical` |
+| Clinical Service Host | 1 Orchestration + 1 Procedure `clinical` (+1 Observability) | Orchestration databus + Procedure `clinical` |
 | Camera simulator (standalone) | 1 (+1 Observability) | Procedure `operational` |
-| Operational Service Host | 1 Orchestration + 1 Procedure `operational` (+1 Observability) | Orchestration domain + Procedure `operational` |
+| Operational Service Host | 1 Orchestration + 1 Procedure `operational` (+1 Observability) | Orchestration databus + Procedure `operational` |
 | Procedure context + status publisher (standalone) | 1 (+1 Observability) | Procedure `operational` |
 | Device telemetry gateway (standalone) | 1 (+1 Observability) | Procedure `clinical` |
 | Digital twin display | 1 (+1 Observability) | Procedure `control` |
-| **Procedure Controller** | 1 Orchestration + 2 Procedure read-only (+1 Observability) | Orchestration domain (Domain 11, room-scoped) + Procedure `operational` (read-only: ProcedureStatus, ProcedureContext) + Procedure `control` (read-only: RobotArmAssignment) |
+| **Procedure Controller** | 1 Orchestration + 2 Procedure read-only (+1 Observability) | Orchestration databus (Domain 11, room-scoped) + Procedure `operational` (read-only: ProcedureStatus, ProcedureContext) + Procedure `control` (read-only: RobotArmAssignment) |
 | **Routing Service** (per-room MedtechBridge) | **5** (+1 Observability) | `control` + `clinical` + `operational` (3 on Domain 10) + 1 on Domain 11 (ServiceCatalog extraction) + 1 on Domain 20 (Hospital output, no tag) |
 
 Application logging uses the **RTI Connext Logging API** (`rti::config::Logger` / `rti.connextdds.Logger`), with log messages forwarded to Collector Service via Monitoring Library 2.0. See [technology.md — Logging Standard](technology.md) for details.
 
-Monitoring Library 2.0 creates an additional **+1 dedicated participant** per process on the **Room Observability domain** (Domain 19) to distribute telemetry (metrics, logs, security events) to Collector Service. This participant is created automatically by the MONITORING QoS policy — no application code is needed. See [data-model.md — Domain 19](data-model.md) for the domain definition.
+Monitoring Library 2.0 creates an additional **+1 dedicated participant** per process on the **Room Observability databus** (Domain 19) to distribute telemetry (metrics, logs, security events) to Collector Service. This participant is created automatically by the MONITORING QoS policy — no application code is needed. See [data-model.md — Domain 19](data-model.md) for the domain definition.
 
 Each process creates a single participant on the tag it needs. If a future process genuinely
 requires data from multiple tags (e.g., a combined surgical console), it creates multiple
@@ -492,7 +492,7 @@ as new RS instances bridge additional rooms.
 
 #### Why the Hospital Domain Has No Domain Tags
 
-The Procedure domain uses domain tags (`control`, `clinical`, `operational`) to isolate
+The Procedure DDS domain uses domain tags (`control`, `clinical`, `operational`) to isolate
 risk classes **at the point of surgical action** — preventing a fault in a lower-risk
 participant from interfering with higher-risk data paths (e.g., a camera publisher
 cannot disrupt robot commands). That isolation model is necessary because Procedure-domain
@@ -501,14 +501,14 @@ affect the surgical process.
 
 Hospital-domain participants are **observers only**. They consume bridged data for
 monitoring, alerting, and resource coordination. No Hospital-domain application
-publishes commands back into the Procedure domain. Because there is no surgical
-process at risk on the Hospital domain, domain-tag isolation provides no safety
+publishes commands back into the Procedure DDS domain. Because there is no surgical
+process at risk on the Hospital Integration databus, domain-tag isolation provides no safety
 benefit — it would add participant complexity (dashboards would need 3 participants
 instead of 1) with no corresponding risk reduction.
 
 The trust and isolation boundary is **Routing Service itself**. It is a one-way,
 configuration-controlled gateway. Only explicitly configured topics cross from
-Procedure → Hospital. The Hospital domain receives a denormalized, read-only view
+Procedure → Hospital. The Hospital Integration databus receives a denormalized, read-only view
 of surgical data.
 
 > **Escalation trigger:** If any future requirement introduces a Hospital → Procedure
@@ -522,9 +522,9 @@ of surgical data.
 
 ### Cloud / Enterprise Domain — Domain 30 (V3.0)
 
-Regional or enterprise-wide layer for multi-facility command center operations. Data arrives here only via a WAN-capable Routing Service from individual Hospital domains (Domain 20) — no hospital application publishes directly to the Cloud domain (Domain 30).
+Regional or enterprise-wide layer for multi-facility command center operations. Data arrives here only via a WAN-capable Routing Service from individual Hospital Integration databuss (Domain 20) — no hospital application publishes directly to the Cloud domain (Domain 30).
 
-The Cloud domain aggregates across facilities the same way the Hospital domain aggregates across ORs:
+The Cloud domain aggregates across facilities the same way the Hospital Integration databus aggregates across ORs:
 
 - **Facility-level partitions** isolate data by hospital: `facility/hospital-a`, `facility/hospital-b`
 - **Wildcard partition matching** (`facility/*`) enables enterprise-wide aggregation
@@ -533,17 +533,17 @@ The Cloud domain aggregates across facilities the same way the Hospital domain a
 - A **central Collector Service** aggregates telemetry forwarded from per-hospital Collectors and stores it in Prometheus (metrics) and Grafana Loki (logs) for enterprise-wide observability
 - A **Connext Runtime MCP Server** is deployed at the cloud level alongside the central Collector Service. It queries per-hospital Collector Service instances reachable from the cloud network, runs specialized diagnostic tooling to aggregate system health data, and serves as the backend for an AI-agent-powered frontend where users can ask natural-language questions about hospital DDS system health, participant topology, QoS compliance, and operational characteristics across the enterprise
 
-The WAN Routing Service bridge uses the **RTI Real-Time WAN Transport** (`UDPv4_WAN`) for NAT/firewall-traversal cross-site communication, with **Cloud Discovery Service** providing multicast-free discovery across WAN-connected sites. **Connext Security Plugins** are required on all WAN connections — mutual authentication, encrypted data, and governance enforcement. Each hospital runs its own WAN Routing Service instance that selectively forwards Hospital domain data to the Cloud domain.
+The WAN Routing Service bridge uses the **RTI Real-Time WAN Transport** (`UDPv4_WAN`) for NAT/firewall-traversal cross-site communication, with **Cloud Discovery Service** providing multicast-free discovery across WAN-connected sites. **Connext Security Plugins** are required on all WAN connections — mutual authentication, encrypted data, and governance enforcement. Each hospital runs its own WAN Routing Service instance that selectively forwards Hospital Integration databus data to the Cloud domain.
 
 This layer is deferred to V3.0. The Procedure and Hospital layers are designed so that adding the Cloud layer above them requires **zero changes** to existing modules — only new Routing Service configurations and the Command Center application are added.
 
 ### Orchestration Domain (Domain 11 — Room-Scoped)
 
 Infrastructure lifecycle layer for managing Service Hosts and procedure service deployment.
-The Orchestration domain is architecturally distinct from the Procedure domain because
+The Orchestration databus is architecturally distinct from the Procedure databuses because
 orchestration has a fundamentally different lifecycle — Service Hosts and the Procedure
 Controller persist across multiple procedures, shift changes, and OR reassignments, whereas
-Procedure domain data is scoped to a single active procedure.
+Procedure DDS domain data is scoped to a single active procedure.
 
 Orchestration is **room-scoped** in V1.x: all orchestration participants (Procedure
 Controller and Service Hosts) operate within a single room's deployment. The Procedure
@@ -569,17 +569,17 @@ Controller runs as a room-level application alongside Service Hosts and the Digi
 
 #### Why a Separate Domain (Not a Domain Tag)
 
-The Procedure domain's domain tags isolate **risk classes** of surgical data. Orchestration is not a risk class — it is an infrastructure control-plane with a different lifecycle, different failure modes, and different security posture:
+The Procedure DDS domain's domain tags isolate **risk classes** of surgical data. Orchestration is not a risk class — it is an infrastructure control-plane with a different lifecycle, different failure modes, and different security posture:
 
-- **Lifecycle:** A Service Host on a robot cart persists across procedures, shift changes, and OR reassignments. Procedure domain data is ephemeral per-procedure.
-- **Scope:** Orchestration may eventually span multiple ORs or the entire facility (V3 upgrade path). Procedure domain data is always OR-local.
+- **Lifecycle:** A Service Host on a robot cart persists across procedures, shift changes, and OR reassignments. Procedure DDS domain data is ephemeral per-procedure.
+- **Scope:** Orchestration may eventually span multiple ORs or the entire facility (V3 upgrade path). Procedure DDS domain data is always OR-local.
 - **Failure isolation:** An orchestration failure (controller crash, RPC timeout) must not disrupt an in-progress surgical procedure. Domain-level isolation guarantees this — orchestration discovery, transport, and resource contention are fully separated from surgical data paths.
 - **Security:** In V2, orchestration commands (`start_service`, `stop_service`) require different governance than surgical data (e.g., only an authenticated Procedure Controller may issue lifecycle commands).
 
 #### Routing Topology
 
-The Orchestration domain (Domain 11) does **not** sit on the primary data path between the
-Procedure and Hospital domains. However, the per-room Routing Service (MedtechBridge)
+The Orchestration databus (Domain 11) does **not** sit on the primary data path between the
+Procedure and Hospital Integration databuss. However, the per-room Routing Service (MedtechBridge)
 selectively bridges **`ServiceCatalog`** from Domain 11 → Domain 20 so that the hospital
 dashboard can discover room GUIs and Service Hosts without joining Domain 11 directly.
 
@@ -595,7 +595,7 @@ no reverse path through the integration domain.
 
 #### The Orchestration Domain Has No Domain Tags
 
-All orchestration participants — the Procedure Controller and all Service Hosts — discover each other directly on the Orchestration domain. Domain tags are not needed because:
+All orchestration participants — the Procedure Controller and all Service Hosts — discover each other directly on the Orchestration databus. Domain tags are not needed because:
 
 - There is no risk-class separation concern — all orchestration traffic is infrastructure
 - The Procedure Controller needs to communicate with all Service Hosts regardless of their specialization
@@ -603,7 +603,7 @@ All orchestration participants — the Procedure Controller and all Service Host
 
 #### Orchestration Partition Strategy
 
-The Orchestration domain uses **static DomainParticipant-level partitions** for tier isolation.
+The Orchestration databus uses **static DomainParticipant-level partitions** for tier isolation.
 Partitions are set once at startup and never changed during a participant's lifetime —
 avoiding the re-discovery churn that runtime partition changes would cause.
 Room and procedure context is carried as data in `ServiceCatalog` property fields, not as
@@ -616,11 +616,11 @@ partition strings (see [data-model.md — Domain 11](data-model.md)).
 | `*` | Cross-tier observer (e.g., hospital admin dashboard) — set at startup, never changed | All orchestration tiers |
 | `unassigned` | Service Hosts not yet configured with an orchestration tier | Unconfigured host pool |
 
-Publisher/Subscriber Partition QoS is **not used** on the Orchestration domain.
+Publisher/Subscriber Partition QoS is **not used** on the Orchestration databus.
 
 #### Communication Model
 
-The Orchestration domain uses a **hybrid RPC + pub/sub** model:
+The Orchestration databus uses a **hybrid RPC + pub/sub** model:
 
 - **DDS RPC** (`ServiceHostControl` interface, `Pattern.RPC` QoS) — directed, transactional commands from Procedure Controller to a specific Service Host. Each Service Host exposes a uniquely-named RPC service instance (`ServiceHostControl/<host_id>`).
 - **Pub/sub** (`ServiceCatalog` and `ServiceStatus` topics, `Pattern.Status` QoS) — asynchronous state distribution. Service Hosts publish per-service capabilities and lifecycle state. TRANSIENT_LOCAL durability enables state reconstruction by late-joining or restarting controllers.
@@ -629,7 +629,7 @@ See [data-model.md — Domain 11](data-model.md) for topic definitions and RPC i
 
 ### Alert Data Flow — Two Independent Pathways
 
-Two semantically distinct alert pathways coexist on the Hospital domain. They are
+Two semantically distinct alert pathways coexist on the Hospital Integration databus. They are
 **not redundant** — they originate from different sources, serve different purposes,
 and the dashboard consumes both.
 
@@ -666,24 +666,24 @@ Procedure Domain (clinical tag)              Hospital Domain
 
 | Attribute | Detail |
 |-----------|--------|
-| **Origin** | Bedside monitor simulator (Procedure domain, `clinical` tag) |
+| **Origin** | Bedside monitor simulator (Procedure DDS domain, `clinical` tag) |
 | **Trigger** | Immediate threshold violation on a single vital sign (e.g., HR ≥ 120 bpm) |
 | **Latency** | Sub-second — alarm is raised in the same publication cycle as the triggering vital |
 | **Semantics** | Raw device alarm: "this sensor reading exceeded a configured limit right now" |
 | **Lifecycle** | Alarm is ACTIVE when the condition holds, transitions to CLEARED when the vital returns to normal range |
-| **Transport** | Published on Procedure domain (`clinical` tag), bridged to Hospital domain via Routing Service |
+| **Transport** | Published on Procedure clinical databus, bridged to Hospital Integration databus via Routing Service |
 | **Consumer** | Dashboard alert feed (direct display), ClinicalAlerts engine (optional — could incorporate device alarms into risk models in future versions) |
 
 #### Pathway 2 — Analytics-Level Alerts (`ClinicalAlert`)
 
 | Attribute | Detail |
 |-----------|--------|
-| **Origin** | ClinicalAlerts engine (publishes natively on the Hospital domain — not bridged) |
+| **Origin** | ClinicalAlerts engine (publishes natively on the Hospital Integration databus — not bridged) |
 | **Trigger** | Computed risk score exceeds a configured threshold (e.g., hemorrhage risk ≥ 0.7), or a direct vital-sign rule fires (e.g., HR > 150 bpm) |
 | **Latency** | ≤ 500 ms after receiving the triggering vitals sample |
 | **Semantics** | Analytical assessment: "based on a weighted model of multiple vital signs, this patient's clinical risk is elevated" |
 | **Lifecycle** | Alert is published once per threshold crossing; duplicates are suppressed for sustained conditions at the same severity; alert resolves when the score drops below threshold |
-| **Transport** | Published directly on Hospital domain — no Routing Service involvement |
+| **Transport** | Published directly on Hospital Integration databus — no Routing Service involvement |
 | **Consumer** | Dashboard alert feed (displayed alongside device alarms, distinguished by category) |
 
 #### Why Both Exist
@@ -703,8 +703,8 @@ Procedure Domain (clinical tag)              Hospital Domain
 - **Do not merge the pathways.** `AlarmMessages` and `ClinicalAlert` are independent
   data flows. The ClinicalAlerts engine does not re-publish device alarms as `ClinicalAlert`.
   The bedside monitor does not publish `ClinicalAlert`.
-- **Do not bridge `ClinicalAlert` back to the Procedure domain.** It originates on
-  and stays on the Hospital domain. (This is consistent with the Hospital-domain
+- **Do not bridge `ClinicalAlert` back to the Procedure DDS domain.** It originates on
+  and stays on the Hospital Integration databus. (This is consistent with the Hospital-domain
   observer-only design — see [Hospital Domain](#hospital-domain).)
 
 ---
@@ -763,7 +763,7 @@ If an application must operate across multiple contexts simultaneously, it shoul
 ```
 ┌──────────────────────────────────┐
 │  Surgical LAN (per OR)           │  Dedicated, low-latency network
-│  • Robot controller              │  Procedure domain (all tags)
+│  • Robot controller              │  Procedure DDS domain (all tags)
 │  • Surgeon console               │  Domain partition: room/OR-n/procedure/...
 │  • Digital twin display          │
 │  • Bedside monitors              │
@@ -775,7 +775,7 @@ If an application must operate across multiple contexts simultaneously, it shoul
                  │
 ┌────────────────▼─────────────────┐
 │  Hospital Backbone Network       │  Standard LAN/VLAN
-│  • Dashboard servers             │  Hospital domain
+│  • Dashboard servers             │  Hospital Integration databus
 │  • ClinicalAlerts engine                    │
 │  • Nurse station                 │
 │                                  │  Note: multicast is commonly restricted
@@ -951,7 +951,7 @@ Each hospital instance launches an RTI Collector Service container
 (`rticom/collector-service`) on `hospital-net` as base infrastructure.
 Monitoring Library 2.0, enabled on every DDS participant, automatically
 forwards metrics, logs, and security events to the local Collector
-Service via its dedicated participant on the Room Observability domain
+Service via its dedicated participant on the Room Observability databus
 (Domain 19).
 
 The hospital-level Collector operates as a **forwarding Collector** per
@@ -1055,7 +1055,7 @@ hospital command center runs on the backbone.
 
 > **Room-level GUI containers** (controller, twin, future camera display) are launched
 > by `medtech run or`, not by `medtech run hospital`. Each room GUI joins both
-> `surgical-net` (for Procedure domain data) and `orchestration-net` (for
+> `surgical-net` (for Procedure DDS domain data) and `orchestration-net` (for
 > `medtech.gui.room_nav` sibling discovery via `ServiceCatalog`). Each is served
 > on its own host port — separate origins from the hospital dashboard.
 
@@ -1145,8 +1145,8 @@ to prevent intermittent initialization failures:
    from the beginning.
 3. **Surgical procedure instances** start after the gateway is healthy.
    They operate entirely on `surgical-net` and do not depend on Routing Service or
-   Hospital domain services.
-4. **Hospital domain applications** (dashboard, ClinicalAlerts engine) start after the
+   Hospital Integration databus services.
+4. **Hospital Integration databus applications** (dashboard, ClinicalAlerts engine) start after the
    gateway (including RS) is healthy.
 5. **Visualization stack** (Prometheus, Grafana Loki, Grafana) — when enabled via
    `--observability` for local development, or as cloud infrastructure in V3.0 —
@@ -1291,7 +1291,7 @@ On the **Domain 11 (Orchestration) input side**, the Routing Service participant
 `procedure` DomainParticipant partition (matching the Orchestration partition strategy) to
 discover Service Host `ServiceCatalog` publications.
 
-Hospital domain consumers (e.g., the dashboard) subscribe with wildcard partition
+Hospital Integration databus consumers (e.g., the dashboard) subscribe with wildcard partition
 `room/*/procedure/*` and use content-based filtering on data fields (e.g.,
 `ProcedureContext.room_id`) to narrow to a specific room — room narrowing is an
 application-layer filter, not a partition change.
@@ -1315,7 +1315,7 @@ WAN transport uses the RTI Real-Time WAN Transport (`UDPv4_WAN`) for NAT/firewal
 ### Teleoperation Routing Service (V2.1)
 
 V2.1 teleoperation introduces a **reverse data path** from the Hospital
-and Cloud domains into the Procedure domain for remote operator control.
+and Cloud domains into the Procedure DDS domain for remote operator control.
 This is a fundamentally different data flow from the existing Procedure →
 Hospital observational bridge and requires dedicated routing
 infrastructure.
@@ -1325,7 +1325,7 @@ infrastructure.
 The surgeon console application publishes `OperatorInput` with a fixed
 ownership strength (200) regardless of its deployment location. When the
 console is deployed at the hospital or cloud level, its `OperatorInput`
-samples reach the Procedure domain via Routing Service. The Routing
+samples reach the Procedure DDS domain via Routing Service. The Routing
 Service output DataWriter is configured with a **lower ownership
 strength** than the console's native strength:
 
@@ -1345,9 +1345,9 @@ reader — standard DDS exclusive ownership behavior.
 
 The reverse teleoperation route uses a **separate `domain_route`** from
 the existing observational bridge. It creates dedicated
-DomainParticipants with the `control` domain tag on the Procedure domain
+DomainParticipants with the `control` domain tag on the Procedure DDS domain
 side. This enforces the same risk-class isolation in the routing
-infrastructure that exists between direct Procedure domain participants.
+infrastructure that exists between direct Procedure DDS domain participants.
 
 The control-tag route is architecturally independent:
 - Separate participants (different domain tags)

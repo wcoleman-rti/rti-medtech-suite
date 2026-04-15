@@ -5,9 +5,9 @@ milestone: dynamic spawning, spatial assignment, and positioning of
 multiple robot arm services around a surgical table, with full lifecycle
 visibility from the Procedure Controller and digital twin display.
 
-All scenarios assume the Procedure domain `control` tag and DomainParticipant partition
+All scenarios assume the Procedure control databus and DomainParticipant partition
 `room/<room_id>/procedure/<procedure_id>` unless stated otherwise.
-Orchestration domain scenarios use DomainParticipant partition `procedure` (tier partition,
+Orchestration databus scenarios use DomainParticipant partition `procedure` (tier partition,
 set statically at startup — see [spec/procedure-orchestration.md](procedure-orchestration.md)).
 
 ---
@@ -31,7 +31,7 @@ set statically at startup — see [spec/procedure-orchestration.md](procedure-or
 | Liveliness for `RobotArmAssignment` | 2 s (inherited from `Patterns::State` via `LivelinessStandard` snippet) |
 | Arm instance correlation | `robot_id` — shared key across `RobotArmAssignment`, `RobotState`, `RobotCommand`, `OperatorInput` |
 | Digital twin rendering | Subscribes to `RobotArmAssignment` on `control` tag; renders arm positions and lifecycle status |
-| Orchestration-to-assignment coordination latency | ≤ 5 s from `ServiceStatus(RUNNING)` on Orchestration domain to first `RobotArmAssignment` sample on Procedure domain |
+| Orchestration-to-assignment coordination latency | ≤ 5 s from `ServiceStatus(RUNNING)` on Orchestration databus to first `RobotArmAssignment` sample on Procedure DDS domain |
 
 *This table must be updated whenever a concrete value in the scenarios below is added or changed.*
 
@@ -42,8 +42,8 @@ set statically at startup — see [spec/procedure-orchestration.md](procedure-or
 ### Scenario: Arm publishes ASSIGNED on startup `@integration` `@multi-arm`
 
 **Given** a robot arm service has been started by a Service Host via `start_service` RPC
-**And** the arm service's `ServiceStatus` is `RUNNING` on the Orchestration domain
-**When** the arm service initializes its Procedure domain `control`-tag participant
+**And** the arm service's `ServiceStatus` is `RUNNING` on the Orchestration databus
+**When** the arm service initializes its Procedure control databus participant
 **Then** the arm publishes a `RobotArmAssignment` sample with `status = ASSIGNED` and the requested `table_position`
 **And** remote subscribers (Procedure Controller, digital twin) begin tracking this `robot_id` instance
 
@@ -86,7 +86,7 @@ set statically at startup — see [spec/procedure-orchestration.md](procedure-or
 ### Scenario: RobotArmAssignment is TRANSIENT_LOCAL for late joiners `@integration` `@multi-arm` `@durability`
 
 **Given** two arms have published `RobotArmAssignment` samples and are in `OPERATIONAL` state
-**When** the Procedure Controller restarts and joins the Procedure domain `control` tag
+**When** the Procedure Controller restarts and joins the Procedure control databus
 **Then** the controller immediately receives the most recent `RobotArmAssignment` sample for each arm
 **And** reconstructs the full table layout without re-querying the arms
 
@@ -119,8 +119,8 @@ set statically at startup — see [spec/procedure-orchestration.md](procedure-or
 
 **Given** the Procedure Controller sends `start_service` to a Robot Service Host
 **When** the Service Host spawns the arm service
-**Then** `ServiceStatus(state = RUNNING)` is published on the Orchestration domain first
-**And** `RobotArmAssignment(status = ASSIGNED)` is published on the Procedure domain `control` tag within 5 s
+**Then** `ServiceStatus(state = RUNNING)` is published on the Orchestration databus first
+**And** `RobotArmAssignment(status = ASSIGNED)` is published on the Procedure control databus within 5 s
 **And** the Procedure Controller correlates the two via matching `robot_id` / `service_id`
 
 ### Scenario: Procedure Controller waits for all arms OPERATIONAL before enabling control `@integration` `@multi-arm`
@@ -194,28 +194,28 @@ set statically at startup — see [spec/procedure-orchestration.md](procedure-or
 
 ## Procedure Controller Enhancement
 
-### Scenario: Procedure Controller joins Procedure domain control tag `@integration` `@multi-arm` `@orchestration`
+### Scenario: Procedure Controller joins Procedure DDS domain control tag `@integration` `@multi-arm` `@orchestration`
 
 **Given** the Procedure Controller process starts
 **When** the controller creates its DomainParticipants
-**Then** one participant is on the Orchestration domain (for RPC and status)
-**And** one participant is on the Procedure domain with `control` domain tag (for `RobotArmAssignment` subscription)
-**And** one participant is on the Hospital domain (for scheduling context, read-only)
+**Then** one participant is on the Orchestration databus (for RPC and status)
+**And** one participant is on the Procedure DDS domain with `control` domain tag (for `RobotArmAssignment` subscription)
+**And** one participant is on the Hospital Integration databus (for scheduling context, read-only)
 **And** the controller has 3 DomainParticipants total (plus Observability)
 
 ### Scenario: Procedure Controller subscribes to RobotArmAssignment `@integration` `@multi-arm`
 
-**Given** the Procedure Controller has a Procedure domain `control`-tag participant
+**Given** the Procedure Controller has a Procedure control databus participant
 **When** arm services publish `RobotArmAssignment` in the same partition
 **Then** the controller receives all arm assignment updates
 **And** can build and maintain a complete table layout view
 
-### Scenario: Procedure Controller is read-only on the Procedure domain `@integration` `@multi-arm` `@isolation`
+### Scenario: Procedure Controller is read-only on the Procedure DDS domain `@integration` `@multi-arm` `@isolation`
 
-**Given** the Procedure Controller has a Procedure domain `control`-tag participant
+**Given** the Procedure Controller has a Procedure control databus participant
 **When** the controller processes `RobotArmAssignment` data
-**Then** the controller only subscribes (reads) — it never publishes on the Procedure domain
-**And** all procedure-level commands are issued via the Orchestration domain RPC interface
+**Then** the controller only subscribes (reads) — it never publishes on the Procedure DDS domain
+**And** all procedure-level commands are issued via the Orchestration databus RPC interface
 
 ### Scenario: Procedure Controller table layout UI `@gui` `@multi-arm`
 
@@ -231,7 +231,7 @@ set statically at startup — see [spec/procedure-orchestration.md](procedure-or
 
 ### Scenario: Digital twin subscribes to RobotArmAssignment `@integration` `@multi-arm` `@gui`
 
-**Given** the digital twin display is running with a Procedure domain `control`-tag participant
+**Given** the digital twin display is running with a Procedure control databus participant
 **When** arm services publish `RobotArmAssignment` in the same partition
 **Then** the digital twin receives arm assignment and positioning data
 **And** renders all arms at their table positions
@@ -280,19 +280,19 @@ set statically at startup — see [spec/procedure-orchestration.md](procedure-or
 
 ### Scenario: RobotArmAssignment is on the control tag `@integration` `@multi-arm` `@isolation`
 
-**Given** a publisher for `RobotArmAssignment` on the Procedure domain `control` tag
-**And** a subscriber on the Procedure domain `clinical` tag attempting to subscribe to `RobotArmAssignment`
+**Given** a publisher for `RobotArmAssignment` on the Procedure control databus
+**And** a subscriber on the Procedure clinical databus attempting to subscribe to `RobotArmAssignment`
 **When** both participants are active
 **Then** they do not discover each other
 **And** no `RobotArmAssignment` data crosses domain tag boundaries
 
-### Scenario: Orchestration domain failure does not affect arm assignment data `@integration` `@multi-arm` `@isolation`
+### Scenario: Orchestration databus failure does not affect arm assignment data `@integration` `@multi-arm` `@isolation`
 
-**Given** arms are `OPERATIONAL` and publishing `RobotArmAssignment` on the Procedure domain
-**And** the Procedure Controller is managing services via the Orchestration domain
+**Given** arms are `OPERATIONAL` and publishing `RobotArmAssignment` on the Procedure DDS domain
+**And** the Procedure Controller is managing services via the Orchestration databus
 **When** the Procedure Controller process crashes
-**Then** `RobotArmAssignment` samples continue flowing on the Procedure domain without interruption
-**And** no deadline violations or liveliness losses occur on `RobotArmAssignment` due to the Orchestration domain failure
+**Then** `RobotArmAssignment` samples continue flowing on the Procedure DDS domain without interruption
+**And** no deadline violations or liveliness losses occur on `RobotArmAssignment` due to the Orchestration databus failure
 
 ---
 
@@ -301,7 +301,7 @@ set statically at startup — see [spec/procedure-orchestration.md](procedure-or
 ### Scenario: Multi-arm procedure lifecycle end-to-end `@e2e` `@multi-arm` `@acceptance`
 
 **Given** a Procedure Controller, 2 Robot Service Hosts, and a digital twin display are running in Docker Compose
-**And** the Procedure Controller is on the Orchestration domain and the Procedure domain `control` tag
+**And** the Procedure Controller is on the Orchestration databus and the Procedure control databus
 **When** the Procedure Controller issues `start_service` RPCs for 2 arms at positions `LEFT` and `RIGHT`
 **Then** both Service Hosts spawn arm services
 **And** both arms publish `RobotArmAssignment` transitioning through `ASSIGNED → POSITIONING → OPERATIONAL`

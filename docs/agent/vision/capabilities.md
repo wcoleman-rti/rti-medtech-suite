@@ -18,7 +18,7 @@ A multi-instance module — each running instance represents one operating room 
 | **Camera Feed** | Simulated endoscope/surgical camera publishing frames (metadata + image reference). Consumed by operator display and optional processing pipeline. | Procedure (`operational`) |
 | **Patient Vitals** | Simulated bedside monitor publishing vital signs (HR, SpO2, BP, temp, etc.) and physiological waveforms (ECG, pleth, capnography). Alarm generation on threshold violations. | Procedure (`clinical`) |
 | **Procedure Context** | Medical setting metadata: hospital, room, bed, assigned patient, procedure type, surgeon, anesthesiologist, start time. Published once at procedure start, updated on changes. Durable for late joiners. | Procedure (`operational`) |
-| **Procedure Status** | Running status of the procedure (in-progress, completing, alert). Published periodically and on state transitions. Durable for late joiners. Bridged to Hospital domain via Routing Service for dashboard consumption. | Procedure (`operational`) |
+| **Procedure Status** | Running status of the procedure (in-progress, completing, alert). Published periodically and on state transitions. Durable for late joiners. Bridged to Hospital Integration databus via Routing Service for dashboard consumption. | Procedure (`operational`) |
 | **Device Telemetry** | Simulated device status for ancillary devices (infusion pump, anesthesia machine). Read-only telemetry for dashboard consumption. | Procedure (`clinical`) |
 | **Digital Twin Display** | Per-OR NiceGUI 3D web application rendering the surgical robot arm — joint positions (forward kinematics), tool tip, active command, operational mode, and safety interlock status. Read-only subscriber to `control`-tag topics (`RobotState`, `RobotCommand`, `SafetyInterlock`, `OperatorInput`). Uses time-based filter to downsample to the rendering frame rate. Accessible from any browser on the network at `/twin/{room_id}`. | Procedure (`control`) |
 
@@ -51,9 +51,9 @@ A single facility-wide NiceGUI web application providing facility-level situatio
 
 #### Architecture
 
-- Subscribes to Hospital domain topics (Domain 20)
-- All room data arrives via Routing Service bridge from Procedure and Orchestration domains — the dashboard never joins a room-level domain directly
-- Room discovery uses RS-bridged `ServiceCatalog` (from Domain 11 via per-room MedtechBridge) — each `ServiceCatalog` entry carries `room_id` and `gui_url` properties
+- Subscribes to Hospital Integration databus topics (Hospital Integration databus)
+- All room data arrives via Routing Service bridge from Procedure and Orchestration databuss — the dashboard never joins a room-level domain directly
+- Room discovery uses RS-bridged `ServiceCatalog` (from the Orchestration databus via per-room MedtechBridge) — each `ServiceCatalog` entry carries `room_id` and `gui_url` properties
 - Uses content-filtered topics to support per-room drill-down views within the dashboard (vitals, alerts)
 - DDS reads run as asyncio coroutines via `background_tasks.create()` on the NiceGUI event loop; UI refreshes driven by `ui.timer()` and `@ui.refreshable`
 
@@ -68,13 +68,13 @@ The medtech suite uses a **cross-plane, cross-origin** navigation model that ref
 | **Room ↔ Room (horizontal)** | Within a room tab, a shared nav pill shows sibling room-level GUIs (controller, twin, future services). Clicking a sibling navigates the current tab to that sibling's URL. Same-tab, potentially cross-origin (separate containers). | Standard nav pill buttons |
 
 **Horizontal room-nav implementation:** All room-level GUI services share a reusable navigation module (`medtech.gui.room_nav`) that:
-- Creates a single read-only Orchestration domain participant (subscribes to `ServiceCatalog` filtered by `room_id`)
+- Creates a single read-only Orchestration databus participant (subscribes to `ServiceCatalog` filtered by `room_id`)
 - Discovers sibling GUI URLs dynamically as services start/stop — no environment variable configuration
 - Renders a common floating nav pill with buttons for each discovered sibling GUI
 
 Room GUIs have **no upward visibility** to the hospital level. A room can be deployed in complete isolation without a hospital instance above it. To return to the hospital dashboard, the user simply closes the room tab or switches to the still-open hospital tab.
 
-This model is deployment-agnostic: it works identically whether GUIs run in Docker containers, on physical hosts in an OR, or in a mixed environment. Each GUI service only needs Orchestration domain network reachability to discover siblings.
+This model is deployment-agnostic: it works identically whether GUIs run in Docker containers, on physical hosts in an OR, or in a mixed environment. Each GUI service only needs Orchestration databus network reachability to discover siblings.
 
 ### Module 3: Clinical Alerts & Decision Support
 
@@ -94,14 +94,14 @@ A Clinical Decision Support (ClinicalAlerts module) engine that subscribes to pa
 
 | Feature | Where Exercised |
 |---------|-----------------|
-| Multi-domain isolation | Procedure domain (Domain 10) vs Hospital integration domain (Domain 20) vs Orchestration domain (Domain 11) |
-| Domain tags (risk-class) | `control` vs `clinical` vs `operational` within Procedure domain |
+| Multi-domain isolation | Procedure DDS domain vs Hospital integration domain (Hospital Integration databus) vs Orchestration databus (Orchestration databus) |
+| Domain tags (risk-class) | `control` vs `clinical` vs `operational` within Procedure DDS domain |
 | Domain partitions | Room/procedure isolation across surgical instances; wildcard matching for aggregation |
 | Real-time deterministic streaming | Robot teleop, waveforms, camera frames |
 | QoS differentiation | Stream vs State vs Command patterns, topic-filter-bound profiles |
 | Content-filtered topics | Dashboard per-room views, ClinicalAlerts per-patient subscription |
 | Time-based filter | GUI readers downsampled to display refresh rate |
-| Routing Service (per-room MedtechBridge) | Domain 10+11 → Domain 20, selective topic/data forwarding |
+| Routing Service (per-room MedtechBridge) | Procedure + Orchestration → Hospital Integration, selective topic/data forwarding |
 | TRANSIENT_LOCAL durability | Late-joining dashboards receive current state |
 | Exclusive ownership (failover) | Service gateway redundancy (simulated) |
 | XML-based QoS configuration | All QoS from shared profiles, zero programmatic QoS |
@@ -121,11 +121,11 @@ The full release version policy — including version increment rules, release c
 
 ### V1.0.0 — Procedure Orchestration (merged into V1.0)
 
-**Theme:** Introduce a service-oriented orchestration layer for managing the lifecycle of surgical procedure services across distributed Service Hosts, using DDS RPC for directed commands and pub/sub for asynchronous state distribution on a dedicated Orchestration domain. Implemented before Phase 3 (Hospital Dashboard) to establish the `medtech::Service` interface and apply IDL breaking changes (Foxglove translatability) while the consumer surface is minimal.
+**Theme:** Introduce a service-oriented orchestration layer for managing the lifecycle of surgical procedure services across distributed Service Hosts, using DDS RPC for directed commands and pub/sub for asynchronous state distribution on a dedicated Orchestration databus. Implemented before Phase 3 (Hospital Dashboard) to establish the `medtech::Service` interface and apply IDL breaking changes (Foxglove translatability) while the consumer surface is minimal.
 
 #### Service Interface & Dual-Mode Services
 - **`medtech::Service` abstract interface** (C++ abstract class, Python ABC) defining the contract for all DDS service classes: `run()`, `stop()`, `name`, `state` — enabling consistent lifecycle management across languages
-- **`ServiceState` enum** — pollable state exposed by every service: `STOPPED`, `STARTING`, `RUNNING`, `STOPPING`, `FAILED`, `UNKNOWN` — the Service Host polls this and publishes `ServiceStatus` to the Orchestration domain
+- **`ServiceState` enum** — pollable state exposed by every service: `STOPPED`, `STARTING`, `RUNNING`, `STOPPING`, `FAILED`, `UNKNOWN` — the Service Host polls this and publishes `ServiceStatus` to the Orchestration databus
 - **Dual-mode constructor** — all existing V1.0 service classes (robot controller, bedside monitor, camera simulator, operator console, device gateway, procedure context publisher) refactored to accept a nullable `DomainParticipant` parameter:
   - `None` / `dds::core::null` → standalone mode: service creates its own participant (backward-compatible with existing Docker Compose deployment)
   - Valid participant → hosted mode: service uses the provided participant, lifecycle managed by Service Host
@@ -135,9 +135,9 @@ The full release version policy — including version increment rules, release c
 #### Procedure Controller
 - Surgeon-facing NiceGUI web application (`/controller/{room_id}`) for driving the procedure lifecycle
 - **Room-deployed** standalone application — deployed in a per-room container alongside other room-level GUI services (digital twin, future camera display, etc.). The controller is **not** served by the hospital-level container.
-- Participates on the Orchestration domain (Domain 11, room-scoped) for RPC and status, and on the Procedure domain (read-only: `operational` for ProcedureStatus/ProcedureContext, `control` for RobotArmAssignment)
-- Issues service lifecycle commands via DDS RPC (`ServiceHostControl` interface) to targeted Service Hosts on the Orchestration domain
-- Subscribes to `ServiceCatalog` and `ServiceStatus` topics on the Orchestration domain for real-time visibility of host availability and service state
+- Participates on the Orchestration databus (Orchestration databus, room-scoped) for RPC and status, and on the Procedure DDS domain (read-only: `operational` for ProcedureStatus/ProcedureContext, `control` for RobotArmAssignment)
+- Issues service lifecycle commands via DDS RPC (`ServiceHostControl` interface) to targeted Service Hosts on the Orchestration databus
+- Subscribes to `ServiceCatalog` and `ServiceStatus` topics on the Orchestration databus for real-time visibility of host availability and service state
 - Reconstructs full orchestration state on restart via TRANSIENT_LOCAL status topics
 - **Procedure Lifecycle Workflow:**
   1. User clicks "Start Procedure" on the room's controller page
@@ -152,22 +152,22 @@ The full release version policy — including version increment rules, release c
 #### Service Host Framework
 - Distributed process that hosts and manages DDS services locally on behalf of the Procedure Controller
 - Exposes a `ServiceHostControl` RPC service (uniquely named per host instance) for receiving start/stop/configure commands
-- Polls hosted services’ `state` property and publishes `ServiceCatalog` (per-service capabilities, configuration descriptors, health) and `ServiceStatus` (per-service lifecycle state) on the Orchestration domain
+- Polls hosted services’ `state` property and publishes `ServiceCatalog` (per-service capabilities, configuration descriptors, health) and `ServiceStatus` (per-service lifecycle state) on the Orchestration databus
 - Reconciliation loop: on startup or controller reconnection, compares desired state from RPC commands against actual local service state and converges
 - Specialized subtypes: Robot Service Host (C++, manages robot controller), Clinical Service Host (Python, manages vitals/alarms/telemetry), Operational Service Host (Python, manages camera/context)
 
 #### Orchestration Domain
 - New dedicated DDS domain (no domain tags) for infrastructure lifecycle management
-- Completely isolated from the Procedure domain's surgical data — different lifecycle (Service Hosts span multiple procedures)
-- Procedure domain continues to route directly to Hospital domain via Routing Service — Orchestration domain is **not** on that data path
+- Completely isolated from the Procedure databuses's surgical data — different lifecycle (Service Hosts span multiple procedures)
+- Procedure DDS domain continues to route directly to Hospital Integration databus via Routing Service — Orchestration databus is **not** on that data path
 - Hybrid communication model: DDS RPC (`Pattern.RPC`) for directed commands, pub/sub (`Pattern.Status`) for asynchronous state
 
 | Module / Capability | Connext Features Demonstrated |
 |---------------------|-------------------------------|
-| Procedure Controller (NiceGUI web app) | DDS RPC client (Modern C++ and Python), Orchestration participant (Domain 11, room-scoped) + Procedure read-only participants (`operational` + `control`), asyncio integration |
+| Procedure Controller (NiceGUI web app) | DDS RPC client (Modern C++ and Python), Orchestration participant (Orchestration databus, room-scoped) + Procedure read-only participants (`operational` + `control`), asyncio integration |
 | Room-level GUI navigation (`medtech.gui.room_nav`) | Shared Orchestration read-only participant for dynamic sibling GUI discovery via `ServiceCatalog` `gui_url` properties |
 | Service Host framework | DDS RPC service, dual-mode service lifecycle, per-host unique service naming |
-| Orchestration domain | Dedicated domain for infrastructure control-plane, `Pattern.Status` for state topics, `Pattern.RPC` for command channel |
+| Orchestration databus | Dedicated domain for infrastructure control-plane, `Pattern.Status` for state topics, `Pattern.RPC` for command channel |
 | `ServiceCatalog` + `ServiceStatus` topics | TRANSIENT_LOCAL state reconstruction, write-on-change, liveliness-based host failure detection |
 | `ServiceHostControl` RPC interface | IDL `@service` interface, typed request/reply, generated client/service stubs for C++ and Python |
 | `medtech::Service` interface | Consistent service contract across C++ and Python, pollable `ServiceState` for lifecycle reporting |
@@ -178,10 +178,10 @@ The full release version policy — including version increment rules, release c
 
 Additive within the V1 milestone. No structural changes to V1.0 modules.
 
-- **RTI Recording Service** — passive multi-domain capture of all DDS traffic across Procedure, Hospital, and Orchestration domains. Recording Service operates as a multi-domain subscriber, joining the Procedure domain (all domain tags), the Hospital domain, and the Orchestration domain simultaneously. A single Recording Service instance captures the complete system state.
+- **RTI Recording Service** — passive multi-domain capture of all DDS traffic across Procedure, Hospital, and Orchestration databuss. Recording Service operates as a multi-domain subscriber, joining the Procedure DDS domain (all domain tags), the Hospital Integration databus, and the Orchestration databus simultaneously. A single Recording Service instance captures the complete system state.
 - **RTI Replay Service** — deterministic replay into subscriber applications for training, incident review, and regression testing
 - `@recording` and `@replay` spec scenarios added to cover capture completeness and replay fidelity
-- **Resource Status** — `ResourceAvailability` topic on the Hospital domain: OR, bed, equipment,
+- **Resource Status** — `ResourceAvailability` topic on the Hospital Integration databus: OR, bed, equipment,
   and staff availability simulator; resource status panel added to the Hospital Dashboard.
   Deferred from V1.0 to keep the initial release scope focused. Spec scenarios and a new
   implementation step will be authored when this milestone is approved for implementation.
@@ -259,7 +259,7 @@ the Procedure Controller and digital twin display.
 
 #### Robot Arm Assignment & Positioning
 - **`RobotArmAssignment` topic** — new write-on-change state topic on the
-  Procedure domain (`control` tag, Class C / Class III) tracking each
+  Procedure DDS domain (`control` tag, Class C / Class III) tracking each
   arm's table position and assignment lifecycle
 - **`ArmAssignmentState` lifecycle:** `IDLE → ASSIGNED → POSITIONING →
   OPERATIONAL` with `dispose()` on arm departure
@@ -273,12 +273,12 @@ the Procedure Controller and digital twin display.
 
 #### Orchestration Flow
 1. Procedure Controller issues `start_service` RPC to a Robot Service
-   Host on the Orchestration domain — includes desired table position in
+   Host on the Orchestration databus — includes desired table position in
    the service configuration
 2. Service Host spawns the arm service and publishes
-   `ServiceStatus(state = RUNNING)` on the Orchestration domain
+   `ServiceStatus(state = RUNNING)` on the Orchestration databus
 3. Arm service writes `RobotArmAssignment(status = ASSIGNED)` on the
-   Procedure domain (`control` tag) — remote subscribers begin tracking
+   Procedure control databus — remote subscribers begin tracking
    the instance
 4. Arm transitions to `POSITIONING` — publishes updated assignment as it
    moves to the requested table position
@@ -299,9 +299,9 @@ the Procedure Controller and digital twin display.
 - Clickable per-arm overlay showing capabilities and assignment state
 
 #### Procedure Controller Enhancement
-- Adds a Procedure domain `control`-tag DomainParticipant for
+- Adds a Procedure control databus DomainParticipant for
   subscribing to `RobotArmAssignment` (in addition to existing
-  Orchestration and Hospital domain participants)
+  Orchestration and Hospital Integration databus participants)
 - Table layout UI showing arm positions, status, and readiness
 - Procedure start gated on all requested arms reaching `OPERATIONAL`
 
@@ -426,7 +426,7 @@ with DDS-enforced control authority arbitration.
   Hospital/Cloud → Procedure data path for remote operator input.
   Uses a **separate `domain_route`** with dedicated `control`-tag
   participants, architecturally isolated from the existing observational
-  bridge. Triggers the Hospital domain tag re-evaluation per the
+  bridge. Triggers the Hospital Integration databus tag re-evaluation per the
   escalation trigger in `system-architecture.md`.
 
 #### Safe-Hold Mode
@@ -485,7 +485,7 @@ with DDS-enforced control authority arbitration.
 - QNX cross-compilation for embedded surgical controller targets
 
 #### Cloud Command Center
-- **Cloud / Enterprise domain** — third layer of the layered databus, above the Hospital domain
+- **Cloud / Cloud Enterprise databus** — third layer of the layered databus, above the Hospital Integration databus
 - **WAN Routing Service** — Real-Time WAN Transport (`UDPv4_WAN`) bridge from Hospital → Cloud domain; per-facility selective forwarding; Connext Security Plugins required on all WAN connections
 - **Command Center Dashboard** — NiceGUI web application (shared design standard) subscribing to the Cloud domain; displays facility status, aggregated alerts, resource utilization, and operational KPIs across multiple hospitals
 - **Facility-level partitions** — `facility/hospital-a`, `facility/hospital-b`; wildcard matching (`facility/*`) for enterprise-wide aggregation

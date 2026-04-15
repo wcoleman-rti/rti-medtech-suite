@@ -1,5 +1,10 @@
 # Revision: Domain ID Migration
 
+> **Terminology note:** This entry uses pre-V1.4.x terminology.
+> "Procedure domain" → "Procedure control/clinical/operational
+> databus"; "Hospital domain" → "Hospital Integration databus";
+> `MedtechDomains` → `Room`/`Hospital`/`Cloud` libraries.
+
 **Goal:** Bring all XML configuration, service configuration, application participant
 definitions, IDL constants, application code, and tests into alignment with the
 decade-offset domain numbering scheme adopted in

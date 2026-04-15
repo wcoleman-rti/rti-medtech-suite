@@ -2,10 +2,10 @@
 
 Behavioral specifications for the V1.0 Procedure Orchestration milestone:
 the `medtech::Service` interface, dual-mode participant pattern, Service
-Host framework, Procedure Controller GUI, Orchestration domain (Domain 11)
+Host framework, Procedure Controller GUI, Orchestration databus (Orchestration databus)
 communication, and DDS RPC lifecycle management.
 
-The Orchestration domain uses **no Publisher/Subscriber partitions** and no
+The Orchestration databus uses **no Publisher/Subscriber partitions** and no
 domain tags. Tier-level visibility isolation is achieved via static
 **DomainParticipant-level partitions** set once at startup and never changed
 during a host or controller's lifetime. Room and procedure context is
@@ -29,7 +29,7 @@ as partition strings.
 | `ServiceCatalog` durability | TRANSIENT_LOCAL (late-joining controllers receive current state) |
 | `ServiceStatus` durability | TRANSIENT_LOCAL (late-joining controllers receive current state) |
 | `ServiceHostControl` RPC QoS | `Pattern.RPC` (RELIABLE, KEEP_ALL) |
-| Orchestration domain ID | 15 |
+| Orchestration databus ID | 15 |
 | Orchestration tier partition — procedure hosts | `procedure` |
 | Orchestration tier partition — facility hosts (future) | `facility` |
 | Orchestration cross-tier observer partition | `*` (wildcard, set at startup) |
@@ -39,7 +39,7 @@ as partition strings.
 | Well-known property key — GUI endpoint URL | `gui_url` |
 | Service Host liveliness lease | 2 s (host failure detection via liveliness) |
 | Procedure Controller domains | Orchestration + Procedure (`operational` read-only, `control` read-only) |
-| Orchestration → Procedure domain isolation | Complete — orchestration failure must not disrupt surgical data |
+| Orchestration → Procedure DDS domain isolation | Complete — orchestration failure must not disrupt surgical data |
 | Service context injection | All context via constructor/setter — never environment variables |
 | RPC operations | `start_service`, `stop_service`, `update_service`, `get_capabilities`, `get_health` |
 
@@ -120,7 +120,7 @@ is added or changed.*
 ### Scenario: Standalone service is backward-compatible with V1.0 deployment `@integration` `@orchestration`
 
 **Given** an existing V1.0 Docker Compose deployment with standalone services
-**When** V1.0 service classes are deployed in standalone mode (no Service Host, no Orchestration domain)
+**When** V1.0 service classes are deployed in standalone mode (no Service Host, no Orchestration databus)
 **Then** all V1.0 spec scenarios continue to pass without modification
 **And** the service operates identically to its V1.0 predecessor
 
@@ -138,7 +138,7 @@ is added or changed.*
 ### Scenario: Service Host publishes ServiceCatalog on startup `@integration` `@orchestration`
 
 **Given** a Service Host is started and assigned to partition `room/OR-1`
-**When** the Service Host’s Orchestration domain participant becomes active
+**When** the Service Host’s Orchestration databus participant becomes active
 **Then** the Service Host publishes a `ServiceCatalog` sample for each registered service, with `host_id`, `service_id`, `display_name`, and configurable property descriptors
 **And** the samples are TRANSIENT_LOCAL and available to late-joining controllers
 
@@ -216,14 +216,14 @@ is added or changed.*
 
 ### Scenario: Procedure Controller discovers available Service Hosts `@integration` `@orchestration`
 
-**Given** the Procedure Controller is subscribed to `ServiceCatalog` on the Orchestration domain
+**Given** the Procedure Controller is subscribed to `ServiceCatalog` on the Orchestration databus
 **When** Service Hosts publish their catalog entries
 **Then** the Procedure Controller displays the available hosts and their capabilities
 
 ### Scenario: Procedure Controller reconstructs state on restart `@integration` `@orchestration` `@durability`
 
 **Given** Service Hosts have been publishing `ServiceCatalog` and `ServiceStatus` with TRANSIENT_LOCAL durability
-**When** the Procedure Controller restarts and joins the Orchestration domain
+**When** the Procedure Controller restarts and joins the Orchestration databus
 **Then** the controller immediately receives the most recent `ServiceCatalog` sample for each (host, service) pair
 **And** the most recent `ServiceStatus` sample for each (host, service) pair
 **And** reconstructs the full orchestration state without re-querying each host via RPC
@@ -232,7 +232,7 @@ is added or changed.*
 
 **Given** the Procedure Controller has selected a Service Host and a service to start
 **When** the controller sends a `start_service` RPC request to the targeted host
-**Then** the request is delivered via DDS RPC on the Orchestration domain
+**Then** the request is delivered via DDS RPC on the Orchestration databus
 **And** the targeted Service Host receives and processes the request
 **And** the controller receives the `OperationResult` reply
 
@@ -244,21 +244,21 @@ is added or changed.*
 **And** the controller receives the `OperationResult` reply
 **And** the controller observes the `ServiceStatus` transition to `STOPPED`
 
-### Scenario: Procedure Controller joins the Orchestration domain and reads Procedure context directly `@integration` `@orchestration`
+### Scenario: Procedure Controller joins the Orchestration databus and reads Procedure context directly `@integration` `@orchestration`
 
 **Given** the Procedure Controller process starts
 **When** the controller creates its DomainParticipants
-**Then** one participant is on the Orchestration domain (for RPC and status)
-**And** one participant is on the Procedure domain (`operational` tag, read-only — for `ProcedureStatus` and `ProcedureContext`)
-**And** one participant is on the Procedure domain (`control` tag, read-only — for `RobotArmAssignment`)
-**And** the controller does not join the Hospital domain
+**Then** one participant is on the Orchestration databus (for RPC and status)
+**And** one participant is on the Procedure DDS domain (`operational` tag, read-only — for `ProcedureStatus` and `ProcedureContext`)
+**And** one participant is on the Procedure DDS domain (`control` tag, read-only — for `RobotArmAssignment`)
+**And** the controller does not join the Hospital Integration databus
 
 ### Scenario: Procedure Controller does not publish on any domain `@integration` `@orchestration`
 
-**Given** the Procedure Controller has participants on the Orchestration and Procedure domains
+**Given** the Procedure Controller has participants on the Orchestration and Procedure DDS domain
 **When** the controller operates normally
-**Then** the controller only subscribes (reads) on the Procedure domain — it never publishes
-**And** the controller only publishes via DDS RPC on the Orchestration domain (request/reply)
+**Then** the controller only subscribes (reads) on the Procedure DDS domain — it never publishes
+**And** the controller only publishes via DDS RPC on the Orchestration databus (request/reply)
 
 ---
 
@@ -334,7 +334,7 @@ is added or changed.*
 ### Scenario: Room GUI nav pill discovers sibling GUIs via ServiceCatalog `@integration` `@orchestration` `@gui`
 
 **Given** a room-level GUI (e.g., Procedure Controller for OR-1) is running
-**And** the shared `medtech.gui.room_nav` module has a read-only Orchestration domain participant
+**And** the shared `medtech.gui.room_nav` module has a read-only Orchestration databus participant
 **When** sibling GUI services (e.g., Digital Twin for OR-1) publish `ServiceCatalog` entries with `gui_url` properties
 **Then** the nav pill renders buttons for each discovered sibling GUI
 **And** button labels reflect the service display name
@@ -365,26 +365,26 @@ is added or changed.*
 
 ## Orchestration Domain Isolation
 
-### Scenario: Orchestration domain is isolated from the Procedure domain `@integration` `@orchestration` `@isolation`
+### Scenario: Orchestration databus is isolated from the Procedure databuses `@integration` `@orchestration` `@isolation`
 
-**Given** a participant on the Orchestration domain (Domain 11)
-**And** a participant on the Procedure domain (Domain 10, any tag)
+**Given** a participant on the Orchestration databus (Orchestration databus)
+**And** a participant on the Procedure DDS domain (the Procedure DDS domain, any tag)
 **When** both are running
 **Then** they do not discover each other
-**And** no data published on the Orchestration domain is received on the Procedure domain (or vice versa)
+**And** no data published on the Orchestration databus is received on the Procedure DDS domain (or vice versa)
 
 ### Scenario: Orchestration failure does not disrupt surgical data `@integration` `@orchestration` `@isolation`
 
-**Given** a surgical procedure is active with services publishing on the Procedure domain
-**And** the Procedure Controller is managing services via the Orchestration domain
+**Given** a surgical procedure is active with services publishing on the Procedure DDS domain
+**And** the Procedure Controller is managing services via the Orchestration databus
 **When** the Procedure Controller process crashes
-**Then** all surgical data continues flowing on the Procedure domain without interruption
-**And** no deadline violations or liveliness losses occur on Procedure domain topics as a result of the Orchestration domain failure
+**Then** all surgical data continues flowing on the Procedure DDS domain without interruption
+**And** no deadline violations or liveliness losses occur on Procedure DDS domain topics as a result of the Orchestration databus failure
 
-### Scenario: Orchestration domain has no domain tags and no Publisher/Subscriber partitions `@integration` `@orchestration`
+### Scenario: Orchestration databus has no domain tags and no Publisher/Subscriber partitions `@integration` `@orchestration`
 
-**Given** a Procedure Controller participant on the Orchestration domain
-**And** a Service Host participant on the Orchestration domain
+**Given** a Procedure Controller participant on the Orchestration databus
+**And** a Service Host participant on the Orchestration databus
 **When** both are active with matching DomainParticipant-level tier partitions
 **Then** they discover each other directly — no domain tag is required or set
 **And** no Publisher/Subscriber partition QoS is applied to any DataWriter or DataReader on this domain
@@ -394,7 +394,7 @@ is added or changed.*
 **Given** a procedure-tier Service Host starts with DomainParticipant partition `procedure`
 **And** a facility-tier Service Host starts with DomainParticipant partition `facility`
 **And** a Procedure Controller starts with DomainParticipant partition `procedure`
-**When** all participants are active on the Orchestration domain
+**When** all participants are active on the Orchestration databus
 **Then** the Procedure Controller discovers procedure-tier hosts and receives their `ServiceCatalog` and `ServiceStatus`
 **And** the Procedure Controller does not discover facility-tier hosts
 **And** no partition change occurs at runtime — all tier partitions are set once at startup and never modified
@@ -402,14 +402,14 @@ is added or changed.*
 ### Scenario: Cross-tier observer uses wildcard partition `@integration` `@orchestration` `@partition`
 
 **Given** a hospital admin controller starts with DomainParticipant partition `*`
-**When** the controller is active on the Orchestration domain
+**When** the controller is active on the Orchestration databus
 **Then** it discovers both procedure-tier and facility-tier Service Hosts
 **And** no partition-change churn occurs because the wildcard is set at startup and never changed
 
 ### Scenario: Untiered Service Host uses the unassigned partition `@integration` `@orchestration` `@partition`
 
 **Given** a Service Host has not been configured with an orchestration tier
-**When** the Service Host starts on the Orchestration domain
+**When** the Service Host starts on the Orchestration databus
 **Then** the Service Host uses DomainParticipant partition `unassigned`
 **And** it is not discoverable by a Procedure Controller or facility controller unless they also use `unassigned` or a wildcard
 
@@ -469,16 +469,16 @@ is added or changed.*
 
 ## System Initialization
 
-### Scenario: Orchestration domain participants match within time budget `@integration` `@orchestration` `@performance`
+### Scenario: Orchestration databus participants match within time budget `@integration` `@orchestration` `@performance`
 
 **Given** a Procedure Controller and one or more Service Hosts are started on `hospital-net`
 **When** all processes are running
-**Then** all Orchestration domain DomainParticipant endpoints have matched within 15 s
+**Then** all Orchestration databus DomainParticipant endpoints have matched within 15 s
 **And** `ServiceCatalog` and `ServiceStatus` TRANSIENT_LOCAL state has been delivered to the Procedure Controller within the same 15 s window
 
 ### Scenario: Procedure Controller restart re-integrates within time budget `@integration` `@orchestration` `@performance`
 
-**Given** the Orchestration domain is active with running Service Hosts
+**Given** the Orchestration databus is active with running Service Hosts
 **When** the Procedure Controller process is stopped and restarted
 **Then** the controller has re-matched all expected endpoints within 15 s
 **And** TRANSIENT_LOCAL state is re-delivered within the same 15 s window

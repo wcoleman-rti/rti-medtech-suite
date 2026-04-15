@@ -4,7 +4,7 @@
 
 The digital twin display is a PySide6 GUI application that renders a
 live 2D visualization of the surgical robot. It subscribes to the
-Procedure domain (`control` tag) and displays robot joint positions,
+Procedure DDS domain (`control` tag) and displays robot joint positions,
 operational mode, active commands, and safety interlock status in
 real time.
 
@@ -155,11 +155,11 @@ Participant configuration:
 
 QoS profiles loaded via `NDDS_QOS_PROFILES`:
 
-| File                        | Content                                                                                                                            |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `share/qos/Topics.xml`      | `TopicProfiles::GuiRobotState`, `TopicProfiles::GuiOperatorInput`, `TopicProfiles::SafetyInterlock`, `TopicProfiles::RobotCommand` |
-| `share/qos/Patterns.xml`    | Base State, Stream, Command patterns                                                                                               |
-| `share/domains/Domains.xml` | Procedure domain definition                                                                                                        |
+| File                                            | Content                                                                                                                            |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `share/qos/Topics.xml`                          | `TopicProfiles::GuiRobotState`, `TopicProfiles::GuiOperatorInput`, `TopicProfiles::SafetyInterlock`, `TopicProfiles::RobotCommand` |
+| `share/qos/Patterns.xml`                        | Base State, Stream, Command patterns                                                                                               |
+| `share/domains/Room,Hospital,CloudDatabuses.xml` | Domain library definitions                                                                                                         |
 
 ### Domain Partition
 

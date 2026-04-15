@@ -49,10 +49,10 @@ Scenarios are tagged to enable selective test execution. Tags also communicate w
 | `@performance` | Validates latency, throughput, or deadline enforcement requirements (e.g. control-path round-trip time, waveform streaming rate) | V1.0+ |
 | `@recording` | Verifies RTI Recording Service captures data correctly and completely | V1.1+ |
 | `@replay` | Verifies RTI Replay Service replays samples correctly and subscribers process them as expected | V1.1+ |
-| `@orchestration` | Tests Procedure Orchestration: Service interface, dual-mode participant, Service Host lifecycle, DDS RPC, Orchestration domain communication | V1.0+ |
+| `@orchestration` | Tests Procedure Orchestration: Service interface, dual-mode participant, Service Host lifecycle, DDS RPC, Orchestration databus communication | V1.0+ |
 | `@security` | Validates security behavior: authentication, access control, governance enforcement, origin authentication, CRL, PSK. Requires Connext Security Plugins and governance files to be present. | V2.0+ |
 | `@wan` | Tests WAN transport (Real-Time WAN Transport — `UDPv4_WAN`), cross-site bridging, and Cloud Discovery Service multi-site federation | V3.0+ |
-| `@cloud` | Tests Cloud/Enterprise domain topics, facility-level partitions, and WAN Routing Service aggregation | V3.0+ |
+| `@cloud` | Tests Cloud/Cloud Enterprise databus topics, facility-level partitions, and WAN Routing Service aggregation | V3.0+ |
 | `@observability` | Tests Monitoring Library 2.0 telemetry delivery, Collector Service integration, Prometheus metrics, and Grafana dashboard visibility | V1.0+ |
 | `@benchmark` | Tests performance benchmark harness: metric collection, baseline comparison, regression detection, threshold enforcement | V1.0+ |
 | `@simulation` | Tests simulation fidelity: scenario profiles, cross-signal correlation, temporal realism, seeded reproducibility | V1.0+ |

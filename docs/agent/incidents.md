@@ -1,5 +1,12 @@
 # Incident Log
 
+> **Terminology note:** Entries in this log use the terminology current at
+> the time they were written. Pre-V1.4.x entries may refer to "Procedure
+> domain" (now "Procedure control/clinical/operational databus"),
+> "Hospital domain" (now "Hospital Integration databus"),
+> "Orchestration domain" (now "Orchestration databus"), and
+> `MedtechDomains` (now `Room`/`Hospital`/`Cloud` libraries).
+
 This file records incidents discovered during implementation.
 See [workflow.md](workflow.md) Section 5 for the incident recording
 process and format.

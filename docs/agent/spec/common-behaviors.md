@@ -8,7 +8,7 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 
 | Requirement | Value |
 |-------------|-------|
-| DomainParticipant partition format (Procedure domain) | `room/<room_id>/procedure/<procedure_id>` |
+| DomainParticipant partition format (Procedure DDS domain) | `room/<room_id>/procedure/<procedure_id>` |
 | `OperatorInput` deadline (DDS Deadline QoS) | 4 ms — enforced on both writer and reader; detects stream interruption per instance |
 | `RobotState` deadline (DDS Deadline QoS) | 20 ms — enforced on both writer and reader; detects stream interruption per instance |
 | `RobotFrameTransform` deadline (DDS Deadline QoS) | 20 ms — enforced on both writer and reader; detects stream interruption per instance |
@@ -19,7 +19,7 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 | General liveliness lease duration | 2 s |
 | `SafetyInterlock` liveliness lease duration | 500 ms — tighter lease for safety-critical write-on-change topic (via `LivelinessSafety` snippet) |
 | Domain tag isolation | All three tag pairs (`control`/`clinical`, `control`/`operational`, `clinical`/`operational`) are mutually isolated; no cross-tag discovery or data exchange |
-| Cross-domain data flow | Procedure domain data reaches Hospital domain only via Routing Service; no direct cross-domain discovery |
+| Cross-domain data flow | Procedure DDS domain data reaches Hospital Integration databus only via Routing Service; no direct cross-domain discovery |
 | Monitoring Library 2.0 | Enabled on every DomainParticipant via XML — no code-level opt-in |
 | Observability stack independence | Removing the `observability` Docker Compose profile does not affect functional behavior |
 | GUI shared theme | `init_theme()` applies RTI brand palette via `ui.colors()` and serves bundled fonts via `app.add_static_files('/fonts', ...)` at startup |
@@ -42,22 +42,22 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 
 ### Scenario: Participants in the same DomainParticipant partition discover each other `@integration` `@partition`
 
-**Given** participant A and participant B are both on the Procedure domain with DomainParticipant partition `room/OR-3/procedure/proc-001`
+**Given** participant A and participant B are both on the Procedure DDS domain with DomainParticipant partition `room/OR-3/procedure/proc-001`
 **When** both participants create publishers/subscribers for the same topic
 **Then** their DataWriters and DataReaders match and can exchange data
 
 ### Scenario: Participants in different DomainParticipant partitions do NOT discover each other `@integration` `@partition`
 
-**Given** participant A is on the Procedure domain with DomainParticipant partition `room/OR-3/procedure/proc-001`
-**And** participant B is on the Procedure domain with DomainParticipant partition `room/OR-5/procedure/proc-002`
+**Given** participant A is on the Procedure DDS domain with DomainParticipant partition `room/OR-3/procedure/proc-001`
+**And** participant B is on the Procedure DDS domain with DomainParticipant partition `room/OR-5/procedure/proc-002`
 **When** both create DataWriters/DataReaders for the same topic (e.g., `PatientVitals`)
 **Then** their endpoints do not match
 **And** no data is exchanged between them
 
 ### Scenario: Wildcard DomainParticipant partition receives from all matching partitions `@integration` `@partition`
 
-**Given** participant A is publishing on the Procedure domain with DomainParticipant partition `room/OR-3/procedure/proc-001`
-**And** participant B is publishing on the Procedure domain with DomainParticipant partition `room/OR-5/procedure/proc-002`
+**Given** participant A is publishing on the Procedure DDS domain with DomainParticipant partition `room/OR-3/procedure/proc-001`
+**And** participant B is publishing on the Procedure DDS domain with DomainParticipant partition `room/OR-5/procedure/proc-002`
 **And** an aggregator participant uses DomainParticipant partition `room/*`
 **When** both participants publish `PatientVitals`
 **Then** the aggregator receives vitals from both OR-3 and OR-5
@@ -73,46 +73,46 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 
 ## Domain Isolation
 
-### Scenario: Procedure domain `control` tag is isolated from `clinical` tag `@integration` `@isolation`
+### Scenario: Procedure control databus is isolated from `clinical` tag `@integration` `@isolation`
 
-**Given** a publisher on the Procedure domain with domain tag `control` publishing `RobotCommand`
-**And** a subscriber on the Procedure domain with domain tag `clinical` subscribing to `RobotCommand`
+**Given** a publisher on the Procedure DDS domain with domain tag `control` publishing `RobotCommand`
+**And** a subscriber on the Procedure DDS domain with domain tag `clinical` subscribing to `RobotCommand`
 **When** the publisher sends a sample
 **Then** the subscriber does NOT receive it
 **And** the two participants do not discover each other
 
-### Scenario: Procedure domain `control` tag is isolated from `operational` tag `@integration` `@isolation`
+### Scenario: Procedure control databus is isolated from `operational` tag `@integration` `@isolation`
 
-**Given** a publisher on the Procedure domain with domain tag `control` publishing `RobotCommand`
-**And** a subscriber on the Procedure domain with domain tag `operational` subscribing to `RobotCommand`
+**Given** a publisher on the Procedure DDS domain with domain tag `control` publishing `RobotCommand`
+**And** a subscriber on the Procedure DDS domain with domain tag `operational` subscribing to `RobotCommand`
 **When** the publisher sends a sample
 **Then** the subscriber does NOT receive it
 **And** the two participants do not discover each other
 
-### Scenario: Procedure domain `clinical` tag is isolated from `operational` tag `@integration` `@isolation`
+### Scenario: Procedure clinical databus is isolated from `operational` tag `@integration` `@isolation`
 
-**Given** a publisher on the Procedure domain with domain tag `clinical` publishing `PatientVitals`
-**And** a subscriber on the Procedure domain with domain tag `operational` subscribing to `PatientVitals`
+**Given** a publisher on the Procedure DDS domain with domain tag `clinical` publishing `PatientVitals`
+**And** a subscriber on the Procedure DDS domain with domain tag `operational` subscribing to `PatientVitals`
 **When** the publisher sends a sample
 **Then** the subscriber does NOT receive it
 **And** the two participants do not discover each other
 
-### Scenario: Procedure domain and Hospital domain do not discover each other `@integration` `@isolation`
+### Scenario: Procedure DDS domain and Hospital Integration databus do not discover each other `@integration` `@isolation`
 
-**Given** a participant on the Procedure domain (any tag) on `hospital-net`
-**And** a participant on the Hospital domain on the same `hospital-net`
+**Given** a participant on the Procedure DDS domain (any tag) on `hospital-net`
+**And** a participant on the Hospital Integration databus on the same `hospital-net`
 **When** both participants are running and sufficient discovery time has elapsed (≥ 15 s)
 **Then** neither participant discovers the other's endpoints
-**And** no data published on the Procedure domain is received by the Hospital domain participant (or vice versa) without Routing Service
+**And** no data published on the Procedure DDS domain is received by the Hospital Integration databus participant (or vice versa) without Routing Service
 
 ### Scenario: Cross-domain data only flows through Routing Service `@e2e` `@routing`
 
-**Given** a publisher on the Procedure domain publishing `PatientVitals`
-**And** a subscriber on the Hospital domain subscribing to `PatientVitals`
-**And** Routing Service is configured to bridge `PatientVitals` from the Procedure domain to the Hospital domain
+**Given** a publisher on the Procedure DDS domain publishing `PatientVitals`
+**And** a subscriber on the Hospital Integration databus subscribing to `PatientVitals`
+**And** Routing Service is configured to bridge `PatientVitals` from the Procedure databuses to the Hospital Integration databus
 **When** the publisher sends a vitals sample
-**Then** the Hospital domain subscriber receives it via Routing Service
-**And** without Routing Service running, the Hospital domain subscriber receives nothing
+**Then** the Hospital Integration databus subscriber receives it via Routing Service
+**And** without Routing Service running, the Hospital Integration databus subscriber receives nothing
 
 ---
 
@@ -185,28 +185,28 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 
 ### Scenario: Routing Service bridges configured topics `@e2e` `@routing`
 
-**Given** Routing Service is configured to bridge `PatientVitals` and `AlarmMessages` from the Procedure domain to the Hospital domain
-**When** publishers on the Procedure domain publish both topics
-**Then** subscribers on the Hospital domain receive both topics
+**Given** Routing Service is configured to bridge `PatientVitals` and `AlarmMessages` from the Procedure databuses to the Hospital Integration databus
+**When** publishers on the Procedure DDS domain publish both topics
+**Then** subscribers on the Hospital Integration databus receive both topics
 
 ### Scenario: Routing Service does NOT bridge unconfigured topics `@e2e` `@routing`
 
 **Given** Routing Service is configured to bridge only `PatientVitals` and `AlarmMessages`
-**When** a publisher on the Procedure domain publishes `CameraFrame`
-**Then** no `CameraFrame` data appears on the Hospital domain
+**When** a publisher on the Procedure DDS domain publishes `CameraFrame`
+**Then** no `CameraFrame` data appears on the Hospital Integration databus
 
 > **Parameterization note:** `CameraFrame` is one example. This test must be parameterized
-> across **all non-bridged Procedure domain topics**: `RobotCommand`, `SafetyInterlock`,
+> across **all non-bridged Procedure DDS domain topics**: `RobotCommand`, `SafetyInterlock`,
 > `OperatorInput`, `WaveformData`, and `CameraFrame`. Of these, `RobotCommand` and
 > `SafetyInterlock` are safety-critical — verifying they are not exposed on the Hospital
 > domain is the highest-priority negative case.
 
-### Scenario: Hospital domain subscribers handle Routing Service unavailability `@e2e` `@routing`
+### Scenario: Hospital Integration databus subscribers handle Routing Service unavailability `@e2e` `@routing`
 
-**Given** Routing Service is configured to bridge topics from the Procedure domain to the Hospital domain
-**And** Hospital domain subscribers (dashboard, ClinicalAlerts engine) are running
+**Given** Routing Service is configured to bridge topics from the Procedure databuses to the Hospital Integration databus
+**And** Hospital Integration databus subscribers (dashboard, ClinicalAlerts engine) are running
 **When** Routing Service is stopped
-**Then** Hospital domain subscribers stop receiving new data from the Procedure domain
+**Then** Hospital Integration databus subscribers stop receiving new data from the Procedure databuses
 
 ---
 
@@ -242,9 +242,9 @@ Cross-cutting behavioral specifications that apply to multiple modules. These te
 
 ### Scenario: Routing Service preserves data integrity across bridge `@e2e` `@routing`
 
-**Given** Routing Service bridges `PatientVitals` from the Procedure domain to the Hospital domain
-**When** a vitals sample with specific values (HR=72, SpO2=98) is published on the Procedure domain
-**Then** the sample received on the Hospital domain contains identical values (HR=72, SpO2=98)
+**Given** Routing Service bridges `PatientVitals` from the Procedure databuses to the Hospital Integration databus
+**When** a vitals sample with specific values (HR=72, SpO2=98) is published on the Procedure DDS domain
+**Then** the sample received on the Hospital Integration databus contains identical values (HR=72, SpO2=98)
 
 ---
 

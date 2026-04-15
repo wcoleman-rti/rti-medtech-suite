@@ -18,7 +18,7 @@
 ### Routing Service Participant Topology
 
 Routing Service must bridge topics that span all three Procedure-domain tags
-(`control`, `clinical`, `operational`) into the Hospital domain. Because a
+(`control`, `clinical`, `operational`) into the Hospital Integration databus. Because a
 DomainParticipant can have at most one domain tag (see
 [system-architecture.md — Domain Tag Participant Model](../vision/system-architecture.md)),
 Routing Service requires **four DomainParticipants**:
@@ -39,27 +39,27 @@ tag.
 ### Work
 
 - Author Routing Service XML configuration for bridging:
-  - Procedure domain → Hospital domain: `ProcedureStatus`, `ProcedureContext`, `PatientVitals`, `AlarmMessages`, `DeviceTelemetry`
+  - Procedure databuses → Hospital Integration databus: `ProcedureStatus`, `ProcedureContext`, `PatientVitals`, `AlarmMessages`, `DeviceTelemetry`
 
-> **Note:** `DeviceTelemetry` is bridged to the Hospital domain for future dashboard
+> **Note:** `DeviceTelemetry` is bridged to the Hospital Integration databus for future dashboard
 > consumption (device status panels) and potential ClinicalAlerts integration. V1 dashboard does not
-> display device telemetry directly — it is available on the Hospital domain for later
+> display device telemetry directly — it is available on the Hospital Integration databus for later
 > phases or custom subscribers.
-  - Procedure domain (`control` tag) → Hospital domain: `RobotState` (read-only)
+  - Procedure control databus → Hospital Integration databus: `RobotState` (read-only)
 - Configure separate sessions per traffic class (StatusSession, StreamingSession)
 - Configure Routing Service DomainParticipant partition handling per [system-architecture.md](../vision/system-architecture.md): both input-side and output-side RS participants use DomainParticipant partition `room/*/procedure/*` — RTI Routing Service 7.6.0 does not automatically propagate participant-level partitions (see `incidents.md` INC-070); both sides must be configured explicitly with matching wildcard partitions
 - Enable `<administration>` and `<monitoring>` in the Routing Service XML per [vision/dds-consistency.md §8](../vision/dds-consistency.md)
-- Use the Observability domain (Domain 20) for Routing Service monitoring traffic
+- Use the Observability domain (Hospital Integration databus) for Routing Service monitoring traffic
 - Add TCP port health checks in Docker Compose for Routing Service startup ordering
 - Add Routing Service container to `docker-compose.yml` on both `surgical-net` and `hospital-net` (dual-homed)
 - Verify data flows from surgical containers to hospital network
 
 ### Test Gate (spec: common-behaviors.md — Routing Service)
 
-- [x] Routing Service bridges configured topics from the Procedure domain to the Hospital domain
-- [x] Unconfigured topics (e.g., `CameraFrame`) do NOT appear on the Hospital domain
+- [x] Routing Service bridges configured topics from the Procedure databuses to the Hospital Integration databus
+- [x] Unconfigured topics (e.g., `CameraFrame`) do NOT appear on the Hospital Integration databus
 - [x] Data integrity preserved across bridge (values match)
-- [x] Robot state from the Procedure domain (`control` tag) appears on the Hospital domain (read-only)
+- [x] Robot state from the Procedure control databus appears on the Hospital Integration databus (read-only)
 
 ---
 
@@ -70,7 +70,7 @@ tag.
 - Create NiceGUI application skeleton in `modules/hospital-dashboard/`
 - Load shared GUI theme: `init_theme()` applies RTI brand palette and serves bundled fonts (see `vision/technology.md` GUI Design Standard)
 - Implement DDS worker thread:
-  - Creates DomainParticipant on the Hospital domain
+  - Creates DomainParticipant on the Hospital Integration databus
   - QoS is loaded automatically via the default QosProvider (`NDDS_QOS_PROFILES`)
   - Uses `background_tasks.create()` / asyncio for data reception (never block the event loop)
   - Emits Qt signals with normalized data for UI consumption
@@ -83,7 +83,7 @@ tag.
 ### Test Gate
 
 - [x] Application launches without errors
-- [x] DDS participant is created on the Hospital domain with correct QoS
+- [x] DDS participant is created on the Hospital Integration databus with correct QoS
 - [x] UI renders placeholder layout with all panels visible
 - [x] DDS worker thread does not block the Qt main thread
 
@@ -93,7 +93,7 @@ tag.
 
 ### Work
 
-- Subscribe to `ProcedureStatus` (bridged from the Procedure domain via Routing Service — same IDL type `Surgery::ProcedureStatus` on both domains)
+- Subscribe to `ProcedureStatus` (bridged from the Procedure databuses via Routing Service — same IDL type `Surgery::ProcedureStatus` on both domains)
 - Populate procedure list widget with real-time data
 - Auto-add new procedures as they are discovered
 - Status indicators (color-coded): in-progress, completing, alert
@@ -110,7 +110,7 @@ tag.
 
 ### Work
 
-- Subscribe to patient vitals data (bridged to the Hospital domain)
+- Subscribe to patient vitals data (bridged to the Hospital Integration databus)
 - Display summarized vitals per procedure (HR, SpO2, BP)
 - Color-code vitals by severity thresholds
 - Support late-joining: dashboard shows vitals immediately on startup
@@ -127,7 +127,7 @@ tag.
 
 ### Work
 
-- Subscribe to `ClinicalAlert` on the Hospital domain
+- Subscribe to `ClinicalAlert` on the Hospital Integration databus
 - Display unified alert feed across all ORs
 - Implement filtering: by severity, by room
 - New alerts appear in real-time with visual distinction
@@ -147,7 +147,7 @@ tag.
 
 ### Work
 
-- Subscribe to `RobotState` (bridged from the Procedure domain)
+- Subscribe to `RobotState` (bridged from the Procedure databuses)
 - Display robot status per OR with color-coded indicators
 - Detect E-STOP and disconnection (liveliness lost)
 
@@ -165,7 +165,7 @@ tag.
 
 ### Work
 
-- Create a resource status simulator service (`services/resource-simulator/`) on the Hospital domain that publishes `ResourceAvailability` samples for ORs, beds, equipment, and staff with `State` pattern QoS (RELIABLE, TRANSIENT_LOCAL, KEEP_LAST 1)
+- Create a resource status simulator service (`services/resource-simulator/`) on the Hospital Integration databus that publishes `ResourceAvailability` samples for ORs, beds, equipment, and staff with `State` pattern QoS (RELIABLE, TRANSIENT_LOCAL, KEEP_LAST 1)
 - Subscribe to `ResourceAvailability` in the dashboard
 - Display a resource panel showing availability by kind, name, location, and status
 - Support late-joining: dashboard shows current resource state on startup via TRANSIENT_LOCAL durability
@@ -225,7 +225,7 @@ tag.
   2. Surgical instances publish vitals, procedure status, and robot state
   3. Dashboard receives bridged data → procedure list shows 2+ active procedures
   4. Dashboard vitals overview displays current heart rate and blood pressure for each OR
-  5. An alarm is raised on the Procedure domain → Dashboard alert feed displays the alarm
+  5. An alarm is raised on the Procedure DDS domain → Dashboard alert feed displays the alarm
   - The test must fail if Dashboard, Routing Service, or any surgical instance is absent.
 
 ### Test Gate
@@ -242,7 +242,7 @@ tag.
 
 - Run the performance benchmark harness with the full Phase 3 Docker Compose environment (2 surgical instances + Routing Service + Dashboard + observability stack): `python tests/performance/benchmark.py --record --phase phase-3`
 - Compare against the Phase 2 baseline — verify no regressions from adding Routing Service and the Dashboard
-- Routing Service latency (L5) and Hospital domain throughput metrics are now meaningful for the first time
+- Routing Service latency (L5) and Hospital Integration databus throughput metrics are now meaningful for the first time
 - If any metric regresses beyond the defined threshold, investigate before recording the new baseline
 - Commit `tests/performance/baselines/phase-3.json` alongside the Phase 3 completion commit
 

@@ -221,7 +221,7 @@ headings below (e.g., "Domain 10 — Procedure") and in the corresponding
 `HospitalDatabuses.xml`, `CloudDatabuses.xml`). Every other document, code
 comment, spec scenario, implementation step, and log message must reference a
 domain by **semantic databus name** (e.g., "Procedure control databus",
-"Hospital Integration databus") or **domain name** (e.g., "Procedure domain").
+"Hospital Integration databus") or **domain name** (e.g., "Procedure DDS domain").
 If a domain ID changes, only this section and the domain library XML files
 require an update. See the No-Numeric-ID Rule in
 [system-architecture.md — Databus Terminology](system-architecture.md).
@@ -256,7 +256,7 @@ Data streams that cross a risk class boundary must not operate within the same d
 | `CameraConfig` | `Imaging::CameraConfig` | `operational` | `camera_id` | Camera stream configuration state (resolution, encoding, exposure). Write-on-change, TRANSIENT_LOCAL. Late joiners correlate with `CameraFrame` via `camera_id`. |
 | `ProcedureContext` | `Surgery::ProcedureContext` | `operational` | `procedure_id` | Hospital, room, bed, patient, surgeon, procedure type. TRANSIENT_LOCAL. |
 | `RobotFrameTransform` | `Surgery::RobotFrameTransform` | `control` | `robot_id` | *(V1.1)* Kinematic frame hierarchy for 3D visualization. Continuous stream at 100 Hz, synchronized with `RobotState`. Foxglove `FrameTransforms` aligned. |
-| `ProcedureStatus` | `Surgery::ProcedureStatus` | `operational` | `procedure_id` | Running status (in-progress, completing, alert). Published by each instance. TRANSIENT_LOCAL. Bridged to Hospital domain. |
+| `ProcedureStatus` | `Surgery::ProcedureStatus` | `operational` | `procedure_id` | Running status (in-progress, completing, alert). Published by each instance. TRANSIENT_LOCAL. Bridged to Hospital Integration databus. |
 | `RobotArmAssignment` | `Surgery::RobotArmAssignment` | `control` | `robot_id` | *(V1.2)* Arm-to-table spatial assignment and positioning lifecycle. Write-on-change, TRANSIENT_LOCAL. `dispose()` on arm removal. |
 
 ### Domain 20 — Hospital Integration
@@ -265,12 +265,12 @@ The facility-wide integration layer. Domain 20 receives extracted data from room
 domains (Domain 10 and Domain 11) via per-room Routing Service (MedtechBridge), and hosts
 hospital-native topics published by hospital-level applications.
 
-The Hospital domain has **no domain tags**. All participants on the Hospital domain discover
+The Hospital Integration databus has **no domain tags**. All participants on the Hospital Integration databus discover
 each other directly — there is no tag-based discovery scoping. Bridged data from the
-Procedure domain's three risk-class tags and extracted orchestration data (ServiceCatalog)
+Procedure DDS domain's three risk-class tags and extracted orchestration data (ServiceCatalog)
 land in a single flat integration domain. This is intentional: Hospital-domain
 participants are read-only observers — they do not publish commands or interlocks
-back into the Procedure domain. Domain-tag isolation protects the surgical process
+back into the Procedure DDS domain. Domain-tag isolation protects the surgical process
 from cross-class interference between actors; since there are no actors on the Hospital
 domain, tags would add participant complexity with no safety benefit. The trust boundary
 is Routing Service (one-way, selective bridge). See
@@ -281,12 +281,12 @@ full rationale and escalation trigger.
 
 | Topic | Registered Type | Key Fields | Notes |
 |-------|----------------|------------|-------|
-| `ProcedureStatus` | `Surgery::ProcedureStatus` | `procedure_id` | Procedure state for dashboard. Bridged from Procedure domain — not published directly on this domain. |
-| `ProcedureContext` | `Surgery::ProcedureContext` | `procedure_id` | Hospital, room, bed, patient, surgeon, procedure type. Bridged from Procedure domain (`operational` tag) — not published directly on this domain. TRANSIENT_LOCAL — late-joining dashboards receive current context immediately. |
-| `PatientVitals` | `Monitoring::PatientVitals` | `patient.id` | Real-time vital signs snapshot per patient. Bridged from Procedure domain (`clinical` tag) — not published directly on this domain. Consumed by the Dashboard vitals overview and the ClinicalAlerts engine. |
-| `AlarmMessages` | `Monitoring::AlarmMessage` | `alarm_id` | Device-level alarms (Pathway 1). Bridged from Procedure domain (`clinical` tag) — not published directly on this domain. Consumed by the Dashboard alert feed. |
-| `DeviceTelemetry` | `Devices::DeviceTelemetry` | `device_id` | Device status. Bridged from Procedure domain (`clinical` tag) — not published directly on this domain. Available on this domain in V1.0; not displayed by the V1.0 dashboard — reserved for V1.1+. |
-| `RobotState` | `Surgery::RobotState` | `robot_id` | Read-only robot state for the Dashboard robot status panel. Bridged from Procedure domain (`control` tag) — not published directly on this domain. |
+| `ProcedureStatus` | `Surgery::ProcedureStatus` | `procedure_id` | Procedure state for dashboard. Bridged from Procedure DDS domain — not published directly on this domain. |
+| `ProcedureContext` | `Surgery::ProcedureContext` | `procedure_id` | Hospital, room, bed, patient, surgeon, procedure type. Bridged from Procedure operational databus — not published directly on this domain. TRANSIENT_LOCAL — late-joining dashboards receive current context immediately. |
+| `PatientVitals` | `Monitoring::PatientVitals` | `patient.id` | Real-time vital signs snapshot per patient. Bridged from Procedure clinical databus — not published directly on this domain. Consumed by the Dashboard vitals overview and the ClinicalAlerts engine. |
+| `AlarmMessages` | `Monitoring::AlarmMessage` | `alarm_id` | Device-level alarms (Pathway 1). Bridged from Procedure clinical databus — not published directly on this domain. Consumed by the Dashboard alert feed. |
+| `DeviceTelemetry` | `Devices::DeviceTelemetry` | `device_id` | Device status. Bridged from Procedure clinical databus — not published directly on this domain. Available on this domain in V1.0; not displayed by the V1.0 dashboard — reserved for V1.1+. |
+| `RobotState` | `Surgery::RobotState` | `robot_id` | Read-only robot state for the Dashboard robot status panel. Bridged from Procedure control databus — not published directly on this domain. |
 | `ClinicalAlert` | `ClinicalAlerts::ClinicalAlert` | `alert_id` | Risk-based alerts from ClinicalAlerts engine. |
 | `RiskScore` | `ClinicalAlerts::RiskScore` | `patient.id`, `score_kind` | Computed risk scores (sepsis, hemorrhage, etc.). |
 | `ResourceAvailability` | `Hospital::ResourceAvailability` | `resource_id` | *(V1.1)* OR, bed, equipment, and staff availability. Deferred to V1.1 — no simulator or dashboard panel in V1.0. |
@@ -316,7 +316,7 @@ Controller runs as a room-level application, joining only this domain.
 
 **No domain tags.** All participants discover each other directly. See [system-architecture.md — Orchestration Domain](system-architecture.md) for the full rationale.
 
-**Why a separate domain (not a Procedure domain tag):** The Procedure domain's domain tags isolate risk classes of surgical data per IEC 62304. Orchestration is an infrastructure control-plane with a fundamentally different lifecycle — Service Hosts persist across procedures, shift changes, and OR reassignments. Domain-level isolation guarantees that orchestration failures (controller crash, RPC timeout) cannot disrupt an in-progress surgical procedure. See [system-architecture.md — Why a Separate Domain](system-architecture.md) for the full analysis.
+**Why a separate domain (not a Procedure DDS domain tag):** The Procedure DDS domain's domain tags isolate risk classes of surgical data per IEC 62304. Orchestration is an infrastructure control-plane with a fundamentally different lifecycle — Service Hosts persist across procedures, shift changes, and OR reassignments. Domain-level isolation guarantees that orchestration failures (controller crash, RPC timeout) cannot disrupt an in-progress surgical procedure. See [system-architecture.md — Why a Separate Domain](system-architecture.md) for the full analysis.
 
 #### Pub/Sub Topics
 
@@ -364,7 +364,7 @@ Types defined in `module Orchestration`:
 > monitoring, inter-service status queries, and future health-check RPC
 > extensions.
 
-**DomainParticipant partition scheme (Domain 11 only):** The Orchestration domain uses
+**DomainParticipant partition scheme (Domain 11 only):** The Orchestration databus uses
 no Publisher/Subscriber partition QoS. Tier-level visibility isolation is achieved
 via **DomainParticipant-level partitions**, set once at startup and never changed
 during a participant's lifetime:
@@ -399,7 +399,7 @@ an "Open" action button should be rendered for that service instance.
 Dedicated room-level domain for **RTI Observability Framework** telemetry. Monitoring Library 2.0 creates a dedicated DomainParticipant on this domain in every process to publish metrics, logs, and security events. RTI Collector Service subscribes on this domain to aggregate telemetry and export it to Prometheus (metrics), Grafana Loki (logs), or an OpenTelemetry Collector.
 
 **Domain 19** is the room-level observability domain (decade 10, offset +9). A separate
-Hospital Observability domain (Domain 29) aggregates facility-level telemetry, and
+Hospital Observability databus (Domain 29) aggregates facility-level telemetry, and
 Cloud Observability (Domain 39) aggregates enterprise-wide telemetry (V3.0).
 
 **Observability forwarding chain:** The offset +9 domains at each level form a Collector
@@ -411,11 +411,11 @@ the full forwarding configuration.
 
 **Why a separate domain:**
 
-- **Performance** — high-volume telemetry (metrics emitted at configurable intervals, forwarded logs) cannot compete for transport resources with safety-critical control or clinical data on the Procedure domain.
+- **Performance** — high-volume telemetry (metrics emitted at configurable intervals, forwarded logs) cannot compete for transport resources with safety-critical control or clinical data on the Procedure DDS domain.
 - **Safety** — temporarily increasing telemetry verbosity for debugging must not affect discovery, deadline enforcement, or sample delivery on Domains 10 or 11.
 - **Isolation** — Collector Service only needs to join the Observability domain. It does not participate in application domains, reducing its attack surface and resource footprint.
 
-The Room Observability domain has **no domain tags** and **no application-defined topics**. Monitoring Library 2.0 creates its internal telemetry topics, publishers, and subscribers automatically — no XML topic or endpoint definitions are needed in the domain library XML files.
+The Room Observability databus has **no domain tags** and **no application-defined topics**. Monitoring Library 2.0 creates its internal telemetry topics, publishers, and subscribers automatically — no XML topic or endpoint definitions are needed in the domain library XML files.
 
 #### Configuration
 
@@ -434,7 +434,7 @@ The domain ID is set in the MONITORING QoS policy on the `DomainParticipantFacto
 </participant_factory_qos>
 ```
 
-This overrides the Monitoring Library 2.0 default (domain 2) to place observability traffic on the project’s designated Room Observability domain (Domain 19). The configuration is defined once in the shared QoS profile and applies to all applications. See [technology.md — Observability Standard](technology.md) for the full QoS configuration.
+This overrides the Monitoring Library 2.0 default (domain 2) to place observability traffic on the project’s designated Room Observability databus (Domain 19). The configuration is defined once in the shared QoS profile and applies to all applications. See [technology.md — Observability Standard](technology.md) for the full QoS configuration.
 
 ### Cross-Domain Bridging (Per-Room Routing Service)
 
@@ -654,13 +654,13 @@ Example structure:
         <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::RobotState"/>
         <datawriter_qos topic_filter="RobotArmAssignment" base_name="TopicProfiles::RobotArmAssignment"/>
         <datareader_qos topic_filter="RobotArmAssignment" base_name="TopicProfiles::RobotArmAssignment"/>
-        <!-- ...etc for all Procedure domain topics... -->
+        <!-- ...etc for all Procedure DDS domain topics... -->
     </qos_profile>
 
     <qos_profile name="HospitalTopics">
         <datareader_qos topic_filter="RobotState" base_name="TopicProfiles::RobotState"/>
         <datareader_qos topic_filter="PatientVitals" base_name="TopicProfiles::PatientVitals"/>
-        <!-- ...etc for all Hospital domain topics... -->
+        <!-- ...etc for all Hospital Integration databus topics... -->
     </qos_profile>
 
     <qos_profile name="GuiProcedureTopics">
@@ -1186,12 +1186,12 @@ Topic: `RobotArmAssignment` | Domain Tag: `control` | Pattern: `State`
 
 Tracks the spatial assignment and positioning lifecycle of a robot arm
 around the surgical table. Published by each robot arm service on the
-Procedure domain (`control` tag). The Procedure Controller and digital
+Procedure control databus. The Procedure Controller and digital
 twin display subscribe to this topic to track arm readiness and table
 layout.
 
 **Lifecycle:** The Procedure Controller orchestrates arm startup via
-`ServiceHostControl` RPC on the Orchestration domain. Once the arm
+`ServiceHostControl` RPC on the Orchestration databus. Once the arm
 service is running (`ServiceStatus.state = RUNNING`), the arm writes
 its first `RobotArmAssignment` sample with `status = ASSIGNED`. The
 arm then transitions through `POSITIONING → OPERATIONAL` as it moves
@@ -1558,8 +1558,8 @@ Governance files will be maintained at:
 ```
 interfaces/security/
 ├── governance/
-│   ├── Governance_Procedure.xml    # Procedure domain governance
-│   └── Governance_Hospital.xml     # Hospital domain governance
+│   ├── Governance_Procedure.xml    # Procedure DDS domain governance
+│   └── Governance_Hospital.xml     # Hospital Integration databus governance
 └── permissions/                    # Per-participant permissions (module-owned, not defined here)
 ```
 
@@ -2053,7 +2053,7 @@ strength** regardless of its deployment location (bedside, hospital,
 or cloud). The ownership priority tier is enforced by **Routing
 Service**, which lowers the ownership strength on the output
 DataWriter when bridging operator input from a higher domain layer
-into the Procedure domain.
+into the Procedure DDS domain.
 
 This design keeps the surgeon console configuration identical across
 deployment contexts — no dynamic ownership strength based on
@@ -2061,9 +2061,9 @@ deployment location. The priority tiers are:
 
 | Data Path | Ownership Strength | Mechanism |
 |-----------|--------------------|----------|
-| Local console → Procedure domain (direct) | 200 (console's native strength) | Direct write, no Routing Service |
-| Hospital console → Routing Service → Procedure domain | 100 (lowered by RS output writer QoS) | Routing Service `control`-tag route, separate `domain_route` |
-| Cloud console → Routing Service → Procedure domain | 50 (lowered by RS output writer QoS) | WAN Routing Service `control`-tag route |
+| Local console → Procedure DDS domain (direct) | 200 (console's native strength) | Direct write, no Routing Service |
+| Hospital console → Routing Service → Procedure DDS domain | 100 (lowered by RS output writer QoS) | Routing Service `control`-tag route, separate `domain_route` |
+| Cloud console → Routing Service → Procedure DDS domain | 50 (lowered by RS output writer QoS) | WAN Routing Service `control`-tag route |
 
 Each Routing Service control-data route uses a **separate
 `domain_route`** with dedicated participants carrying the `control`
@@ -2071,7 +2071,7 @@ domain tag, architecturally isolated from the existing observational
 bridge (which carries `clinical`/`operational` data to the Hospital
 domain for dashboards). The domain tag separation applies within
 Routing Service and enforces the same risk-class isolation in the
-bridge that exists on the Procedure domain itself.
+bridge that exists on the Procedure DDS domain itself.
 
 ### ControlAuthority State Machine (V2.1)
 
@@ -2186,6 +2186,6 @@ Introducing a reverse data path (Hospital/Cloud → Procedure) for
 teleoperation makes Hospital-domain participants **actors** rather
 than observers. Per the escalation trigger in
 [system-architecture.md](system-architecture.md), this requires
-re-evaluating the Hospital domain for domain-tag isolation. The V2.1
-design must address whether the Hospital domain needs a `control` tag
+re-evaluating the Hospital Integration databus for domain-tag isolation. The V2.1
+design must address whether the Hospital Integration databus needs a `control` tag
 for the remote operator's outbound data path.

@@ -2,7 +2,7 @@
 
 Behavioral specifications for the Clinical Decision Support (ClinicalAlerts module) engine that subscribes to patient vitals and procedure context, computes risk scores, and publishes clinical alerts.
 
-The ClinicalAlerts engine subscribes to Procedure domain data via Routing Service and publishes results on the Hospital domain.
+The ClinicalAlerts engine subscribes to Procedure DDS domain data via Routing Service and publishes results on the Hospital Integration databus.
 
 ---
 
@@ -33,7 +33,7 @@ The ClinicalAlerts engine subscribes to Procedure domain data via Routing Servic
 
 ### Scenario: Risk score is computed from vitals `@integration`
 
-**Given** the ClinicalAlerts engine is subscribed to `PatientVitals` on the Hospital domain (bridged from the Procedure domain)
+**Given** the ClinicalAlerts engine is subscribed to `PatientVitals` on the Hospital Integration databus (bridged from the Procedure databuses)
 **And** the engine has a configured risk model (e.g., hemorrhage risk)
 **When** a `PatientVitals` sample is received for a patient
 **Then** the engine computes a risk score and publishes a `RiskScore` sample within 500 ms of receiving the triggering sample
@@ -56,7 +56,7 @@ The ClinicalAlerts engine subscribes to Procedure domain data via Routing Servic
 ### Scenario: Risk score is durable for late-joining dashboards `@integration` `@durability`
 
 **Given** the ClinicalAlerts engine has published `RiskScore` with TRANSIENT_LOCAL durability
-**When** the hospital dashboard joins the Hospital domain after scores have been computed
+**When** the hospital dashboard joins the Hospital Integration databus after scores have been computed
 **Then** the dashboard immediately receives the most recent `RiskScore` for each patient
 
 ### Scenario: Risk score is deterministic given same inputs `@unit`
@@ -74,7 +74,7 @@ The ClinicalAlerts engine subscribes to Procedure domain data via Routing Servic
 
 **Given** the ClinicalAlerts engine has configured alert threshold: hemorrhage risk ≥ 0.7 = CRITICAL
 **When** a computed risk score meets or exceeds the threshold
-**Then** a `ClinicalAlert` sample is published on the Hospital domain
+**Then** a `ClinicalAlert` sample is published on the Hospital Integration databus
 **And** the alert contains severity CRITICAL, category CLINICAL, the triggering patient ID, and a human-readable message
 
 ### Scenario: Alert is generated on vital sign threshold violation `@unit`
@@ -104,15 +104,15 @@ The ClinicalAlerts engine subscribes to Procedure domain data via Routing Servic
 
 ### Scenario: ClinicalAlerts engine receives vitals via Routing Service `@e2e` `@routing`
 
-**Given** the ClinicalAlerts engine subscribes to vitals on the Hospital domain
-**And** Routing Service bridges `PatientVitals` from the Procedure domain to the Hospital domain
-**When** a bedside monitor publishes vitals on the Procedure domain
-**Then** the ClinicalAlerts engine receives the vitals sample on the Hospital domain
+**Given** the ClinicalAlerts engine subscribes to vitals on the Hospital Integration databus
+**And** Routing Service bridges `PatientVitals` from the Procedure databuses to the Hospital Integration databus
+**When** a bedside monitor publishes vitals on the Procedure DDS domain
+**Then** the ClinicalAlerts engine receives the vitals sample on the Hospital Integration databus
 
 ### Scenario: ClinicalAlerts engine receives procedure context for patient correlation `@e2e` `@routing`
 
-**Given** the ClinicalAlerts engine subscribes to `ProcedureContext` on the Hospital domain
-**And** Routing Service bridges it from the Procedure domain
+**Given** the ClinicalAlerts engine subscribes to `ProcedureContext` on the Hospital Integration databus
+**And** Routing Service bridges it from the Procedure databuses
 **When** a procedure starts and publishes its context
 **Then** the ClinicalAlerts engine can correlate patient vitals with the procedure and room
 
@@ -174,7 +174,7 @@ The ClinicalAlerts engine subscribes to Procedure domain data via Routing Servic
 ### Scenario: Stale risk scores are identifiable on ClinicalAlerts engine restart `@integration` `@durability`
 
 **Given** the ClinicalAlerts engine has published `RiskScore` samples with TRANSIENT_LOCAL durability
-**When** the ClinicalAlerts engine is stopped and a dashboard joins the Hospital domain
+**When** the ClinicalAlerts engine is stopped and a dashboard joins the Hospital Integration databus
 **Then** the dashboard receives the last known `RiskScore` samples via durability
 **And** the samples carry their original publication timestamps
 **And** the consumer can distinguish stale scores from fresh ones by comparing the timestamp to the current time

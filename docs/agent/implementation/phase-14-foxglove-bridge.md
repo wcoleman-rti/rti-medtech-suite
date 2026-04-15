@@ -129,7 +129,7 @@
 1. Create `services/foxglove-bridge/config/recording_service_mcap.xml`
 2. Register the Storage plugin under `<plugin_library>` with `<storage_plugin>`
 3. Register the Transformation plugin (same shared library as Step 13.2)
-4. Configure Recording Service to subscribe to Procedure domain topics (`RobotState`, `RobotFrameTransform`, `CameraFrame`)
+4. Configure Recording Service to subscribe to Procedure DDS domain topics (`RobotState`, `RobotFrameTransform`, `CameraFrame`)
 5. Apply the Transformation plugin before the Storage plugin — transformed samples reach `store()`
 6. Set `mcap.filename` property for output path
 7. This configuration follows the XML pattern documented in [vision/data-model.md — Recording Service XML Pattern (V2)](../vision/data-model.md#recording-service-xml-pattern-v2)
@@ -145,7 +145,7 @@
 
 **Work:** Verify that both pipelines (live Routing Service + offline Recording Service) operate simultaneously without interference, and run the full `@foxglove` spec scenario suite.
 
-1. Start both Routing Service (live bridge) and Recording Service (MCAP recorder) against the same Procedure domain
+1. Start both Routing Service (live bridge) and Recording Service (MCAP recorder) against the same Procedure DDS domain
 2. Run all surgical procedure simulators for a 30-second capture window
 3. Verify live WebSocket output and MCAP file are consistent
 

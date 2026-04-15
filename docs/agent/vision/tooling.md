@@ -63,10 +63,10 @@ samples to stdout. Lightweight alternative to Admin Console for quick checks.
 **How to run in this project:**
 
 ```bash
-# Spy on the Procedure domain (all topics, all DomainParticipant partitions visible)
+# Spy on the Procedure DDS domain (all topics, all DomainParticipant partitions visible)
 rtiddsspy -domainId 10 -printSample
 
-# Spy on the Hospital domain
+# Spy on the Hospital Integration databus
 rtiddsspy -domainId 11 -printSample
 
 # NOTE: The -partition flag sets Pub/Sub partition QoS on the spy, NOT DomainParticipant
@@ -157,7 +157,7 @@ application data.
 
 ### `partition-inspector` — Active Partition Scanner
 
-**What:** A lightweight subscriber that joins the Procedure domain with a `room/*`
+**What:** A lightweight subscriber that joins the Procedure DDS domain with a `room/*`
 wildcard DomainParticipant partition, discovers all active partitions from endpoint
 builtin topics, and reports which instances are publishing on each.
 

@@ -14,10 +14,10 @@
 
 - Implement `ProcedureContext` publisher (Python or C++)
 - Reads room, patient, procedure, surgeon info from configuration (file or environment)
-- Publishes on the Procedure domain (`operational` tag) with `State` pattern QoS and TRANSIENT_LOCAL durability
+- Publishes on the Procedure operational databus with `State` pattern QoS and TRANSIENT_LOCAL durability
 - Partition derived programmatically from `ROOM_ID` and `PROCEDURE_ID` at startup
 - Implement `ProcedureStatus` publisher alongside `ProcedureContext`
-- Publishes running status (in-progress, completing, alert) on the Procedure domain (`operational` tag) with `State` pattern QoS and TRANSIENT_LOCAL durability
+- Publishes running status (in-progress, completing, alert) on the Procedure operational databus with `State` pattern QoS and TRANSIENT_LOCAL durability
 - Status is updated as the procedure progresses through its lifecycle
 
 ### Test Gate (spec: surgical-procedure.md — Procedure Context)
@@ -33,15 +33,15 @@
 
 ### Work
 
-- Implement robot state publisher (C++) on the Procedure domain (`control` tag)
+- Implement robot state publisher (C++) on the Procedure control databus
   - Publishes `RobotState` at configured rate with `State` pattern QoS
   - Supports modes: OPERATIONAL, PAUSED, EMERGENCY_STOP, IDLE
-- Implement operator input publisher (C++ or Python) on the Procedure domain (`control` tag)
+- Implement operator input publisher (C++ or Python) on the Procedure control databus
   - Publishes `OperatorInput` at high rate with `Stream` pattern QoS
   - Simulates joystick/haptic input
-- Implement robot command publisher on the Procedure domain (`control` tag)
+- Implement robot command publisher on the Procedure control databus
   - Publishes `RobotCommand` with `Command` pattern QoS
-- Implement safety interlock publisher on the Procedure domain (`control` tag)
+- Implement safety interlock publisher on the Procedure control databus
   - Publishes `SafetyInterlock` with `State` pattern QoS
 - **Operator console simulator** (`modules/surgical-procedure/operator_sim/`)
   - Standalone launchable application using `ControlOperator` participant
@@ -91,7 +91,7 @@
 
 ### Work
 
-- Implement bedside monitor simulator (Python) on the Procedure domain (`clinical` tag)
+- Implement bedside monitor simulator (Python) on the Procedure clinical databus
   - Publishes `PatientVitals` at configured rate with `State` pattern QoS (periodic-snapshot publication model — see `vision/data-model.md`)
   - Implements the simulation model per `vision/simulation-model.md`:
     - Signal model with current value, target value, convergence rate, and noise parameters
@@ -124,7 +124,7 @@
 
 ### Work
 
-- Implement camera simulator (Python) on the Procedure domain (`operational` tag)
+- Implement camera simulator (Python) on the Procedure operational databus
   - Publishes `CameraFrame` at configured frame rate with `Stream` pattern QoS
   - Simulates frame metadata (ID, sequence, timestamp, resolution) and synthetic image reference
 
@@ -139,7 +139,7 @@
 
 ### Work
 
-- Implement device telemetry simulators (Python) on the Procedure domain (`clinical` tag)
+- Implement device telemetry simulators (Python) on the Procedure clinical databus
   - Infusion pump status, anesthesia machine status
   - Publishes `DeviceTelemetry` with `State` pattern QoS using **write-on-change publication model** — samples published only when device parameters change, faults occur, or mode transitions happen (see `vision/data-model.md` Publication Model)
   - Supports exclusive ownership for primary/backup pattern
@@ -162,7 +162,7 @@
 > an interactive 3D scene at `/twin/{room_id}` with forward kinematics, heatmap coloring,
 > orbit controls, and safety interlock overlays.
 
-- Create DomainParticipant on the Procedure domain (`control` tag) with partition derived from `ROOM_ID` and `PROCEDURE_ID`
+- Create DomainParticipant on the Procedure control databus with partition derived from `ROOM_ID` and `PROCEDURE_ID`
 - Subscribe to `RobotState`, `RobotCommand`, `SafetyInterlock`, and `OperatorInput`
   - QoS loaded automatically via the default QosProvider (`NDDS_QOS_PROFILES`)
   - Apply time-based filter (~16 ms minimum separation for 60 Hz rendering) on **high-rate streaming readers only**: `RobotState` and `OperatorInput`
@@ -259,7 +259,7 @@
 - This is the **first meaningful baseline** — Phase 1 has no real publishers, so Phase 2 establishes the initial performance reference point
 - Review the benchmark output: all metrics should report status NEW (no prior baseline)
 - Commit `tests/performance/baselines/phase-2.json` alongside the Phase 2 completion commit
-- Note: only Tier 1 latency (Procedure domain internal) and Tier 2 throughput metrics are meaningful at this phase. Routing Service metrics (L5) and Hospital domain metrics will be populated in Phase 3.
+- Note: only Tier 1 latency (Procedure DDS domain internal) and Tier 2 throughput metrics are meaningful at this phase. Routing Service metrics (L5) and Hospital Integration databus metrics will be populated in Phase 3.
 
 ### Test Gate (spec: performance-baseline.md — Baseline Recording, Phase Gate Integration)
 
@@ -281,7 +281,7 @@
   - Supports `--domain`, `--check`, and `--format json` options
   - Exits cleanly and destroys temporary participants on completion
 - Implement `tools/partition-inspector.py`:
-  - Joins Procedure domain with `room/*` wildcard DomainParticipant partition
+  - Joins Procedure DDS domain with `room/*` wildcard DomainParticipant partition
   - Enumerates active participants and attempts to list entities per partition
   - Note: subject to INC-041 — RTI Connext Python 7.6.0 does not expose DomainParticipant partition in builtin discovery data; tool reports participants but cannot currently enumerate partition values
   - Supports `--watch` (continuous) and `--filter` options

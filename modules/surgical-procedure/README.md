@@ -6,7 +6,7 @@ The surgical procedure module is a multi-instance application set that
 simulates a complete surgical operating room. Each instance represents
 one OR and runs in an isolated DDS partition. The module publishes
 robot control, patient vitals, camera feeds, device telemetry, and
-procedure context onto the Procedure domain.
+procedure context onto the Procedure DDS domain.
 
 Every service implements the `medtech::Service` interface and supports
 two operating modes:
@@ -26,7 +26,7 @@ Four Service Hosts package the services for orchestrated deployment:
 | Clinical Service Host    | Python   | `BedsideMonitorService`, `DeviceTelemetryService` |
 | Operational Service Host | Python   | `CameraService`, `ProcedureContextService`        |
 
-All participants operate on the **Procedure domain** across three
+All participants operate on the **Procedure DDS domain** across three
 domain tags:
 
 - **control** — Robot teleop loop (100 Hz state, operator input,
@@ -35,7 +35,7 @@ domain tags:
 - **operational** — Procedure context, procedure status, camera frames
 
 Service Hosts additionally create a participant on the
-**Orchestration domain** (no domain tags) for host catalog
+**Orchestration databus** (no domain tags) for host catalog
 advertisement, service status reporting, and DDS RPC command
 reception.
 
@@ -245,7 +245,7 @@ domain tag: `control`
 | DataReader | `RobotArmAssignment` | `TopicProfiles::RobotArmAssignment` | Multi-arm spatial tracking (V1.2) |
 
 **Orchestration** (`OrchestrationParticipants::Orchestration`) —
-Orchestration domain, no domain tags. Created by each Service Host.
+Orchestration databus, no domain tags. Created by each Service Host.
 
 | Entity      | Topic                          | QoS Profile                             | Notes                            |
 | ----------- | ------------------------------ | --------------------------------------- | -------------------------------- |
@@ -270,7 +270,7 @@ thread pool size 1 each:
   publisher (read-lock) and subscriber (write-lock) threads.
 
 **Robot Service Host (C++):** The generic `medtech::ServiceHost`
-creates an Orchestration domain participant and runs an RPC server
+creates an Orchestration databus participant and runs an RPC server
 (`dds::rpc::Server` with thread pool size 1). A polling loop (100 ms
 interval) on the main thread publishes `ServiceStatus` on state
 transitions. The hosted `RobotControllerService` runs on a dedicated
@@ -317,13 +317,13 @@ reader status to detect robot disconnection.
 All QoS and entity configuration is loaded from XML via
 `NDDS_QOS_PROFILES` (set by `source install/setup.bash`):
 
-| File                         | Content                                                  |
-| ---------------------------- | -------------------------------------------------------- |
-| `share/qos/Snippets.xml`     | Reusable QoS snippets (reliability, durability)          |
-| `share/qos/Patterns.xml`     | QoS patterns (State, Stream, Command)                    |
-| `share/qos/Topics.xml`       | Per-topic QoS profiles (`TopicProfiles::*`)              |
-| `share/qos/Participants.xml` | Transport and participant base QoS                       |
-| `share/domains/Domains.xml`  | Domain library (Procedure, Hospital domain IDs and tags) |
+| File                                                  | Content                                                          |
+| ----------------------------------------------------- | ---------------------------------------------------------------- |
+| `share/qos/Snippets.xml`                              | Reusable QoS snippets (reliability, durability)                  |
+| `share/qos/Patterns.xml`                              | QoS patterns (State, Stream, Command)                            |
+| `share/qos/Topics.xml`                                | Per-topic QoS profiles (`TopicProfiles::*`)                      |
+| `share/qos/Participants.xml`                          | Transport and participant base QoS                               |
+| `share/domains/Room,Hospital,CloudDatabuses.xml`      | Domain libraries (Procedure, Hospital Integration databus, etc.) |
 
 Participant configurations are in
 `interfaces/participants/SurgicalParticipants.xml`, which is included
