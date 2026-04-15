@@ -31,7 +31,26 @@ participant library, and purging stale naming/config remnants.
 
 ---
 
-## Step UX.1 — `medtech build --docker` and `--all`
+## Progress Summary
+
+| Step | Description | Status | Commit |
+|------|-------------|--------|--------|
+| UX.1 | `medtech build --docker` and `--all` | ✅ Complete | `59d2e01` |
+| UX.2 | Room-Deployed Procedure Controller | ✅ Complete | `4f4db71` |
+| UX.3 | Room-Centric Hospital Dashboard | ✅ Complete | `3c706d8` |
+| UX.4 | Room-Level GUI Navigation | ✅ Complete | `5779550` |
+| UX.5 | Procedure Lifecycle Workflow | ✅ Complete | `6d2092e` |
+| UX.6 | Regression & Acceptance | ✅ Complete | `8f2c893` |
+| UX.7 | Module Boundary Consolidation | ⬜ Not started | — |
+| UX.8 | Hospital Participant Library | ⬜ Not started | — |
+| UX.9 | Unified App Remnant Cleanup | ⬜ Not started | — |
+| UX.10 | Regression & Vision Doc Alignment | ⬜ Not started | — |
+
+**Test results at UX.6 gate:** 666 tests passing, 12/12 CI gates green.
+
+---
+
+## Step UX.1 — `medtech build --docker` and `--all` ✅
 
 ### Work
 
@@ -48,16 +67,16 @@ participant library, and purging stale naming/config remnants.
 
 ### Test Gate
 
-- [ ] `medtech build --docker --help` prints usage
-- [ ] `medtech build --all` runs CMake then Docker builds
-- [ ] `medtech build` (no flags) continues to run CMake only (backward compat)
-- [ ] **@smoke Tier 1:** `medtech build --help` exits 0 and lists `--docker` and `--all` flags
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] `medtech build --docker --help` prints usage
+- [x] `medtech build --all` runs CMake then Docker builds
+- [x] `medtech build` (no flags) continues to run CMake only (backward compat)
+- [x] **@smoke Tier 1:** `medtech build --help` exits 0 and lists `--docker` and `--all` flags
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 
-## Step UX.2 — Room-Deployed Procedure Controller
+## Step UX.2 — Room-Deployed Procedure Controller ✅
 
 ### Work
 
@@ -92,22 +111,22 @@ participant library, and purging stale naming/config remnants.
 
 ### Test Gate
 
-- [ ] `medtech run or --name OR-1` starts controller container alongside twin
-- [ ] Controller container joins both `surgical-net` and `orchestration-net`
-- [ ] Controller is accessible at assigned host port
-- [ ] `medtech-gui` serves only the hospital dashboard (no controller routes)
-- [ ] `medtech launch` output shows dashboard URL prominently, includes per-OR controller URLs
-- [ ] `medtech stop` removes controller containers
-- [ ] **@smoke Tier 1:** `import medtech.gui.app` succeeds; registered sub_pages contain `/dashboard` only (no `/controller`, no `/twin`)
-- [ ] **@smoke Tier 1:** `from hospital_dashboard.procedure_controller import controller` succeeds
-- [ ] **@smoke Tier 2:** Hospital dashboard container starts; `GET /health` returns 200 within 30 s
-- [ ] **@smoke Tier 2:** Controller container starts with `ROOM_ID=OR-1`; `GET /health` returns 200 within 30 s
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] `medtech run or --name OR-1` starts controller container alongside twin
+- [x] Controller container joins both `surgical-net` and `orchestration-net`
+- [x] Controller is accessible at assigned host port
+- [x] `medtech-gui` serves only the hospital dashboard (no controller routes)
+- [x] `medtech launch` output shows dashboard URL prominently, includes per-OR controller URLs
+- [x] `medtech stop` removes controller containers
+- [x] **@smoke Tier 1:** `import medtech.gui.app` succeeds; registered sub_pages contain `/dashboard` only (no `/controller`, no `/twin`)
+- [x] **@smoke Tier 1:** `from hospital_dashboard.procedure_controller import controller` succeeds
+- [x] **@smoke Tier 2:** Hospital dashboard container starts; `GET /health` returns 200 within 30 s
+- [x] **@smoke Tier 2:** Controller container starts with `ROOM_ID=OR-1`; `GET /health` returns 200 within 30 s
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 
-## Step UX.3 — Room-Centric Hospital Dashboard
+## Step UX.3 — Room-Centric Hospital Dashboard ✅
 
 ### Work
 
@@ -136,25 +155,25 @@ participant library, and purging stale naming/config remnants.
 
 ### Test Gate
 
-- [ ] Hospital dashboard primary view shows room cards
-- [ ] Room cards display room name and active procedure indicator
-- [ ] Room cards show aggregate service counts (running/total)
-- [ ] Room cards show alert/warning counts per room
-- [ ] New rooms auto-appear when `ServiceCatalog` arrives
-- [ ] Room card action links include `open_in_new` icon
-- [ ] Clicking a room GUI link opens a new browser tab
-- [ ] Active Procedures secondary view filters to rooms with procedures
-- [ ] Existing vitals, alert, robot, resource panels still render
-- [ ] All existing dashboard spec tests pass (may need adaptation for
+- [x] Hospital dashboard primary view shows room cards
+- [x] Room cards display room name and active procedure indicator
+- [x] Room cards show aggregate service counts (running/total)
+- [x] Room cards show alert/warning counts per room
+- [x] New rooms auto-appear when `ServiceCatalog` arrives
+- [x] Room card action links include `open_in_new` icon
+- [x] Clicking a room GUI link opens a new browser tab
+- [x] Active Procedures secondary view filters to rooms with procedures
+- [x] Existing vitals, alert, robot, resource panels still render
+- [x] All existing dashboard spec tests pass (may need adaptation for
       new primary view structure)
-- [ ] **@smoke Tier 1:** Hospital dashboard entry point imports without error; `/dashboard` route is registered
-- [ ] **@smoke Tier 2:** Hospital dashboard container starts; `GET /health` returns 200; dashboard URL is reachable
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] **@smoke Tier 1:** Hospital dashboard entry point imports without error; `/dashboard` route is registered
+- [x] **@smoke Tier 2:** Hospital dashboard container starts; `GET /health` returns 200; dashboard URL is reachable
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 
-## Step UX.4 — Room-Level GUI Navigation Module (`medtech.gui.room_nav`)
+## Step UX.4 — Room-Level GUI Navigation Module (`medtech.gui.room_nav`) ✅
 
 ### Work
 
@@ -192,22 +211,22 @@ participant library, and purging stale naming/config remnants.
 
 ### Test Gate
 
-- [ ] `room_nav` module creates Orchestration participant and discovers
+- [x] `room_nav` module creates Orchestration participant and discovers
       sibling GUIs via `ServiceCatalog`
-- [ ] Nav pill renders buttons for each discovered sibling GUI
-- [ ] Nav pill updates dynamically when a sibling GUI starts or stops
-- [ ] Clicking a sibling button navigates the current tab to that URL
-- [ ] Nav pill does **not** include any link to the hospital dashboard
-- [ ] Room GUI operates correctly without a hospital instance deployed
-- [ ] Procedure Controller uses `room_nav` for navigation
-- [ ] Digital Twin uses `room_nav` for navigation
-- [ ] DDS reads do not block the NiceGUI event loop
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] Nav pill renders buttons for each discovered sibling GUI
+- [x] Nav pill updates dynamically when a sibling GUI starts or stops
+- [x] Clicking a sibling button navigates the current tab to that URL
+- [x] Nav pill does **not** include any link to the hospital dashboard
+- [x] Room GUI operates correctly without a hospital instance deployed
+- [x] Procedure Controller uses `room_nav` for navigation
+- [x] Digital Twin uses `room_nav` for navigation
+- [x] DDS reads do not block the NiceGUI event loop
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 
-## Step UX.5 — Procedure Lifecycle Workflow
+## Step UX.5 — Procedure Lifecycle Workflow ✅
 
 ### Work
 
@@ -242,22 +261,22 @@ participant library, and purging stale naming/config remnants.
 
 ### Test Gate
 
-- [ ] "Start Procedure" button visible when room has no active procedure
-- [ ] Start Procedure workflow shows idle services for selection
-- [ ] Deploying selected services sends RPCs with generated `procedure_id`
-- [ ] Active procedure indicator shown after deployment
-- [ ] "Start Procedure" disabled when a procedure is already active
-- [ ] "Add Services" deploys additional services with same `procedure_id`
-- [ ] "Stop Procedure" stops all services with the active `procedure_id`
-- [ ] Stopped services clear `procedure_id` from `ServiceCatalog`
-- [ ] Procedure state reconstructed on controller restart
-- [ ] All existing orchestration tests pass
-- [ ] All existing tests pass
-- [ ] Lint passes
+- [x] "Start Procedure" button visible when room has no active procedure
+- [x] Start Procedure workflow shows idle services for selection
+- [x] Deploying selected services sends RPCs with generated `procedure_id`
+- [x] Active procedure indicator shown after deployment
+- [x] "Start Procedure" disabled when a procedure is already active
+- [x] "Add Services" deploys additional services with same `procedure_id`
+- [x] "Stop Procedure" stops all services with the active `procedure_id`
+- [x] Stopped services clear `procedure_id` from `ServiceCatalog`
+- [x] Procedure state reconstructed on controller restart
+- [x] All existing orchestration tests pass
+- [x] All existing tests pass
+- [x] Lint passes
 
 ---
 
-## Step UX.6 — Regression & Acceptance
+## Step UX.6 — Regression & Acceptance ✅
 
 ### Work
 
@@ -276,19 +295,23 @@ participant library, and purging stale naming/config remnants.
 
 ### Test Gate
 
-- [ ] All `@gui` spec tests pass for Room Overview scenarios
-- [ ] All `@orchestration` spec tests pass for Procedure Lifecycle scenarios
-- [ ] All `@cli` spec tests pass for updated build/run/launch
-- [ ] **@smoke Tier 1:** All entry point import tests pass (hospital app, controller, twin, CLI)
-- [ ] **@smoke Tier 2:** All container startup tests pass (hospital, controller, twin, C++ runtime)
-- [ ] `@acceptance` test validates the composed end-to-end UX workflow
-- [ ] All existing tests pass
-- [ ] Lint passes (including markdownlint)
-- [ ] Performance benchmark passes against the Phase SIM baseline
+- [x] All `@gui` spec tests pass for Room Overview scenarios
+- [x] All `@orchestration` spec tests pass for Procedure Lifecycle scenarios
+- [x] All `@cli` spec tests pass for updated build/run/launch
+- [x] **@smoke Tier 1:** All entry point import tests pass (hospital app, controller, twin, CLI)
+- [x] **@smoke Tier 2:** All container startup tests pass (hospital, controller, twin, C++ runtime)
+- [x] `@acceptance` test validates the composed end-to-end UX workflow
+- [x] All existing tests pass
+- [x] Lint passes (including markdownlint)
+- [x] Performance benchmark passes against the Phase SIM baseline
 
 ---
 
 ## Tests to Rewrite or Remove
+
+> **Status:** All test rewrites, removals, and moves listed below were
+> completed during UX.1–UX.6 implementation. The table is retained for
+> traceability.
 
 The following existing tests verify behavior that is superseded by V1.5.0.
 They should be **removed or replaced** during the implementation steps above.
