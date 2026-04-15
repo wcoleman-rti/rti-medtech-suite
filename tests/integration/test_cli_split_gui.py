@@ -8,43 +8,6 @@ from __future__ import annotations
 import os
 from unittest.mock import MagicMock, patch
 
-from click.testing import CliRunner
-from medtech.cli._main import main
-
-
-class TestGuiModeEnvVar:
-    """Verify MEDTECH_GUI_MODE controls digital twin loading."""
-
-    def test_default_gui_mode_is_unified(self) -> None:
-        """Without MEDTECH_GUI_MODE, the app defaults to unified."""
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("MEDTECH_GUI_MODE", None)
-            mode = os.environ.get("MEDTECH_GUI_MODE", "unified")
-            assert mode == "unified"
-
-    def test_controller_dashboard_mode(self) -> None:
-        """MEDTECH_GUI_MODE=controller-dashboard is accepted."""
-        with patch.dict(os.environ, {"MEDTECH_GUI_MODE": "controller-dashboard"}):
-            mode = os.environ.get("MEDTECH_GUI_MODE", "unified")
-            assert mode == "controller-dashboard"
-
-
-class TestDockerComposeGuiMode:
-    """Verify docker-compose.yml has MEDTECH_GUI_MODE."""
-
-    def test_compose_has_gui_mode(self) -> None:
-        """docker-compose.yml medtech-gui service has MEDTECH_GUI_MODE."""
-        import yaml
-
-        compose_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "docker-compose.yml"
-        )
-        with open(compose_path) as f:
-            compose = yaml.safe_load(f)
-        gui_svc = compose["services"]["medtech-gui"]
-        env = gui_svc["environment"]
-        assert "MEDTECH_GUI_MODE" in env
-
 
 class TestDigitalTwinGuiUrl:
     """Verify DigitalTwinBackend.gui_urls() in split-GUI mode."""
@@ -143,27 +106,6 @@ class TestDigitalTwinDunderMain:
             "digital_twin",
         )
         assert os.path.isfile(os.path.join(src_dir, "__main__.py"))
-
-
-class TestUnifiedLaunchSetsGuiMode:
-    """Verify medtech launch unified passes MEDTECH_GUI_MODE=unified."""
-
-    @patch("medtech.cli._launch.run_cmd")
-    def test_launch_unified_sets_env(self, mock_run) -> None:
-        """medtech launch unified passes env_override with MEDTECH_GUI_MODE."""
-        runner = CliRunner()
-        result = runner.invoke(main, ["launch", "unified"])
-        assert result.exit_code == 0
-        # Find the docker compose call
-        compose_calls = [
-            c
-            for c in mock_run.call_args_list
-            if len(c[0]) > 0 and c[0][0][:2] == ["docker", "compose"]
-        ]
-        assert len(compose_calls) >= 1
-        # Check that env_override includes MEDTECH_GUI_MODE=unified
-        call_kwargs = compose_calls[0].kwargs
-        assert call_kwargs.get("env_override", {}).get("MEDTECH_GUI_MODE") == "unified"
 
 
 class TestRunCmdEnvOverride:

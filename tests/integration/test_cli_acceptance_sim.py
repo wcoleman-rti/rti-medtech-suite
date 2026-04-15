@@ -208,21 +208,3 @@ class TestAcceptanceSimulationWorkflow:
         # Both hospitals + ORs should have been created
         assert mock_h_run.call_count > 0
         assert mock_or_run.call_count > 0
-
-    @patch("medtech.cli._launch.run_cmd")
-    def test_launch_unified(self, mock_run) -> None:
-        """Unified launch scenario runs docker compose."""
-        runner = CliRunner()
-        result = runner.invoke(main, ["launch", "unified"])
-        assert result.exit_code == 0, result.output
-
-        # Should call docker compose with unified-gui profile
-        compose_calls = [
-            c
-            for c in mock_run.call_args_list
-            if len(c[0]) > 0 and c[0][0][:2] == ["docker", "compose"]
-        ]
-        assert len(compose_calls) >= 1
-        args = compose_calls[0][0][0]
-        assert "--profile" in args
-        assert "unified-gui" in args

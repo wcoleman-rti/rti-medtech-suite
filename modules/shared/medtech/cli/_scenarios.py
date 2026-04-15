@@ -15,11 +15,6 @@ SCENARIOS: dict[str, dict] = {
             {"name": "hospital-b", "rooms": ["OR-1", "OR-2"]},
         ],
     },
-    "unified": {
-        "description": "Monolithic GUI (pre-V1.4), 2 ORs",
-        "compose_profiles": ["unified-gui"],
-        "rooms": [],  # twins served in-process
-    },
     "minimal": {
         "description": "Single OR, split GUI, no observability",
         "hospital_args": [],

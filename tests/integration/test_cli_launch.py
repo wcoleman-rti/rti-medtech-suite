@@ -15,13 +15,12 @@ class TestLaunchList:
     """Verify ``medtech launch --list``."""
 
     def test_lists_all_scenarios(self) -> None:
-        """medtech launch --list prints all four scenarios."""
+        """medtech launch --list prints all scenarios."""
         runner = CliRunner()
         result = runner.invoke(main, ["launch", "--list"])
         assert result.exit_code == 0
         assert "distributed" in result.output
         assert "multi-site" in result.output
-        assert "unified" in result.output
         assert "minimal" in result.output
 
 
@@ -123,25 +122,6 @@ class TestLaunchMultiSite:
         result = runner.invoke(main, ["launch", "multi-site"])
         assert result.exit_code == 0
         assert "Simulation ready" in result.output
-
-
-class TestLaunchUnified:
-    """Verify ``medtech launch unified``."""
-
-    @patch("medtech.cli._launch.run_cmd")
-    def test_starts_unified(self, mock_run) -> None:
-        """medtech launch unified runs docker compose with unified-gui profile."""
-        runner = CliRunner()
-        result = runner.invoke(main, ["launch", "unified"])
-        assert result.exit_code == 0
-        # Should invoke docker compose with --profile unified-gui
-        compose_calls = [
-            c.args[0]
-            for c in mock_run.call_args_list
-            if isinstance(c.args[0], list) and "compose" in c.args[0]
-        ]
-        assert len(compose_calls) >= 1
-        assert "unified-gui" in compose_calls[0]
 
 
 class TestLaunchMinimal:

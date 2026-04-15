@@ -45,15 +45,27 @@ def main() -> None:
 
 
 @main.command()
-@click.option("--no-docker", is_flag=True, help="Skip Docker image build.")
-def build(no_docker: bool) -> None:
-    """Build the project (CMake + Docker images)."""
+@click.option("--docker", is_flag=True, help="Build Docker images only.")
+@click.option("--all", "build_all", is_flag=True, help="CMake build + Docker images.")
+def build(docker: bool, build_all: bool) -> None:
+    """Build the project (CMake by default, --docker for images, --all for both)."""
     import os
 
-    if not os.path.isdir("build"):
-        run_cmd(["cmake", "-B", "build", "-S", "."])
-    run_cmd(["cmake", "--build", "build", "--target", "install"])
-    if not no_docker:
+    if docker and build_all:
+        click.secho(
+            "Error: --docker and --all are mutually exclusive.", fg="red", err=True
+        )
+        raise SystemExit(1)
+
+    run_cmake = not docker  # CMake unless --docker-only
+    run_docker = docker or build_all  # Docker only when explicitly requested
+
+    if run_cmake:
+        if not os.path.isdir("build"):
+            run_cmd(["cmake", "-B", "build", "-S", "."])
+        run_cmd(["cmake", "--build", "build", "--target", "install"])
+
+    if run_docker:
         run_cmd(
             ["docker", "compose", "--profile", "build", "build"],
             check=False,

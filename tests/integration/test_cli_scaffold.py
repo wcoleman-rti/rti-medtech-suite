@@ -47,6 +47,17 @@ class TestCLIScaffold:
         assert result.exit_code == 0
         assert "Build" in result.output or "build" in result.output.lower()
 
+    def test_build_help_lists_docker_and_all_flags(self) -> None:
+        """@smoke Tier 1: medtech build --help lists --docker and --all flags."""
+        from click.testing import CliRunner
+        from medtech.cli._main import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["build", "--help"])
+        assert result.exit_code == 0
+        assert "--docker" in result.output
+        assert "--all" in result.output
+
     def test_status_help(self) -> None:
         """medtech status --help prints status usage."""
         from click.testing import CliRunner
