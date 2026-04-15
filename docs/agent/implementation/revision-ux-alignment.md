@@ -161,8 +161,9 @@ CLI (`medtech build --docker`, controller container deployment).
     - Shows a button for each discovered sibling GUI (dynamic — updates
       as services start/stop via `@ui.refreshable` / `ui.timer()`)
     - Highlights the currently active page
-    - Includes a "Dashboard" link with `open_in_new` icon that opens
-      the hospital dashboard in a new browser tab
+    - **No upward link to hospital dashboard** — room GUIs have
+      visibility at and below their level only. A room can be deployed
+      standalone without a hospital instance above it.
     - Uses the design token system and glassmorphism styling from
       the existing UI modernization phase
   - DDS reads run as asyncio coroutines (never block the event loop)
@@ -170,14 +171,14 @@ CLI (`medtech build --docker`, controller container deployment).
 - **Integrate room_nav into existing room GUIs:**
   - Procedure Controller: replace existing nav pill with `room_nav`
   - Digital Twin: add `room_nav` pill (currently has no nav pill)
-  - Each GUI passes its `room_id` and `dashboard_url` to the module
+  - Each GUI passes its `room_id` to the module (no dashboard URL needed)
 
 - **Dashboard URL discovery:**
-  - Room GUIs receive the hospital dashboard URL via environment
-    variable (`MEDTECH_DASHBOARD_URL`) set by the CLI at container
-    launch time (e.g., `http://localhost:8080/dashboard`). This is
-    acceptable because the hospital URL is stable infrastructure —
-    unlike sibling GUIs which are dynamic.
+  - Not applicable — room GUIs do **not** link to the hospital
+    dashboard. Room-level services have visibility at and below their
+    level only, matching the layered databus principle that lower
+    levels never depend on upper levels. To return to the hospital
+    view, the user closes the room tab.
 
 ### Test Gate
 
@@ -186,7 +187,8 @@ CLI (`medtech build --docker`, controller container deployment).
 - [ ] Nav pill renders buttons for each discovered sibling GUI
 - [ ] Nav pill updates dynamically when a sibling GUI starts or stops
 - [ ] Clicking a sibling button navigates the current tab to that URL
-- [ ] Dashboard link includes `open_in_new` icon and opens new tab
+- [ ] Nav pill does **not** include any link to the hospital dashboard
+- [ ] Room GUI operates correctly without a hospital instance deployed
 - [ ] Procedure Controller uses `room_nav` for navigation
 - [ ] Digital Twin uses `room_nav` for navigation
 - [ ] DDS reads do not block the NiceGUI event loop

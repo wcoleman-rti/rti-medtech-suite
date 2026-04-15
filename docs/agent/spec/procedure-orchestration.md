@@ -354,13 +354,12 @@ is added or changed.*
 **When** the user clicks the "Digital Twin" button
 **Then** the browser navigates the current tab to the Digital Twin's URL
 
-### Scenario: Nav pill provides hospital dashboard link with external icon `@gui`
+### Scenario: Room-level GUI has no upward link to hospital `@gui`
 
 **Given** a room-level GUI is running with the nav pill
 **When** the nav pill renders
-**Then** it includes a link to the hospital dashboard URL
-**And** the link includes the `open_in_new` icon (Material Icons) indicating a new browser tab will open
-**And** clicking the link opens the hospital dashboard in a new browser tab
+**Then** there is no link or button to the hospital dashboard
+**And** the room GUI can operate independently without a hospital instance deployed above it
 
 ---
 

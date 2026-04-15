@@ -71,7 +71,8 @@ The medtech suite uses a **cross-plane, cross-origin** navigation model that ref
 - Creates a single read-only Orchestration domain participant (subscribes to `ServiceCatalog` filtered by `room_id`)
 - Discovers sibling GUI URLs dynamically as services start/stop — no environment variable configuration
 - Renders a common floating nav pill with buttons for each discovered sibling GUI
-- Provides a visual `open_in_new`-annotated link back to the hospital dashboard URL
+
+Room GUIs have **no upward visibility** to the hospital level. A room can be deployed in complete isolation without a hospital instance above it. To return to the hospital dashboard, the user simply closes the room tab or switches to the still-open hospital tab.
 
 This model is deployment-agnostic: it works identically whether GUIs run in Docker containers, on physical hosts in an OR, or in a mixed environment. Each GUI service only needs Orchestration domain network reachability to discover siblings.
 

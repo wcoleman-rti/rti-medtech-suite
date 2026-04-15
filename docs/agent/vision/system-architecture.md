@@ -1051,9 +1051,10 @@ shared navigation module (`medtech.gui.room_nav`) that creates a read-only Orche
 domain participant, subscribes to `ServiceCatalog` filtered by `room_id`, and renders a
 floating nav pill with buttons for each discovered sibling GUI. This enables same-tab
 horizontal navigation between room GUIs (e.g., controller → twin → future camera display)
-without infrastructure coupling. The nav pill also provides a visual `open_in_new`-annotated
-link to the hospital dashboard URL. The module is deployment-agnostic — it works identically
-on Docker, physical hardware, or mixed environments.
+without infrastructure coupling. Room GUIs have **no upward visibility** to the hospital
+level — a room can be deployed standalone without a hospital instance above it. The module
+is deployment-agnostic — it works identically on Docker, physical hardware, or mixed
+environments.
 
 **`gui_url` browser reachability:** Each GUI container sets
 `MEDTECH_GUI_EXTERNAL_URL` in its environment (e.g.,
