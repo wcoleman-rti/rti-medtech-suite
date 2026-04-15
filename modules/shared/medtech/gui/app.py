@@ -1,53 +1,31 @@
-"""Unified NiceGUI application entry point for medtech-suite.
+"""Hospital dashboard NiceGUI application entry point.
 
-Serves all GUI modules — Hospital Dashboard, Procedure Controller, and
-Digital Twin — from a single process with a persistent SPA shell.
+Serves only the hospital-level dashboard. Room-level GUIs (Procedure
+Controller, Digital Twin) run in per-room containers launched by
+``medtech run or``.
 
 Routes:
     /                  Landing page (redirects to /dashboard)
     /dashboard         Hospital Dashboard  (dashboard.dashboard_content)
-    /controller        Procedure Controller (controller.controller_content)
-    /twin/{room_id}    Digital Twin 3D      (digital_twin.twin_content)
 
 Health / Readiness probes:
     GET /health        Liveness probe — always 200 while process is running
     GET /ready         Readiness probe — 200 when all GuiBackend instances are
                        active, 503 otherwise
-
-Architecture notes:
-    GuiBackend subclasses are instantiated at module level in each page
-    module.  Their __init__ calls app.on_startup/on_shutdown automatically,
-    so this main entry point never manually calls start() or close().
-
-    ``shell_page`` is passed as the ``root`` argument to ``ui.run()``, making
-    it the handler for **all** URL paths. ``ui.sub_pages()`` inside it does
-    client-side routing so the floating navigation pill persists across all
-    navigations and browser refreshes.
 """
 
 from __future__ import annotations
 
 import os
 
-# MEDTECH_GUI_MODE controls which GUI modules are loaded:
-#   "unified"               — all modules (dashboard, controller, twin)
-#   "controller-dashboard"  — dashboard + controller only (twins run separately)
-# Default is "unified" for backward compatibility.
-_GUI_MODE = os.environ.get("MEDTECH_GUI_MODE", "unified")
-
-from fastapi.responses import JSONResponse  # noqa: E402
+from fastapi.responses import JSONResponse
 
 # Import page builder functions — module-level GuiBackend instantiation
 # happens inside these modules, self-registering lifecycle hooks.
-from hospital_dashboard.dashboard.dashboard import dashboard_content  # noqa: F401, E402
-from hospital_dashboard.procedure_controller.controller import (  # noqa: F401, E402
-    ControllerBackend,
-    controller_content,
-    controller_content_for_room,
-)
-from medtech.gui._backend import GuiBackend  # noqa: E402
-from medtech.gui._icons import ICONS  # noqa: E402
-from medtech.gui._theme import (  # noqa: E402
+from hospital_dashboard.dashboard.dashboard import dashboard_content  # noqa: F401
+from medtech.gui._backend import GuiBackend
+from medtech.gui._icons import ICONS
+from medtech.gui._theme import (
     NICEGUI_STORAGE_SECRET_DEFAULT,
     NICEGUI_STORAGE_SECRET_ENV,
     NICEGUI_THEME_MODE_KEY,
@@ -55,15 +33,8 @@ from medtech.gui._theme import (  # noqa: E402
     _theme_mode_value,
     init_theme,
 )
-from medtech.gui._widgets import ConnectionDot  # noqa: E402
-from nicegui import app, ui  # noqa: E402
-
-# Conditionally import the digital twin module only in unified mode.
-# In split-GUI mode (controller-dashboard), twins run in separate containers.
-if _GUI_MODE == "unified":
-    from surgical_procedure.digital_twin.digital_twin import twin_content  # noqa: F401
-else:
-    twin_content = None  # type: ignore[assignment]
+from medtech.gui._widgets import ConnectionDot
+from nicegui import app, ui
 
 # ---------------------------------------------------------------------------
 # Health / Readiness probes (FastAPI routes)
@@ -109,8 +80,6 @@ _STATIC_NAV_ITEMS = [
 # Page display names keyed by route prefix (for breadcrumb)
 _PAGE_TITLES: dict[str, str] = {
     "/dashboard": "Dashboard",
-    "/controller/": "Controller",
-    "/twin/": "Digital Twin",
 }
 
 
@@ -118,38 +87,8 @@ def _page_title_for_path(path: str) -> str:
     """Return a human-readable page title for a given URL path."""
     for prefix, title in _PAGE_TITLES.items():
         if path == prefix or path.startswith(prefix):
-            # For twin pages, extract room_id
-            if prefix == "/twin/" and len(path) > len(prefix):
-                room_id = path[len(prefix) :]
-                return f"Digital Twin — {room_id}"
             return title
     return "Home"
-
-
-def _get_controller_backend() -> ControllerBackend | None:
-    """Return the ControllerBackend from the registry, if any."""
-    for b in GuiBackend.registry():
-        if isinstance(b, ControllerBackend):
-            return b
-    return None
-
-
-def _discovered_rooms() -> list[str]:
-    """Return discovered room IDs from ServiceCatalog.
-
-    Returns a sorted list of unique room_id strings.
-    """
-    ctrl = _get_controller_backend()
-    if ctrl is None:
-        return []
-    seen_rooms: set[str] = set()
-    for (_host_id, _service_id), catalog in ctrl.catalogs.items():
-        for prop in getattr(catalog, "properties", None) or []:
-            name = getattr(prop, "name", "")
-            val = getattr(prop, "current_value", "") or ""
-            if name == "room_id" and val:
-                seen_rooms.add(val)
-    return sorted(seen_rooms)
 
 
 def shell_page() -> None:
@@ -191,64 +130,6 @@ def shell_page() -> None:
                 .classes("rounded-full px-4 transition-fast")
             )
             nav_buttons[path] = btn
-
-        # --- Discovered services (collapsed "Rooms" dropdown) ---------------
-        # A single button with a badge count instead of one button per room.
-        # Scales to dozens of ORs without widening the pill.
-        with (
-            ui.button("Rooms", icon=ICONS.get("robot", "smart_toy"))
-            .props("flat no-caps size=md")
-            .classes("rounded-full px-4 transition-fast")
-        ):
-            rooms_badge = ui.badge("0").props("floating color=accent")
-            rooms_badge.set_visibility(False)
-            with ui.menu().props("auto-close").classes("rooms-dropdown") as rooms_menu:
-                pass  # populated by render_discovered_rooms
-
-        @ui.refreshable
-        def render_discovered_rooms() -> None:
-            rooms_menu.clear()
-            rooms = _discovered_rooms()
-            count = len(rooms)
-            rooms_badge.set_text(str(count))
-            rooms_badge.set_visibility(count > 0)
-            if not rooms:
-                with rooms_menu:
-                    ui.menu_item(
-                        "No rooms discovered",
-                        auto_close=True,
-                    ).props(
-                        "disable"
-                    ).classes("text-sm italic opacity-60")
-                return
-            with rooms_menu:
-                for room_id in rooms:
-                    with ui.row().classes("items-center gap-4 px-3 py-1"):
-                        ui.label(room_id).classes(
-                            "type-label min-w-[4rem] text-sm font-semibold"
-                        )
-                        ui.button(
-                            "Controller",
-                            icon=ICONS["service"],
-                            on_click=lambda r=room_id: ui.navigate.to(
-                                f"/controller/{r}"
-                            ),
-                        ).props("flat dense no-caps size=md").classes("rounded-full")
-                        ui.button(
-                            "Twin",
-                            icon=ICONS.get("robot", "smart_toy"),
-                            on_click=lambda r=room_id: ui.navigate.to(f"/twin/{r}"),
-                        ).props("flat dense no-caps size=md").classes("rounded-full")
-
-        render_discovered_rooms()
-
-        def _safe_refresh() -> None:
-            try:
-                render_discovered_rooms.refresh()
-            except RuntimeError:
-                pass
-
-        ui.timer(2.0, _safe_refresh)
 
         # --- Separator + theme toggle + connection dot ---
         ui.separator().props("vertical").classes("mx-2 h-6")
@@ -299,11 +180,8 @@ def shell_page() -> None:
     with ui.column().classes("w-full h-full p-0 m-0").style("padding-top: 64px;"):
         routes: dict = {
             "/dashboard": dashboard_content,
-            "/controller/{room_id}": controller_content_for_room,
             "/": lambda: ui.navigate.to("/dashboard"),
         }
-        if twin_content is not None:
-            routes["/twin/{room_id}"] = twin_content
         ui.sub_pages(routes)
 
     # Track path changes for active highlighting
@@ -321,32 +199,22 @@ def shell_page() -> None:
 
 
 def main() -> None:
-    """Launch the unified medtech-suite web application."""
+    """Launch the hospital dashboard web application."""
     storage_secret = os.environ.get(
         NICEGUI_STORAGE_SECRET_ENV, NICEGUI_STORAGE_SECRET_DEFAULT
     )
 
-    # Eagerly instantiate the dashboard and a discovery-only controller
-    # backend before ui.run() so they register app.on_startup /
-    # on_shutdown hooks while the app is still in the pre-start state.
-    # The discovery controller provides ServiceCatalog data for room
-    # discovery in the nav pill.  Per-room controller views and digital
-    # twin backends are created lazily on first page visit.
+    # Eagerly instantiate the dashboard backend before ui.run() so it
+    # registers app.on_startup/on_shutdown hooks while the app is still
+    # in the pre-start state.
     from hospital_dashboard.dashboard.dashboard import _current_backend as _dash_init
-    from hospital_dashboard.procedure_controller.controller import (
-        _current_backend as _ctrl_init,
-    )
 
     _dash_init()
-    _ctrl_init()
 
     # Remove standalone @ui.page routes registered by module imports so that
     # the root=shell_page catch-all handles all paths through the SPA shell.
     _standalone_paths = {
         "/dashboard",
-        "/controller",
-        "/controller/{room_id}",
-        "/twin/{room_id}",
     }
     app.routes[:] = [
         r for r in app.routes if getattr(r, "path", None) not in _standalone_paths

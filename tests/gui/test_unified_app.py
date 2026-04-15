@@ -488,9 +488,6 @@ class TestShellPage:
             app_module, "init_theme", lambda *a, **kw: FakeElement("row")
         )
 
-        # Mock _discovered_rooms to return empty list
-        monkeypatch.setattr(app_module, "_discovered_rooms", lambda: [])
-
         # Mock ConnectionDot
         monkeypatch.setattr(
             app_module, "ConnectionDot", lambda **kw: FakeElement("dot")
@@ -547,7 +544,7 @@ class TestShellPage:
     def test_shell_page_registers_sub_pages(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """shell_page() calls ui.sub_pages() with route dict."""
+        """shell_page() calls ui.sub_pages() with dashboard-only route dict."""
         import medtech.gui.app as app_module
 
         log = self._patch_shell(monkeypatch)
@@ -556,8 +553,9 @@ class TestShellPage:
         assert len(log["sub_pages"]) == 1
         routes = log["sub_pages"][0]["args"][0]
         assert "/dashboard" in routes
-        assert "/controller/{room_id}" in routes
-        assert "/twin/{room_id}" in routes
+        # Controller and twin routes are no longer in the hospital app
+        assert "/controller/{room_id}" not in routes
+        assert "/twin/{room_id}" not in routes
 
     def test_shell_page_sub_pages_use_content_functions(
         self, monkeypatch: pytest.MonkeyPatch
@@ -565,30 +563,24 @@ class TestShellPage:
         """sub_pages routes point to the content-only builder functions."""
         import medtech.gui.app as app_module
         from hospital_dashboard.dashboard.dashboard import dashboard_content
-        from hospital_dashboard.procedure_controller.controller import (
-            controller_content_for_room,
-        )
-        from surgical_procedure.digital_twin.digital_twin import twin_content
 
         log = self._patch_shell(monkeypatch)
         app_module.shell_page()
 
         routes = log["sub_pages"][0]["args"][0]
         assert routes["/dashboard"] is dashboard_content
-        assert routes["/controller/{room_id}"] is controller_content_for_room
-        assert routes["/twin/{room_id}"] is twin_content
 
     def test_shell_page_nav_pill_has_static_buttons(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Navigation pill contains button entries for Dashboard and Controller."""
+        """Navigation pill contains a Dashboard button."""
         import medtech.gui.app as app_module
 
         log = self._patch_shell(monkeypatch)
         app_module.shell_page()
 
-        # Static nav buttons (Dashboard, Controller) + theme toggle buttons
-        assert len(log["button"]) >= 2
+        # Static nav button (Dashboard) + theme toggle buttons
+        assert len(log["button"]) >= 1
 
     def test_shell_page_root_redirect(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Root '/' route redirects to '/dashboard' via sub_pages."""
@@ -614,21 +606,6 @@ class TestPageTitleForPath:
 
         assert _page_title_for_path("/dashboard") == "Dashboard"
 
-    def test_controller_path(self) -> None:
-        from medtech.gui.app import _page_title_for_path
-
-        assert _page_title_for_path("/controller/OR-1") == "Controller"
-
-    def test_twin_with_room_id(self) -> None:
-        from medtech.gui.app import _page_title_for_path
-
-        assert _page_title_for_path("/twin/OR-1") == "Digital Twin — OR-1"
-
-    def test_twin_with_different_room_id(self) -> None:
-        from medtech.gui.app import _page_title_for_path
-
-        assert _page_title_for_path("/twin/OR-3") == "Digital Twin — OR-3"
-
     def test_unknown_path_returns_home(self) -> None:
         from medtech.gui.app import _page_title_for_path
 
@@ -638,104 +615,6 @@ class TestPageTitleForPath:
         from medtech.gui.app import _page_title_for_path
 
         assert _page_title_for_path("/") == "Home"
-
-
-# ---------------------------------------------------------------------------
-# Discovered GUI services helper tests (@ui-modernization)
-# ---------------------------------------------------------------------------
-
-
-class TestDiscoveredRooms:
-    """_discovered_rooms() extracts room IDs from ServiceCatalog."""
-
-    def setup_method(self) -> None:
-        GuiBackend._clear_registry()
-
-    def teardown_method(self) -> None:
-        GuiBackend._clear_registry()
-
-    def test_returns_empty_when_no_controller(self) -> None:
-        """Returns empty list when no ControllerBackend is registered."""
-        from medtech.gui.app import _discovered_rooms
-
-        assert _discovered_rooms() == []
-
-    def test_room_id_discovered(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """A catalog with room_id is returned as a discovered room."""
-        import medtech.gui.app as app_module
-        from hospital_dashboard.procedure_controller.controller import ControllerBackend
-
-        # Fake property with room_id
-        class _Prop:
-            def __init__(self, name: str, current_value: str) -> None:
-                self.name = name
-                self.current_value = current_value
-
-        class _Catalog:
-            def __init__(self, props: list[_Prop]) -> None:
-                self.properties = props
-
-        class _FakeController(ControllerBackend):
-            def __init__(self) -> None:
-                pass  # skip DDS init
-
-            @property
-            def catalogs(self) -> dict[tuple[str, str], Any]:
-                return {
-                    ("host1", "svc1"): _Catalog(
-                        [
-                            _Prop("room_id", "OR-1"),
-                            _Prop("display_name", "Robot Arm"),
-                        ]
-                    ),
-                }
-
-            def is_ready(self) -> bool:
-                return True
-
-        ctrl = _FakeController()
-        GuiBackend._registry.append(ctrl)
-        monkeypatch.setattr(app_module, "_get_controller_backend", lambda: ctrl)
-
-        results = app_module._discovered_rooms()
-        assert len(results) == 1
-        assert results[0] == "OR-1"
-
-    def test_room_id_deduplication(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Multiple catalogs with the same room_id yield only one entry."""
-        import medtech.gui.app as app_module
-        from hospital_dashboard.procedure_controller.controller import ControllerBackend
-
-        class _Prop:
-            def __init__(self, name: str, current_value: str) -> None:
-                self.name = name
-                self.current_value = current_value
-
-        class _Catalog:
-            def __init__(self, props: list[_Prop]) -> None:
-                self.properties = props
-
-        class _FakeController(ControllerBackend):
-            def __init__(self) -> None:
-                pass
-
-            @property
-            def catalogs(self) -> dict[tuple[str, str], Any]:
-                return {
-                    ("h1", "s1"): _Catalog([_Prop("room_id", "OR-2")]),
-                    ("h1", "s2"): _Catalog([_Prop("room_id", "OR-2")]),
-                }
-
-            def is_ready(self) -> bool:
-                return True
-
-        ctrl = _FakeController()
-        GuiBackend._registry.append(ctrl)
-        monkeypatch.setattr(app_module, "_get_controller_backend", lambda: ctrl)
-
-        results = app_module._discovered_rooms()
-        assert len(results) == 1
-        assert results[0] == "OR-2"
 
 
 # ---------------------------------------------------------------------------
@@ -796,10 +675,6 @@ class TestMainUsesRoot:
         # Patch module-level backend factories to avoid DDS init
         monkeypatch.setattr(
             "hospital_dashboard.dashboard.dashboard._current_backend",
-            lambda: None,
-        )
-        monkeypatch.setattr(
-            "hospital_dashboard.procedure_controller.controller._current_backend",
             lambda: None,
         )
 

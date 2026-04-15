@@ -50,6 +50,7 @@ def _mock_hospitals_two_named():
 class TestRunOR:
     """Verify ``medtech run or``."""
 
+    @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
     @patch(
         "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_unnamed()
@@ -58,7 +59,7 @@ class TestRunOR:
     @patch("medtech.cli._or._config_volumes", return_value=[])
     @patch("medtech.cli._or._env_flags", return_value=[])
     def test_starts_gateway_and_5_containers(
-        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port
+        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port, mock_ctrl_port
     ) -> None:
         """medtech run or --name OR-5 starts room-gateway + 5 app containers."""
         runner = CliRunner()
@@ -76,15 +77,17 @@ class TestRunOR:
             if "--name" in cmd:
                 idx = cmd.index("--name")
                 names.append(cmd[idx + 1])
-        # Gateway (CDS) + RS + Collector + 4 service hosts + 1 twin = 8
-        assert len(docker_runs) == 8
+        # Gateway (CDS) + RS + Collector + 4 service hosts + 1 twin + 1 controller = 9
+        assert len(docker_runs) == 9
         assert any("gateway" in n for n in names)
         assert any("clinical" in n for n in names)
         assert any("operational" in n for n in names)
         assert any("operator" in n for n in names)
         assert any("robot" in n for n in names)
         assert any("twin" in n for n in names)
+        assert any("controller" in n for n in names)
 
+    @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
     @patch(
         "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_unnamed()
@@ -94,7 +97,14 @@ class TestRunOR:
     @patch("medtech.cli._or._config_volumes", return_value=[])
     @patch("medtech.cli._or._env_flags", return_value=[])
     def test_auto_generates_name(
-        self, mock_env, mock_vols, mock_run, mock_next_or, mock_hosp, mock_port
+        self,
+        mock_env,
+        mock_vols,
+        mock_run,
+        mock_next_or,
+        mock_hosp,
+        mock_port,
+        mock_ctrl_port,
     ) -> None:
         """medtech run or (no --name) auto-generates OR-1."""
         runner = CliRunner()
@@ -103,6 +113,7 @@ class TestRunOR:
         assert "OR-1" in result.output
         mock_next_or.assert_called_once()
 
+    @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
     @patch(
         "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_two_named()
@@ -111,7 +122,7 @@ class TestRunOR:
     @patch("medtech.cli._or._config_volumes", return_value=[])
     @patch("medtech.cli._or._env_flags", return_value=[])
     def test_targets_named_hospital(
-        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port
+        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port, mock_ctrl_port
     ) -> None:
         """medtech run or --hospital hospital-a targets named hospital networks."""
         runner = CliRunner()
@@ -141,6 +152,7 @@ class TestRunOR:
         result = runner.invoke(main, ["run", "or", "--name", "OR-1"])
         assert result.exit_code != 0
 
+    @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
     @patch(
         "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_unnamed()
@@ -149,13 +161,14 @@ class TestRunOR:
     @patch("medtech.cli._or._config_volumes", return_value=[])
     @patch("medtech.cli._or._env_flags", return_value=[])
     def test_infers_single_hospital(
-        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port
+        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port, mock_ctrl_port
     ) -> None:
         """Infers hospital when only one is running."""
         runner = CliRunner()
         result = runner.invoke(main, ["run", "or", "--name", "OR-1"])
         assert result.exit_code == 0
 
+    @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
     @patch(
         "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_unnamed()
@@ -164,7 +177,7 @@ class TestRunOR:
     @patch("medtech.cli._or._config_volumes", return_value=[])
     @patch("medtech.cli._or._env_flags", return_value=[])
     def test_containers_have_dynamic_label(
-        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port
+        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port, mock_ctrl_port
     ) -> None:
         """Containers have the medtech.dynamic=true label."""
         runner = CliRunner()
@@ -180,6 +193,7 @@ class TestRunOR:
         for cmd in docker_runs:
             assert "medtech.dynamic=true" in cmd
 
+    @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
     @patch(
         "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_unnamed()
@@ -188,14 +202,16 @@ class TestRunOR:
     @patch("medtech.cli._or._config_volumes", return_value=[])
     @patch("medtech.cli._or._env_flags", return_value=[])
     def test_prints_docker_commands(
-        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port
+        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port, mock_ctrl_port
     ) -> None:
         """Each docker run command is printed to stdout (via run_cmd)."""
         runner = CliRunner()
         result = runner.invoke(main, ["run", "or", "--name", "OR-1"])
         assert result.exit_code == 0
         # run_cmd prints "  $ <cmd>" for each docker run
-        assert mock_run.call_count >= 8  # gateway + rs + collector + 4 hosts + twin
+        assert (
+            mock_run.call_count >= 9
+        )  # gateway + rs + collector + 4 hosts + twin + controller
 
     @patch("medtech.cli._or._detect_hospitals", return_value=[])
     def test_errors_no_hospital(self, mock_hosp) -> None:

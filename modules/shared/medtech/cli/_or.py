@@ -85,6 +85,50 @@ def _twin_port_base(hospital_name: str | None) -> int:
     return 8081 + (ordinal - 1) * 1000
 
 
+def _controller_port_base(hospital_name: str | None) -> int:
+    """Base port for controller containers.  Unnamed=8091, hospital-a=8091, hospital-b=9091, …"""
+    if hospital_name is None:
+        return 8091
+    networks = _running_networks()
+    names: list[str] = []
+    for net in sorted(networks):
+        parts = net.removeprefix("medtech_").split("_")
+        if len(parts) >= 2 and parts[0].startswith("hospital-"):
+            if parts[0] not in names:
+                names.append(parts[0])
+    if hospital_name in names:
+        ordinal = names.index(hospital_name) + 1
+    else:
+        ordinal = 1
+    return 8091 + (ordinal - 1) * 1000
+
+
+def _next_controller_port(hospital_name: str | None) -> int:
+    """Auto-assign the next available controller port for the hospital."""
+    base = _controller_port_base(hospital_name)
+    containers = _running_containers()
+    used_ports: set[int] = set()
+    for c in containers:
+        ports = c.get("Ports", "")
+        if ports:
+            for mapping in ports.split(","):
+                mapping = mapping.strip()
+                if "->" in mapping:
+                    host_part = mapping.split("->")[0].strip()
+                    if ":" in host_part:
+                        port_str = host_part.rsplit(":", 1)[-1]
+                    else:
+                        port_str = host_part
+                    try:
+                        used_ports.add(int(port_str))
+                    except ValueError:
+                        pass
+    port = base
+    while port in used_ports:
+        port += 1
+    return port
+
+
 def _next_twin_port(hospital_name: str | None) -> int:
     """Auto-assign the next available twin port for the hospital."""
     base = _twin_port_base(hospital_name)
@@ -216,6 +260,9 @@ def or_cmd(
     if twin_port is None:
         twin_port = _next_twin_port(target["name"])
 
+    # Auto-assign controller port
+    controller_port = _next_controller_port(target["name"])
+
     root = _project_root()
     gateway_name_for_hospital = (
         f"{target['name']}-gateway" if target["name"] else "hospital-gateway"
@@ -253,14 +300,14 @@ def or_cmd(
             extra_env=extra_env,
         )
 
-    # 3. Digital twin container
+    # 3. Digital twin container (surgical-net + orchestration-net for room_nav)
     twin_name = f"{h_prefix}medtech-twin-{or_key}"
     twin_url = f"http://localhost:{twin_port}"
     _start_service_container(
         name=twin_name,
         image="medtech/app-python",
         command=["python", "-m", "surgical_procedure.digital_twin"],
-        networks=[target["nets"]["surgical"], target["nets"]["hospital"]],
+        networks=[target["nets"]["surgical"], target["nets"]["orchestration"]],
         extra_env={
             "ROOM_ID": or_name,
             "PROCEDURE_ID": procedure_id,
@@ -271,11 +318,31 @@ def or_cmd(
         port_mapping=f"{twin_port}:8080",
     )
 
+    # 4. Procedure Controller container (surgical-net + orchestration-net)
+    ctrl_name = f"{h_prefix}medtech-controller-{or_key}"
+    ctrl_url = f"http://localhost:{controller_port}"
+    _start_service_container(
+        name=ctrl_name,
+        image="medtech/app-python",
+        command=["python", "-m", "hospital_dashboard.procedure_controller"],
+        networks=[target["nets"]["surgical"], target["nets"]["orchestration"]],
+        extra_env={
+            "ROOM_ID": or_name,
+            "PROCEDURE_ID": procedure_id,
+            "HOST_ID": f"controller-{or_key}",
+            "MEDTECH_APP_NAME": ctrl_name,
+            "MEDTECH_GUI_EXTERNAL_URL": ctrl_url,
+            "NDDS_DISCOVERY_PEERS": cds_peers,
+        },
+        port_mapping=f"{controller_port}:8080",
+    )
+
     # Summary
     click.echo()
     click.secho(f"OR: {or_name}", bold=True)
     if target["name"]:
         click.echo(f"Hospital: {target['name']}")
+    click.secho(f"Controller: {ctrl_url}/controller/{or_name}", fg="green")
     click.secho(f"Twin: {twin_url}/twin/{or_name}", fg="green")
 
 
