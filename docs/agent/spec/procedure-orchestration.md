@@ -262,6 +262,108 @@ is added or changed.*
 
 ---
 
+## Procedure Lifecycle Workflow
+
+### Scenario: Procedure Controller shows "Start Procedure" when no procedure is active `@integration` `@orchestration` `@gui`
+
+**Given** the Procedure Controller is displaying services for a room (e.g., OR-1)
+**And** no `ServiceCatalog` entries for OR-1 have a non-empty `procedure_id` property
+**When** the controller renders the room view
+**Then** a "Start Procedure" action is visible and enabled
+
+### Scenario: Start Procedure workflow presents idle services for selection `@integration` `@orchestration` `@gui`
+
+**Given** the user clicks "Start Procedure" on the OR-1 controller page
+**And** OR-1 has 6 services in `ServiceCatalog`, all with empty `procedure_id`
+**When** the workflow UI is displayed
+**Then** the user sees a selectable list of available idle services
+**And** the user can select one or more services to deploy
+
+### Scenario: Deploying selected services sends start_service RPCs with procedure_id `@integration` `@orchestration`
+
+**Given** the user has selected 4 services from the idle list and clicks "Deploy"
+**When** the controller initiates the deployment
+**Then** the controller generates a unique `procedure_id` (e.g., `OR-1-001`)
+**And** sends a `start_service` RPC to each selected service's Service Host, including `procedure_id` as a property
+**And** each Service Host starts the requested service and re-publishes `ServiceCatalog` with the `procedure_id` property set
+
+### Scenario: Procedure becomes active after services are deployed `@integration` `@orchestration` `@gui`
+
+**Given** the controller has deployed services with `procedure_id = "OR-1-001"`
+**And** at least one service has transitioned to `RUNNING` state
+**When** the controller view refreshes
+**Then** the room shows an active procedure indicator with the procedure ID
+**And** the "Start Procedure" action is replaced by procedure management actions (add services, stop procedure)
+
+### Scenario: One active procedure per room is enforced `@integration` `@orchestration` `@gui`
+
+**Given** OR-1 already has an active procedure (`procedure_id = "OR-1-001"` on deployed services)
+**When** the controller renders the room view
+**Then** the "Start Procedure" action is disabled or hidden
+**And** only "Add Services" and "Stop Procedure" actions are available
+
+### Scenario: Adding services to a running procedure `@integration` `@orchestration` `@gui`
+
+**Given** OR-1 has an active procedure with `procedure_id = "OR-1-001"` and 4 running services
+**And** 2 additional idle services are available in the room
+**When** the user clicks "Add Services" and selects the idle services
+**Then** the controller sends `start_service` RPCs with the same `procedure_id = "OR-1-001"`
+**And** the newly deployed services appear in the procedure's service list
+
+### Scenario: Stopping a procedure stops all deployed services `@integration` `@orchestration` `@gui`
+
+**Given** OR-1 has an active procedure with `procedure_id = "OR-1-001"` and 4 running services
+**When** the user clicks "Stop Procedure"
+**Then** the controller sends `stop_service` RPCs to all services whose `ServiceCatalog` entry has `procedure_id = "OR-1-001"`
+**And** services transition through `STOPPING` → `STOPPED`
+**And** `procedure_id` is cleared from the stopped services' `ServiceCatalog` entries
+**And** the room returns to idle state with "Start Procedure" action re-enabled
+
+### Scenario: Procedure state is reconstructed on controller restart `@integration` `@orchestration` `@durability`
+
+**Given** a procedure is active in OR-1 with deployed services
+**When** the Procedure Controller process restarts
+**Then** the controller receives TRANSIENT_LOCAL `ServiceCatalog` and `ServiceStatus` samples
+**And** services with a non-empty `procedure_id` matching OR-1 are displayed as part of the active procedure
+**And** no manual re-deployment is required
+
+---
+
+## Room-Level GUI Navigation
+
+### Scenario: Room GUI nav pill discovers sibling GUIs via ServiceCatalog `@integration` `@orchestration` `@gui`
+
+**Given** a room-level GUI (e.g., Procedure Controller for OR-1) is running
+**And** the shared `medtech.gui.room_nav` module has a read-only Orchestration domain participant
+**When** sibling GUI services (e.g., Digital Twin for OR-1) publish `ServiceCatalog` entries with `gui_url` properties
+**Then** the nav pill renders buttons for each discovered sibling GUI
+**And** button labels reflect the service display name
+
+### Scenario: Nav pill updates dynamically as sibling GUIs start and stop `@integration` `@orchestration` `@gui`
+
+**Given** the nav pill is showing a button for Digital Twin
+**When** the Digital Twin service is stopped and its `ServiceCatalog` `gui_url` is cleared
+**Then** the nav pill removes the Digital Twin button without manual refresh
+**When** a new GUI service (e.g., Camera Display) starts and publishes a `gui_url`
+**Then** the nav pill adds a new button for Camera Display
+
+### Scenario: Nav pill clicking a sibling navigates the current tab `@gui`
+
+**Given** the nav pill shows buttons for Controller and Digital Twin
+**And** the user is viewing the Controller page
+**When** the user clicks the "Digital Twin" button
+**Then** the browser navigates the current tab to the Digital Twin's URL
+
+### Scenario: Nav pill provides hospital dashboard link with external icon `@gui`
+
+**Given** a room-level GUI is running with the nav pill
+**When** the nav pill renders
+**Then** it includes a link to the hospital dashboard URL
+**And** the link includes the `open_in_new` icon (Material Icons) indicating a new browser tab will open
+**And** clicking the link opens the hospital dashboard in a new browser tab
+
+---
+
 ## Orchestration Domain Isolation
 
 ### Scenario: Orchestration domain is isolated from the Procedure domain `@integration` `@orchestration` `@isolation`
