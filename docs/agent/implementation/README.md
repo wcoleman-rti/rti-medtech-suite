@@ -26,6 +26,7 @@ Phases are grouped by release milestone. All phases within a milestone must be c
 > **Implementation order:** Execute phases in **milestone order**, which now
 > matches phase numbering: V1.0 phases (1–5) → V1.1 phase (6) →
 > V1.2 phase (20) → V1.3 phase (UI-M) → V1.4 phase (SIM) →
+> V1.4 revisions (Domain ID Migration, Databus Terminology) →
 > V1.5 revision (UX) → V2.0 phases (7–14) → V2.1 phase (21) →
 > V3.0 phases (15–19).
 
@@ -79,6 +80,11 @@ Phase SIM: Distributed Simulation     (depends on: Phase UI-M)
     ├──► Revision: Domain ID Migration (depends on: Phase SIM;
     │        prerequisite for V2.0 — aligns domain IDs, RS routes,
     │        and controller plane with decade-offset architecture)
+    │
+    └──► Revision: Databus Terminology Alignment
+              (depends on: Revision: Domain ID Migration;
+               splits MedtechDomains into Room/Hospital/Cloud libraries,
+               adopts "databus" terminology across docs)
 
 ── V1.5.0 ──────────────────────────────────────────────────────────────────────
 

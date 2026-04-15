@@ -106,8 +106,19 @@ A version may only be cut when **all** of the following are true:
 | Multi-hospital simulation | Named hospitals with isolated private networks, NAT routers (`iptables MASQUERADE`), shared `wan-net`, per-hospital subnet/port allocation |
 | `medtech` CLI | `build`, `run hospital [--name]`, `run or [--name] [--hospital]`, `launch`, `status`, `status --topology`, `stop` — unified `--name` across all multi-instance commands |
 | Topology visualization | `medtech status --topology` (ASCII); optional [DockGraph](https://github.com/dockgraph/dockgraph) sidecar at `http://localhost:7800` |
-| Simulation scenarios | Distributed (default), multi-site, unified (fallback), minimal |
+| Simulation scenarios | Distributed (default), multi-site, minimal |
+#### V1.4.x Revisions
 
+**Revision: Domain ID Migration** — Aligns domain IDs, Routing Service
+routes, and controller participant plane with the decade-offset
+architecture. Patch release, no new capabilities.
+
+**Revision: Databus Terminology Alignment** — Adopts RTI's "databus"
+terminology across all documentation, splits the single
+`MedtechDomains` XML domain library into per-level libraries (`Room`,
+`Hospital`, `Cloud`), and enforces the No-Numeric-ID Rule restricting
+domain ID references to 4 canonical locations. Patch release, no new
+capabilities.
 ---
 
 ### V1.5.0 — UX Alignment
