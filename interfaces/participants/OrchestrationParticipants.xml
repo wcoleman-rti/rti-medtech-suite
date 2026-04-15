@@ -78,6 +78,25 @@
         </domain_participant>
 
         <!--
+            RoomNav — Lightweight read-only Orchestration participant for
+            room-level GUI navigation.  Discovers sibling GUIs via
+            ServiceCatalog filtered by room_id in application code.
+        -->
+        <domain_participant name="RoomNav"
+                            domain_ref="Room::Orchestration">
+            <domain_participant_qos base_name="Participants::Transport"/>
+
+            <subscriber name="RoomNavSubscriber">
+
+                <data_reader name="ServiceCatalogReader"
+                             topic_ref="ServiceCatalog">
+                    <datareader_qos base_name="TopicProfiles::ServiceCatalog"/>
+                </data_reader>
+
+            </subscriber>
+        </domain_participant>
+
+        <!--
             HospitalDashboard — Dashboard's Hospital Integration databus participant.
             Read-only subscriber for facility-wide monitoring.
             Subscribes to all bridged topics + native Hospital topics.

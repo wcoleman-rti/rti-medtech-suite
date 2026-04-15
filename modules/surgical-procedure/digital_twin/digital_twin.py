@@ -715,6 +715,7 @@ class DigitalTwinBackend(GuiBackend):
 # --------------------------------------------------------------------------- #
 
 _twin_backends: dict[str, DigitalTwinBackend] = {}
+_room_nav_instance: Any = None
 
 
 def _get_backend(room_id: str) -> DigitalTwinBackend:
@@ -735,12 +736,8 @@ def twin_page(room_id: str) -> None:
     """Render the digital twin 3D visualization page for *room_id* (standalone with self-contained shell)."""
     init_theme()
     create_header(title=f"Digital Twin — {room_id}")
-    controller_url = os.environ.get("MEDTECH_CONTROLLER_URL", "")
-    if controller_url:
-        with ui.row().classes("w-full px-4 pt-2 items-center"):
-            ui.link("← Return to Controller", controller_url).classes(
-                "text-sm text-blue-400 hover:text-blue-300"
-            )
+    if _room_nav_instance is not None:
+        _room_nav_instance.render_nav_pill(active_label="Digital Twin")
     twin_content(room_id)
 
 
@@ -1208,6 +1205,7 @@ def _build_scene(
 
 def main() -> None:
     """Standalone launch entry point."""
+    global _room_nav_instance
     storage_secret = os.environ.get(
         NICEGUI_STORAGE_SECRET_ENV, NICEGUI_STORAGE_SECRET_DEFAULT
     )
@@ -1224,6 +1222,15 @@ def main() -> None:
     from medtech.gui._theme import _resource_dir
 
     favicon_path = _resource_dir() / "images" / "favicon.ico"
+
+    # Room navigation pill — discovers sibling GUIs in this room
+    from medtech.gui.room_nav import RoomNav
+
+    _room_nav_instance = RoomNav(room_id)
+    from nicegui import app as nicegui_app
+
+    nicegui_app.on_startup(_room_nav_instance.start)
+    nicegui_app.on_shutdown(_room_nav_instance.close)
 
     # Root redirect: navigating to / sends the browser to the room-specific page.
     @ui.page("/")

@@ -771,10 +771,15 @@ def _current_backend() -> ControllerBackend:
     return backend
 
 
+_room_nav_instance: Any = None
+
+
 @ui.page("/controller", title="Procedure Controller — Medtech Suite")
 def controller_page() -> None:
     """Render the controller page (standalone with self-contained shell)."""
     init_theme(title="Procedure Controller")
+    if _room_nav_instance is not None:
+        _room_nav_instance.render_nav_pill(active_label="Procedure Controller")
     controller_content()
 
 
@@ -1441,6 +1446,7 @@ async def _service_bulk_action(action: Any, refresh_ui: Any) -> None:
 
 
 def main() -> None:
+    global _room_nav_instance
     storage_secret = os.environ.get(
         NICEGUI_STORAGE_SECRET_ENV, NICEGUI_STORAGE_SECRET_DEFAULT
     )
@@ -1450,6 +1456,17 @@ def main() -> None:
     favicon_path = _resource_dir() / "images" / "favicon.ico"
 
     _current_backend()
+
+    room_id = os.environ.get("ROOM_ID", "")
+    if room_id:
+        from medtech.gui.room_nav import RoomNav
+
+        _room_nav_instance = RoomNav(room_id)
+        from nicegui import app as nicegui_app
+
+        nicegui_app.on_startup(_room_nav_instance.start)
+        nicegui_app.on_shutdown(_room_nav_instance.close)
+
     try:
         ui.run(
             root=controller_page,

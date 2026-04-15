@@ -84,6 +84,12 @@ module MedtechEntityNames {
         const string CTRL_SERVICE_STATUS_READER  = "ControllerOrchSubscriber::ServiceStatusReader";
     };
 
+    // --- RoomNav participant (in OrchestrationParticipants library) ---
+    module RoomNav {
+        const string ROOM_NAV                = "OrchestrationParticipants::RoomNav";
+        const string SERVICE_CATALOG_READER  = "RoomNavSubscriber::ServiceCatalogReader";
+    };
+
     // --- HospitalDashboard participant (in OrchestrationParticipants library) ---
     module HospitalDashboard {
 
