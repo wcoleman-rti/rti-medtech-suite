@@ -233,6 +233,11 @@ to 3D visualization.
 
 ## Step N.6 — Unified App & SPA Navigation
 
+> **Superseded by V1.5.0** — The hospital container now serves only the
+> dashboard. Room-level GUIs (controller, twin) run in per-room containers
+> per Step UX.2. The unified-gui fallback is removed. See
+> `revision-ux-alignment.md`.
+
 ### Work
 
 - Create root app entry point (`modules/shared/medtech/gui/app.py` or `__main__.py`)

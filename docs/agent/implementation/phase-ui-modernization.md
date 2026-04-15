@@ -24,6 +24,12 @@ Phase N (NiceGUI Migration) Steps N.1–N.5 ✅, Phase 20 (Multi-Arm)
 
 ## Step M.0 — Fix SPA Navigation (Unified App Shell) ✅ `cca747b`
 
+> **Superseded by V1.5.0** — Step UX.3 (room-centric dashboard) and Step UX.4
+> (room_nav module) replace the sidebar navigation model described here.
+> The sidebar is removed in favor of room cards on the dashboard and a
+> floating nav pill for horizontal room-level navigation. The unified-gui
+> fallback is also removed. See `revision-ux-alignment.md`.
+
 ### Problem
 
 The unified app (`app.py`) renders the SPA shell (header + left drawer +

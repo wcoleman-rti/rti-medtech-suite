@@ -299,15 +299,20 @@ dynamically via `docker run --rm` — no duplicated compose service blocks.
 
 ### Test Gate
 
+> **V1.5.0 note:** Sidebar discovery is replaced by hospital dashboard
+> room cards (Step UX.3) and room_nav (Step UX.4). The unified-gui
+> profile and `medtech launch unified` command are removed. Test gate
+> items below marked with † are superseded by `revision-ux-alignment.md`.
+
 - [x] `docker compose up -d` starts infrastructure + central GUI
       (no twin containers)
 - [x] `http://localhost:8080` serves dashboard + controller
 - [x] `medtech run or --name OR-1` starts twin accessible at
       assigned port
-- [x] Procedure Controller sidebar discovers twin `gui_url` entries
-- [x] Clicking twin sidebar entry opens new browser tab
-- [x] `docker compose --profile unified-gui up -d` starts monolithic
-      GUI serving all modules
+- [x] Procedure Controller sidebar discovers twin `gui_url` entries †
+- [x] Clicking twin sidebar entry opens new browser tab †
+- [x] ~~`docker compose --profile unified-gui up -d` starts monolithic
+      GUI serving all modules~~ † *removed in V1.5.0*
 - [x] All existing tests pass
 - [x] Lint passes
 
