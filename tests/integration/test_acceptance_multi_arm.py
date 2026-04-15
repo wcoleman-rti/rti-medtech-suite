@@ -41,7 +41,7 @@ pytestmark = [
     pytest.mark.xdist_group("acceptance_multi_arm"),
 ]
 
-ORCHESTRATION_DOMAIN_ID = 15
+ORCHESTRATION_DOMAIN_ID = 11
 PROCEDURE_DOMAIN_ID = 10
 ROOM_ID = "OR-MACC"
 PROCEDURE_ID = "proc-macc"

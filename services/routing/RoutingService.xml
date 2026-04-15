@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    Routing Service Configuration — Procedure domain to Hospital domain bridge.
+    Routing Service Configuration — Procedure + Orchestration → Hospital bridge.
 
-    Bridges selected topics from the Procedure domain (Domain 10) to the
-    Hospital domain (Domain 11). Three input participants cover the three
-    Procedure domain tags (control, clinical, operational). One output
-    participant publishes on the Hospital domain (no tag).
+    Bridges selected topics from the Procedure domain (Domain 10) and
+    Orchestration domain (Domain 11) to the Hospital domain (Domain 20).
+    Three input participants cover the three Procedure domain tags
+    (control, clinical, operational). A fourth input participant reads
+    ServiceCatalog from Orchestration. One output participant publishes
+    on the Hospital domain (no tag).
+
+    Participants: 6 total
+      - ProcedureControl       (Domain 10, control tag)
+      - ProcedureClinical      (Domain 10, clinical tag)
+      - ProcedureOperational   (Domain 10, operational tag)
+      - ProcedureOrchestration (Domain 11, Orchestration)
+      - Hospital               (Domain 20, output)
 
     QoS profiles are loaded from the project QoS files via NDDS_QOS_PROFILES
     environment variable — the same profiles used by all applications.
@@ -19,10 +28,10 @@
     facility-wide view.
 
     Sessions:
-      - StatusSession:    low-rate status/state topics
+      - StatusSession:    low-rate status/state topics + ServiceCatalog
       - StreamingSession: higher-rate telemetry
 
-    Administration and monitoring are on Domain 20 (Observability).
+    Administration and monitoring are on Domain 19 (Room Observability).
 -->
 <dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
      xsi:noNamespaceSchemaLocation="https://community.rti.com/schema/7.6.0/rti_routing_service.xsd">
@@ -31,20 +40,20 @@
 
         <annotation>
             <documentation>
-                Bridges selected topics from Procedure domain (10) to
-                Hospital domain (11). Only explicitly configured topics
-                cross this boundary.
+                Bridges selected topics from Procedure domain (10) and
+                Orchestration domain (11) to Hospital domain (20). Only
+                explicitly configured topics cross this boundary.
             </documentation>
         </annotation>
 
-        <!-- Remote administration on Observability domain.
+        <!-- Remote administration on Room Observability domain (19).
              Disabled: the Participants::Transport QoS profile sets
              autoenable_created_entities=false, which conflicts with
              RS's internal admin participant. Enable when a dedicated
              admin QoS profile is available. -->
         <!--
         <administration>
-            <domain_id>20</domain_id>
+            <domain_id>19</domain_id>
             <distributed_logger>
                 <enabled>true</enabled>
                 <filter_level>WARNING</filter_level>
@@ -52,11 +61,11 @@
         </administration>
         -->
 
-        <!-- Remote monitoring on Observability domain — disabled (same reason). -->
+        <!-- Remote monitoring on Room Observability domain (19) — disabled (same reason). -->
         <!--
         <monitoring>
             <enabled>true</enabled>
-            <domain_id>20</domain_id>
+            <domain_id>19</domain_id>
             <status_publication_period>
                 <sec>5</sec>
                 <nanosec>0</nanosec>
@@ -140,7 +149,24 @@
                 </domain_participant_qos>
             </participant>
 
-            <!-- ── Output participant: Hospital domain (11) ────────── -->
+            <!-- ── Input participant: Orchestration domain (11) ────── -->
+
+            <!--
+                RS::ProcedureOrchestration — reads ServiceCatalog from Domain 11
+                (Orchestration, room-scoped) for northbound extraction to Domain 20.
+            -->
+            <participant name="ProcedureOrchestration">
+                <domain_id>11</domain_id>
+                <domain_participant_qos base_name="Participants::Transport">
+                    <partition>
+                        <name>
+                            <element>procedure</element>
+                        </name>
+                    </partition>
+                </domain_participant_qos>
+            </participant>
+
+            <!-- ── Output participant: Hospital domain (20) ────────── -->
 
             <!--
                 RS::Hospital — writes all bridged topics. No domain tag.
@@ -148,7 +174,7 @@
                 data into a facility-wide view.
             -->
             <participant name="Hospital">
-                <domain_id>11</domain_id>
+                <domain_id>20</domain_id>
                 <domain_participant_qos base_name="Participants::Transport"/>
             </participant>
 
@@ -202,6 +228,19 @@
                     <output participant="Hospital">
                         <topic_name>AlarmMessages</topic_name>
                         <datawriter_qos base_name="Topics::HospitalTopics"/>
+                    </output>
+                </topic_route>
+
+                <topic_route name="ServiceCatalogRoute">
+                    <publish_with_original_info>true</publish_with_original_info>
+                    <publish_with_original_timestamp>true</publish_with_original_timestamp>
+                    <input participant="ProcedureOrchestration">
+                        <topic_name>ServiceCatalog</topic_name>
+                        <datareader_qos base_name="TopicProfiles::ServiceCatalog"/>
+                    </input>
+                    <output participant="Hospital">
+                        <topic_name>ServiceCatalog</topic_name>
+                        <datawriter_qos base_name="TopicProfiles::ServiceCatalog"/>
                     </output>
                 </topic_route>
 

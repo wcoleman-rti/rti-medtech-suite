@@ -2,7 +2,7 @@
  * Orchestration module types — service lifecycle, service catalog, RPC.
  *
  * Module: Orchestration
- * Domain: Orchestration (Domain 15, no domain tags)
+ * Domain: Orchestration (Domain 11, no domain tags)
  *
  * Contains:
  *   - ServiceState enum (single source of truth for medtech::Service)

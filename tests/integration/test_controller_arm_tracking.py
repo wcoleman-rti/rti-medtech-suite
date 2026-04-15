@@ -36,7 +36,7 @@ pytestmark = [
     pytest.mark.xdist_group("ctrl_arm"),
 ]
 
-ORCHESTRATION_DOMAIN_ID = 15
+ORCHESTRATION_DOMAIN_ID = 11
 PROCEDURE_DOMAIN_ID = 10
 HOST_ID = "robot-host-ctrl-arm"
 ROOM_ID = "OR-CTRL"

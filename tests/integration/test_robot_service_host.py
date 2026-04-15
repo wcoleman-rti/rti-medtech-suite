@@ -37,7 +37,7 @@ pytestmark = [
     pytest.mark.xdist_group("orch"),
 ]
 
-ORCHESTRATION_DOMAIN_ID = 15
+ORCHESTRATION_DOMAIN_ID = 11
 PROCEDURE_DOMAIN_ID = 10
 HOST_ID = "robot-host-test"
 ROOM_ID = "OR-1"
@@ -97,7 +97,7 @@ def robot_service_host():
     ready = False
     try:
         # 30 s: allows for subprocess startup under CI load when concurrent
-        # all_service_hosts (orch_e2e group) competes for CPU on domain 15.
+        # all_service_hosts (orch_e2e group) competes for CPU on domain 11.
         ws.wait(dds.Duration(30))
         probe_reader.wait_for_historical_data(dds.Duration(15))
         ready = True

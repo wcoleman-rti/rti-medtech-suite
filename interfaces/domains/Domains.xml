@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Domain ID Migration History (revision-domain-id-migration):
+      Hospital:              11 → 20  (integration plane, decade-offset)
+      Orchestration:         15 → 11  (room-scoped control plane)
+      RoomObservability:     new → 19  (Monitoring Library 2.0 per-room)
+      HospitalObservability: new → 29  (aggregated telemetry)
+      Procedure:             10 → 10  (unchanged)
+-->
 <dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
      xsi:noNamespaceSchemaLocation="https://community.rti.com/schema/7.6.0/rti_dds_profiles.xsd">
 
@@ -51,10 +59,10 @@
         </domain>
 
         <!--
-            Domain 11 — Hospital
+            Domain 20 — Hospital (Integration)
             Flat domain, no tags. Bridged + native topics.
         -->
-        <domain name="Hospital" domain_id="11">
+        <domain name="Hospital" domain_id="20">
             <!-- Bridged types from Procedure domain -->
             <register_type name="Surgery::ProcedureStatus"     type_ref="Surgery::ProcedureStatus"/>
             <register_type name="Surgery::ProcedureContext"    type_ref="Surgery::ProcedureContext"/>
@@ -62,6 +70,8 @@
             <register_type name="Monitoring::AlarmMessage"    type_ref="Monitoring::AlarmMessage"/>
             <register_type name="Devices::DeviceTelemetry"    type_ref="Devices::DeviceTelemetry"/>
             <register_type name="Surgery::RobotState"         type_ref="Surgery::RobotState"/>
+            <!-- Bridged types from Orchestration domain -->
+            <register_type name="Orchestration::ServiceCatalog" type_ref="Orchestration::ServiceCatalog"/>
             <!-- Native Hospital types -->
             <register_type name="ClinicalAlerts::ClinicalAlert" type_ref="ClinicalAlerts::ClinicalAlert"/>
             <register_type name="ClinicalAlerts::RiskScore"     type_ref="ClinicalAlerts::RiskScore"/>
@@ -74,6 +84,8 @@
             <topic name="AlarmMessages"    register_type_ref="Monitoring::AlarmMessage"/>
             <topic name="DeviceTelemetry"  register_type_ref="Devices::DeviceTelemetry"/>
             <topic name="RobotState"       register_type_ref="Surgery::RobotState"/>
+            <!-- Bridged from Orchestration domain -->
+            <topic name="ServiceCatalog"   register_type_ref="Orchestration::ServiceCatalog"/>
             <!-- Native topics -->
             <topic name="ClinicalAlert"    register_type_ref="ClinicalAlerts::ClinicalAlert"/>
             <topic name="RiskScore"        register_type_ref="ClinicalAlerts::RiskScore"/>
@@ -81,18 +93,35 @@
         </domain>
 
         <!--
-            Domain 15 — Orchestration
+            Domain 11 — Orchestration (Room-Scoped)
             Infrastructure lifecycle control-plane. No domain tags.
             Pub/sub: ServiceCatalog, ServiceStatus
             RPC: ServiceHostControl (generated topics managed by RPC layer)
         -->
-        <domain name="Orchestration" domain_id="15">
+        <domain name="Orchestration" domain_id="11">
             <register_type name="Orchestration::ServiceCatalog"   type_ref="Orchestration::ServiceCatalog"/>
             <register_type name="Orchestration::ServiceStatus"   type_ref="Orchestration::ServiceStatus"/>
 
             <topic name="ServiceCatalog"  register_type_ref="Orchestration::ServiceCatalog"/>
             <topic name="ServiceStatus"  register_type_ref="Orchestration::ServiceStatus"/>
         </domain>
+
+        <!--
+            Domain 19 — Room Observability
+            Monitoring Library 2.0 per-room telemetry. Collector Service
+            subscribes here and forwards to Domain 29.
+            No registered types or topics (Monitoring Library manages its
+            own entities on this domain).
+        -->
+        <domain name="RoomObservability" domain_id="19"/>
+
+        <!--
+            Domain 29 — Hospital Observability
+            Aggregated telemetry: room-forwarded (Dom 19) + hospital-native.
+            Collector Service forwards to Domain 39 (V3.0).
+            No registered types or topics.
+        -->
+        <domain name="HospitalObservability" domain_id="29"/>
 
     </domain_library>
 

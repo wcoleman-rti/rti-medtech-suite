@@ -3,7 +3,7 @@
     Orchestration Module — Participant Library
 
     Defines named participant configurations for the Orchestration domain
-    (Domain 15). No domain tags. Partition is set programmatically after
+    (Domain 11). No domain tags. Partition is set programmatically after
     participant creation (room/<room_id> or "unassigned").
 
     Participant library naming:
@@ -78,33 +78,6 @@
         </domain_participant>
 
         <!--
-            ProcedureController_Hospital — Controller's Hospital domain
-            participant (read-only subscriber for scheduling context).
-        -->
-        <domain_participant name="ProcedureController_Hospital"
-                            domain_ref="MedtechDomains::Hospital">
-            <domain_participant_qos base_name="Participants::Transport"/>
-
-            <subscriber name="ControllerHospSubscriber">
-
-                <data_reader name="ProcedureStatusReader"
-                             topic_ref="ProcedureStatus">
-                    <datareader_qos base_name="TopicProfiles::ProcedureStatus"/>
-                </data_reader>
-
-                <data_reader name="ProcedureContextReader"
-                             topic_ref="ProcedureContext">
-                    <datareader_qos base_name="TopicProfiles::ProcedureContext"/>
-                </data_reader>
-
-                <data_reader name="PatientVitalsReader"
-                             topic_ref="PatientVitals">
-                    <datareader_qos base_name="TopicProfiles::PatientVitals"/>
-                </data_reader>
-            </subscriber>
-        </domain_participant>
-
-        <!--
             HospitalDashboard — Dashboard's Hospital domain participant.
             Read-only subscriber for facility-wide monitoring.
             Subscribes to all bridged topics + native Hospital topics.
@@ -156,6 +129,12 @@
                 <data_reader name="ResourceAvailabilityReader"
                              topic_ref="ResourceAvailability">
                     <datareader_qos base_name="TopicProfiles::GuiResourceAvailability"/>
+                </data_reader>
+
+                <!-- ServiceCatalog bridged from Domain 11 via Routing Service -->
+                <data_reader name="ServiceCatalogReader"
+                             topic_ref="ServiceCatalog">
+                    <datareader_qos base_name="TopicProfiles::ServiceCatalog"/>
                 </data_reader>
 
             </subscriber>

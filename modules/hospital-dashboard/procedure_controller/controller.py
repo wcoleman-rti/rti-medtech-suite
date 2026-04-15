@@ -85,12 +85,11 @@ class ControllerBackend(GuiBackend):
         self._tasks: list[asyncio.Task[Any]] = []
         self._requesters: dict[str, rti.rpc.Requester] = {}
         self._orch_participant: dds.DomainParticipant | None = None
-        self._hosp_participant: dds.DomainParticipant | None = None
+        self._proc_op_participant: dds.DomainParticipant | None = None
         self._proc_control_participant: dds.DomainParticipant | None = None
         self._arm_assignment_reader: dds.DataReader | None = None
         self._catalog_reader = catalog_reader
         self._status_reader = status_reader
-        self._hospital_readers: list[dds.DataReader] = []
 
         self._catalogs: dict[tuple[str, str], Orchestration.ServiceCatalog] = {}
         self._service_states: dict[tuple[str, str], Orchestration.ServiceStatus] = {}
@@ -338,27 +337,17 @@ class ControllerBackend(GuiBackend):
         self._catalog_reader = _find_orch_reader(dash_names.CTRL_SERVICE_CATALOG_READER)
         self._status_reader = _find_orch_reader(dash_names.CTRL_SERVICE_STATUS_READER)
 
-        self._hosp_participant = provider.create_participant_from_config(
-            dash_names.PROCEDURE_CONTROLLER_HOSPITAL
+        self._proc_op_participant = provider.create_participant_from_config(
+            surg_names.PROCEDURE_CONTROLLER_PROCEDURE_OPERATIONAL
         )
-        if self._hosp_participant is None:
+        if self._proc_op_participant is None:
             raise RuntimeError(
-                "Failed to create Procedure Controller hospital participant"
+                "Failed to create Procedure Controller procedure-operational participant"
             )
-
-        hosp_qos = self._hosp_participant.qos
-        hosp_qos.partition.name = [f"room/{self._room_id}/procedure/*"]
-        self._hosp_participant.qos = hosp_qos
-        self._hosp_participant.enable()
-
-        for entity_name in (
-            dash_names.CTRL_PROCEDURE_STATUS_READER,
-            dash_names.CTRL_PROCEDURE_CONTEXT_READER,
-            dash_names.CTRL_PATIENT_VITALS_READER,
-        ):
-            reader = self._hosp_participant.find_datareader(entity_name)
-            if reader is not None:
-                self._hospital_readers.append(dds.DataReader(reader))
+        proc_op_qos = self._proc_op_participant.qos
+        proc_op_qos.partition.name = [f"room/{self._room_id}/procedure/*"]
+        self._proc_op_participant.qos = proc_op_qos
+        self._proc_op_participant.enable()
 
         self._proc_control_participant = provider.create_participant_from_config(
             surg_names.PROCEDURE_CONTROLLER_PROCEDURE_CONTROL
@@ -413,7 +402,6 @@ class ControllerBackend(GuiBackend):
             self._catalog_reader,
             self._status_reader,
             self._arm_assignment_reader,
-            *self._hospital_readers,
         ]:
             if reader is not None:
                 with suppress(Exception):
@@ -421,7 +409,7 @@ class ControllerBackend(GuiBackend):
 
         for participant in (
             self._orch_participant,
-            self._hosp_participant,
+            self._proc_op_participant,
             self._proc_control_participant,
         ):
             if participant is not None:
@@ -429,7 +417,7 @@ class ControllerBackend(GuiBackend):
                     participant.close()
 
         self._orch_participant = None
-        self._hosp_participant = None
+        self._proc_op_participant = None
         self._proc_control_participant = None
         self._arm_assignment_reader = None
 
@@ -736,7 +724,11 @@ class ControllerBackend(GuiBackend):
 
     @property
     def hosp_participant(self) -> dds.DomainParticipant | None:
-        return self._hosp_participant
+        return None
+
+    @property
+    def proc_op_participant(self) -> dds.DomainParticipant | None:
+        return self._proc_op_participant
 
     @property
     def proc_control_participant(self) -> dds.DomainParticipant | None:
@@ -747,14 +739,14 @@ class ControllerBackend(GuiBackend):
         self._requesters.clear()
         for participant in (
             self._orch_participant,
-            self._hosp_participant,
+            self._proc_op_participant,
             self._proc_control_participant,
         ):
             if participant is not None:
                 with suppress(Exception):
                     participant.close()
         self._orch_participant = None
-        self._hosp_participant = None
+        self._proc_op_participant = None
         self._proc_control_participant = None
         self._arm_assignment_reader = None
 

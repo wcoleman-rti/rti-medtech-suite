@@ -41,7 +41,7 @@ pytestmark = [
     pytest.mark.xdist_group("acceptance_orch"),
 ]
 
-ORCHESTRATION_DOMAIN_ID = 15
+ORCHESTRATION_DOMAIN_ID = 11
 PROCEDURE_DOMAIN_ID = 10
 
 ROBOT_HOST_ID = "robot-host-acc"

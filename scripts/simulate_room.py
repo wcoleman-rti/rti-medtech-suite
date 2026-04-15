@@ -133,7 +133,7 @@ def main() -> None:
     parser.add_argument(
         "--no-bridge",
         action="store_true",
-        help="Skip launching Routing Service (bridge Domain 10 → 11 for Dashboard)",
+        help="Skip launching Routing Service (bridge Domain 10 → 20 for Dashboard)",
     )
     args = parser.parse_args()
 
@@ -199,14 +199,14 @@ def main() -> None:
         )
         procs.append((host_id, proc))
 
-    # ── Routing Service (Domain 10 → 11 bridge for Dashboard) ──────
+    # ── Routing Service (Domain 10 → 20 bridge for Dashboard) ──────
     if not args.no_bridge:
         rs_bin = _find_routing_service()
         if rs_bin:
             rs_cfg = os.path.join("services", "routing", "RoutingService.xml")
             if os.path.isfile(rs_cfg):
                 env = _base_env(room, procedure)
-                label = "Routing Service  (Domain 10 → 11 bridge)"
+                label = "Routing Service  (Domain 10 → 20 bridge)"
                 proc = _spawn(
                     [rs_bin, "-cfgFile", rs_cfg, "-cfgName", "MedtechBridge"],
                     env,

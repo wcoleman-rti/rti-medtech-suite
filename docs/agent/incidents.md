@@ -2784,3 +2784,39 @@ after closure. They form the project's decision log.
   skips RS if not needed. RS uses the standard `NDDS_QOS_PROFILES`
   from `setup.bash` (after INC-086 and INC-087 fixes).
 - **Date closed:** 2026-04-13
+
+---
+
+## INC-091: Domain ID migration required broader scope than revision plan
+
+- **Status:** Closed
+- **Category:** Discovery
+- **Date opened:** 2026-04-14
+- **Phase/Step:** Revision: Domain ID Migration / Steps DM.1–DM.10
+- **Documents involved:** `implementation/revision-domain-id-migration.md`
+- **Description:** The revision plan covered the primary XML configuration
+  files, IDL, controller code, and the explicitly listed test files.
+  During implementation, additional files required updates that were not
+  enumerated in the plan:
+  1. `interfaces/qos/Topics.xml` — domain number comments (Hospital 11→20,
+     Orchestration 15→11)
+  2. `interfaces/idl/orchestration/orchestration.idl` — domain comment (15→11)
+  3. `docker-compose.yml` — `OBSERVABILITY_DOMAIN: "20"` → `"19"`
+  4. `scripts/simulate_room.py` — Routing Service bridge comment (11→20)
+  5. `tests/integration/test_observability.py` — observability domain assertions
+     (20→19)
+  6. Five additional test files with `ORCHESTRATION_DOMAIN_ID = 15` beyond
+     the three explicitly listed in the plan (`test_clinical_service_host.py`,
+     `test_controller_arm_tracking.py`, `test_acceptance_orchestration.py`,
+     `test_acceptance_multi_arm.py`, `test_operational_service_host.py`,
+     `test_multi_arm_orchestration.py`, `test_multi_arm_isolation.py`)
+  7. `Domains.xml` — `ServiceCatalog` type+topic registration needed in
+     Hospital domain for the new `HospitalDashboard::ServiceCatalogReader`
+  All were straightforward mechanical updates consistent with the migration.
+- **Guideline:** Future domain ID / architectural constant revisions should
+  use `grep` to discover all references rather than enumerating files by
+  memory. A comprehensive search pattern like `domain.?15|ORCHESTRATION_DOMAIN`
+  catches references that the plan author may not recall.
+- **Resolution:** All additional files updated and verified via full CI (647
+  tests passing, 12/12 gates).
+- **Date closed:** 2026-04-14

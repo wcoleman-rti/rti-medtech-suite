@@ -211,7 +211,7 @@
         </qos_profile>
 
         <!--
-            HospitalTopics: topic-filter-bound QoS for Hospital domain (Domain 11).
+            HospitalTopics: topic-filter-bound QoS for Hospital domain (Domain 20).
         -->
         <qos_profile name="HospitalTopics">
             <datawriter_qos topic_filter="ClinicalAlert" base_name="TopicProfiles::ClinicalAlert"/>
@@ -268,7 +268,7 @@
         </qos_profile>
 
         <!--
-            OrchestrationTopics: topic-filter-bound QoS for Orchestration domain (Domain 15).
+            OrchestrationTopics: topic-filter-bound QoS for Orchestration domain (Domain 11).
         -->
         <qos_profile name="OrchestrationTopics">
             <datawriter_qos topic_filter="ServiceCatalog" base_name="TopicProfiles::ServiceCatalog"/>

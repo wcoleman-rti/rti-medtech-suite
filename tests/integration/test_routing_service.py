@@ -101,14 +101,15 @@ class TestRoutingServiceConfig:
         assert not leaked, f"Non-bridged topics have routes: {leaked}"
 
     def test_four_participants_defined(self):
-        """RS has exactly 4 participants: 3 Procedure + 1 Hospital."""
+        """RS has exactly 5 participants: 3 Procedure + 1 Orchestration + 1 Hospital."""
         participants = self.domain_route.findall("participant")
-        assert len(participants) == 4
+        assert len(participants) == 5
         names = {p.get("name") for p in participants}
         assert names == {
             "ProcedureControl",
             "ProcedureClinical",
             "ProcedureOperational",
+            "ProcedureOrchestration",
             "Hospital",
         }
 
@@ -116,18 +117,18 @@ class TestRoutingServiceConfig:
         """All Procedure-side participants use domain_id 10."""
         for p in self.domain_route.findall("participant"):
             name = p.get("name")
-            if name.startswith("Procedure"):
+            if name.startswith("Procedure") and name != "ProcedureOrchestration":
                 did = p.find("domain_id")
                 assert (
                     did is not None and did.text.strip() == "10"
                 ), f"{name} should be on domain 10"
 
-    def test_hospital_participant_on_domain_11(self):
-        """Hospital participant uses domain_id 11."""
+    def test_hospital_participant_on_domain_20(self):
+        """Hospital participant uses domain_id 20 (integration)."""
         for p in self.domain_route.findall("participant"):
             if p.get("name") == "Hospital":
                 did = p.find("domain_id")
-                assert did is not None and did.text.strip() == "11"
+                assert did is not None and did.text.strip() == "20"
 
     def test_procedure_participants_have_domain_tags(self):
         """Each Procedure participant has the correct domain tag."""
@@ -180,7 +181,7 @@ class TestRoutingServiceConfig:
         """Every Procedure-side RS participant uses wildcard partition."""
         for p in self.domain_route.findall("participant"):
             name = p.get("name")
-            if not name.startswith("Procedure"):
+            if not name.startswith("Procedure") or name == "ProcedureOrchestration":
                 continue
             qos = p.find("domain_participant_qos")
             assert qos is not None, f"{name} missing domain_participant_qos"
@@ -216,14 +217,14 @@ class TestRoutingServiceConfig:
         assert "StatusSession" in session_names
         assert "StreamingSession" in session_names
 
-    def test_administration_on_domain_20(self):
+    def test_administration_on_domain_19(self):
         """Administration is commented out (autoenable conflict with Transport QoS)."""
         admin = self.rs.find("administration")
         # Admin is disabled until a dedicated admin QoS profile is created
         # that doesn't set autoenable_created_entities=false.
         assert admin is None
 
-    def test_monitoring_on_domain_20(self):
+    def test_monitoring_on_domain_19(self):
         """Monitoring is commented out (autoenable conflict with Transport QoS)."""
         mon = self.rs.find("monitoring")
         assert mon is None
@@ -317,16 +318,40 @@ class TestRoutingServiceConfig:
             )
 
     def test_filter_propagation_enabled(self):
-        """All topic routes enable filter propagation."""
+        """All Procedure topic routes enable filter propagation."""
         for route in self._get_all_topic_routes():
+            name = route.get("name")
+            # ServiceCatalog route has no filter_propagation (not a Procedure route)
+            if name == "ServiceCatalogRoute":
+                continue
             fp = route.find("filter_propagation")
-            assert (
-                fp is not None
-            ), f"Route {route.get('name')} missing filter_propagation"
+            assert fp is not None, f"Route {name} missing filter_propagation"
             enabled = fp.find("enabled")
             assert enabled is not None and enabled.text.strip() == "true", (
-                f"Route {route.get('name')} must set " "filter_propagation/enabled=true"
+                f"Route {name} must set " "filter_propagation/enabled=true"
             )
+
+    def test_orchestration_participant_on_domain_11(self):
+        """ProcedureOrchestration participant uses domain_id 11."""
+        for p in self.domain_route.findall("participant"):
+            if p.get("name") == "ProcedureOrchestration":
+                did = p.find("domain_id")
+                assert did is not None and did.text.strip() == "11"
+                return
+        pytest.fail("ProcedureOrchestration participant not found")
+
+    def test_service_catalog_is_bridged(self):
+        """ServiceCatalog appears in StatusSession topic routes."""
+        for session in self.domain_route.findall("session"):
+            if session.get("name") != "StatusSession":
+                continue
+            for route in session.findall("topic_route"):
+                inp = route.find("input")
+                tn = inp.find("topic_name")
+                if tn is not None and tn.text and tn.text.strip() == "ServiceCatalog":
+                    assert inp.get("participant") == "ProcedureOrchestration"
+                    return
+        pytest.fail("ServiceCatalog route not found in StatusSession")
 
 
 # ─── Routing Behavior Tests (DDS-level, no RS process needed) ────
@@ -349,7 +374,7 @@ class TestCrossDomainIsolation:
         PatientVitals = monitoring.Monitoring.PatientVitals
 
         proc_domain = 10
-        hosp_domain = 11
+        hosp_domain = 20
 
         proc_p = participant_factory(
             domain_id=proc_domain,

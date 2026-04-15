@@ -67,7 +67,7 @@ is removed. Procedure context data the controller needs is obtained from:
 
 ---
 
-## Step DM.1 — Migrate `Domains.xml`
+## Step DM.1 — Migrate `Domains.xml` ✅ `7506d9b`
 
 ### Work
 
@@ -108,7 +108,7 @@ is removed. Procedure context data the controller needs is obtained from:
 
 ---
 
-## Step DM.2 — Migrate Monitoring Library Domain in `Participants.xml`
+## Step DM.2 — Migrate Monitoring Library Domain in `Participants.xml` ✅ `7506d9b`
 
 ### Work
 
@@ -137,7 +137,7 @@ is removed. Procedure context data the controller needs is obtained from:
 
 ---
 
-## Step DM.3 — Migrate `RoutingService.xml`
+## Step DM.3 — Migrate `RoutingService.xml` ✅ `7506d9b`
 
 ### Work
 
@@ -220,7 +220,7 @@ change, the new domain ID mapping, and the ServiceCatalog route addition.
 
 ---
 
-## Step DM.4 — Migrate `CloudDiscoveryService.xml`
+## Step DM.4 — Migrate `CloudDiscoveryService.xml` ✅ `7506d9b`
 
 ### Work
 
@@ -247,7 +247,7 @@ change, the new domain ID mapping, and the ServiceCatalog route addition.
 
 ---
 
-## Step DM.5 — Migrate `OrchestrationParticipants.xml`
+## Step DM.5 — Migrate `OrchestrationParticipants.xml` ✅ `7506d9b`
 
 ### Work
 
@@ -284,7 +284,7 @@ change, the new domain ID mapping, and the ServiceCatalog route addition.
 
 ---
 
-## Step DM.6 — Add `ProcedureController_Procedure_Operational` to `SurgicalParticipants.xml`
+## Step DM.6 — Add `ProcedureController_Procedure_Operational` to `SurgicalParticipants.xml` ✅ `7506d9b`
 
 ### Work
 
@@ -321,7 +321,7 @@ change, the new domain ID mapping, and the ServiceCatalog route addition.
 
 ---
 
-## Step DM.7 — Migrate `app_names.idl`
+## Step DM.7 — Migrate `app_names.idl` ✅ `7506d9b`
 
 ### Work
 
@@ -370,7 +370,7 @@ In `interfaces/idl/app_names.idl`, inside `module SurgicalParticipants`
 
 ---
 
-## Step DM.8 — Migrate Procedure Controller Application
+## Step DM.8 — Migrate Procedure Controller Application ✅ `7506d9b`
 
 ### Work
 
@@ -448,7 +448,7 @@ In `modules/hospital-dashboard/procedure_controller/controller.py`:
 
 ---
 
-## Step DM.9 — Migrate Test Domain ID Constants
+## Step DM.9 — Migrate Test Domain ID Constants ✅ `7506d9b`
 
 ### Work
 
@@ -485,7 +485,7 @@ Update hard-coded domain ID integers in integration tests:
 
 ---
 
-## Step DM.10 — Rebuild, Regenerate, and CI Validation
+## Step DM.10 — Rebuild, Regenerate, and CI Validation ✅ `7506d9b`
 
 ### Work
 

@@ -81,7 +81,7 @@
                     <application_name>$(MEDTECH_APP_NAME)</application_name>
                     <distribution_settings>
                         <dedicated_participant>
-                            <domain_id>20</domain_id>
+                            <domain_id>19</domain_id>
                         </dedicated_participant>
                     </distribution_settings>
                     <telemetry_data>

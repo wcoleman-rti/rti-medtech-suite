@@ -36,7 +36,7 @@ pytestmark = [
     pytest.mark.xdist_group("orch"),
 ]
 
-ORCHESTRATION_DOMAIN_ID = 15
+ORCHESTRATION_DOMAIN_ID = 11
 HOST_ID = "operational-host-test"
 ROOM_ID = "OR-1"
 

@@ -140,7 +140,7 @@ services:
     profiles: ["observability"]
     environment:
       CFG_NAME: NonSecureLAN
-      OBSERVABILITY_DOMAIN: "20"
+      OBSERVABILITY_DOMAIN: "19"
       OBSERVABILITY_PROMETHEUS_EXPORTER_PORT: "19090"
       OBSERVABILITY_LOKI_HOSTNAME: loki
       OBSERVABILITY_LOKI_EXPORTER_PORT: "3100"

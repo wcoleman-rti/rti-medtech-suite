@@ -54,6 +54,14 @@ module MedtechEntityNames {
         const string TWIN_ROBOT_COMMAND_READER     = "TwinSubscriber::RobotCommandReader";
         const string TWIN_ROBOT_ARM_ASSIGNMENT_READER = "TwinSubscriber::RobotArmAssignmentReader";
         const string CTRL_ROBOT_ARM_ASSIGNMENT_READER = "ProcedureControlSubscriber::RobotArmAssignmentReader";
+
+        // ProcedureController_Procedure_Operational — Domain 10 operational reads
+        const string PROCEDURE_CONTROLLER_PROCEDURE_OPERATIONAL =
+            "SurgicalParticipants::ProcedureController_Procedure_Operational";
+        const string CTRL_PROCEDURE_STATUS_READER =
+            "ControllerProcOpSubscriber::ProcedureStatusReader";
+        const string CTRL_PROCEDURE_CONTEXT_READER =
+            "ControllerProcOpSubscriber::ProcedureContextReader";
     };
 
     // --- OrchestrationParticipants library ---
@@ -62,7 +70,6 @@ module MedtechEntityNames {
         // Participant config names — create_participant_from_config()
         const string ORCHESTRATION                    = "OrchestrationParticipants::Orchestration";
         const string PROCEDURE_CONTROLLER_ORCHESTRATION = "OrchestrationParticipants::ProcedureController_Orchestration";
-        const string PROCEDURE_CONTROLLER_HOSPITAL    = "OrchestrationParticipants::ProcedureController_Hospital";
 
         // Writer names — find_datawriter_by_name() / find_datawriter()
         const string SERVICE_CATALOG_WRITER  = "OrchestrationPublisher::ServiceCatalogWriter";
@@ -75,9 +82,6 @@ module MedtechEntityNames {
         // Controller reader names
         const string CTRL_SERVICE_CATALOG_READER = "ControllerOrchSubscriber::ServiceCatalogReader";
         const string CTRL_SERVICE_STATUS_READER  = "ControllerOrchSubscriber::ServiceStatusReader";
-        const string CTRL_PROCEDURE_STATUS_READER  = "ControllerHospSubscriber::ProcedureStatusReader";
-        const string CTRL_PROCEDURE_CONTEXT_READER = "ControllerHospSubscriber::ProcedureContextReader";
-        const string CTRL_PATIENT_VITALS_READER    = "ControllerHospSubscriber::PatientVitalsReader";
     };
 
     // --- HospitalDashboard participant (in OrchestrationParticipants library) ---
