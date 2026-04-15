@@ -169,7 +169,7 @@ integration, multi-client behavior, theming, and DDS event loop unification.
 
 ### Scenario: Storage requires secret for session signing `@deployment`
 
-**Given** the unified app calls `ui.run(storage_secret='...')`
+**Given** the NiceGUI application calls `ui.run(storage_secret='...')`
 **When** `app.storage.user` or `app.storage.tab` is accessed
 **Then** the session cookie is signed with the provided secret
 **And** unsigned or tampered cookies are rejected
@@ -193,87 +193,82 @@ integration, multi-client behavior, theming, and DDS event loop unification.
 
 ### Scenario: SPA navigation does not reload the page shell `@integration` `@gui`
 
-**Given** the unified app uses `ui.sub_pages()` for client-side routing
+**Given** the hospital app uses `ui.sub_pages()` for client-side routing
 **And** a user is viewing `/dashboard`
-**When** the user navigates to `/controller` via the navigation drawer
+**When** the user navigates to `/alerts` via the navigation pill
 **Then** only the content area is swapped (no full page reload)
-**And** the header bar, connection dot, and navigation drawer persist
+**And** the header bar, connection dot, and navigation pill persist
 **And** the WebSocket connection remains open (no reconnection)
 **And** all `GuiBackend` instances remain active — no DDS reinitialization
 
 ### Scenario: Browser refresh at sub-page preserves the app shell `@gui` `@ui-modernization`
 
-**Given** the unified app is running and the user is viewing `/dashboard`
+**Given** the hospital app is running and the user is viewing `/dashboard`
 **When** the user refreshes the browser (F5 or Ctrl+R)
-**Then** the page re-renders with the full SPA shell (header, sidebar drawer, connection dot)
+**Then** the page re-renders with the full SPA shell (nav pill, connection dot)
 **And** the dashboard content is displayed in the content area
-**And** the sidebar navigation is fully functional
+**And** the navigation pill is fully functional
 
 ### Scenario: Direct URL entry renders full app shell `@gui` `@ui-modernization`
 
-**Given** the unified app is running
-**When** a user pastes `http://localhost:8080/controller` directly into the browser address bar
-**Then** the page renders with the full SPA shell (header, sidebar, connection dot)
-**And** the controller content is displayed in the content area
-**And** the user can navigate to any other page via the sidebar without using the browser back button
+**Given** the hospital app is running
+**When** a user pastes `http://localhost:8080/dashboard` directly into the browser address bar
+**Then** the page renders with the full SPA shell (nav pill, connection dot)
+**And** the dashboard content is displayed in the content area
 
-### Scenario: Active nav item is highlighted in sidebar `@gui` `@ui-modernization`
+### Scenario: Active nav item is highlighted in nav pill `@gui` `@ui-modernization`
 
-**Given** the unified app is running with the sidebar navigation visible
+**Given** the hospital app is running with the navigation pill visible
 **When** the user navigates to `/dashboard`
-**Then** the "Dashboard" nav item in the sidebar is visually highlighted (active state)
-**And** other nav items (Controller, Digital Twin) are in their default (inactive) state
-**When** the user navigates to `/controller`
-**Then** the "Controller" nav item becomes highlighted and "Dashboard" returns to inactive
+**Then** the "Dashboard" button in the nav pill is visually highlighted (active state)
+**And** other nav items are in their default (inactive) state
 
 ### Scenario: Breadcrumb shows current page context `@gui` `@ui-modernization`
 
-**Given** the unified app header displays a breadcrumb or dynamic title
+**Given** the hospital app header displays a breadcrumb or dynamic title
 **When** the user navigates to `/dashboard`
 **Then** the header shows "Medtech Suite › Dashboard" (or equivalent contextual title)
-**When** the user navigates to `/twin/OR-3`
-**Then** the header shows "Medtech Suite › Digital Twin — OR-3"
 
-### Scenario: Shared link to sub-page works for new visitors `@gui` `@ui-modernization`
+### Scenario: Shared link to hospital sub-page works for new visitors `@gui` `@ui-modernization`
 
-**Given** the unified app is running
-**When** a new browser session opens `/twin/OR-1` for the first time (no prior navigation)
-**Then** the full SPA shell renders with header, sidebar, and digital twin content for OR-1
-**And** the user can navigate to other pages via the sidebar
+**Given** the hospital dashboard app is running
+**When** a new browser session opens `/dashboard` for the first time (no prior navigation)
+**Then** the full SPA shell renders with nav pill and dashboard content
 
-### Scenario: Discovered GUI service appears in sidebar dynamically `@gui` `@ui-modernization`
+### Scenario: Discovered room appears as room card on dashboard `@gui` `@ui-modernization`
 
-**Given** the unified app is running with an empty "Discovered Services" sidebar section
-**When** a remote service publishes a `ServiceCatalog` sample with `gui_url = "http://host-b:8082/twin/OR-3"`
-**Then** a new sidebar entry appears under "Discovered Services" within 5 seconds
-**And** the entry label shows the service's `display_name` and `room_id` (e.g., "Digital Twin — OR-3")
+**Given** the hospital dashboard Room Overview is displayed with no active rooms
+**When** a per-room Routing Service bridges a `ServiceCatalog` sample with `gui_url = "http://localhost:8091/controller/OR-3"` to Domain 20
+**Then** a new room card appears in the Room Overview within 5 seconds
+**And** the card shows the room's `room_id` (e.g., "OR-3") and aggregated status
 
-### Scenario: Same-origin gui_url navigates within the SPA shell `@gui` `@ui-modernization`
+### Scenario: Room card opens room GUI in new browser tab `@gui` `@ui-modernization`
 
-**Given** the sidebar shows a discovered service whose `gui_url` origin matches the current app origin
-**When** the user clicks that sidebar entry
-**Then** the SPA shell navigates to the sub-page path without a full page reload
-**And** the sidebar entry is highlighted as active
-
-### Scenario: Cross-origin gui_url opens in a new browser tab `@gui` `@ui-modernization`
-
-**Given** the sidebar shows a discovered service whose `gui_url` origin differs from the current app origin
-**When** the user clicks that sidebar entry
+**Given** the Room Overview shows a room card for "OR-3" with `gui_url` `http://localhost:8091/controller/OR-3`
+**When** the user clicks the room card's `open_in_new` button
 **Then** a new browser tab opens with the full `gui_url`
-**And** the current SPA shell remains unchanged
+**And** the hospital dashboard tab remains unchanged
 
-### Scenario: Service disposal removes sidebar entry `@gui` `@ui-modernization`
+### Scenario: Room disposal removes room card `@gui` `@ui-modernization`
 
-**Given** the sidebar shows a discovered service entry for "Digital Twin — OR-3"
-**When** that service's `ServiceCatalog` sample is disposed (NOT_ALIVE_NO_WRITERS or explicit dispose)
-**Then** the sidebar entry is removed within 5 seconds
+**Given** the Room Overview shows a room card for "OR-3"
+**When** that room's `ServiceCatalog` samples are disposed (NOT_ALIVE_NO_WRITERS or explicit dispose)
+**Then** the room card is removed within 5 seconds
 
-### Scenario: Standalone page provides return navigation `@gui` `@ui-modernization`
+### Scenario: Room-level nav pill discovers sibling GUIs `@gui` `@ui-modernization`
 
-**Given** a user opens a cross-origin `gui_url` in a new tab (standalone mode)
-**When** the standalone page renders
-**Then** a "← Return to Controller" link is visible at the top of the page
-**And** clicking it navigates back to the originating Procedure Controller URL
+**Given** a room GUI (e.g., Procedure Controller for OR-1) is open in its own browser tab
+**And** the `medtech.gui.room_nav` module has created a read-only Orchestration participant
+**When** a sibling service in the same room publishes a `ServiceCatalog` sample with `gui_url`
+**Then** a new button appears in the floating nav pill within 5 seconds
+**And** clicking the button navigates to the sibling's `gui_url` in the same tab
+
+### Scenario: Room GUI has no upward hospital link `@gui` `@ui-modernization`
+
+**Given** a room GUI (controller or twin) is open in a standalone browser tab
+**When** the page finishes rendering
+**Then** there is no link, button, or navigation element pointing to the hospital dashboard
+**And** the user returns to the hospital level by closing the browser tab
 
 > **Note:** The `/alerts` route (Clinical Alerts Dashboard) is a **new capability**
 > enabled by the migration, not a 1:1 PySide6 replacement. Its behavioral spec
@@ -343,12 +338,12 @@ integration, multi-client behavior, theming, and DDS event loop unification.
 **Then** the web server listens on port 8080
 **And** a browser on the host network can access the dashboard
 
-### Scenario: Multiple GUI modules served from single container `@deployment`
+### Scenario: Hospital dashboard container serves dashboard pages `@deployment`
 
-**Given** a single Docker container running the NiceGUI app
-**When** browsers access `/dashboard`, `/controller`, and `/twin/OR-1`
-**Then** all three pages render correctly
-**And** all share the same DDS participant (one participant per domain)
+**Given** the hospital Docker container is running the NiceGUI dashboard app
+**When** a browser accesses `/dashboard`
+**Then** the dashboard page renders correctly
+**And** the container does NOT serve `/controller` or `/twin` routes (those are served by room containers)
 
 ---
 

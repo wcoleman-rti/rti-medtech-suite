@@ -74,7 +74,7 @@ Additional Foxglove schemas (`CameraCalibration`, `ImageAnnotations`, `Compresse
 
 - **NiceGUI** — Python web-based UI framework, built on FastAPI and Quasar/Vue3
 - GUI applications run in the browser; the NiceGUI server uses a single asyncio event loop shared with `rti.asyncio` for DDS I/O — no separate Qt event loop or thread bridge required
-- All GUI modules are served from a single process (`medtech.gui.app`) at `http://localhost:8080`; clients connect via any modern browser
+- **Hospital container** serves the hospital dashboard at `http://localhost:8080`; **per-room containers** serve the Procedure Controller and Digital Twin at dynamically assigned ports (e.g., `8091`, `8092`). Each container runs its own NiceGUI process with only its own page modules.
 - `GuiBackend` ABC (see `modules/shared/medtech/gui/_backend.py`) is the standardized lifecycle pattern: subclasses register `app.on_startup` / `app.on_shutdown` hooks automatically, ensuring clean DDS participant lifecycle management
 
 ### GUI Design Standard
@@ -162,7 +162,7 @@ class MyBackend(GuiBackend):
 backend = MyBackend()  # registers hooks automatically at module import time
 ```
 
-The unified app entry point (`medtech.gui.app`) imports all page modules at startup. Each page module instantiates its `GuiBackend` subclass at module level — no manual lifecycle orchestration is needed in the main entry point.
+Each NiceGUI process imports only its own page modules at startup. The hospital app imports the dashboard module; each room app imports the controller and digital twin modules for its room. Each page module instantiates its `GuiBackend` subclass at module level — no manual lifecycle orchestration is needed in the entry point.
 
 ## CLI Tool
 

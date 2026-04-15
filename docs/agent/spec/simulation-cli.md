@@ -152,18 +152,13 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 ### @simulation @cli — `medtech launch minimal` starts a single-OR scenario
 
 **Given** Docker images are built
+### @simulation @cli — `medtech launch minimal` starts single-OR simulation
+
+**Given** Docker images are built
 **When** the developer runs `medtech launch minimal`
 **Then** infrastructure is started via `medtech run hospital`
 **And** only a single OR instance is started (`medtech run or --name OR-1`)
 **And** the observability stack is not started
-
-### @simulation @cli — `medtech launch unified` starts monolithic GUI
-
-**Given** Docker images are built
-**When** the developer runs `medtech launch unified`
-**Then** the CLI runs `docker compose --profile unified-gui up -d`
-**And** a single `medtech-gui` container serves all GUI modules in one process
-**And** per-OR twin containers are not started separately
 
 ---
 
@@ -216,34 +211,35 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 
 ## Split-GUI Deployment
 
-### @simulation — dynamically launched OR is discovered by Procedure Controller
+### @simulation — dynamically launched OR appears in hospital dashboard room cards
 
-**Given** infrastructure is running and the Procedure Controller is loaded
+**Given** infrastructure is running and the hospital dashboard is loaded
 **And** the developer runs `medtech run or --name OR-5`
-**When** the new Service Hosts publish `ServiceCatalog` on the Orchestration domain
-**Then** the Procedure Controller sidebar discovers and displays the new hosts/services
-**And** the digital twin's `gui_url` appears in the sidebar as a cross-origin link
+**When** the new per-room Routing Service bridges `ServiceCatalog` from Domain 11 to Domain 20
+**Then** a new room card for OR-5 appears in the dashboard Room Overview
+**And** the card shows the room's `gui_url` with an `open_in_new` button
 
-### @simulation — twin gui_url is browser-reachable
+### @simulation — room gui_url is browser-reachable
 
-**Given** a twin container has `MEDTECH_GUI_EXTERNAL_URL=http://localhost:8081`
-**When** the Procedure Controller sidebar reads the twin's `gui_url` from `ServiceCatalog`
-**Then** the URL is `http://localhost:8081/twin/OR-1`
+**Given** a room container has `MEDTECH_GUI_EXTERNAL_URL=http://localhost:8091`
+**When** the hospital dashboard reads the room's `gui_url` from bridged `ServiceCatalog`
+**Then** the URL is `http://localhost:8091/controller/OR-1`
 **And** the developer's browser can reach this URL via Docker port mapping
 
-### @simulation — cross-origin twins open in new tabs
+### @simulation — room card opens room GUI in new tab
 
-**Given** the dashboard SPA is open at `http://localhost:8080`
-**And** the sidebar shows a discovered twin with `gui_url` `http://localhost:8081/twin/OR-1`
-**When** the developer clicks the twin sidebar entry
-**Then** the twin opens in a new browser tab (not within the SPA shell)
-**And** the standalone twin page includes a "Return to Controller" link
+**Given** the hospital dashboard is open at `http://localhost:8080`
+**And** the Room Overview shows a room card for OR-1 with `gui_url` `http://localhost:8091/controller/OR-1`
+**When** the developer clicks the room card's `open_in_new` button
+**Then** the room GUI opens in a new browser tab
+**And** the hospital dashboard tab remains unchanged
 
-### @simulation — unified-gui profile deploys monolithic GUI
+### @simulation — room nav pill discovers sibling GUIs
 
-**Given** the developer runs `docker compose --profile unified-gui up -d`
-**Then** a single `medtech-gui` container serves all GUI modules (dashboard, controller, twin) in one process
-**And** no separate twin containers are started
+**Given** a room GUI (Procedure Controller for OR-1) is open at `http://localhost:8091/controller/OR-1`
+**When** the `room_nav` module's read-only Orchestration participant discovers a twin `gui_url` for OR-1
+**Then** a "Digital Twin" button appears in the floating nav pill
+**And** clicking it navigates to the twin's `gui_url` in the same tab
 
 ---
 

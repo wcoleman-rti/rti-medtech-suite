@@ -496,111 +496,75 @@ sub-page routes** when running in the hospital app. Standalone `@ui.page()`
 handlers conflict with `ui.sub_pages()` routing. Module `*_content()`
 functions are the entry points for `ui.sub_pages()`.
 
-#### Distributed Deployment: Origin-Aware Hybrid Navigation
+#### Split-Deployment Navigation Model
 
-In a physical deployment, GUI services may run on **different machines**.
-For example, a Digital Twin runs on `surgical-host:8081` while the
-Procedure Controller runs on `admin-host:8080`. The unified SPA shell
-cannot embed a NiceGUI page from a different origin as a sub-page — each
-NiceGUI instance owns its own WebSocket connection and asyncio event loop.
+GUI services run in **separate containers** across deployment planes.
+The hospital dashboard runs in the hospital container on `hospital-net`;
+the Procedure Controller and Digital Twin run in per-room containers
+dual-homed on `surgical-net` + `orchestration-net`. Each NiceGUI instance
+owns its own WebSocket connection and asyncio event loop — there is no
+shared SPA shell across planes.
 
-The architecture handles this with **origin-aware navigation**:
+Navigation follows three patterns:
 
-| gui_url Origin vs. Current Page Origin | Navigation Behavior |
-|---------------------------------------|---------------------|
-| **Same origin** (co-located in unified app) | In-app SPA navigation via `ui.navigate.to(path)` — stays in shell, no new tab |
-| **Different origin** (remote host) | Open in new browser tab via `ui.navigate.to(url, new_tab=True)` — standalone page on remote host |
+| Direction | Mechanism | Behavior |
+|-----------|-----------|----------|
+| **Hospital → Room** (downward) | Room cards on the dashboard with `open_in_new` icon | Opens room GUI in a new browser tab |
+| **Room ↔ Room** (horizontal, same level) | `medtech.gui.room_nav` shared module — floating nav pill with sibling buttons | Same-tab navigation via `ui.navigate.to(gui_url)` |
+| **Room → Hospital** (upward) | **Not permitted** — close the browser tab | Room GUIs have no upward visibility to hospital-level infrastructure |
 
-The `gui_url` property in `ServiceCatalog` already provides the full HTTP
-endpoint URL for each GUI service. The Procedure Controller's "Open" button
-compares the URL's origin to `window.location.origin`:
-
-```python
-# Conceptual origin-aware open handler (Procedure Controller)
-async def _open_gui(gui_url: str) -> None:
-    # Check if the service is co-located (same NiceGUI process)
-    parsed = urlparse(gui_url)
-    local_origin = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
-    if _is_same_origin(local_origin):
-        # Same process — navigate within the SPA shell
-        ui.navigate.to(parsed.path)
-    else:
-        # Remote host — open standalone page in new tab
-        ui.navigate.to(gui_url, new_tab=True)
-```
-
-**Standalone page requirements:** When a GUI service is opened in a new
-tab (cross-origin), it must render a **self-contained page** with:
+**Room-level GUI self-sufficiency:** Each room GUI (controller, twin)
+renders a **self-contained page** with:
 - Its own header bar (RTI logo, title, theme toggle)
-- A "Return to Controller" link using the controller's announced URL
-  (also discoverable via `ServiceCatalog` `gui_url` on the controller's
-  own catalog entry, or via a well-known property key)
-- Full theme and font support (each standalone NiceGUI instance serves
-  its own static assets)
+- A floating nav pill (from `medtech.gui.room_nav`) showing sibling
+  room GUIs discovered via `ServiceCatalog` on the Orchestration domain
+- Full theme and font support (each NiceGUI instance serves its own
+  static assets)
 
-This means every GUI service must maintain both:
-1. A `*_content()` function for embedding in the unified SPA shell
-2. A `*_page()` function for standalone operation (with its own shell)
+The `gui_url` property in `ServiceCatalog` provides the full HTTP
+endpoint URL for each GUI service. The hospital dashboard reads bridged
+`ServiceCatalog` data (Domain 11 → 20 via per-room RS) and renders
+**room cards** in the Room Overview view — one card per discovered room,
+each with an `open_in_new` button that opens the room GUI in a new tab.
 
-The `*_page()` function is registered via `@ui.page()` **only when the
-module runs as its own entry point** (`__main__`), never when imported
-by the unified app.
+#### Room-Level Horizontal Navigation (`medtech.gui.room_nav`)
 
-#### Dynamic Sidebar Navigation (Hospital Dashboard)
-
-The sidebar navigation in the hospital dashboard app is built from two sources:
-
-1. **Static local pages** — pages whose content functions are compiled
-   into the hospital dashboard process (e.g., Dashboard, Alerts). These
-   are always present.
-
-2. **Discovered room GUI services** — services with a non-empty `gui_url`
-   in their `ServiceCatalog` data (bridged from Domain 11 → Domain 20 by
-   per-room RS). These appear dynamically as rooms start and disappear
-   when rooms are torn down.
-
-Because all discovered room GUIs run on different origins (room-level
-containers on `surgical-net` or `orchestration-net`), they are **always**
-opened in new browser tabs. There is no same-origin in-app navigation to
-room GUIs from the hospital dashboard.
-
-The sidebar renders discovered GUI services in a "Rooms" dropdown section.
-Each entry shows:
-- The service's `display_name` (from `ServiceCatalog`)
-- The host's `room_id` (from the `room_id` property)
-- An "open in new tab" icon indicating cross-origin navigation
+The shared `medtech.gui.room_nav` module provides same-level navigation
+between room GUIs. It creates a **read-only Orchestration domain
+participant** that subscribes to `ServiceCatalog` filtered by the
+current `room_id`, then renders a floating nav pill with buttons for
+each discovered sibling GUI service in the same room.
 
 ```python
-# Conceptual dynamic sidebar (simplified)
-_STATIC_NAV = [
-    ("/dashboard", ICONS["dashboard"], "Dashboard"),
-    ("/alerts", ICONS["alert"], "Alerts"),
-]
+# Conceptual room_nav module (simplified)
+def create_room_nav(room_id: str) -> None:
+    """Render floating nav pill with sibling GUI buttons."""
+    # Read-only Orchestration participant discovers ServiceCatalog
+    # entries matching this room_id
+    siblings = _discover_siblings(room_id)  # [{name, gui_url}, ...]
 
-def _build_sidebar(drawer, dashboard_backend):
-    # Static entries (always present)
-    for path, icon, label in _STATIC_NAV:
-        _render_nav_button(drawer, path, icon, label)
-
-    # Dynamic entries from ServiceCatalog gui_url (bridged from Domain 11)
-    ui.separator()
-    ui.label("Rooms").classes(...)
-    for (host_id, svc_id), catalog in dashboard_backend.catalogs.items():
-        gui_url = _catalog_property(catalog, "gui_url")
-        if not gui_url:
-            continue
-        room_id = _catalog_property(catalog, "room_id") or ""
-        label = f"{catalog.display_name}"
-        if room_id:
-            label += f" ({room_id})"
-        # Always new tab — room GUIs are cross-origin
-        _render_nav_button(drawer, gui_url, ICONS["open_in_new"], label, new_tab=True)
+    with ui.row().classes("fixed bottom-4 ..."):
+        for sib in siblings:
+            ui.button(sib["name"], on_click=lambda url=sib["gui_url"]: ui.navigate.to(url))
 ```
 
-This pattern generalizes naturally: any future room-level GUI service
-(Foxglove Viewer, camera feed, etc.) automatically appears in the
-dashboard sidebar when its Service Host advertises a `gui_url` — with
-zero configuration changes.
+This module is deployment-agnostic — it works identically on Docker,
+physical hardware, or mixed environments. Any future room-level GUI
+(Foxglove Viewer, camera feed, etc.) automatically appears in the nav
+pill when its Service Host advertises a `gui_url` — with zero
+configuration changes.
+
+#### Hospital Dashboard Room Discovery
+
+The hospital dashboard discovers rooms via **bridged `ServiceCatalog`**
+data (Domain 11 → Domain 20 via per-room RS). The `DashboardBackend`
+subscribes to `ServiceCatalog` on Domain 20 and extracts `room_id` and
+`gui_url` properties. The Room Overview view renders one card per
+discovered room, showing room status, active procedure info, and an
+`open_in_new` button to open the room GUI in a new browser tab.
+
+Room GUIs are always cross-origin from the hospital dashboard. There is
+no same-origin in-app navigation to room GUIs from the hospital level.
 
 ---
 
