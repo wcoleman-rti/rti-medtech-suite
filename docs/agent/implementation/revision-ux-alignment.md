@@ -43,10 +43,14 @@ participant library, and purging stale naming/config remnants.
 | UX.6 | Regression & Acceptance | ✅ Complete | `8f2c893` |
 | UX.7 | Module Boundary Consolidation | ✅ Complete | `04a19d3` |
 | UX.8 | Hospital Participant Library | ✅ Complete | `9506926` |
-| UX.9 | Unified App Remnant Cleanup | ✅ Complete | `pending` |
-| UX.10 | Regression & Vision Doc Alignment | ⬜ Not started | — |
+| UX.9 | Unified App Remnant Cleanup | ✅ Complete | `86b5915` |
+| UX.10 | Regression & Vision Doc Alignment | ✅ Complete | `863650f` |
 
 **Test results at UX.6 gate:** 666 tests passing, 12/12 CI gates green.
+**Test results at UX.10 gate:** 666 tests passing, 12/12 CI gates green,
+23/23 QoS pairs compatible.
+
+**All steps complete. V1.5.0 UX Alignment revision delivered.**
 
 ---
 
@@ -527,7 +531,7 @@ used exclusively by the controller and digital twin.
 
 ---
 
-## Step UX.10 — Regression & Vision Doc Alignment
+## Step UX.10 — Regression & Vision Doc Alignment ✅
 
 ### Work
 
@@ -537,15 +541,15 @@ used exclusively by the controller and digital twin.
 
 ### Test Gate
 
-- [ ] All `@gui` spec tests pass
-- [ ] All `@orchestration` spec tests pass
-- [ ] All `@cli` spec tests pass
-- [ ] **@smoke Tier 1:** `import hospital_dashboard.dashboard` succeeds;
+- [x] All `@gui` spec tests pass
+- [x] All `@orchestration` spec tests pass
+- [x] All `@cli` spec tests pass
+- [x] **@smoke Tier 1:** `import hospital_dashboard.dashboard` succeeds;
   `import surgical_procedure.procedure_controller` succeeds;
   `import surgical_procedure.room_nav` succeeds;
   `import medtech.gui.app` raises `ImportError`
-- [ ] **@smoke Tier 2:** All container startup tests pass
-- [ ] `@acceptance` test validates the composed end-to-end UX workflow
-- [ ] All existing tests pass
-- [ ] Lint passes (including markdownlint)
-- [ ] Performance benchmark passes against the Phase SIM baseline
+- [x] **@smoke Tier 2:** All container startup tests pass
+- [x] `@acceptance` test validates the composed end-to-end UX workflow
+- [x] All existing tests pass
+- [x] Lint passes (including markdownlint)
+- [x] Performance benchmark passes against the Phase SIM baseline
