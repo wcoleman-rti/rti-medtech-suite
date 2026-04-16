@@ -8,6 +8,53 @@ import sys
 
 import click
 
+# ---------------------------------------------------------------------------
+# Verbosity control
+# ---------------------------------------------------------------------------
+
+_verbose = False
+
+
+def set_verbose(v: bool) -> None:
+    """Set the module-level verbosity flag (called by the CLI group)."""
+    global _verbose
+    _verbose = v
+
+
+def _compact_summary(args: list[str]) -> tuple[str, str] | None:
+    """Derive a (label, action) pair for compact output, or *None* to skip."""
+    if not args or args[0] != "docker":
+        return None
+    if len(args) < 2:
+        return None
+    sub = args[1]
+    if sub == "run":
+        try:
+            name = args[args.index("--name") + 1]
+        except (ValueError, IndexError):
+            return None
+        return (f"Container {name}", "Started")
+    if sub == "network":
+        if len(args) < 3:
+            return None
+        action = args[2]
+        if action == "create":
+            return (f"Network {args[-1]}", "Created")
+        if action == "connect":
+            return None  # silent in compact mode
+        if action == "rm":
+            nets = [a for a in args[3:] if not a.startswith("-")]
+            return (f"Network{'s' if len(nets) != 1 else ''} ({len(nets)})", "Removed")
+        return None
+    if sub == "stop":
+        ids = args[2:]
+        return (f"Container{'s' if len(ids) != 1 else ''} ({len(ids)})", "Stopped")
+    if sub == "compose":
+        return ("Docker images", "Built")
+    if sub == "rm":
+        return None  # silent (cleanup)
+    return None
+
 
 def run_cmd(
     args: list[str],
@@ -17,31 +64,83 @@ def run_cmd(
     env_override: dict[str, str] | None = None,
 ) -> int:
     """Print and execute a shell command. Returns the exit code."""
-    cmd_str = " ".join(args)
-    click.secho(f"  $ {cmd_str}", fg="cyan")
     env = None
     if env_override:
         import os
 
         env = {**os.environ, **env_override}
-    if capture:
-        result = subprocess.run(args, capture_output=True, text=True, env=env)
-        if result.stdout:
-            click.echo(result.stdout.rstrip())
-        if result.returncode != 0 and result.stderr:
-            click.secho(result.stderr.rstrip(), fg="red", err=True)
+
+    # --- Verbose mode: show full command + passthrough output -------------
+    if _verbose:
+        cmd_str = " ".join(args)
+        click.secho(f"  $ {cmd_str}", fg="cyan")
+        if capture:
+            result = subprocess.run(args, capture_output=True, text=True, env=env)
+            if result.stdout:
+                click.echo(result.stdout.rstrip())
+            if result.returncode != 0 and result.stderr:
+                click.secho(result.stderr.rstrip(), fg="red", err=True)
+            if check and result.returncode != 0:
+                sys.exit(result.returncode)
+            return result.returncode
+        result = subprocess.run(args, env=env)
         if check and result.returncode != 0:
             sys.exit(result.returncode)
         return result.returncode
-    result = subprocess.run(args, env=env)
-    if check and result.returncode != 0:
-        sys.exit(result.returncode)
+
+    # --- Compact mode: one-liner per operation ----------------------------
+    summary = _compact_summary(args)
+
+    if summary is None:
+        # Non-docker commands (cmake, etc.) → show as-is
+        if not args or args[0] != "docker":
+            cmd_str = " ".join(args)
+            click.secho(f"  $ {cmd_str}", fg="cyan")
+            if capture:
+                result = subprocess.run(args, capture_output=True, text=True, env=env)
+                if result.stdout:
+                    click.echo(result.stdout.rstrip())
+                if result.returncode != 0 and result.stderr:
+                    click.secho(result.stderr.rstrip(), fg="red", err=True)
+                if check and result.returncode != 0:
+                    sys.exit(result.returncode)
+                return result.returncode
+            result = subprocess.run(args, env=env)
+            if check and result.returncode != 0:
+                sys.exit(result.returncode)
+            return result.returncode
+
+        # Docker but skip-worthy (network connect, rm -f) → silent
+        result = subprocess.run(args, capture_output=True, text=True, env=env)
+        if check and result.returncode != 0:
+            if result.stderr:
+                click.secho(result.stderr.rstrip(), fg="red", err=True)
+            sys.exit(result.returncode)
+        return result.returncode
+
+    # Labelled docker operation → compact one-liner
+    label, action = summary
+    result = subprocess.run(args, capture_output=True, text=True, env=env)
+    if result.returncode == 0:
+        mark = click.style("\u2714", fg="green")
+        click.echo(f" {mark} {label:<45} {action}")
+    else:
+        mark = click.style("\u2718", fg="red")
+        click.echo(f" {mark} {label:<45} Error")
+        if result.stderr:
+            click.secho(f"   {result.stderr.rstrip()}", fg="red", err=True)
+        if check:
+            sys.exit(result.returncode)
     return result.returncode
 
 
 @click.group()
-def main() -> None:
+@click.option(
+    "--verbose", "-v", is_flag=True, help="Show full docker commands and output."
+)
+def main(verbose: bool) -> None:
     """medtech — build, launch, and manage the medtech suite."""
+    set_verbose(verbose)
 
 
 @main.command()

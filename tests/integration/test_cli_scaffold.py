@@ -9,6 +9,8 @@ import subprocess
 import sys
 from unittest.mock import patch
 
+import click
+from medtech.cli._main import _compact_summary, set_verbose
 from medtech.cli._naming import next_or_name
 
 
@@ -91,7 +93,13 @@ class TestStopCommand:
         result = runner.invoke(main, ["stop"])
         # When nothing is running, stop completes without error
         assert result.exit_code == 0
-        assert "No medtech containers" in result.output or "docker" in result.output
+        # Compact mode shows checkmarks or "No medtech containers/networks"
+        output = result.output.lower()
+        assert (
+            "no medtech containers" in output
+            or "stopped" in output
+            or "no medtech" in output
+        )
 
 
 class TestAutoNaming:
@@ -126,3 +134,169 @@ class TestAutoNaming:
         ):
             assert next_or_name("hospital-a") == "OR-2"
             assert next_or_name("hospital-b") == "OR-2"
+
+
+class TestVerboseFlag:
+    """Verify ``--verbose`` / ``-v`` flag and compact output."""
+
+    def test_help_lists_verbose_flag(self) -> None:
+        """medtech --help shows --verbose / -v."""
+        from click.testing import CliRunner
+        from medtech.cli._main import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["--help"])
+        assert result.exit_code == 0
+        assert "--verbose" in result.output
+
+    def test_verbose_flag_accepted(self) -> None:
+        """medtech -v --help is accepted without error."""
+        from click.testing import CliRunner
+        from medtech.cli._main import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["-v", "--help"])
+        assert result.exit_code == 0
+
+
+class TestCompactSummary:
+    """Unit tests for ``_compact_summary``."""
+
+    def test_docker_run_extracts_name(self) -> None:
+        args = ["docker", "run", "--rm", "-d", "--name", "hospitalA-gateway", "img"]
+        label, action = _compact_summary(args)
+        assert label == "Container hospitalA-gateway"
+        assert action == "Started"
+
+    def test_docker_network_create(self) -> None:
+        args = ["docker", "network", "create", "medtech_hospitalA-net"]
+        label, action = _compact_summary(args)
+        assert label == "Network medtech_hospitalA-net"
+        assert action == "Created"
+
+    def test_docker_network_connect_skipped(self) -> None:
+        args = ["docker", "network", "connect", "net", "ctr"]
+        assert _compact_summary(args) is None
+
+    def test_docker_network_rm_plural(self) -> None:
+        args = ["docker", "network", "rm", "net1", "net2", "net3"]
+        label, action = _compact_summary(args)
+        assert "3" in label
+        assert action == "Removed"
+
+    def test_docker_stop_singular(self) -> None:
+        args = ["docker", "stop", "abc123"]
+        label, action = _compact_summary(args)
+        assert "1" in label
+        assert action == "Stopped"
+
+    def test_docker_compose(self) -> None:
+        args = ["docker", "compose", "--profile", "build", "build"]
+        label, action = _compact_summary(args)
+        assert "Docker" in label
+        assert action == "Built"
+
+    def test_docker_rm_skipped(self) -> None:
+        args = ["docker", "rm", "-f", "ctr"]
+        assert _compact_summary(args) is None
+
+    def test_non_docker_returns_none(self) -> None:
+        args = ["cmake", "--build", "build"]
+        assert _compact_summary(args) is None
+
+
+class TestRunCmdCompact:
+    """Verify ``run_cmd`` compact output (default mode)."""
+
+    def setup_method(self) -> None:
+        set_verbose(False)
+
+    def teardown_method(self) -> None:
+        set_verbose(False)
+
+    @patch("medtech.cli._main.subprocess.run")
+    def test_compact_docker_run_shows_checkmark(self, mock_sub) -> None:
+        """Compact mode shows ✔ Container <name> Started for docker run."""
+        from medtech.cli._main import run_cmd
+
+        mock_sub.return_value.returncode = 0
+        mock_sub.return_value.stdout = "abc123\n"
+        mock_sub.return_value.stderr = ""
+
+        from click.testing import CliRunner
+
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            # run_cmd uses click.echo, so capture via CliRunner
+            @click.command()
+            def _cli() -> None:
+                run_cmd(["docker", "run", "--rm", "-d", "--name", "test-ctr", "img"])
+
+            result = runner.invoke(_cli)
+            assert result.exit_code == 0
+            assert "test-ctr" in result.output
+            assert "Started" in result.output
+            assert "$ docker" not in result.output
+
+    @patch("medtech.cli._main.subprocess.run")
+    def test_verbose_docker_run_shows_command(self, mock_sub) -> None:
+        """Verbose mode shows the full $ docker run command."""
+        from medtech.cli._main import run_cmd
+
+        mock_sub.return_value.returncode = 0
+        set_verbose(True)
+
+        from click.testing import CliRunner
+
+        @click.command()
+        def _cli() -> None:
+            run_cmd(["docker", "run", "--rm", "-d", "--name", "test-ctr", "img"])
+
+        runner = CliRunner()
+        result = runner.invoke(_cli)
+        assert result.exit_code == 0
+        assert "$ docker run" in result.output
+
+    @patch("medtech.cli._main.subprocess.run")
+    def test_compact_network_connect_silent(self, mock_sub) -> None:
+        """Compact mode suppresses docker network connect output."""
+        from medtech.cli._main import run_cmd
+
+        mock_sub.return_value.returncode = 0
+        mock_sub.return_value.stdout = ""
+        mock_sub.return_value.stderr = ""
+
+        from click.testing import CliRunner
+
+        @click.command()
+        def _cli() -> None:
+            run_cmd(["docker", "network", "connect", "net", "ctr"], check=False)
+
+        runner = CliRunner()
+        result = runner.invoke(_cli)
+        assert result.exit_code == 0
+        assert result.output.strip() == ""
+
+    @patch("medtech.cli._main.subprocess.run")
+    def test_compact_failure_shows_error(self, mock_sub) -> None:
+        """Compact mode shows ✗ and stderr on failure."""
+        from medtech.cli._main import run_cmd
+
+        mock_sub.return_value.returncode = 1
+        mock_sub.return_value.stdout = ""
+        mock_sub.return_value.stderr = "something went wrong"
+
+        from click.testing import CliRunner
+
+        @click.command()
+        def _cli() -> None:
+            run_cmd(
+                ["docker", "run", "--rm", "-d", "--name", "fail-ctr", "img"],
+                check=False,
+            )
+
+        runner = CliRunner()
+        result = runner.invoke(_cli)
+        assert result.exit_code == 0
+        assert "fail-ctr" in result.output
+        assert "Error" in result.output
