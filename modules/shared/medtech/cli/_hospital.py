@@ -205,7 +205,7 @@ def hospital(hospital_name: str | None, observability: bool) -> None:
     _start_gui(gui_name, net_name, port, gateway_name)
 
     if observability:
-        _start_observability(net_name, name)
+        _start_observability(net_name, name, ordinal)
 
     click.echo()
     click.secho(f"Dashboard ({name}): http://localhost:{port}", fg="green", bold=True)
@@ -287,6 +287,10 @@ def _start_gateway(
     run_cmd(rs_cmd)
 
     # 3. Collector Service (shares gateway network namespace)
+    # Loki runs in the observability node (Prometheus's namespace),
+    # reachable via the Prometheus container's DNS name.
+    hospital_name = gateway_name.removesuffix("-gateway")
+    loki_host = f"prometheus-{hospital_name}"
     collector_cmd = [
         "docker",
         "run",
@@ -305,7 +309,7 @@ def _start_gateway(
         "-e",
         "OBSERVABILITY_PROMETHEUS_EXPORTER_PORT=19090",
         "-e",
-        "OBSERVABILITY_LOKI_HOSTNAME=loki",
+        f"OBSERVABILITY_LOKI_HOSTNAME={loki_host}",
         "-e",
         "OBSERVABILITY_LOKI_EXPORTER_PORT=3100",
         "-e",
@@ -394,32 +398,61 @@ def _start_gui(
     run_cmd(cmd)
 
 
-def _start_observability(network: str, hospital_name: str | None = None) -> None:
-    """Launch Prometheus, Loki, and Grafana containers for local telemetry."""
+def _start_observability(
+    network: str, hospital_name: str | None = None, ordinal: int = 1
+) -> None:
+    """Launch Prometheus, Loki, and Grafana as a co-located observability node.
+
+    Prometheus is the base container (owns the network identity and port
+    mappings).  Loki and Grafana join its network namespace via
+    ``--network container:prometheus-{suffix}``, so all three share a
+    single IP and can reach each other on ``localhost``.
+
+    Host ports are offset by hospital ordinal (1000 stride) to avoid
+    collisions in multi-hospital scenarios::
+
+        Hospital 1: Prometheus 9090, Loki 3100, Grafana 3000
+        Hospital 2: Prometheus 10090, Loki 4100, Grafana 4000
+
+    Maximum 8 concurrent hospitals before port ranges overlap with
+    other well-known services — see ``Port Allocation`` in README.
+
+    Collectors (in the gateway namespace) reach Loki via the Prometheus
+    container's DNS hostname on the hospital network.
+    """
     root = _project_root()
     suffix = f"-{hospital_name}" if hospital_name else ""
+    base_name = f"prometheus{suffix}"
+    offset = (ordinal - 1) * 1000
+    prom_port = 9090 + offset
+    loki_port = 3100 + offset
+    grafana_port = 3000 + offset
 
-    # Prometheus
+    # Prometheus — base container (owns all host-mapped ports)
     prom_cmd = [
         "docker",
         "run",
         "--rm",
         "-d",
         "--name",
-        f"prometheus{suffix}",
+        base_name,
         "--label",
         "medtech.dynamic=true",
         "--network",
         network,
         "-p",
-        "9090:9090",
+        f"{prom_port}:9090",
+        "-p",
+        f"{loki_port}:3100",
+        "-p",
+        f"{grafana_port}:3000",
         "-v",
         f"{root}/services/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro",
         "prom/prometheus:v2.51.0",
     ]
     run_cmd(prom_cmd)
 
-    # Loki
+    # Loki — shares Prometheus network namespace
     loki_cmd = [
         "docker",
         "run",
@@ -430,14 +463,12 @@ def _start_observability(network: str, hospital_name: str | None = None) -> None
         "--label",
         "medtech.dynamic=true",
         "--network",
-        network,
-        "-p",
-        "3100:3100",
+        f"container:{base_name}",
         "grafana/loki:2.9.0",
     ]
     run_cmd(loki_cmd)
 
-    # Grafana
+    # Grafana — shares Prometheus network namespace
     nddshome = os.environ.get("NDDSHOME", "/opt/rti.com/rti_connext_dds-7.6.0")
     grafana_cmd = [
         "docker",
@@ -449,9 +480,7 @@ def _start_observability(network: str, hospital_name: str | None = None) -> None
         "--label",
         "medtech.dynamic=true",
         "--network",
-        network,
-        "-p",
-        "3000:3000",
+        f"container:{base_name}",
         "-e",
         "GF_SECURITY_ADMIN_PASSWORD=admin",
         "-e",

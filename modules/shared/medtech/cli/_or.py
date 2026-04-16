@@ -260,7 +260,9 @@ def or_cmd(
     room_gw = f"{target['name']}-{or_key}-gateway"
     room_cds_peers = f"rtps@udpv4://{room_gw}:7400"
     hospital_cds_peers = f"rtps@udpv4://{target['name']}-gateway:7400"
-    _start_room_gateway(room_gw, room_net, target["net"], root, hospital_cds_peers)
+    _start_room_gateway(
+        room_gw, room_net, target["net"], root, hospital_cds_peers, target["name"]
+    )
 
     # Service host containers — all on room-net only
     procedure_id = f"{or_name}-001"
@@ -369,6 +371,7 @@ def _start_room_gateway(
     hospital_net: str,
     root: "os.PathLike[str]",
     hospital_cds_peers: str,
+    hospital_name: str = "hospitalA",
 ) -> None:
     """Launch room-level CDS + RS + Collector in shared namespace."""
     license_file = os.environ.get("RTI_LICENSE_FILE", str(root / "rti_license.dat"))
@@ -442,6 +445,9 @@ def _start_room_gateway(
     run_cmd(rs_cmd)
 
     # Collector (shared namespace) — peers: room CDS (localhost) + hospital CDS
+    # Loki runs in the observability node (Prometheus's namespace),
+    # reachable via the Prometheus container's DNS name.
+    loki_host = f"prometheus-{hospital_name}"
     collector_cmd = [
         "docker",
         "run",
@@ -460,7 +466,7 @@ def _start_room_gateway(
         "-e",
         "OBSERVABILITY_PROMETHEUS_EXPORTER_PORT=19090",
         "-e",
-        "OBSERVABILITY_LOKI_HOSTNAME=loki",
+        f"OBSERVABILITY_LOKI_HOSTNAME={loki_host}",
         "-e",
         "OBSERVABILITY_LOKI_EXPORTER_PORT=3100",
         "-e",

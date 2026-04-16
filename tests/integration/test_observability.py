@@ -140,8 +140,8 @@ class TestCLIObservabilityLauncher:
 
     @patch("medtech.cli._hospital._project_root")
     @patch("medtech.cli._hospital.run_cmd")
-    def test_observability_containers_on_hospital_network(self, mock_run, mock_root):
-        """All observability containers join the hospital network."""
+    def test_prometheus_on_hospital_network(self, mock_run, mock_root):
+        """Prometheus (base) is on the hospital network; Loki/Grafana share its namespace."""
         mock_root.return_value = Path("/fake/root")
         from medtech.cli._hospital import _start_observability
 
@@ -154,8 +154,16 @@ class TestCLIObservabilityLauncher:
             and len(c.args[0]) > 2
             and c.args[0][:3] == ["docker", "run", "--rm"]
         ]
-        for cmd in docker_runs:
-            assert "medtech_hospitalA-net" in cmd
+        # Prometheus is the base — directly on hospital network
+        prom_cmd = [c for c in docker_runs if "prometheus-hospitalA" in c][0]
+        assert "medtech_hospitalA-net" in prom_cmd
+
+        # Loki and Grafana share Prometheus's namespace
+        loki_cmd = [c for c in docker_runs if "loki-hospitalA" in c][0]
+        assert "container:prometheus-hospitalA" in loki_cmd
+
+        grafana_cmd = [c for c in docker_runs if "grafana-hospitalA" in c][0]
+        assert "container:prometheus-hospitalA" in grafana_cmd
 
     @patch("medtech.cli._hospital._project_root")
     @patch("medtech.cli._hospital.run_cmd")
@@ -178,8 +186,8 @@ class TestCLIObservabilityLauncher:
 
     @patch("medtech.cli._hospital._project_root")
     @patch("medtech.cli._hospital.run_cmd")
-    def test_loki_exposes_port_3100(self, mock_run, mock_root):
-        """Loki container maps port 3100."""
+    def test_prometheus_owns_all_ports(self, mock_run, mock_root):
+        """Prometheus base container publishes ports 9090, 3100, and 3000."""
         mock_root.return_value = Path("/fake/root")
         from medtech.cli._hospital import _start_observability
 
@@ -192,8 +200,31 @@ class TestCLIObservabilityLauncher:
             and len(c.args[0]) > 2
             and c.args[0][:3] == ["docker", "run", "--rm"]
         ]
-        loki_cmd = [c for c in docker_runs if "loki-hospitalA" in c][0]
-        assert "3100:3100" in loki_cmd
+        prom_cmd = [c for c in docker_runs if "prometheus-hospitalA" in c][0]
+        assert "9090:9090" in prom_cmd
+        assert "3100:3100" in prom_cmd
+        assert "3000:3000" in prom_cmd
+
+    @patch("medtech.cli._hospital._project_root")
+    @patch("medtech.cli._hospital.run_cmd")
+    def test_second_hospital_gets_offset_ports(self, mock_run, mock_root):
+        """Second hospital observability stack uses +1000 port offset."""
+        mock_root.return_value = Path("/fake/root")
+        from medtech.cli._hospital import _start_observability
+
+        _start_observability("medtech_hospital-b-net", "hospital-b", ordinal=2)
+
+        docker_runs = [
+            c.args[0]
+            for c in mock_run.call_args_list
+            if isinstance(c.args[0], list)
+            and len(c.args[0]) > 2
+            and c.args[0][:3] == ["docker", "run", "--rm"]
+        ]
+        prom_cmd = [c for c in docker_runs if "prometheus-hospital-b" in c][0]
+        assert "10090:9090" in prom_cmd
+        assert "4100:3100" in prom_cmd
+        assert "4000:3000" in prom_cmd
 
 
 class TestObservabilityIndependence:

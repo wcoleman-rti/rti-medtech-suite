@@ -45,20 +45,24 @@ def main() -> None:
 
 
 @main.command()
-@click.option("--docker", is_flag=True, help="Build Docker images only.")
-@click.option("--all", "build_all", is_flag=True, help="CMake build + Docker images.")
-def build(docker: bool, build_all: bool) -> None:
-    """Build the project (CMake by default, --docker for images, --all for both)."""
+@click.option("--docker", is_flag=True, help="Build Docker images only (skip CMake).")
+@click.option(
+    "--no-docker", is_flag=True, help="CMake build only (skip Docker images)."
+)
+def build(docker: bool, no_docker: bool) -> None:
+    """Build the project (CMake + Docker images by default)."""
     import os
 
-    if docker and build_all:
+    if docker and no_docker:
         click.secho(
-            "Error: --docker and --all are mutually exclusive.", fg="red", err=True
+            "Error: --docker and --no-docker are mutually exclusive.",
+            fg="red",
+            err=True,
         )
         raise SystemExit(1)
 
     run_cmake = not docker  # CMake unless --docker-only
-    run_docker = docker or build_all  # Docker only when explicitly requested
+    run_docker = not no_docker  # Docker unless --no-docker
 
     if run_cmake:
         if not os.path.isdir("build"):
