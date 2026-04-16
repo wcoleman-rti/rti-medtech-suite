@@ -57,14 +57,11 @@ _MEDTECH_ENV: dict[str, str] = {
     "LIFESPAN_OPERATOR_INPUT_NS": "100000000",
 }
 
-_FLAT_NETWORKS = [
-    "medtech_surgical-net",
-    "medtech_hospital-net",
-    "medtech_orchestration-net",
-]
-
 _WAN_NET = "medtech_wan-net"
 _WAN_SUBNET = "172.30.0.0/24"
+
+# Default hospital name when --name is omitted
+_DEFAULT_HOSPITAL = "hospitalA"
 
 
 # ---------------------------------------------------------------------------
@@ -121,27 +118,37 @@ def _ensure_network(name: str, subnet: str | None = None) -> None:
     run_cmd(cmd)
 
 
-def _hospital_ordinal(name: str) -> int:
-    """Derive a 1-based ordinal from a hospital name for subnet/port allocation.
+def _detect_hospital_names() -> list[str]:
+    """Return sorted list of hospital names detected from running networks.
 
-    Allocates sequentially based on how many named hospitals exist.
+    Hospital networks match ``medtech_{name}-net`` (no underscore in the
+    name portion).  Room networks (``medtech_{hospital}_{room}-net``) and
+    the ``medtech_wan-net`` infrastructure network are excluded.
     """
     networks = _running_networks()
     names: list[str] = []
     for net in sorted(networks):
-        parts = net.removeprefix("medtech_").split("_")
-        if len(parts) >= 2 and parts[0].startswith("hospital-"):
-            if parts[0] not in names:
-                names.append(parts[0])
+        stripped = net.removeprefix("medtech_")
+        if not stripped.endswith("-net"):
+            continue
+        # Room nets contain an underscore (medtech_{hospital}_{room}-net)
+        if "_" in stripped:
+            continue
+        hname = stripped.removesuffix("-net")
+        # Exclude infrastructure networks
+        if hname == "wan":
+            continue
+        if hname not in names:
+            names.append(hname)
+    return names
+
+
+def _hospital_ordinal(name: str) -> int:
+    """Derive a 1-based ordinal from a hospital name for subnet/port allocation."""
+    names = _detect_hospital_names()
     if name in names:
         return names.index(name) + 1
     return len(names) + 1
-
-
-def _unnamed_hospital_exists() -> bool:
-    """Check if an unnamed (flat-network) hospital is running."""
-    networks = _running_networks()
-    return "medtech_surgical-net" in networks
 
 
 def _gui_port(ordinal: int) -> int:
@@ -159,82 +166,46 @@ def _gui_port(ordinal: int) -> int:
     "--name",
     "hospital_name",
     default=None,
-    help="Hospital name (enables NAT isolation)",
+    help="Hospital name (enables NAT isolation). Defaults to hospitalA.",
 )
 @click.option(
     "--observability", is_flag=True, help="Include Prometheus and Grafana containers"
 )
 def hospital(hospital_name: str | None, observability: bool) -> None:
     """Start hospital infrastructure (CDS gateway, Routing Service, Collector, GUI)."""
-    if hospital_name is None:
-        _start_unnamed_hospital(observability)
-    else:
-        _start_named_hospital(hospital_name, observability)
+    named_explicitly = hospital_name is not None
+    name = hospital_name or _DEFAULT_HOSPITAL
 
-
-def _start_unnamed_hospital(observability: bool) -> None:
-    """Start a flat-network unnamed hospital."""
-    if _unnamed_hospital_exists():
+    # Duplicate validation
+    net_name = f"medtech_{name}-net"
+    if net_name in _running_networks():
         click.secho(
-            "Error: An unnamed hospital is already running. "
-            "Use --name to create a named hospital.",
+            f"Error: Hospital '{name}' is already running.",
             fg="red",
             err=True,
         )
         sys.exit(1)
 
-    # Create flat networks
-    for net in _FLAT_NETWORKS:
-        _ensure_network(net)
-
-    gateway_name = "hospital-gateway"
-    _start_gateway(gateway_name, _FLAT_NETWORKS, None)
-    _start_gui("medtech-gui", _FLAT_NETWORKS[1:], 8080, gateway_name)
-
-    if observability:
-        _start_observability(_FLAT_NETWORKS)
-
-    click.echo()
-    click.secho("Dashboard: http://localhost:8080", fg="green", bold=True)
-
-
-def _start_named_hospital(name: str, observability: bool) -> None:
-    """Start a named hospital with per-hospital networks and NAT router."""
     ordinal = _hospital_ordinal(name)
 
-    # Per-hospital private networks with explicit subnets
-    net_prefix = f"medtech_{name}"
-    nets = {
-        "surgical": f"{net_prefix}_surgical-net",
-        "hospital": f"{net_prefix}_hospital-net",
-        "orchestration": f"{net_prefix}_orchestration-net",
-    }
-    subnets = {
-        "surgical": f"10.{ordinal * 10}.1.0/24",
-        "hospital": f"10.{ordinal * 10}.2.0/24",
-        "orchestration": f"10.{ordinal * 10}.3.0/24",
-    }
-    for key in nets:
-        _ensure_network(nets[key], subnets[key])
+    if named_explicitly:
+        # Named hospital: explicit subnet + WAN + NAT
+        subnet = f"10.{ordinal * 10}.1.0/24"
+        _ensure_network(net_name, subnet)
+        _ensure_network(_WAN_NET, _WAN_SUBNET)
+        _start_nat_router(name, net_name, subnet)
+    else:
+        _ensure_network(net_name)
 
-    # Shared WAN network
-    _ensure_network(_WAN_NET, _WAN_SUBNET)
-
-    # NAT router
-    _start_nat_router(name, list(nets.values()), list(subnets.values()))
-
-    # Gateway (CDS + RS + Collector in shared namespace)
-    all_nets = list(nets.values())
     gateway_name = f"{name}-gateway"
-    _start_gateway(gateway_name, all_nets, name)
+    _start_gateway(gateway_name, net_name)
 
-    # GUI
     port = _gui_port(ordinal)
-    gui_name = f"medtech-gui-{name}"
-    _start_gui(gui_name, [nets["hospital"], nets["orchestration"]], port, gateway_name)
+    gui_name = f"{name}-gui"
+    _start_gui(gui_name, net_name, port, gateway_name)
 
     if observability:
-        _start_observability(list(nets.values()), name)
+        _start_observability(net_name, name)
 
     click.echo()
     click.secho(f"Dashboard ({name}): http://localhost:{port}", fg="green", bold=True)
@@ -247,8 +218,7 @@ def _start_named_hospital(name: str, observability: bool) -> None:
 
 def _start_gateway(
     gateway_name: str,
-    networks: list[str],
-    hospital_name: str | None,
+    network: str,
 ) -> None:
     """Launch the gateway base container (CDS) plus co-located RS and Collector."""
     root = _project_root()
@@ -264,26 +234,22 @@ def _start_gateway(
         gateway_name,
         "--label",
         "medtech.dynamic=true",
+        "--network",
+        network,
+        "-v",
+        f"{root}/services/cloud-discovery-service/CloudDiscoveryService.xml:"
+        "/opt/medtech/config/CloudDiscoveryService.xml:ro",
+        "-v",
+        f"{os.environ.get('RTI_LICENSE_FILE', str(root / 'rti_license.dat'))}:"
+        "/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro",
+        "rticom/cloud-discovery-service:7.6.0",
+        "-cfgFile",
+        "/opt/medtech/config/CloudDiscoveryService.xml",
+        "-cfgName",
+        "DockerCDS",
+        "-verbosity",
+        "WARN",
     ]
-    for net in networks:
-        cmd.extend(["--network", net])
-    cmd.extend(
-        [
-            "-v",
-            f"{root}/services/cloud-discovery-service/CloudDiscoveryService.xml:"
-            "/opt/medtech/config/CloudDiscoveryService.xml:ro",
-            "-v",
-            f"{os.environ.get('RTI_LICENSE_FILE', str(root / 'rti_license.dat'))}:"
-            "/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro",
-            "rticom/cloud-discovery-service:7.6.0",
-            "-cfgFile",
-            "/opt/medtech/config/CloudDiscoveryService.xml",
-            "-cfgName",
-            "DockerCDS",
-            "-verbosity",
-            "WARN",
-        ]
-    )
     run_cmd(cmd)
 
     # 2. Routing Service (shares gateway network namespace)
@@ -312,6 +278,10 @@ def _start_gateway(
             "-e",
             "MEDTECH_TRANSPORT_PROFILE=Docker",
             "medtech/routing-service",
+            "-cfgFile",
+            "/opt/medtech/config/RoutingService.xml",
+            "-cfgName",
+            "MedtechBridge",
         ]
     )
     run_cmd(rs_cmd)
@@ -350,8 +320,8 @@ def _start_gateway(
 
 def _start_nat_router(
     hospital_name: str,
-    private_nets: list[str],
-    private_subnets: list[str],
+    network: str,
+    subnet: str,
 ) -> None:
     """Launch a privileged NAT router container for a named hospital."""
     router_name = f"{hospital_name}-nat"
@@ -365,43 +335,30 @@ def _start_nat_router(
         "--privileged",
         "--label",
         "medtech.dynamic=true",
+        "--network",
+        network,
+        "-e",
+        f"NAT_PRIVATE_SUBNETS={subnet}",
+        "alpine:3.19",
+        "sh",
+        "-c",
+        "apk add --no-cache iptables > /dev/null 2>&1 && "
+        "sysctl -w net.ipv4.ip_forward=1 > /dev/null && "
+        "for subnet in $(echo $NAT_PRIVATE_SUBNETS | tr ',' ' '); do "
+        "iptables -t nat -A POSTROUTING -s $subnet ! -d $subnet -j MASQUERADE; "
+        "done && "
+        "echo 'NAT router ready' && "
+        "sleep infinity",
     ]
-    for net in private_nets:
-        cmd.extend(["--network", net])
-    # Also attach to WAN
-    # Note: docker run --network only supports one network.
-    # We attach additional networks after creation.
-    cmd.extend(
-        [
-            "-e",
-            f"NAT_PRIVATE_SUBNETS={','.join(private_subnets)}",
-            "alpine:3.19",
-            "sh",
-            "-c",
-            "apk add --no-cache iptables > /dev/null 2>&1 && "
-            "sysctl -w net.ipv4.ip_forward=1 > /dev/null && "
-            "for subnet in $(echo $NAT_PRIVATE_SUBNETS | tr ',' ' '); do "
-            "iptables -t nat -A POSTROUTING -s $subnet ! -d $subnet -j MASQUERADE; "
-            "done && "
-            "echo 'NAT router ready' && "
-            "sleep infinity",
-        ]
-    )
     run_cmd(cmd)
 
-    # Connect to WAN and remaining private networks
-    # docker run --network only attaches the first network; connect the rest
-    for net in private_nets[1:]:
-        run_cmd(
-            ["docker", "network", "connect", net, router_name],
-            check=False,
-        )
+    # Connect to WAN
     run_cmd(["docker", "network", "connect", _WAN_NET, router_name], check=False)
 
 
 def _start_gui(
     name: str,
-    networks: list[str],
+    network: str,
     host_port: int,
     gateway_name: str,
 ) -> None:
@@ -418,9 +375,9 @@ def _start_gui(
         "medtech.dynamic=true",
         "-p",
         f"{host_port}:8080",
+        "--network",
+        network,
     ]
-    for net in networks:
-        cmd.extend(["--network", net])
     cmd.extend(_config_volumes())
     cmd.extend(
         _env_flags(
@@ -437,11 +394,10 @@ def _start_gui(
     run_cmd(cmd)
 
 
-def _start_observability(networks: list[str], hospital_name: str | None = None) -> None:
+def _start_observability(network: str, hospital_name: str | None = None) -> None:
     """Launch Prometheus and Grafana containers for local telemetry."""
     root = _project_root()
     suffix = f"-{hospital_name}" if hospital_name else ""
-    net = networks[0]  # Attach to first available network
 
     # Prometheus
     prom_cmd = [
@@ -454,7 +410,7 @@ def _start_observability(networks: list[str], hospital_name: str | None = None) 
         "--label",
         "medtech.dynamic=true",
         "--network",
-        net,
+        network,
         "-p",
         "9090:9090",
         "-v",
@@ -475,7 +431,7 @@ def _start_observability(networks: list[str], hospital_name: str | None = None) 
         "--label",
         "medtech.dynamic=true",
         "--network",
-        net,
+        network,
         "-p",
         "3000:3000",
         "-e",

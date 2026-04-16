@@ -89,7 +89,7 @@ participant library, and purging stale naming/config remnants.
     `medtech-controller-<or_key>` container alongside the twin container:
     - Image: `medtech/app-python`
     - Command: `python -m hospital_dashboard.procedure_controller`
-    - Networks: `surgical-net` + `orchestration-net` (dual-homed)
+    - Networks: `{room}-net` (room's per-instance network)
     - Host port: auto-assigned from controller port range (base: 8091
       for unnamed hospital, offset by hospital ordinal for named)
     - Env: `ROOM_ID`, `PROCEDURE_ID`, `HOST_ID`, `NDDS_DISCOVERY_PEERS`,
@@ -116,7 +116,7 @@ participant library, and purging stale naming/config remnants.
 ### Test Gate
 
 - [x] `medtech run or --name OR-1` starts controller container alongside twin
-- [x] Controller container joins both `surgical-net` and `orchestration-net`
+- [x] Controller container joins `{room}-net`
 - [x] Controller is accessible at assigned host port
 - [x] `medtech-gui` serves only the hospital dashboard (no controller routes)
 - [x] `medtech launch` output shows dashboard URL prominently, includes per-OR controller URLs
@@ -379,7 +379,7 @@ The unified app placed the Procedure Controller under
 (`app.py`) in `modules/shared/medtech/gui/`. Both violate tier
 boundaries: the Procedure Controller is a room-tier app (Orchestration +
 Procedure databuses, deployed in per-room containers on
-`surgical-net + orchestration-net`), and the dashboard entry point is a
+`{room}-net`), and the dashboard entry point is a
 hospital-tier application, not a shared utility. The room-level
 navigation module (`room_nav.py`) is likewise a room-tier component
 used exclusively by the controller and digital twin.

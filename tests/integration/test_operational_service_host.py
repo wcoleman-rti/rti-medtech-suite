@@ -20,10 +20,10 @@ import pytest
 import rti.connextdds as dds
 from conftest import (
     make_get_capabilities_call,
+    make_participant_qos,
     make_start_call,
     make_stop_call,
     send_rpc,
-    test_participant_qos,
     wait_for_replier,
     wait_for_status,
 )
@@ -39,6 +39,7 @@ pytestmark = [
 ORCHESTRATION_DOMAIN_ID = 11
 HOST_ID = "operational-host-test"
 ROOM_ID = "OR-1"
+PROCEDURE_ID = "proc-test"
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +53,6 @@ def operational_service_host():
     env = os.environ.copy()
     env["HOST_ID"] = HOST_ID
     env["ROOM_ID"] = ROOM_ID
-    env["PROCEDURE_ID"] = "proc-test"
 
     proc = subprocess.Popen(
         ["python", "-m", "surgical_procedure.operational_service_host"],
@@ -61,8 +61,8 @@ def operational_service_host():
         stderr=subprocess.STDOUT,
     )
     # Wait for ServiceCatalog publication instead of fixed sleep
-    qos = test_participant_qos()
-    qos.partition.name = ["procedure"]
+    qos = make_participant_qos()
+    qos.partition.name = [f"room/{ROOM_ID}"]
     probe_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     probe_dp.enable()
     topic = dds.Topic(probe_dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -103,8 +103,8 @@ def orch_participant():
     Transport QoS matches BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation
     used by the XML-configured Orchestration participant.
     """
-    qos = test_participant_qos()
-    qos.partition.name = ["procedure"]
+    qos = make_participant_qos()
+    qos.partition.name = [f"room/{ROOM_ID}"]
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     p.enable()
     yield p
@@ -231,7 +231,10 @@ class TestOperationalRpcControl:
     ):
         """start_service starts CameraService."""
         wait_for_replier(rpc_requester, timeout_sec=10)
-        call = make_start_call("CameraService")
+        call = make_start_call(
+            "CameraService",
+            properties=[("room_id", ROOM_ID), ("procedure_id", PROCEDURE_ID)],
+        )
         reply = send_rpc(rpc_requester, call)
         assert reply is not None
         result = reply.start_service.result.return_
@@ -249,7 +252,10 @@ class TestOperationalRpcControl:
     ):
         """start_service starts ProcedureContextService."""
         wait_for_replier(rpc_requester, timeout_sec=10)
-        call = make_start_call("ProcedureContextService")
+        call = make_start_call(
+            "ProcedureContextService",
+            properties=[("room_id", ROOM_ID), ("procedure_id", PROCEDURE_ID)],
+        )
         reply = send_rpc(rpc_requester, call)
         assert reply is not None
         result = reply.start_service.result.return_

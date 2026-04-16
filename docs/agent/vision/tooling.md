@@ -234,24 +234,26 @@ medtech launch --list
 # --- Single hospital (unnamed, flat networks, no NAT) ---
 
 medtech run hospital
-# Running: docker run --rm -d --name gateway ...  (CDS base)
-# Running: docker run --rm -d --name gateway-rs --network container:gateway ...  (co-located RS)
-# Running: docker run --rm -d --name gateway-collector --network container:gateway ...  (co-located Collector)
-# Running: docker run --rm -d --name medtech-gui -p 8080:8080 ...
+# Running: docker network create medtech_hospitalA-net
+# Running: docker run --rm -d --name hospitalA-gateway ...  (CDS base)
+# Running: docker run --rm -d --name hospitalA-gateway-rs --network container:hospitalA-gateway ...  (co-located RS)
+# Running: docker run --rm -d --name hospitalA-gateway-collector --network container:hospitalA-gateway ...  (co-located Collector)
+# Running: docker run --rm -d --name hospitalA-gui -p 8080:8080 ...
 
 medtech run or --name OR-5
-# Running: docker run --rm -d --name clinical-service-host-or5 \
-#   --network medtech_surgical-net -e ROOM_ID=OR-5 ...
-# Running: docker run --rm -d --name robot-service-host-or5 ...
-# Running: docker run --rm -d --name medtech-twin-or5 -p 8083:8080 ...
+# Running: docker network create medtech_hospitalA_or5-net
+# Running: docker run --rm -d --name hospitalA-or5-gateway ...  (room CDS base)
+# Running: docker run --rm -d --name hospitalA-clinical-service-host-or5 \
+#   --network medtech_hospitalA_or5-net -e ROOM_ID=OR-5 ...
+# Running: docker run --rm -d --name hospitalA-robot-service-host-or5 ...
+# Running: docker run --rm -d --name hospitalA-twin-or5 -p 8083:8080 ...
 # ✓ OR-5 started — twin at http://localhost:8083/twin/OR-5
 
 # --- Multi-hospital (named, isolated networks + NAT) ---
 
 medtech run hospital --name hospital-a
 # Running: docker network create medtech_wan-net --subnet 172.30.0.0/24
-# Running: docker network create medtech_hospital-a_surgical-net --subnet 10.10.1.0/24
-# Running: docker network create medtech_hospital-a_hospital-net --subnet 10.10.2.0/24
+# Running: docker network create medtech_hospital-a-net --subnet 10.10.1.0/24
 # Running: docker run --privileged -d --name hospital-a-nat ...
 # Running: docker run --rm -d --name hospital-a-gateway ...  (CDS base)
 # Running: docker run --rm -d --name hospital-a-gateway-rs --network container:hospital-a-gateway ...  (co-located RS)
@@ -260,17 +262,21 @@ medtech run hospital --name hospital-a
 # ✓ hospital-a started — dashboard at http://localhost:8080
 
 medtech run hospital --name hospital-b
-# Running: docker network create medtech_hospital-b_surgical-net --subnet 10.20.1.0/24
+# Running: docker network create medtech_hospital-b-net --subnet 10.20.1.0/24
 # ...
 # Running: docker run --privileged -d --name hospital-b-nat ...
 # Running: docker run --rm -d --name hospital-b-gui -p 9080:8080 ...
 # ✓ hospital-b started — dashboard at http://localhost:9080
 
 medtech run or --name OR-1 --hospital hospital-a
+# Running: docker network create medtech_hospital-a_or1-net --subnet 10.10.16.0/24
+# Running: docker run --rm -d --name hospital-a-or1-gateway ...  (room CDS base)
 # Running: docker run --rm -d --name hospital-a-twin-or1 -p 8081:8080 ...
 # ✓ OR-1 started on hospital-a — twin at http://localhost:8081/twin/OR-1
 
 medtech run or --name OR-4 --hospital hospital-b
+# Running: docker network create medtech_hospital-b_or4-net --subnet 10.20.16.0/24
+# Running: docker run --rm -d --name hospital-b-or4-gateway ...  (room CDS base)
 # Running: docker run --rm -d --name hospital-b-twin-or4 -p 9081:8080 ...
 # ✓ OR-4 started on hospital-b — twin at http://localhost:9081/twin/OR-4
 
@@ -310,7 +316,7 @@ the medtech suite’s multi-network Docker simulation.
 **Key features:**
 
 - Live topology graph with network grouping (containers visually
-  clustered by `surgical-net`, `hospital-net`, `orchestration-net`)
+  clustered by per-room `<room>-net` and `<hospital>-net`)
 - Compose-aware — mount the compose file and it shows services that
   haven’t started yet
 - Real-time — watches Docker event stream; new `medtech run or`

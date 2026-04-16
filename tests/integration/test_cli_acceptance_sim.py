@@ -21,7 +21,9 @@ class TestAcceptanceSimulationWorkflow:
     """Full CLI workflow acceptance test."""
 
     @patch("medtech.cli._main.subprocess.run")
+    @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._running_networks", return_value=[])
     @patch("medtech.cli._or._detect_hospitals")
     @patch("medtech.cli._hospital._running_networks", return_value=[])
     @patch("medtech.cli._hospital.run_cmd")
@@ -36,7 +38,9 @@ class TestAcceptanceSimulationWorkflow:
         mock_h_run,
         mock_nets,
         mock_hosp,
+        mock_or_nets,
         mock_port,
+        mock_ctrl_port,
         mock_subprocess,
     ) -> None:
         """Full workflow: launch → run or OR-5 → status → stop."""
@@ -45,12 +49,8 @@ class TestAcceptanceSimulationWorkflow:
         # --- Phase 1: medtech launch (distributed) -------------------------
         mock_hosp.return_value = [
             {
-                "name": None,
-                "nets": {
-                    "surgical": "medtech_surgical-net",
-                    "hospital": "medtech_hospital-net",
-                    "orchestration": "medtech_orchestration-net",
-                },
+                "name": "hospitalA",
+                "net": "medtech_hospitalA-net",
             }
         ]
         result = runner.invoke(main, ["launch"])
@@ -66,6 +66,7 @@ class TestAcceptanceSimulationWorkflow:
         mock_or_run.reset_mock()
         mock_h_run.reset_mock()
         mock_port.return_value = 8083
+        mock_ctrl_port.return_value = 8093
 
         result = runner.invoke(main, ["run", "or", "--name", "OR-5"])
         assert result.exit_code == 0, result.output
@@ -86,21 +87,21 @@ class TestAcceptanceSimulationWorkflow:
         containers_json = [
             json.dumps(
                 {
-                    "Names": "hospital-gateway",
+                    "Names": "hospitalA-gateway",
                     "Status": "Up 5 minutes",
                     "Ports": "",
                 }
             ),
             json.dumps(
                 {
-                    "Names": "medtech-gui",
+                    "Names": "hospitalA-gui",
                     "Status": "Up 5 minutes",
                     "Ports": "0.0.0.0:8080->8080/tcp",
                 }
             ),
             json.dumps(
                 {
-                    "Names": "clinical-service-host-or5",
+                    "Names": "hospitalA-clinical-service-host-or5",
                     "Status": "Up 2 minutes",
                     "Ports": "",
                 }
@@ -113,20 +114,18 @@ class TestAcceptanceSimulationWorkflow:
 
         result = runner.invoke(main, ["status"])
         assert result.exit_code == 0, result.output
-        assert "hospital-gateway" in result.output
-        assert "medtech-gui" in result.output
+        assert "hospitalA-gateway" in result.output
+        assert "hospitalA-gui" in result.output
 
         # --- Phase 4: medtech stop ------------------------------------------
         # Mock running containers and networks for stop
         running_containers = [
-            json.dumps({"Names": "hospital-gateway"}),
-            json.dumps({"Names": "medtech-gui"}),
-            json.dumps({"Names": "clinical-service-host-or5"}),
-            json.dumps({"Names": "medtech-twin-or5"}),
+            json.dumps({"Names": "hospitalA-gateway"}),
+            json.dumps({"Names": "hospitalA-gui"}),
+            json.dumps({"Names": "hospitalA-clinical-service-host-or5"}),
+            json.dumps({"Names": "hospitalA-medtech-twin-or5"}),
         ]
-        running_networks = (
-            "medtech_surgical-net\nmedtech_hospital-net\nmedtech_orchestration-net\n"
-        )
+        running_networks = "medtech_hospitalA-net\nmedtech_hospitalA_or5-net\n"
 
         call_count = [0]
 
@@ -153,7 +152,9 @@ class TestAcceptanceSimulationWorkflow:
         assert mock_subprocess.call_count > 0
 
     @patch("medtech.cli._main.subprocess.run")
+    @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._running_networks", return_value=[])
     @patch("medtech.cli._or._detect_hospitals")
     @patch("medtech.cli._hospital._running_networks")
     @patch("medtech.cli._hospital.run_cmd")
@@ -168,7 +169,9 @@ class TestAcceptanceSimulationWorkflow:
         mock_h_run,
         mock_nets,
         mock_hosp,
+        mock_or_nets,
         mock_port,
+        mock_ctrl_port,
         mock_subprocess,
     ) -> None:
         """Multi-site workflow: launch multi-site → status → stop."""
@@ -176,19 +179,11 @@ class TestAcceptanceSimulationWorkflow:
 
         hospital_a = {
             "name": "hospital-a",
-            "nets": {
-                "surgical": "medtech_hospital-a_surgical-net",
-                "hospital": "medtech_hospital-a_hospital-net",
-                "orchestration": "medtech_hospital-a_orchestration-net",
-            },
+            "net": "medtech_hospital-a-net",
         }
         hospital_b = {
             "name": "hospital-b",
-            "nets": {
-                "surgical": "medtech_hospital-b_surgical-net",
-                "hospital": "medtech_hospital-b_hospital-net",
-                "orchestration": "medtech_hospital-b_orchestration-net",
-            },
+            "net": "medtech_hospital-b-net",
         }
 
         # _running_networks: called once per hospital creation

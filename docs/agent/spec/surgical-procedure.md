@@ -30,7 +30,7 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 | `CameraFrame` deadline (DDS Deadline QoS) | 66 ms — enforced on both writer and reader |
 | `DeviceTelemetry` publication model | Write-on-change (publish on state transition, fault, or mode change — not periodic) |
 | Device gateway liveliness lease | 2 s |
-| Procedure system initialization — all participants matched | ≤ 5 s from last component start on `surgical-net` |
+| Procedure system initialization — all participants matched | ≤ 5 s from last component start on the room network (`{room}-net`) |
 | Procedure system initialization — initial TRANSIENT_LOCAL state received | ≤ 5 s from last component start (included in initialization budget) |
 | Restarted component re-integration | ≤ 5 s to re-match all endpoints and receive TRANSIENT_LOCAL state |
 | `ProcedureStatus` durability | TRANSIENT_LOCAL — late joiners receive current status immediately |
@@ -299,7 +299,7 @@ All scenarios assume the participant operates within a DomainParticipant partiti
 
 ### Scenario: Procedure system reaches operational state within time budget `@integration` `@performance`
 
-**Given** all procedure system components (robot controller, bedside monitor, procedure context publisher, device gateway) are started within a 2 s window on `surgical-net`
+**Given** all procedure system components (robot controller, bedside monitor, procedure context publisher, device gateway) are started within a 2 s window on the room network (`{room}-net`)
 **When** the last component starts
 **Then** all DomainParticipant DataWriter/DataReader pairs have matched within 5 s
 **And** all TRANSIENT_LOCAL topics (`ProcedureContext`, `RobotState`) have delivered their most recent samples to late-joining subscribers within the same 5 s window

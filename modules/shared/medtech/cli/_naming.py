@@ -46,32 +46,16 @@ def _running_containers(prefix: str = "medtech") -> list[dict]:
     return containers
 
 
-def next_hospital_name() -> str | None:
-    """Return the next available hospital name, or None if unnamed is OK."""
-    networks = _running_networks()
-    hospital_names: set[str] = set()
-    for net in networks:
-        # Named hospitals create networks like medtech_hospital-a_surgical-net
-        parts = net.removeprefix("medtech_").split("_")
-        if len(parts) >= 2 and parts[0].startswith("hospital-"):
-            hospital_names.add(parts[0])
-    return None  # Caller decides; this helper is for enumeration
-
-
-def next_or_name(hospital: str | None = None) -> str:
+def next_or_name(hospital: str) -> str:
     """Return the next sequential OR name (OR-1, OR-2, …) for the hospital."""
-    # Look for containers with service-host or twin naming
     containers = _running_containers()
     or_numbers: set[int] = set()
+    prefix = hospital.lower() + "-"
     for c in containers:
         name = c.get("Names", "")
-        # Patterns: clinical-service-host-or1, medtech-twin-or2,
-        # hospital-a-clinical-service-host-or3
         lower = name.lower()
-        if hospital:
-            prefix = hospital.lower() + "-"
-            if not lower.startswith(prefix):
-                continue
+        if not lower.startswith(prefix):
+            continue
         # Extract OR number from container names like *-or<N>
         for part in lower.split("-"):
             if part.startswith("or") and part[2:].isdigit():

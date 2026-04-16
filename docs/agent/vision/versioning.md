@@ -51,7 +51,7 @@ A version may only be cut when **all** of the following are true:
 | Hospital Dashboard (NiceGUI) | Hospital Integration databus subscription, TRANSIENT_LOCAL late-join, content-filtered topics, asyncio DDS integration |
 | Clinical Alerts & Decision Support | Risk scoring, alert generation, cross-domain subscription via Routing Service |
 | Routing Service | Per-room MedtechBridge: Procedure + Orchestration → Hospital Integration, selective topic bridging, multiple sessions by traffic class |
-| Cloud Discovery Service | Multicast-free discovery on `hospital-net` and `orchestration-net` |
+| Cloud Discovery Service | Multicast-free discovery — per-room CDS on `<room>-net`, per-hospital CDS on `<hospital>-net` |
 | CMake unified build | C++17, Python, rtiddsgen C++11/Python, `RTIConnextDDS::cpp2_api`, build-dir generated code |
 
 ---
@@ -102,7 +102,7 @@ A version may only be cut when **all** of the following are true:
 
 | Module / Capability | Features |
 |---------------------|----------|
-| Split-GUI Docker deployment | Per-OR twin containers on `surgical-net`, central GUI on `hospital-net`, per-hospital Collector Service (`rticom/collector-service`) as base infrastructure, all containers via `docker run` |
+| Split-GUI Docker deployment | Per-OR twin containers on per-room `<room>-net`, central GUI on `<hospital>-net`, per-hospital Collector Service (`rticom/collector-service`) as base infrastructure, all containers via `docker run` |
 | Multi-hospital simulation | Named hospitals with isolated private networks, NAT routers (`iptables MASQUERADE`), shared `wan-net`, per-hospital subnet/port allocation |
 | `medtech` CLI | `build`, `run hospital [--name]`, `run or [--name] [--hospital]`, `launch`, `status`, `status --topology`, `stop` — unified `--name` across all multi-instance commands |
 | Topology visualization | `medtech status --topology` (ASCII); optional [DockGraph](https://github.com/dockgraph/dockgraph) sidecar at `http://localhost:7800` |
@@ -130,7 +130,7 @@ capabilities.
 | Module / Capability | Features |
 |---------------------|----------|
 | Hospital Dashboard (room-centric) | Primary view: room cards with active procedure indicator, service counts, alert counts, `gui_url` action links opening new browser tab with `open_in_new` icon. Secondary view: active procedures filter. |
-| Procedure Controller (room-deployed) | Per-room container (dual-homed `surgical-net` + `orchestration-net`), own host port, serves controller SPA independently of hospital container |
+| Procedure Controller (room-deployed) | Per-room container on `<room>-net`, own host port, serves controller SPA independently of hospital container |
 | Procedure Lifecycle Workflow | Start Procedure → select idle services → Deploy → Add Services → Stop Procedure; one active procedure per room; procedure state reconstruction on restart via TRANSIENT_LOCAL |
 | Room-level GUI navigation | `medtech.gui.room_nav` module: shared Orchestration read-only participant for dynamic sibling GUI discovery via `ServiceCatalog` `gui_url` properties; floating nav pill with sibling buttons; no upward link to hospital dashboard (room GUIs have visibility at and below their level only) |
 | CLI enhancements | `medtech build --docker`, `medtech build --all`; `medtech run or` launches controller container alongside twin; `medtech launch` output emphasizes dashboard as primary entry point |

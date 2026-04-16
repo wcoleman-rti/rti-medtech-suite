@@ -23,10 +23,10 @@ import pytest
 import rti.connextdds as dds
 import surgery
 from conftest import (
+    make_participant_qos,
     make_start_call,
     make_stop_call,
     send_rpc,
-    test_participant_qos,
     wait_for_reader_match,
     wait_for_replier,
     wait_for_status,
@@ -80,7 +80,6 @@ def _start_robot_host(host_id: str, robot_id: str):
     env["HOST_ID"] = host_id
     env["ROBOT_ID"] = robot_id
     env["ROOM_ID"] = ROOM_ID
-    env["PROCEDURE_ID"] = PROCEDURE_ID
     return subprocess.Popen(
         [bin_path],
         env=env,
@@ -118,8 +117,8 @@ def _make_requester(participant, host_id):
 @pytest.fixture(scope="module")
 def orch_dp():
     """Orchestration databus participant."""
-    qos = test_participant_qos()
-    qos.partition.name = ["procedure"]
+    qos = make_participant_qos()
+    qos.partition.name = [f"room/{ROOM_ID}"]
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     dp.enable()
     yield dp
@@ -129,7 +128,7 @@ def orch_dp():
 @pytest.fixture(scope="module")
 def control_dp():
     """Procedure DDS domain participant with 'control' tag."""
-    qos = test_participant_qos()
+    qos = make_participant_qos()
     qos.property["dds.domain_participant.domain_tag"] = "control"
     qos.partition.name = [PARTITION]
     dp = dds.DomainParticipant(PROCEDURE_DOMAIN_ID, qos)
@@ -224,7 +223,14 @@ class TestAcceptanceMultiArm:
         """Start arm A at LEFT position, verify OPERATIONAL."""
         wait_for_replier(requester_a, timeout_sec=15)
 
-        call = make_start_call(SERVICE_ID, properties=[("table_position", "LEFT")])
+        call = make_start_call(
+            SERVICE_ID,
+            properties=[
+                ("room_id", ROOM_ID),
+                ("procedure_id", PROCEDURE_ID),
+                ("table_position", "LEFT"),
+            ],
+        )
         reply = send_rpc(requester_a, call)
         assert reply is not None, "No reply for start_service on host A"
         result = reply.start_service.result.return_
@@ -258,7 +264,14 @@ class TestAcceptanceMultiArm:
         """Start arm B at RIGHT position, verify OPERATIONAL."""
         wait_for_replier(requester_b, timeout_sec=15)
 
-        call = make_start_call(SERVICE_ID, properties=[("table_position", "RIGHT")])
+        call = make_start_call(
+            SERVICE_ID,
+            properties=[
+                ("room_id", ROOM_ID),
+                ("procedure_id", PROCEDURE_ID),
+                ("table_position", "RIGHT"),
+            ],
+        )
         reply = send_rpc(requester_b, call)
         assert reply is not None, "No reply for start_service on host B"
         result = reply.start_service.result.return_

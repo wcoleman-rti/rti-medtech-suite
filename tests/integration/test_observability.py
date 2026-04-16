@@ -151,13 +151,17 @@ class TestMonitoringLibraryConfiguration:
             "cloud-discovery-service" in cs_section
         ), "Collector Service must discover via Cloud Discovery Service"
 
-    def test_collector_service_on_both_networks(self):
-        """Collector Service joins both surgical-net and hospital-net."""
+    def test_collector_service_on_hospital_and_room_networks(self):
+        """Collector Service joins hospitalA-net and room networks."""
         content = _read_text("docker-compose.yml")
         cs_idx = content.index("collector-service:")
         cs_section = content[cs_idx : cs_idx + 1000]
-        assert "surgical-net" in cs_section, "Collector Service must be on surgical-net"
-        assert "hospital-net" in cs_section, "Collector Service must be on hospital-net"
+        assert (
+            "hospitalA-net" in cs_section
+        ), "Collector Service must be on hospitalA-net"
+        assert (
+            "hospitalA_or1-net" in cs_section
+        ), "Collector Service must be on a room network"
 
 
 class TestObservabilityIndependence:

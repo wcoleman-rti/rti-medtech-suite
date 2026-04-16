@@ -21,10 +21,10 @@ import pytest
 import rti.connextdds as dds
 import surgery
 from conftest import (
+    make_participant_qos,
     make_start_call,
     make_stop_call,
     send_rpc,
-    test_participant_qos,
     wait_for_all_states,
     wait_for_data,
     wait_for_reader_match,
@@ -58,7 +58,6 @@ def _start_python_host(module, host_id):
     env = os.environ.copy()
     env["HOST_ID"] = host_id
     env["ROOM_ID"] = ROOM_ID
-    env["PROCEDURE_ID"] = PROCEDURE_ID
     return subprocess.Popen(
         ["python", "-m", module],
         env=env,
@@ -82,7 +81,6 @@ def _start_robot_host(host_id):
     env = os.environ.copy()
     env["HOST_ID"] = host_id
     env["ROOM_ID"] = ROOM_ID
-    env["PROCEDURE_ID"] = PROCEDURE_ID
     return subprocess.Popen(
         [bin_path],
         env=env,
@@ -103,8 +101,8 @@ def _terminate_proc(proc, timeout=3):
 
 
 def _wait_for_catalog(host_ids, timeout=5):
-    qos = test_participant_qos()
-    qos.partition.name = ["procedure"]
+    qos = make_participant_qos()
+    qos.partition.name = [f"room/{ROOM_ID}"]
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     dp.enable()
     topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -172,8 +170,8 @@ def all_hosts():
 @pytest.fixture(scope="module")
 def orch_dp():
     """Orchestration databus participant."""
-    qos = test_participant_qos()
-    qos.partition.name = ["procedure"]
+    qos = make_participant_qos()
+    qos.partition.name = [f"room/{ROOM_ID}"]
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     dp.enable()
     yield dp
@@ -248,7 +246,13 @@ class TestAcceptanceOrchestration:
             try:
                 assert wait_for_replier(req, timeout_sec=15), f"No replier for {hid}"
                 for svc_id in svc_ids:
-                    call = make_start_call(svc_id)
+                    call = make_start_call(
+                        svc_id,
+                        properties=[
+                            ("room_id", ROOM_ID),
+                            ("procedure_id", PROCEDURE_ID),
+                        ],
+                    )
                     reply = send_rpc(req, call)
                     assert reply is not None, f"No reply for start {svc_id}"
                     result = reply.start_service.result.return_

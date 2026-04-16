@@ -167,11 +167,11 @@ hook automatically.
 > **Deployment-level participant model:** Under the A2 hybrid architecture,
 > GUI backends join only the domain(s) at their deployment level:
 >
-> - **Hospital Dashboard** (`medtech-gui` on `hospital-net`) — one participant
+> - **Hospital Dashboard** (`medtech-gui` on `<hospital>-net`) — one participant
 >   on the Hospital Integration databus (Hospital integration). Receives all data via per-room RS bridge.
-> - **Procedure Controller** (`medtech-controller` on `orchestration-net`) — one
+> - **Procedure Controller** (`medtech-controller` on `<room>-net`) — one
 >   participant on the Orchestration databus (Orchestration, room-scoped). Room-level deployment.
-> - **Digital Twin** (`medtech-twin` on `surgical-net`) — one participant on
+> - **Digital Twin** (`medtech-twin` on `<room>-net`) — one participant on
 >   the Procedure DDS domain (`control` tag). Room-level deployment.
 >
 > No GUI backend spans deployment levels. The dashboard does NOT join
@@ -459,8 +459,8 @@ because they run on different hosts/networks.
 
 | App | Container | Network | Route | Domain |
 |-----|-----------|---------|-------|--------|
-| Procedure Controller | `medtech-controller-<room>` | `orchestration-net` | `/controller` | the Orchestration databus |
-| Digital Twin | `medtech-twin-<room>` | `surgical-net` | `/twin` | the Procedure DDS domain (`control` tag) |
+| Procedure Controller | `medtech-controller-<room>` | `<room>-net` | `/controller` | the Orchestration databus |
+| Digital Twin | `medtech-twin-<room>` | `<room>-net` | `/twin` | the Procedure DDS domain (`control` tag) |
 
 Each room-level app is a self-contained NiceGUI instance with its own header
 bar, theme, and static assets. The controller and twin run as `@ui.page()`
@@ -499,9 +499,9 @@ functions are the entry points for `ui.sub_pages()`.
 #### Split-Deployment Navigation Model
 
 GUI services run in **separate containers** across deployment planes.
-The hospital dashboard runs in the hospital container on `hospital-net`;
+The hospital dashboard runs in the hospital container on `<hospital>-net`;
 the Procedure Controller and Digital Twin run in per-room containers
-dual-homed on `surgical-net` + `orchestration-net`. Each NiceGUI instance
+on `<room>-net`. Each NiceGUI instance
 owns its own WebSocket connection and asyncio event loop — there is no
 shared SPA shell across planes.
 

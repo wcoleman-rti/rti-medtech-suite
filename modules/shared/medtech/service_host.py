@@ -36,11 +36,22 @@ Time_t = common.Common.Time_t
 #
 # Accepts the full Orchestration.ServiceRequest so the host can pass
 # both the service_id and any configuration properties to each service
-# it creates.  All other context (room_id, procedure_id, device IDs,
-# logger, …) is captured in the closure at registration time.
+# it creates.  Factories should extract runtime context (procedure_id,
+# room_id, etc.) from ``req.properties`` via :func:`req_property` so
+# the orchestrator can override values at start-service time.
 # ---------------------------------------------------------------------------
 ServiceFactory = Callable[[Orchestration.ServiceRequest], Service]
 """Callable(req: Orchestration.ServiceRequest) -> Service"""
+
+
+def req_property(
+    req: Orchestration.ServiceRequest, name: str, default: str = ""
+) -> str:
+    """Extract a named property value from a ServiceRequest, or *default*."""
+    for prop in req.properties:
+        if prop.name == name:
+            return prop.value or default
+    return default
 
 
 @dataclasses.dataclass
@@ -272,9 +283,11 @@ class ServiceHost(Service):
             orch_names.ORCHESTRATION
         )
 
-        # Set tier partition BEFORE enable() — static deployment-time property
+        # Set room-scoped partition BEFORE enable() — static deployment-time property
         qos = self._participant.qos
-        qos.partition.name = ["procedure"]
+        qos.partition.name = (
+            [f"room/{self._room_id}"] if self._room_id else ["room/unassigned"]
+        )
         self._participant.qos = qos
 
         self._log.info("Orchestration participant created")

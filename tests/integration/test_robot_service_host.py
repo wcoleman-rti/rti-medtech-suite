@@ -41,6 +41,7 @@ ORCHESTRATION_DOMAIN_ID = 11
 PROCEDURE_DOMAIN_ID = 10
 HOST_ID = "robot-host-test"
 ROOM_ID = "OR-1"
+PROCEDURE_ID = "proc-test"
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +71,6 @@ def robot_service_host():
     env = os.environ.copy()
     env["HOST_ID"] = HOST_ID
     env["ROOM_ID"] = ROOM_ID
-    env["PROCEDURE_ID"] = "proc-test"
 
     proc = subprocess.Popen(
         [bin_path],
@@ -81,7 +81,7 @@ def robot_service_host():
     # Wait for ServiceCatalog publication instead of fixed sleep
     qos = dds.DomainParticipantQos()
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
-    qos.partition.name = ["procedure"]
+    qos.partition.name = [f"room/{ROOM_ID}"]
     probe_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     probe_dp.enable()
     topic = dds.Topic(probe_dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -126,7 +126,7 @@ def orch_participant():
     """
     qos = dds.DomainParticipantQos()
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
-    qos.partition.name = ["procedure"]
+    qos.partition.name = [f"room/{ROOM_ID}"]
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     p.enable()
     yield p
@@ -289,7 +289,10 @@ class TestRpcServiceControl:
     def test_start_service_ok(self, robot_service_host, rpc_requester, status_reader):
         """start_service creates and starts the RobotControllerService."""
         wait_for_replier(rpc_requester, timeout_sec=10)
-        call = make_start_call("RobotControllerService")
+        call = make_start_call(
+            "RobotControllerService",
+            properties=[("room_id", ROOM_ID), ("procedure_id", PROCEDURE_ID)],
+        )
         reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for start_service"
         assert (
@@ -312,7 +315,10 @@ class TestRpcServiceControl:
         """start_service on an already-running service returns ALREADY_RUNNING."""
         # Service was started by the previous test (module-scoped host)
         wait_for_replier(rpc_requester, timeout_sec=10)
-        call = make_start_call("RobotControllerService")
+        call = make_start_call(
+            "RobotControllerService",
+            properties=[("room_id", ROOM_ID), ("procedure_id", PROCEDURE_ID)],
+        )
         reply = send_rpc(rpc_requester, call)
         assert reply is not None, "No reply received for start_service"
         result = reply.start_service.result.return_

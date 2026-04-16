@@ -60,7 +60,7 @@ class TestDigitalTwinMain:
             except (KeyboardInterrupt, SystemExit):
                 pass
 
-        mock_get_backend.assert_called_with("OR-5")
+        mock_get_backend.assert_called_with("OR-5", "proc-001")
         assert backend.gui_url == "http://localhost:8085/twin/OR-5"
 
     @patch("surgical_procedure.digital_twin.digital_twin.ui")

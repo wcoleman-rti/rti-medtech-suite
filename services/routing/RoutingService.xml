@@ -154,14 +154,15 @@
             <!--
                 RS::ProcedureOrchestration — reads ServiceCatalog from the
                 Orchestration databus (room-scoped) for northbound extraction
-                to the Hospital Integration databus.
+                to the Hospital Integration databus. Uses wildcard partition
+                to match all rooms' orchestration data.
             -->
             <participant name="ProcedureOrchestration">
                 <domain_id>11</domain_id>
                 <domain_participant_qos base_name="Participants::Transport">
                     <partition>
                         <name>
-                            <element>procedure</element>
+                            <element>room/*</element>
                         </name>
                     </partition>
                 </domain_participant_qos>

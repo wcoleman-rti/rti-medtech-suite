@@ -37,13 +37,14 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 
 ## CLI Run Commands — Hospital
 
-### @simulation @cli — `medtech run hospital` starts unnamed hospital
+### @simulation @cli — `medtech run hospital` starts default hospital
 
 **Given** Docker images are built
 **When** the developer runs `medtech run hospital`
-**Then** the CLI creates flat Docker networks (`medtech_surgical-net`, `medtech_hospital-net`, `medtech_orchestration-net`) if they do not exist
-**And** the CLI launches a hospital-gateway container (CDS base) followed by co-located Routing Service and Collector containers sharing its network namespace via `--network container:hospital-gateway`
-**And** the CLI launches the central GUI container
+**Then** the CLI uses the default hospital name `hospitalA`
+**And** the CLI creates the Docker network `medtech_hospitalA-net` if it does not exist
+**And** the CLI launches a `hospitalA-gateway` container (CDS base) on `medtech_hospitalA-net`, followed by co-located Routing Service and Collector containers sharing its network namespace via `--network container:hospitalA-gateway`
+**And** the CLI launches the central GUI container (`hospitalA-gui`) on `medtech_hospitalA-net`
 **And** no NAT router container is created
 **And** each underlying command is printed to stdout
 **And** the output includes the dashboard URL (`http://localhost:8080`)
@@ -52,10 +53,10 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 
 **Given** Docker images are built
 **When** the developer runs `medtech run hospital --name hospital-a`
-**Then** the CLI creates per-hospital private networks (`medtech_hospital-a_surgical-net`, `medtech_hospital-a_hospital-net`, `medtech_hospital-a_orchestration-net`) with explicit subnets
+**Then** the CLI creates a per-hospital private network (`medtech_hospital-a-net`) with an explicit subnet
 **And** the CLI creates the shared `medtech_wan-net` (172.30.0.0/24) if it does not exist
-**And** a privileged NAT router container (`hospital-a-nat`) is launched, dual-homed on the private networks and `wan-net`, with IP forwarding and `iptables MASQUERADE`
-**And** a per-hospital gateway container (CDS base with co-located RS and Collector via `--network container:<name>-gateway`) and GUI container are launched on the private networks
+**And** a privileged NAT router container (`hospital-a-nat`) is launched, dual-homed on the hospital network and `wan-net`, with IP forwarding and `iptables MASQUERADE`
+**And** a per-hospital gateway container (CDS base with co-located RS and Collector via `--network container:<name>-gateway`) and GUI container are launched on the hospital network
 **And** the GUI is mapped to a host port allocated by hospital ordinal (1st = 8080, 2nd = 9080, etc.)
 **And** each command is printed to stdout
 
@@ -73,10 +74,24 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 
 **Given** `hospital-a` is running
 **When** the developer runs `medtech run hospital --name hospital-b`
-**Then** a new set of private networks is created with a different subnet range
+**Then** a new hospital network (`medtech_hospital-b-net`) is created with a different subnet range
 **And** a new NAT router (`hospital-b-nat`) is launched on `wan-net`
 **And** `hospital-b` containers cannot directly reach `hospital-a` private networks
 **And** both NAT routers can reach each other on `wan-net`
+
+### @simulation @cli — duplicate hospital name is rejected
+
+**Given** `hospitalA` is running (the default hospital)
+**When** the developer runs `medtech run hospital` (which defaults to `hospitalA`)
+**Then** the CLI prints an error: "Hospital 'hospitalA' is already running."
+**And** no containers or networks are created
+
+### @simulation @cli — duplicate named hospital is rejected
+
+**Given** `hospital-b` is running
+**When** the developer runs `medtech run hospital --name hospital-b`
+**Then** the CLI prints an error: "Hospital 'hospital-b' is already running."
+**And** no containers or networks are created
 
 ---
 
@@ -86,9 +101,10 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 
 **Given** a hospital is running
 **When** the developer runs `medtech run or --name OR-1`
-**Then** the CLI launches a room-gateway container (CDS base with co-located RS and Collector via `--network container:<OR-name>-gateway`) on the hospital's Docker networks
-**And** the CLI runs `docker run --rm -d` for each required Service Host container (clinical, operational, operator, robot), a Procedure Controller container, and a Digital Twin container
-**And** the Controller and Twin containers are attached to both `surgical-net` and `orchestration-net` (for Procedure DDS domain data and `surgical_procedure.room_nav` sibling discovery)
+**Then** the CLI creates a per-room Docker network (`medtech_<hospital>_or1-net`, e.g., `medtech_hospitalA_or1-net` for the default hospital)
+**And** the CLI launches a room-gateway container (`<hospital>-or1-gateway`, CDS base with co-located RS and Collector via `--network container:<gateway>`) on the room network and the hospital network (dual-homed)
+**And** the CLI runs `docker run --rm -d` for each required Service Host container (clinical, operational, operator, robot), a Procedure Controller container, and a Digital Twin container, all on the room network only
+**And** all room-local containers use the room CDS as their initial peer (`NDDS_DISCOVERY_PEERS=rtps@udpv4://<hospital>-<room>-gateway:7400`)
 **And** each `docker run` command is printed to stdout before execution
 **And** the controller container is assigned a host port (auto-assigned from the hospital's controller port range)
 **And** the twin container is assigned a host port (auto-assigned from the hospital's twin port range)
@@ -105,7 +121,7 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 
 **Given** `hospital-a` and `hospital-b` are both running
 **When** the developer runs `medtech run or --name OR-1 --hospital hospital-a`
-**Then** the OR containers are attached to `hospital-a`'s private networks
+**Then** the OR containers are created on a room network prefixed with the hospital name (`medtech_hospital-a_or1-net`)
 **And** the twin port is allocated from `hospital-a`'s port range
 
 ### @simulation @cli — `medtech run or` infers hospital when only one is running
@@ -127,6 +143,13 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 **When** the developer runs `medtech run or --name OR-1 --twin-port 8085`
 **Then** the twin container is mapped to host port 8085
 **And** the summary output shows `http://localhost:8085/twin/OR-1`
+
+### @simulation @cli — duplicate room name on same hospital is rejected
+
+**Given** OR-1 is running on `hospitalA`
+**When** the developer runs `medtech run or --name OR-1`
+**Then** the CLI prints an error: "Room 'OR-1' already exists on hospital 'hospitalA'."
+**And** no containers or networks are created
 
 ---
 
@@ -248,7 +271,7 @@ and multi-hospital NAT simulation introduced in V1.4.0.
 ### @simulation — named hospital's private networks are unreachable from other hospitals
 
 **Given** `hospital-a` and `hospital-b` are running
-**When** a container on `hospital-a_surgical-net` attempts to reach an IP on `hospital-b_surgical-net`
+**When** a container on `hospital-a-net` attempts to reach an IP on `hospital-b-net`
 **Then** the connection fails (no route)
 
 ### @simulation — NAT routers can reach each other on wan-net

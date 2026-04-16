@@ -22,10 +22,10 @@ import time
 import pytest
 import rti.connextdds as dds
 from conftest import (
+    make_participant_qos,
     make_start_call,
     make_stop_call,
     send_rpc,
-    test_participant_qos,
     wait_for_all_states,
     wait_for_data,
     wait_for_replier,
@@ -76,7 +76,6 @@ def _start_python_host(module, host_id):
     env = os.environ.copy()
     env["HOST_ID"] = host_id
     env["ROOM_ID"] = ROOM_ID
-    env["PROCEDURE_ID"] = PROCEDURE_ID
     return subprocess.Popen(
         ["python", "-m", module],
         env=env,
@@ -101,7 +100,6 @@ def _start_robot_host(host_id):
     env = os.environ.copy()
     env["HOST_ID"] = host_id
     env["ROOM_ID"] = ROOM_ID
-    env["PROCEDURE_ID"] = PROCEDURE_ID
     return subprocess.Popen(
         [bin_path],
         env=env,
@@ -124,8 +122,8 @@ def _terminate_proc(proc, timeout=3):
 
 def _wait_for_catalog(host_ids, timeout=5):
     """Wait until ServiceCatalog samples from all host_ids appear."""
-    qos = test_participant_qos()
-    qos.partition.name = ["procedure"]
+    qos = make_participant_qos()
+    qos.partition.name = [f"room/{ROOM_ID}"]
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     dp.enable()
     topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -199,8 +197,8 @@ def all_service_hosts():
 @pytest.fixture(scope="module")
 def orch_participant():
     """Orchestration databus participant for E2E tests."""
-    qos = test_participant_qos()
-    qos.partition.name = ["procedure"]
+    qos = make_participant_qos()
+    qos.partition.name = [f"room/{ROOM_ID}"]
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     p.enable()
     yield p
@@ -305,7 +303,13 @@ class TestFullLifecycle:
                     req, timeout_sec=15
                 ), f"RPC requester did not discover replier for {hid}"
                 for svc_id in service_ids:
-                    call = make_start_call(svc_id)
+                    call = make_start_call(
+                        svc_id,
+                        properties=[
+                            ("room_id", ROOM_ID),
+                            ("procedure_id", PROCEDURE_ID),
+                        ],
+                    )
                     reply = send_rpc(req, call)
                     assert (
                         reply is not None
@@ -374,8 +378,8 @@ class TestLivelinessDetection:
 
         # Create the monitoring reader FIRST, before starting the host,
         # so we are guaranteed to discover and match the host's writer.
-        qos = test_participant_qos()
-        qos.partition.name = ["procedure"]
+        qos = make_participant_qos()
+        qos.partition.name = [f"room/{ROOM_ID}"]
         dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
         dp.enable()
         topic = dds.Topic(dp, "ServiceCatalog", Orchestration.ServiceCatalog)
@@ -452,8 +456,8 @@ class TestOrchestrationFailureIsolation:
         verify that Procedure DDS domain writers/readers remain matched.
         """
         # Create a mock controller participant on the Orchestration databus
-        ctrl_qos = test_participant_qos()
-        ctrl_qos.partition.name = ["procedure"]
+        ctrl_qos = make_participant_qos()
+        ctrl_qos.partition.name = [f"room/{ROOM_ID}"]
         ctrl_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, ctrl_qos)
         ctrl_dp.enable()
 
@@ -518,7 +522,7 @@ class TestTierPartitionIsolation:
         This verifies the static 'procedure' tier partition is enforced:
         facility-tier observers cannot eavesdrop on procedure-tier data.
         """
-        qos = test_participant_qos()
+        qos = make_participant_qos()
         qos.partition.name = ["facility"]
         dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
         dp.enable()
@@ -550,8 +554,8 @@ class TestStateReconstruction:
     def test_late_joining_reader_receives_state(self, all_service_hosts):
         """A new Orchestration databus reader receives TRANSIENT_LOCAL
         ServiceCatalog and ServiceStatus from running hosts."""
-        qos = test_participant_qos()
-        qos.partition.name = ["procedure"]
+        qos = make_participant_qos()
+        qos.partition.name = [f"room/{ROOM_ID}"]
         dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
         dp.enable()
 

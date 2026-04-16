@@ -290,20 +290,14 @@ interacts with other levels.
 
 | Level | CDS Container | Networks | Role |
 |-------|---------------|----------|------|
-| Room | `<hospital>-<room>-gateway` (base) | `surgical-net`, `orchestration-net` | Multicast-free discovery for room-local participants (robot service hosts, digital twin, procedure controller). Also the initial peer for upward-facing RS output participants on `hospital-net` |
-| Hospital | `<hospital>-gateway` (base) | `hospital-net`, `surgical-net`, `orchestration-net` | Intra-hospital discovery for all participants + upward-facing initial peer for hospital RS and Collector on `wan-net` |
-| Cloud (V3.0) | `cloud-gateway` (base) | `wan-net` | Cross-facility discovery for hospital WAN RS output participants, hospital-to-cloud Collector forwarding, and cloud-level applications |
+| Room | `<hospital>-<room>-gateway` (base) | `<room>-net` | Multicast-free discovery for all room-local participants (robot service hosts, Service Hosts, digital twin, procedure controller). All intra-room participants use the room CDS hostname as their initial peer. |
+| Hospital | `<hospital>-gateway` (base) | `<hospital>-net` | Intra-hospital discovery for hospital-level participants (dashboard, ClinicalAlerts engine) + upward-facing initial peer for room RS output and room Collector forwarding participants |
+| Cloud (V3.0) | `cloud-gateway` (base) | `cloud-net` | Cross-facility discovery for hospital WAN RS output participants, hospital-to-cloud Collector forwarding, and cloud-level applications |
 
 The observing level's CDS also serves as the **initial peer for upward-facing
 participants** from the level below. For example, the per-room Routing Service's
 Hospital-domain output participant and the room-level Collector Service's
 forwarding participant both use the hospital CDS as their initial peer.
-
-> **Room-level CDS exception:** Rooms do not deploy their own CDS in V1.x because
-> the hospital CDS is directly reachable from all room networks (it is attached to
-> `surgical-net` and `orchestration-net`). If a future deployment model requires
-> rooms to operate in network isolation from the hospital (e.g., disconnected OR
-> carts), a per-room CDS can be added without architectural changes.
 
 #### Rule 2 — Routing Service as Upward Gateway
 
@@ -314,7 +308,7 @@ the layered databus.
 
 | Gateway | Direction | Input Domains | Output Domain | Upward Initial Peer |
 |---------|-----------|---------------|---------------|---------------------|
-| Per-room MedtechBridge | Room → Hospital | Domain 10, 11 | Domain 20 | `rtps@udpv4://<hospital>-cds:7400` |
+| Per-room MedtechBridge | Room → Hospital | Domain 10, 11 | Domain 20 | `rtps@udpv4://<hospital>-gateway:7400` |
 | Per-hospital WAN RS (V3.0) | Hospital → Cloud | Domain 20 | Domain 30 | `rtps@udpv4://wan-cds:7400` |
 
 The upward-facing initial peer is configured as a **hostname**, not an IP
@@ -358,7 +352,7 @@ CDS (or a direct address).
 
 | Level | Collector Input Domain | Collector Output Domain | Forwards To | `OBSERVABILITY_OUTPUT_COLLECTOR_PEER` |
 |-------|----------------------|------------------------|-------------|--------------------------------------|
-| Room | Domain 19 | Domain 29 | Hospital Collector | `rtps@udpv4://<hospital>-cds:7400` |
+| Room | Domain 19 | Domain 29 | Hospital Collector | `rtps@udpv4://<hospital>-gateway:7400` |
 | Hospital | Domain 29 | Domain 39 | Cloud Collector (V3.0) | `rtps@udpv4://wan-cds:7400` |
 | Cloud (V3.0) | Domain 39 | — (terminal) | Prometheus / Loki / OTEL | — |
 
@@ -819,9 +813,8 @@ Each logical host is a Docker container. Custom Docker networks simulate the net
 
 | Docker Network | Simulates | Containers |
 |----------------|-----------|------------|
-| `surgical-net` | Per-OR surgical LAN | Robot sim, surgeon console, digital twin display, bedside monitors, procedure context sim, Service Hosts, room-level GUI containers (twin, controller — dual-homed with `orchestration-net`), per-room gateway (`*-or<N>-gateway`: CDS + RS + Collector, shared namespace) |
-| `hospital-net` | Hospital backbone | Hospital gateway (`*-gateway`: CDS + RS + Collector, shared namespace), Hospital Dashboard, ClinicalAlerts engine, Prometheus, Grafana Loki, Grafana |
-| `orchestration-net` | Orchestration control-plane | Procedure Controller, room-level GUI containers (for `surgical_procedure.room_nav` sibling discovery via ServiceCatalog), Service Hosts (dual-homed: surgical-net + orchestration-net), hospital gateway, per-room gateway — Service Hosts bridge both networks to host surgical services on `surgical-net` while receiving orchestration commands on `orchestration-net` |
+| `<room>-net` (e.g., `or1-net`) | Per-OR surgical LAN | All room-local participants: robot sim, surgeon console, digital twin display, bedside monitors, procedure context sim, Service Hosts, Procedure Controller, room-level GUI containers (twin, controller), room gateway (`*-<room>-gateway`: CDS + RS + Collector, shared namespace) |
+| `<hospital>-net` (e.g., `hospital-net`) | Hospital backbone | Hospital gateway (`*-gateway`: CDS + RS + Collector, shared namespace), room gateways (multi-homed: `<room>-net` + `<hospital>-net`), Hospital Dashboard, ClinicalAlerts engine, Prometheus, Grafana Loki, Grafana |
 | `cloud-net` **(V3.0)** | Enterprise WAN | Cloud gateway (`cloud-gateway`: CDS + Collector, shared namespace), Command Center dashboard — **not created until V3.0 implementation** |
 
 #### Infrastructure Gateway Containers (Shared Network Namespace)
@@ -860,66 +853,63 @@ for its health check, then launches co-located services with `--network containe
 consolidated gateway nodes rather than a proliferation of per-service infrastructure
 containers, making the simulated topology visually match the production architecture
 diagram.
-| `cloud-net` **(V3.0)** | Enterprise WAN | WAN Routing Service (dual-homed: hospital-net + cloud-net), Command Center dashboard, Cloud Discovery Service — **not created until V3.0 implementation** |
 
 #### Multi-Hospital Simulation (V1.4)
 
 The `medtech` CLI supports launching multiple independent hospital
-instances on a single machine. Each named hospital gets its own set of
-isolated Docker networks, its own infrastructure containers, and a NAT
-router container that simulates the hospital's uplink to a public WAN.
+instances on a single machine. Each hospital gets its own Docker
+network, its own infrastructure containers, and (when multiple hospitals
+are deployed) a NAT router container that simulates the hospital's
+uplink to a public WAN.
 
-**Unnamed (default) mode:** `medtech run hospital` (no `--name`) creates
-flat, shared Docker networks with no NAT — the simplest path for
-single-hospital exploration. This is backward-compatible with all
-existing scenarios.
+The CLI always follows a single code path regardless of whether `--name`
+is provided. When `--name` is omitted, the default hospital name
+`hospitalA` is used. Network and container names are always derived from
+the hospital name — there is no separate "unnamed" topology.
 
-**Named mode:** `medtech run hospital --name hospital-a` creates
-per-hospital private networks with explicit subnets and a privileged
-NAT router container that performs `iptables MASQUERADE` on a shared
-`wan-net`. This simulates production-like network isolation where each
-hospital is behind its own NAT boundary, reachable only via the WAN
-segment.
+**Single hospital:** `medtech run hospital` creates
+`medtech_hospitalA-net`. Per-room networks are created dynamically by
+`medtech run or` (e.g., `medtech_hospitalA_or1-net`). No NAT router is
+created.
 
-##### Network Topology — Named Hospitals
+**Named hospital:** `medtech run hospital --name hospital-b` creates
+`medtech_hospital-b-net` with an explicit subnet, plus a shared
+`wan-net` and a privileged NAT router container that performs
+`iptables MASQUERADE`. Per-room networks are created by `medtech run or`
+with hospital-prefixed names (e.g., `medtech_hospital-b_or1-net`). This
+simulates production-like network isolation where each hospital is
+behind its own NAT boundary, reachable only via the WAN segment.
+
+##### Network Topology — Multi-Hospital Example
 
 ```
 medtech_wan-net (172.30.0.0/24) ─── simulated public internet
-├── hospital-a-nat    172.30.0.2    (MASQUERADE)
+├── hospitalA-nat     172.30.0.2    (MASQUERADE)
 ├── hospital-b-nat    172.30.0.3    (MASQUERADE)
 └── cloud-gateway     172.30.0.10   (CDS + Collector — V3.0)
 
-medtech_hospital-a_surgical-net (10.10.1.0/24) ─── private
-├── hospital-a-gateway              (CDS + RS + Collector — shared namespace)
-├── hospital-a-or1-gateway          (per-room CDS + RS + Collector — shared namespace)
-├── hospital-a-robot-service-host-or1
-├── hospital-a-twin-or1           :8081
-└── hospital-a-nat  (dual-homed → wan-net)
+medtech_hospitalA-net (10.10.1.0/24) ─── hospital backbone
+├── hospitalA-gateway               (CDS + RS + Collector — shared namespace)
+├── hospitalA-or1-gateway           (multi-homed: or1-net + hospitalA-net)
+├── hospitalA-gui                 :8080
+└── hospitalA-nat  (dual-homed → wan-net)
 
-medtech_hospital-a_hospital-net (10.10.2.0/24) ─── private
-├── hospital-a-gateway              (same node as above — multi-homed)
-├── hospital-a-or1-gateway          (same node — multi-homed)
-├── hospital-a-gui                :8080
-└── hospital-a-nat  (dual-homed → wan-net)
+medtech_hospitalA_or1-net (10.10.16.0/24) ─── per-room LAN
+├── hospitalA-or1-gateway           (CDS + RS + Collector — shared namespace)
+├── hospitalA-robot-service-host-or1
+├── hospitalA-controller-or1      :8091
+└── hospitalA-twin-or1            :8081
 
-medtech_hospital-a_orchestration-net (10.10.3.0/24) ─── private
-├── hospital-a-gateway              (same node — multi-homed)
-├── hospital-a-or1-gateway          (same node — multi-homed)
-├── hospital-a-controller-or1
-└── hospital-a-robot-service-host-or1  (dual-homed: surgical + orchestration)
-
-medtech_hospital-b_surgical-net (10.20.1.0/24) ─── private
+medtech_hospital-b-net (10.20.1.0/24) ─── hospital backbone
 ├── hospital-b-gateway
-├── hospital-b-or4-gateway
-├── hospital-b-robot-service-host-or4
-├── hospital-b-twin-or4           :9081
-└── hospital-b-nat  (dual-homed → wan-net)
-
-medtech_hospital-b_hospital-net (10.20.2.0/24) ─── private
-├── hospital-b-gateway
-├── hospital-b-or4-gateway
+├── hospital-b-or4-gateway          (multi-homed: or4-net + hospital-b-net)
 ├── hospital-b-gui                :9080
 └── hospital-b-nat  (dual-homed → wan-net)
+
+medtech_hospital-b_or4-net (10.20.16.0/24) ─── per-room LAN
+├── hospital-b-or4-gateway
+├── hospital-b-robot-service-host-or4
+└── hospital-b-twin-or4           :9081
 ```
 
 ##### NAT Router Container
@@ -936,7 +926,7 @@ to `wan-net`. The NAT router:
 - Applies `iptables -t nat -A POSTROUTING -o $NAT_WAN_IFACE -j MASQUERADE`
   (cone NAT — destination-independent mapping, compatible with RTI CDS
   NAT traversal per [wan-testing-strategy.md](wan-testing-strategy.md))
-- Is dual-homed on the hospital's private networks + `wan-net`
+- Is dual-homed on the hospital's network, its room networks, and `wan-net`
 - Does **not** run any DDS participants — it is pure L3 infrastructure
 
 The NAT router ensures that hospital-private containers cannot directly
@@ -948,7 +938,7 @@ and Tier B) without modification.
 ##### Per-Hospital Collector Service
 
 Each hospital instance launches an RTI Collector Service container
-(`rticom/collector-service`) on `hospital-net` as base infrastructure.
+(`rticom/collector-service`) on `<hospital>-net` as base infrastructure.
 Monitoring Library 2.0, enabled on every DDS participant, automatically
 forwards metrics, logs, and security events to the local Collector
 Service via its dedicated participant on the Room Observability databus
@@ -997,13 +987,17 @@ on `docker network create --subnet`.
 
 ##### Subnet Allocation
 
-| Hospital | surgical-net | hospital-net | orchestration-net |
-|----------|-------------|-------------|-------------------|
-| unnamed (default) | Docker default | Docker default | Docker default |
-| hospital-a | 10.10.1.0/24 | 10.10.2.0/24 | 10.10.3.0/24 |
-| hospital-b | 10.20.1.0/24 | 10.20.2.0/24 | 10.20.3.0/24 |
-| hospital-c | 10.30.1.0/24 | 10.30.2.0/24 | 10.30.3.0/24 |
-| hospital-N | 10.(N×10).1.0/24 | 10.(N×10).2.0/24 | 10.(N×10).3.0/24 |
+| Instance | Network | Subnet |
+|----------|---------|--------|
+| hospitalA (default) | `medtech_hospitalA-net` | Docker default |
+| hospitalA OR-1 | `medtech_hospitalA_or1-net` | Docker default |
+| hospital-a (named) | `medtech_hospital-a-net` | 10.10.1.0/24 |
+| hospital-a OR-1 | `medtech_hospital-a_or1-net` | 10.10.16.0/24 |
+| hospital-a OR-2 | `medtech_hospital-a_or2-net` | 10.10.17.0/24 |
+| hospital-b | `medtech_hospital-b-net` | 10.20.1.0/24 |
+| hospital-b OR-4 | `medtech_hospital-b_or4-net` | 10.20.16.0/24 |
+| hospital-N | `medtech_hospital-N-net` | 10.(N×10).1.0/24 |
+| hospital-N OR-M | `medtech_hospital-N_orM-net` | 10.(N×10).(M+15).0/24 |
 
 The CLI allocates subnets by hospital ordinal (based on creation order).
 The `wan-net` subnet (`172.30.0.0/24`) is shared and created once.
@@ -1042,34 +1036,39 @@ deploys GUI modules as separate containers to simulate production-like
 network separation, where per-OR displays run on the surgical LAN and the
 hospital command center runs on the backbone.
 
-**Single hospital (unnamed):**
+**Default hospital (`hospitalA`):**
 
 | Container | Launched By | Network | Serves | Host Port | Simulates |
 |-----------|-------------|---------|--------|-----------|-----------|
-| `gateway` (base) | `docker run --rm` | `hospital-net`, `surgical-net`, `orchestration-net` | CDS — discovery bootstrapper | — | Hospital infrastructure appliance |
-| `gateway` + RS | `docker run --rm --network container:gateway` | (shares `gateway` namespace) | Per-room MedtechBridge: Domain 10+11 → 20 | — | (co-located on gateway) |
-| `gateway` + Collector | `docker run --rm --network container:gateway` | (shares `gateway` namespace) | Telemetry aggregation (Domain 29) | — | (co-located on gateway) |
-| `medtech-gui` | `docker run --rm` | `hospital-net` | Hospital Dashboard (dashboard only — room-level GUIs served by per-room containers) | 8080 | Hospital control room workstation |
-| `medtech-controller-or1` | `docker run --rm` | `surgical-net`, `orchestration-net` | Procedure Controller (OR-1, room-deployed) | 8091 | In-OR orchestration controller |
-| `medtech-twin-or1` | `docker run --rm` | `surgical-net`, `orchestration-net` | Digital Twin (OR-1) | 8081 | In-OR display at OR-1 |
+| `hospitalA-gateway` (base) | `medtech run hospital` | `hospitalA-net` | CDS — discovery bootstrapper for hospital-level participants | — | Hospital infrastructure appliance |
+| `hospitalA-gateway` + RS | `medtech run hospital` | (shares `hospitalA-gateway` namespace) | Per-room MedtechBridge: Domain 10+11 → 20 | — | (co-located on gateway) |
+| `hospitalA-gateway` + Collector | `medtech run hospital` | (shares `hospitalA-gateway` namespace) | Telemetry aggregation (Domain 29) | — | (co-located on gateway) |
+| `hospitalA-gui` | `medtech run hospital` | `hospitalA-net` | Hospital Dashboard (dashboard only — room-level GUIs served by per-room containers) | 8080 | Hospital control room workstation |
+| `hospitalA-or1-gateway` (base) | `medtech run or` | `hospitalA_or1-net`, `hospitalA-net` | Room CDS — discovery bootstrapper for all OR-1 participants | — | Per-OR infrastructure appliance |
+| `hospitalA-or1-gateway` + RS | `medtech run or` | (shares `hospitalA-or1-gateway` namespace) | Per-room MedtechBridge: Domain 10+11 → 20 | — | (co-located on room gateway) |
+| `hospitalA-or1-gateway` + Collector | `medtech run or` | (shares `hospitalA-or1-gateway` namespace) | Room telemetry (Domain 19 → 29) | — | (co-located on room gateway) |
+| `hospitalA-controller-or1` | `medtech run or` | `hospitalA_or1-net` | Procedure Controller (OR-1, room-deployed) | 8091 | In-OR orchestration controller |
+| `hospitalA-twin-or1` | `medtech run or` | `hospitalA_or1-net` | Digital Twin (OR-1) | 8081 | In-OR display at OR-1 |
 
 > **Room-level GUI containers** (controller, twin, future camera display) are launched
-> by `medtech run or`, not by `medtech run hospital`. Each room GUI joins both
-> `surgical-net` (for Procedure DDS domain data) and `orchestration-net` (for
-> `surgical_procedure.room_nav` sibling discovery via `ServiceCatalog`). Each is served
-> on its own host port — separate origins from the hospital dashboard.
+> by `medtech run or`, not by `medtech run hospital`. Each room GUI joins only the
+> room's network (`<room>-net`). Each is served on its own host port — separate origins
+> from the hospital dashboard.
 
 **Named hospital (`--name hospital-a`):**
 
 | Container | Launched By | Network | Host Port |
 |-----------|-------------|---------|-----------|
-| `hospital-a-nat` | `docker run --privileged` | private nets + `wan-net` | — |
-| `hospital-a-gateway` (base: CDS) | `docker run --rm` | `hospital-a_hospital-net`, `hospital-a_surgical-net`, `hospital-a_orchestration-net` | — |
-| `hospital-a-gateway` + RS | `docker run --rm --network container:hospital-a-gateway` | (shared namespace) | — |
-| `hospital-a-gateway` + Collector | `docker run --rm --network container:hospital-a-gateway` | (shared namespace) | — |
-| `hospital-a-gui` | `docker run --rm` | `hospital-a_hospital-net` | 8080 |
-| `hospital-a-controller-or1` | `docker run --rm` | `hospital-a_surgical-net`, `hospital-a_orchestration-net` | 8091 |
-| `hospital-a-twin-or1` | `docker run --rm` | `hospital-a_surgical-net`, `hospital-a_orchestration-net` | 8081 |
+| `hospital-a-nat` | `docker run --privileged` | `hospital-a-net` + room nets + `wan-net` | — |
+| `hospital-a-gateway` (base: CDS) | `medtech run hospital` | `hospital-a-net` | — |
+| `hospital-a-gateway` + RS | `medtech run hospital` | (shared namespace) | — |
+| `hospital-a-gateway` + Collector | `medtech run hospital` | (shared namespace) | — |
+| `hospital-a-gui` | `medtech run hospital` | `hospital-a-net` | 8080 |
+| `hospital-a-or1-gateway` (base: CDS) | `medtech run or` | `hospital-a_or1-net`, `hospital-a-net` | — |
+| `hospital-a-or1-gateway` + RS | `medtech run or` | (shared namespace) | — |
+| `hospital-a-or1-gateway` + Collector | `medtech run or` | (shared namespace) | — |
+| `hospital-a-controller-or1` | `medtech run or` | `hospital-a_or1-net` | 8091 |
+| `hospital-a-twin-or1` | `medtech run or` | `hospital-a_or1-net` | 8081 |
 
 Infrastructure services within a gateway group share a single network identity.
 The `--network container:<base>` flag causes the RS and Collector containers to
@@ -1083,12 +1082,12 @@ infrastructure appliance.
 
 Each twin container runs `python -m surgical_procedure.digital_twin` in
 standalone mode (`__main__` guard). It creates its own `control`-tag
-DomainParticipant on `surgical-net`, subscribes to `RobotState`,
+DomainParticipant on `<room>-net`, subscribes to `RobotState`,
 `RobotCommand`, `SafetyInterlock`, `OperatorInput`, and
 `RobotArmAssignment`, and serves a NiceGUI web page on its container
 port 8080 (mapped to a unique host port).
 
-The central `medtech-gui` container runs the hospital dashboard on `hospital-net`.
+The central `medtech-gui` container runs the hospital dashboard on `<hospital>-net`.
 It subscribes to Domain 20 (Hospital integration) for all procedure, vitals, and alert
 data. It discovers room-level GUIs (controller, twin) via RS-bridged `ServiceCatalog`
 `gui_url` properties from Domain 11 → Domain 20. Room GUIs are served by per-room
@@ -1104,7 +1103,8 @@ horizontal navigation between room GUIs (e.g., controller → twin → future ca
 without infrastructure coupling. Room GUIs have **no upward visibility** to the hospital
 level — a room can be deployed standalone without a hospital instance above it. The module
 is deployment-agnostic — it works identically on Docker, physical hardware, or mixed
-environments.
+environments. All room GUI containers reside on the same `<room>-net`, so the
+Orchestration domain participant discovers siblings via the room CDS.
 
 **`gui_url` browser reachability:** Each GUI container sets
 `MEDTECH_GUI_EXTERNAL_URL` in its environment (e.g.,
@@ -1115,11 +1115,13 @@ unset, the service falls back to its container-internal address.
 
 **Dynamic room addition:** The developer adds ORs at any time via
 `medtech run or --name OR-5` (or `medtech run or --name OR-5 --hospital hospital-a`
-for named hospitals). New containers join the existing Docker networks,
-discover CDS, and appear automatically in the hospital dashboard room cards via
-bridged `ServiceCatalog`. When `--name` is omitted, the CLI auto-generates a
-unique name (e.g., `OR-1`, `OR-2`). No compose override files or
-template generation is required.
+for named hospitals). Each new room gets its own Docker network
+(`medtech_or5-net` or `medtech_hospital-a_or5-net`), and the room
+gateway bridges it to the hospital network. New containers discover
+via the room CDS and appear automatically in the hospital dashboard
+room cards via RS-bridged `ServiceCatalog`. When `--name` is omitted,
+the CLI auto-generates a unique name (e.g., `OR-1`, `OR-2`). No compose
+override files or template generation is required.
 
 **Topology visualization:** `medtech status --topology` renders an ASCII
 tree of running containers grouped by Docker network (see
@@ -1143,9 +1145,9 @@ to prevent intermittent initialization failures:
    networks before bridged data can flow. Collector Service should be available before
    application participants start so that Monitoring Library 2.0 telemetry is captured
    from the beginning.
-3. **Surgical procedure instances** start after the gateway is healthy.
-   They operate entirely on `surgical-net` and do not depend on Routing Service or
-   Hospital Integration databus services.
+3. **Surgical procedure instances** start after the room gateway is healthy.
+   They operate entirely on their room's `<room>-net` and do not depend on
+   Routing Service or Hospital Integration databus services.
 4. **Hospital Integration databus applications** (dashboard, ClinicalAlerts engine) start after the
    gateway (including RS) is healthy.
 5. **Visualization stack** (Prometheus, Grafana Loki, Grafana) — when enabled via
@@ -1179,13 +1181,18 @@ Containers set `MEDTECH_TRANSPORT_PROFILE=Docker` which selects the Docker trans
 - Sets explicit discovery peers: SHMEM and localhost for intra-container, CDS for cross-container
 - Composes `BuiltinQosSnippetLib::Transport.UDP.AvoidIPFragmentation`
 
+The CDS hostname in discovery peers is set per-container via the `NDDS_DISCOVERY_PEERS`
+environment variable (not hardcoded in the snippet XML). Room-level participants point to
+their room CDS (`<room>-gateway:7400`); hospital-level participants point to the hospital
+CDS (`<hospital>-gateway:7400`).
+
 ```xml
 <domain_participant_qos>
     <discovery>
         <initial_peers>
             <element>builtin.shmem://</element>
             <element>builtin.udpv4://localhost</element>
-            <element>rtps@udpv4://gateway:7400</element>
+            <!-- Set via NDDS_DISCOVERY_PEERS environment variable -->
         </initial_peers>
         <multicast_receive_addresses/>
     </discovery>
@@ -1245,17 +1252,20 @@ Hospital networks commonly restrict UDP multicast for security reasons, making s
 
 **Design decision (resolved):** At the hospital level, the CDS runs as the base
 process of the consolidated `<hospital>-gateway` container
-(`rticom/cloud-discovery-service` from Docker Hub), attached to `hospital-net`,
-`surgical-net`, and `orchestration-net`. This gives all participants across all
-hospital networks a direct discovery path — and RS + Collector co-locate in the
-same network namespace. Configuration and deployment details are in
+(`rticom/cloud-discovery-service` from Docker Hub), attached to `<hospital>-net`.
+At the room level, the CDS runs as the base process of the `<room>-gateway`
+container, attached to `<room>-net` and `<hospital>-net` (dual-homed). Room
+participants discover via the room CDS; the room gateway's multi-homed position
+allows RS and Collector upward-facing participants to reach the hospital CDS.
+Configuration and deployment details are in
 [Phase 1 Step 1.4](../implementation/phase-1-foundation.md).
 
 ### Routing Service Deployment (Per-Room MedtechBridge)
 
-Each room deploys its own Routing Service instance (the **MedtechBridge**), attached to
-`surgical-net`, `orchestration-net`, and `hospital-net` (tri-homed). It is the **sole
-cross-level gateway** between room-level databuses and the Hospital Integration databus.
+Each room deploys its own Routing Service instance (the **MedtechBridge**), co-located
+on the room gateway which is dual-homed on `<room>-net` and `<hospital>-net`. It is
+the **sole cross-level gateway** between room-level databuses and the Hospital
+Integration databus.
 
 It bridges:
 - Domain 10 → Domain 20: `ProcedureStatus`, `ProcedureContext`, patient vitals, alarm messages, device telemetry

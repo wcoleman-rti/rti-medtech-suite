@@ -40,7 +40,6 @@ from medtech.gui import (
     NICEGUI_STORAGE_SECRET_DEFAULT,
     NICEGUI_STORAGE_SECRET_ENV,
     GuiBackend,
-    create_header,
     init_theme,
 )
 from medtech.gui._colors import THEME_PALETTE
@@ -718,11 +717,13 @@ _twin_backends: dict[str, DigitalTwinBackend] = {}
 _room_nav_instance: Any = None
 
 
-def _get_backend(room_id: str) -> DigitalTwinBackend:
+def _get_backend(room_id: str, procedure_id: str = "proc-001") -> DigitalTwinBackend:
     """Return (or create on first access) the DigitalTwinBackend for *room_id*."""
     global _twin_backends
     if room_id not in _twin_backends:
-        _twin_backends[room_id] = DigitalTwinBackend(room_id=room_id)
+        _twin_backends[room_id] = DigitalTwinBackend(
+            room_id=room_id, procedure_id=procedure_id
+        )
     return _twin_backends[room_id]
 
 
@@ -733,11 +734,9 @@ def _get_backend(room_id: str) -> DigitalTwinBackend:
 
 @ui.page("/twin/{room_id}", title="Digital Twin — Medtech Suite")
 def twin_page(room_id: str) -> None:
-    """Render the digital twin 3D visualization page for *room_id* (standalone with self-contained shell)."""
-    init_theme()
-    create_header(title=f"Digital Twin — {room_id}")
-    if _room_nav_instance is not None:
-        _room_nav_instance.render_nav_pill(active_label="Digital Twin")
+    """Render the digital twin 3D visualization page for *room_id*."""
+    init_theme(header=False)
+    _room_nav_instance.render_nav_pill(active_label="Digital Twin")
     twin_content(room_id)
 
 
@@ -1068,13 +1067,13 @@ def _build_scene(
         _arm_panel_visible["value"] = not _arm_panel_visible["value"]
         arm_panel.set_visibility(_arm_panel_visible["value"])
 
-    (
-        ui.button(icon="precision_manufacturing", on_click=_toggle_arm_panel)
+    with (
+        ui.button(icon="engineering", on_click=_toggle_arm_panel)
         .props("fab color=primary")
-        .style("position: fixed; bottom: 16px; right: 16px; z-index: 91;")
-    )
-    arm_fab_badge = ui.badge("0").props("floating color=accent")
-    arm_fab_badge.set_visibility(False)
+        .style("position: fixed; bottom: 16px; right: 16px; z-index: 91; color: white;")
+    ):
+        arm_fab_badge = ui.badge("0").props("floating color=accent")
+        arm_fab_badge.set_visibility(False)
 
     def _position_for_assignment(assignment: Any) -> TablePosition | None:
         """Return the TablePosition for an assignment, or None if UNKNOWN."""
@@ -1211,7 +1210,8 @@ def main() -> None:
     )
 
     room_id = os.environ.get("ROOM_ID", "OR-1")
-    backend = _get_backend(room_id)
+    procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
+    backend = _get_backend(room_id, procedure_id)
 
     # Split-GUI mode: derive gui_url from the externally-reachable base URL
     # set by the CLI's ``medtech run or`` when launching a per-OR twin container.
@@ -1227,6 +1227,19 @@ def main() -> None:
     from surgical_procedure.room_nav import RoomNav
 
     _room_nav_instance = RoomNav(room_id)
+
+    # Pre-populate sibling GUI links from env cross-references
+    ctrl_url = os.environ.get("MEDTECH_CONTROLLER_URL", "")
+    if ctrl_url:
+        _room_nav_instance.add_static_sibling("Procedure Controller", ctrl_url)
+
+    # Register self so the pill always shows the current page as selected.
+    twin_self_url = ""
+    if external_url:
+        twin_self_url = f"{external_url.rstrip('/')}/twin/{room_id}"
+    if twin_self_url:
+        _room_nav_instance.add_static_sibling("Digital Twin", twin_self_url)
+
     from nicegui import app as nicegui_app
 
     nicegui_app.on_startup(_room_nav_instance.start)

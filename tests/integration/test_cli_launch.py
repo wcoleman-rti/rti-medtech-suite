@@ -38,8 +38,11 @@ class TestLaunchHelp:
 class TestLaunchDistributed:
     """Verify ``medtech launch`` (default distributed scenario)."""
 
+    @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._running_networks", return_value=[])
     @patch("medtech.cli._or._detect_hospitals")
+    @patch("medtech.cli._or._ensure_network")
     @patch("medtech.cli._hospital._running_networks", return_value=[])
     @patch("medtech.cli._hospital.run_cmd")
     @patch("medtech.cli._or.run_cmd")
@@ -52,19 +55,18 @@ class TestLaunchDistributed:
         mock_or_run,
         mock_h_run,
         mock_nets,
+        mock_ensure_net,
         mock_hosp,
+        mock_or_nets,
         mock_port,
+        mock_ctrl_port,
     ) -> None:
         """medtech launch starts the distributed scenario."""
         # After hospital starts, detect_hospitals returns one hospital
         mock_hosp.return_value = [
             {
-                "name": None,
-                "nets": {
-                    "surgical": "medtech_surgical-net",
-                    "hospital": "medtech_hospital-net",
-                    "orchestration": "medtech_orchestration-net",
-                },
+                "name": "hospitalA",
+                "net": "medtech_hospitalA-net",
             }
         ]
         runner = CliRunner()
@@ -76,8 +78,11 @@ class TestLaunchDistributed:
 class TestLaunchMultiSite:
     """Verify ``medtech launch multi-site``."""
 
+    @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._running_networks", return_value=[])
     @patch("medtech.cli._or._detect_hospitals")
+    @patch("medtech.cli._or._ensure_network")
     @patch("medtech.cli._hospital._running_networks", return_value=[])
     @patch("medtech.cli._hospital.run_cmd")
     @patch("medtech.cli._or.run_cmd")
@@ -90,8 +95,11 @@ class TestLaunchMultiSite:
         mock_or_run,
         mock_h_run,
         mock_nets,
+        mock_ensure_net,
         mock_hosp,
+        mock_or_nets,
         mock_port,
+        mock_ctrl_port,
     ) -> None:
         """medtech launch multi-site starts two hospitals with 4 ORs total."""
 
@@ -99,19 +107,11 @@ class TestLaunchMultiSite:
             return [
                 {
                     "name": "hospital-a",
-                    "nets": {
-                        "surgical": "medtech_hospital-a_surgical-net",
-                        "hospital": "medtech_hospital-a_hospital-net",
-                        "orchestration": "medtech_hospital-a_orchestration-net",
-                    },
+                    "net": "medtech_hospital-a-net",
                 },
                 {
                     "name": "hospital-b",
-                    "nets": {
-                        "surgical": "medtech_hospital-b_surgical-net",
-                        "hospital": "medtech_hospital-b_hospital-net",
-                        "orchestration": "medtech_hospital-b_orchestration-net",
-                    },
+                    "net": "medtech_hospital-b-net",
                 },
             ]
 
@@ -127,8 +127,11 @@ class TestLaunchMultiSite:
 class TestLaunchMinimal:
     """Verify ``medtech launch minimal``."""
 
+    @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._running_networks", return_value=[])
     @patch("medtech.cli._or._detect_hospitals")
+    @patch("medtech.cli._or._ensure_network")
     @patch("medtech.cli._hospital._running_networks", return_value=[])
     @patch("medtech.cli._hospital.run_cmd")
     @patch("medtech.cli._or.run_cmd")
@@ -141,18 +144,17 @@ class TestLaunchMinimal:
         mock_or_run,
         mock_h_run,
         mock_nets,
+        mock_ensure_net,
         mock_hosp,
+        mock_or_nets,
         mock_port,
+        mock_ctrl_port,
     ) -> None:
         """medtech launch minimal starts a single-OR scenario."""
         mock_hosp.return_value = [
             {
-                "name": None,
-                "nets": {
-                    "surgical": "medtech_surgical-net",
-                    "hospital": "medtech_hospital-net",
-                    "orchestration": "medtech_orchestration-net",
-                },
+                "name": "hospitalA",
+                "net": "medtech_hospitalA-net",
             }
         ]
         runner = CliRunner()

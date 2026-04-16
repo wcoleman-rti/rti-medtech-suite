@@ -9,6 +9,8 @@ import click
 from medtech.cli._hospital import (
     _MEDTECH_ENV,
     _config_volumes,
+    _detect_hospital_names,
+    _ensure_network,
     _env_flags,
     _project_root,
 )
@@ -24,60 +26,15 @@ from medtech.cli._run import run
 def _detect_hospitals() -> list[dict]:
     """Return a list of running hospitals.
 
-    Each entry has ``name`` (str or None for unnamed) and ``nets``
-    (dict mapping role → network name).
+    Each entry has ``name`` (str) and ``net`` (network name str).
     """
-    networks = _running_networks()
-    hospitals: list[dict] = []
-
-    # Check for unnamed (flat) hospital
-    if "medtech_surgical-net" in networks:
-        hospitals.append(
-            {
-                "name": None,
-                "nets": {
-                    "surgical": "medtech_surgical-net",
-                    "hospital": "medtech_hospital-net",
-                    "orchestration": "medtech_orchestration-net",
-                },
-            }
-        )
-
-    # Check for named hospitals
-    seen: set[str] = set()
-    for net in sorted(networks):
-        parts = net.removeprefix("medtech_").split("_")
-        if len(parts) >= 2 and parts[0].startswith("hospital-"):
-            hname = parts[0]
-            if hname not in seen:
-                seen.add(hname)
-                prefix = f"medtech_{hname}"
-                hospitals.append(
-                    {
-                        "name": hname,
-                        "nets": {
-                            "surgical": f"{prefix}_surgical-net",
-                            "hospital": f"{prefix}_hospital-net",
-                            "orchestration": f"{prefix}_orchestration-net",
-                        },
-                    }
-                )
-
-    return hospitals
+    names = _detect_hospital_names()
+    return [{"name": n, "net": f"medtech_{n}-net"} for n in names]
 
 
-def _twin_port_base(hospital_name: str | None) -> int:
-    """Base port for twin containers.  Unnamed=8081, hospital-a=8081, hospital-b=9081, …"""
-    if hospital_name is None:
-        return 8081
-    # Derive ordinal from existing networks
-    networks = _running_networks()
-    names: list[str] = []
-    for net in sorted(networks):
-        parts = net.removeprefix("medtech_").split("_")
-        if len(parts) >= 2 and parts[0].startswith("hospital-"):
-            if parts[0] not in names:
-                names.append(parts[0])
+def _twin_port_base(hospital_name: str) -> int:
+    """Base port for twin containers.  hospitalA=8081, 2nd hospital=9081, …"""
+    names = _detect_hospital_names()
     if hospital_name in names:
         ordinal = names.index(hospital_name) + 1
     else:
@@ -85,17 +42,9 @@ def _twin_port_base(hospital_name: str | None) -> int:
     return 8081 + (ordinal - 1) * 1000
 
 
-def _controller_port_base(hospital_name: str | None) -> int:
-    """Base port for controller containers.  Unnamed=8091, hospital-a=8091, hospital-b=9091, …"""
-    if hospital_name is None:
-        return 8091
-    networks = _running_networks()
-    names: list[str] = []
-    for net in sorted(networks):
-        parts = net.removeprefix("medtech_").split("_")
-        if len(parts) >= 2 and parts[0].startswith("hospital-"):
-            if parts[0] not in names:
-                names.append(parts[0])
+def _controller_port_base(hospital_name: str) -> int:
+    """Base port for controller containers.  hospitalA=8091, 2nd hospital=9091, …"""
+    names = _detect_hospital_names()
     if hospital_name in names:
         ordinal = names.index(hospital_name) + 1
     else:
@@ -103,7 +52,7 @@ def _controller_port_base(hospital_name: str | None) -> int:
     return 8091 + (ordinal - 1) * 1000
 
 
-def _next_controller_port(hospital_name: str | None) -> int:
+def _next_controller_port(hospital_name: str) -> int:
     """Auto-assign the next available controller port for the hospital."""
     base = _controller_port_base(hospital_name)
     containers = _running_containers()
@@ -129,7 +78,7 @@ def _next_controller_port(hospital_name: str | None) -> int:
     return port
 
 
-def _next_twin_port(hospital_name: str | None) -> int:
+def _next_twin_port(hospital_name: str) -> int:
     """Auto-assign the next available twin port for the hospital."""
     base = _twin_port_base(hospital_name)
     containers = _running_containers()
@@ -170,25 +119,21 @@ _SERVICE_HOSTS = [
         "role": "clinical-service-host",
         "image": "medtech/app-python",
         "command": ["python", "-m", "surgical_procedure.clinical_service_host"],
-        "needs_orch": True,
     },
     {
         "role": "operational-service-host",
         "image": "medtech/app-python",
         "command": ["python", "-m", "surgical_procedure.operational_service_host"],
-        "needs_orch": True,
     },
     {
         "role": "operator-service-host",
         "image": "medtech/app-python",
         "command": ["python", "-m", "surgical_procedure.operator_service_host"],
-        "needs_orch": True,
     },
     {
         "role": "robot-service-host",
         "image": "medtech/app-cpp",
         "command": ["/opt/medtech/bin/robot-service-host"],
-        "needs_orch": True,
     },
 ]
 
@@ -254,7 +199,19 @@ def or_cmd(
         or_name = next_or_name(target["name"])
 
     or_key = _or_lower(or_name)
-    h_prefix = f"{target['name']}-" if target["name"] else ""
+
+    # Duplicate room validation
+    room_net = f"medtech_{target['name']}_{or_key}-net"
+    if room_net in _running_networks():
+        click.secho(
+            f"Error: Room '{or_name}' already exists on hospital '{target['name']}'.",
+            fg="red",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Create per-room network
+    _ensure_network(room_net)
 
     # Auto-assign twin port
     if twin_port is None:
@@ -264,29 +221,24 @@ def or_cmd(
     controller_port = _next_controller_port(target["name"])
 
     root = _project_root()
-    gateway_name_for_hospital = (
-        f"{target['name']}-gateway" if target["name"] else "hospital-gateway"
-    )
-    cds_peers = f"rtps@udpv4://{gateway_name_for_hospital}:7400"
 
-    # 1. Room-gateway (CDS + RS + Collector in shared namespace)
-    room_gw = f"{h_prefix}{or_name.lower()}-gateway"
-    _start_room_gateway(room_gw, target["nets"], root, cds_peers)
+    # Room gateway: dual-homed on room-net + hospital-net
+    room_gw = f"{target['name']}-{or_key}-gateway"
+    room_cds_peers = f"rtps@udpv4://{room_gw}:7400"
+    hospital_cds_peers = f"rtps@udpv4://{target['name']}-gateway:7400"
+    _start_room_gateway(room_gw, room_net, target["net"], root, hospital_cds_peers)
 
-    # 2. Service host containers
+    # Service host containers — all on room-net only
     procedure_id = f"{or_name}-001"
     for svc in _SERVICE_HOSTS:
-        container_name = f"{h_prefix}{svc['role']}-{or_key}"
-        networks_to_join = [target["nets"]["surgical"]]
-        if svc["needs_orch"]:
-            networks_to_join.append(target["nets"]["orchestration"])
+        container_name = f"{target['name']}-{svc['role']}-{or_key}"
         host_id = f"{svc['role'].replace('-service-host', '-host')}-{or_key}"
         extra_env = {
             "ROOM_ID": or_name,
             "PROCEDURE_ID": procedure_id,
             "HOST_ID": host_id,
             "MEDTECH_APP_NAME": container_name,
-            "NDDS_DISCOVERY_PEERS": cds_peers,
+            "NDDS_DISCOVERY_PEERS": room_cds_peers,
         }
         # Robot needs ROBOT_ID
         if "robot" in svc["role"]:
@@ -296,43 +248,49 @@ def or_cmd(
             name=container_name,
             image=svc["image"],
             command=svc["command"],
-            networks=networks_to_join,
+            networks=[room_net],
             extra_env=extra_env,
         )
 
-    # 3. Digital twin container (surgical-net + orchestration-net for room_nav)
-    twin_name = f"{h_prefix}medtech-twin-{or_key}"
+    # Digital twin container — room-net only
+    twin_name = f"{target['name']}-medtech-twin-{or_key}"
     twin_url = f"http://localhost:{twin_port}"
+
+    # Procedure Controller container — room-net only
+    ctrl_name = f"{target['name']}-medtech-controller-{or_key}"
+    ctrl_url = f"http://localhost:{controller_port}"
+
+    # Start twin with cross-reference to controller
     _start_service_container(
         name=twin_name,
         image="medtech/app-python",
         command=["python", "-m", "surgical_procedure.digital_twin"],
-        networks=[target["nets"]["surgical"], target["nets"]["orchestration"]],
+        networks=[room_net],
         extra_env={
             "ROOM_ID": or_name,
             "PROCEDURE_ID": procedure_id,
             "MEDTECH_APP_NAME": twin_name,
             "MEDTECH_GUI_EXTERNAL_URL": twin_url,
-            "NDDS_DISCOVERY_PEERS": cds_peers,
+            "MEDTECH_CONTROLLER_URL": f"{ctrl_url}/controller/{or_name}",
+            "NDDS_DISCOVERY_PEERS": room_cds_peers,
         },
         port_mapping=f"{twin_port}:8080",
     )
 
-    # 4. Procedure Controller container (surgical-net + orchestration-net)
-    ctrl_name = f"{h_prefix}medtech-controller-{or_key}"
-    ctrl_url = f"http://localhost:{controller_port}"
+    # Start controller with cross-reference to twin
     _start_service_container(
         name=ctrl_name,
         image="medtech/app-python",
         command=["python", "-m", "surgical_procedure.procedure_controller"],
-        networks=[target["nets"]["surgical"], target["nets"]["orchestration"]],
+        networks=[room_net],
         extra_env={
             "ROOM_ID": or_name,
             "PROCEDURE_ID": procedure_id,
             "HOST_ID": f"controller-{or_key}",
             "MEDTECH_APP_NAME": ctrl_name,
             "MEDTECH_GUI_EXTERNAL_URL": ctrl_url,
-            "NDDS_DISCOVERY_PEERS": cds_peers,
+            "MEDTECH_TWIN_URL": f"{twin_url}/twin/{or_name}",
+            "NDDS_DISCOVERY_PEERS": room_cds_peers,
         },
         port_mapping=f"{controller_port}:8080",
     )
@@ -340,8 +298,7 @@ def or_cmd(
     # Summary
     click.echo()
     click.secho(f"OR: {or_name}", bold=True)
-    if target["name"]:
-        click.echo(f"Hospital: {target['name']}")
+    click.echo(f"Hospital: {target['name']}")
     click.secho(f"Controller: {ctrl_url}/controller/{or_name}", fg="green")
     click.secho(f"Twin: {twin_url}/twin/{or_name}", fg="green")
 
@@ -353,14 +310,15 @@ def or_cmd(
 
 def _start_room_gateway(
     gateway_name: str,
-    nets: dict[str, str],
+    room_net: str,
+    hospital_net: str,
     root: "os.PathLike[str]",
-    cds_peers: str,
+    hospital_cds_peers: str,
 ) -> None:
     """Launch room-level CDS + RS + Collector in shared namespace."""
     license_file = os.environ.get("RTI_LICENSE_FILE", str(root / "rti_license.dat"))
 
-    # CDS base
+    # CDS base — on room-net
     cmd = [
         "docker",
         "run",
@@ -371,35 +329,30 @@ def _start_room_gateway(
         "--label",
         "medtech.dynamic=true",
         "--network",
-        nets["surgical"],
+        room_net,
+        "-v",
+        f"{root}/services/cloud-discovery-service/CloudDiscoveryService.xml:"
+        "/opt/medtech/config/CloudDiscoveryService.xml:ro",
+        "-v",
+        f"{license_file}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro",
+        "rticom/cloud-discovery-service:7.6.0",
+        "-cfgFile",
+        "/opt/medtech/config/CloudDiscoveryService.xml",
+        "-cfgName",
+        "DockerCDS",
+        "-verbosity",
+        "WARN",
     ]
-    cmd.extend(
-        [
-            "-v",
-            f"{root}/services/cloud-discovery-service/CloudDiscoveryService.xml:"
-            "/opt/medtech/config/CloudDiscoveryService.xml:ro",
-            "-v",
-            f"{license_file}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro",
-            "rticom/cloud-discovery-service:7.6.0",
-            "-cfgFile",
-            "/opt/medtech/config/CloudDiscoveryService.xml",
-            "-cfgName",
-            "DockerCDS",
-            "-verbosity",
-            "WARN",
-        ]
-    )
     run_cmd(cmd)
 
-    # Connect to additional networks
-    for role in ("hospital", "orchestration"):
-        if role in nets:
-            run_cmd(
-                ["docker", "network", "connect", nets[role], gateway_name],
-                check=False,
-            )
+    # Connect to hospital network (dual-homed)
+    run_cmd(
+        ["docker", "network", "connect", hospital_net, gateway_name],
+        check=False,
+    )
 
-    # RS (shared namespace)
+    # RS (shared namespace) — peers: room CDS (localhost) + hospital CDS
+    dual_peers = f"rtps@udpv4://localhost:7400,{hospital_cds_peers}"
     rs_cmd = [
         "docker",
         "run",
@@ -419,17 +372,21 @@ def _start_room_gateway(
             f"{root}/services/routing/RoutingService.xml:"
             "/opt/medtech/config/RoutingService.xml:ro",
             "-e",
-            "NDDS_DISCOVERY_PEERS=rtps@udpv4://localhost:7400",
+            f"NDDS_DISCOVERY_PEERS={dual_peers}",
             "-e",
             f"NDDS_QOS_PROFILES={_MEDTECH_ENV['NDDS_QOS_PROFILES']}",
             "-e",
             "MEDTECH_TRANSPORT_PROFILE=Docker",
             "medtech/routing-service",
+            "-cfgFile",
+            "/opt/medtech/config/RoutingService.xml",
+            "-cfgName",
+            "MedtechBridge",
         ]
     )
     run_cmd(rs_cmd)
 
-    # Collector (shared namespace)
+    # Collector (shared namespace) — peers: room CDS (localhost) + hospital CDS
     collector_cmd = [
         "docker",
         "run",
@@ -452,7 +409,7 @@ def _start_room_gateway(
         "-e",
         "OBSERVABILITY_LOKI_EXPORTER_PORT=3100",
         "-e",
-        "NDDS_DISCOVERY_PEERS=rtps@udpv4://localhost:7400",
+        f"NDDS_DISCOVERY_PEERS={dual_peers}",
         "-v",
         f"{license_file}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro",
         "rticom/collector-service:7.6.0",

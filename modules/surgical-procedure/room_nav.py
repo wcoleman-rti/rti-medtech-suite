@@ -26,6 +26,19 @@ _nav_names = app_names.MedtechEntityNames.RoomNav
 
 log = init_logging(ModuleName.HOSPITAL_DASHBOARD)
 
+# Canonical display order for room-level GUI pages.  Pages not listed here
+# sort alphabetically after the known entries.
+_PAGE_ORDER: tuple[str, ...] = ("Procedure Controller", "Digital Twin")
+
+
+def _ordered_items(siblings: dict[str, str]) -> list[tuple[str, str]]:
+    """Return *siblings* items sorted by :data:`_PAGE_ORDER`."""
+    order_map = {name: idx for idx, name in enumerate(_PAGE_ORDER)}
+    sentinel = len(_PAGE_ORDER)
+    return sorted(
+        siblings.items(), key=lambda kv: (order_map.get(kv[0], sentinel), kv[0])
+    )
+
 
 def _text(value: Any) -> str:
     return "" if value is None else str(value)
@@ -59,6 +72,11 @@ class RoomNav:
         """Live map of discovered sibling GUI services: display_name → gui_url."""
         return dict(self._siblings)
 
+    def add_static_sibling(self, display_name: str, gui_url: str) -> None:
+        """Pre-populate a sibling entry from environment config (not DDS)."""
+        if display_name and gui_url:
+            self._siblings[display_name] = gui_url
+
     def _init_dds(self) -> None:
         initialize_connext()
         provider = dds.QosProvider.default
@@ -67,7 +85,7 @@ class RoomNav:
             raise RuntimeError("Failed to create RoomNav participant")
 
         qos = participant.qos
-        qos.partition.name = ["procedure"]
+        qos.partition.name = [f"room/{self._room_id}"]
         participant.qos = qos
         participant.enable()
         self._participant = participant
@@ -132,7 +150,7 @@ class RoomNav:
         ----------
         active_label:
             The ``display_name`` of the currently active GUI.  That button
-            receives a highlight style.
+            receives a highlight style and no external-link icon.
         """
         _NAV_PILL_CSS = (
             "position: fixed; top: 18px; left: 50%; transform: translateX(-50%);"
@@ -150,16 +168,32 @@ class RoomNav:
 
             @ui.refreshable
             def _render_buttons() -> None:
-                for name, url in sorted(self._siblings.items()):
+                for name, url in _ordered_items(self._siblings):
+                    is_active = name == active_label
                     classes = "rounded-full px-4 transition-fast"
-                    if name == active_label:
+                    if is_active:
                         classes += " bg-primary text-white"
-                    ui.button(
-                        name,
-                        icon=ICONS.get("open_in_new", "open_in_new"),
-                        on_click=lambda u=url: ui.navigate.to(u),
-                    ).props("flat no-caps size=md").classes(classes)
+                    btn = (
+                        ui.button(
+                            name,
+                            icon=(
+                                None
+                                if is_active
+                                else ICONS.get("open_in_new", "open_in_new")
+                            ),
+                            on_click=(
+                                None if is_active else (lambda u=url: ui.navigate.to(u))
+                            ),
+                        )
+                        .props("flat no-caps size=md")
+                        .classes(classes)
+                    )
+                    if is_active:
+                        btn.props("disable")
 
             _render_buttons()
 
             ui.timer(1.0, _render_buttons.refresh)
+
+        # Spacer so fixed pill doesn't overlap page content below.
+        ui.element("div").style("height: 56px;")

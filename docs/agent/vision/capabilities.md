@@ -337,14 +337,14 @@ QoS, or architectural modifications.
 
 **Theme:** Developer-facing infrastructure for hands-on exploration.
 Split-GUI Docker deployment simulates production network topology with
-per-OR displays on `surgical-net` and a hospital command center on
-`hospital-net`. Named hospitals get isolated private networks with NAT
-routers simulating real WAN boundaries. The `medtech` CLI provides a
+per-OR displays on per-room `<room>-net` networks and a hospital command
+center on `<hospital>-net`. Named hospitals get isolated private networks
+with NAT routers simulating real WAN boundaries. The `medtech` CLI provides a
 single entry point for build, launch, and dynamic scaling.
 
 #### Split-GUI Deployment
-- Per-OR digital twin containers deployed on `surgical-net` in standalone mode
-- Central GUI (dashboard + controller) deployed on `hospital-net`
+- Per-OR digital twin containers deployed on per-room `<room>-net` in standalone mode
+- Central GUI (dashboard) deployed on `<hospital>-net`
 - RTI Collector Service (`rticom/collector-service`) deployed per hospital
   as base infrastructure — collects Monitoring Library 2.0 telemetry from
   all local DDS participants. Serves a dual role: (1) telemetry pipeline

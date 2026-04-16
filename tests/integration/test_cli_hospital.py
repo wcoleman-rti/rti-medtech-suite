@@ -22,17 +22,16 @@ def _make_run_result(
     return result
 
 
-class TestRunHospitalUnnamed:
-    """Verify ``medtech run hospital`` (unnamed, flat networks)."""
+class TestRunHospitalDefault:
+    """Verify ``medtech run hospital`` (default hospitalA)."""
 
     @patch("medtech.cli._hospital._running_networks", return_value=[])
     @patch("medtech.cli._hospital.run_cmd")
-    def test_creates_flat_networks(self, mock_run, mock_nets) -> None:
-        """Flat Docker networks are created."""
+    def test_creates_hospital_network(self, mock_run, mock_nets) -> None:
+        """Single hospital network is created."""
         runner = CliRunner()
         result = runner.invoke(main, ["run", "hospital"])
         assert result.exit_code == 0
-        # Should create 3 flat networks + gateway + RS + collector + GUI
         network_creates = [
             c
             for c in mock_run.call_args_list
@@ -41,7 +40,8 @@ class TestRunHospitalUnnamed:
             and "network" in c.args[0]
             and "create" in c.args[0]
         ]
-        assert len(network_creates) == 3
+        assert len(network_creates) == 1
+        assert network_creates[0].args[0][-1] == "medtech_hospitalA-net"
 
     @patch("medtech.cli._hospital._running_networks", return_value=[])
     @patch("medtech.cli._hospital.run_cmd")
@@ -61,10 +61,10 @@ class TestRunHospitalUnnamed:
             if "--name" in cmd:
                 idx = cmd.index("--name")
                 names.append(cmd[idx + 1])
-        assert "hospital-gateway" in names
-        assert "hospital-gateway-rs" in names
-        assert "hospital-gateway-collector" in names
-        assert "medtech-gui" in names
+        assert "hospitalA-gateway" in names
+        assert "hospitalA-gateway-rs" in names
+        assert "hospitalA-gateway-collector" in names
+        assert "hospitalA-gui" in names
 
     @patch("medtech.cli._hospital._running_networks", return_value=[])
     @patch("medtech.cli._hospital.run_cmd")
@@ -91,14 +91,10 @@ class TestRunHospitalUnnamed:
 
     @patch(
         "medtech.cli._hospital._running_networks",
-        return_value=[
-            "medtech_surgical-net",
-            "medtech_hospital-net",
-            "medtech_orchestration-net",
-        ],
+        return_value=["medtech_hospitalA-net"],
     )
-    def test_second_unnamed_errors(self, mock_nets) -> None:
-        """Second unnamed hospital errors."""
+    def test_second_default_hospital_errors(self, mock_nets) -> None:
+        """Second default hospital errors."""
         runner = CliRunner()
         result = runner.invoke(main, ["run", "hospital"])
         assert result.exit_code != 0
@@ -113,8 +109,8 @@ class TestRunHospitalNamed:
 
     @patch("medtech.cli._hospital._running_networks", return_value=[])
     @patch("medtech.cli._hospital.run_cmd")
-    def test_creates_per_hospital_networks(self, mock_run, mock_nets) -> None:
-        """Per-hospital networks with explicit subnets are created."""
+    def test_creates_per_hospital_network(self, mock_run, mock_nets) -> None:
+        """Per-hospital network with explicit subnet is created."""
         runner = CliRunner()
         result = runner.invoke(main, ["run", "hospital", "--name", "hospital-a"])
         assert result.exit_code == 0
@@ -126,9 +122,7 @@ class TestRunHospitalNamed:
             and "create" in c.args[0]
         ]
         net_names = [cmd[-1] for cmd in network_creates]
-        assert "medtech_hospital-a_surgical-net" in net_names
-        assert "medtech_hospital-a_hospital-net" in net_names
-        assert "medtech_hospital-a_orchestration-net" in net_names
+        assert "medtech_hospital-a-net" in net_names
 
     @patch("medtech.cli._hospital._running_networks", return_value=[])
     @patch("medtech.cli._hospital.run_cmd")
@@ -176,9 +170,7 @@ class TestRunHospitalNamed:
     @patch(
         "medtech.cli._hospital._running_networks",
         return_value=[
-            "medtech_hospital-a_surgical-net",
-            "medtech_hospital-a_hospital-net",
-            "medtech_hospital-a_orchestration-net",
+            "medtech_hospital-a-net",
             "medtech_wan-net",
         ],
     )
@@ -208,9 +200,7 @@ class TestRunHospitalNamed:
     @patch(
         "medtech.cli._hospital._running_networks",
         return_value=[
-            "medtech_hospital-a_surgical-net",
-            "medtech_hospital-a_hospital-net",
-            "medtech_hospital-a_orchestration-net",
+            "medtech_hospital-a-net",
             "medtech_wan-net",
         ],
     )
@@ -247,5 +237,5 @@ class TestRunHospitalObservability:
             if isinstance(args, list) and "--name" in args:
                 idx = args.index("--name")
                 all_names.append(args[idx + 1])
-        assert "prometheus" in all_names
-        assert "grafana" in all_names
+        assert any("prometheus" in n for n in all_names)
+        assert any("grafana" in n for n in all_names)

@@ -26,7 +26,7 @@ import common
 import monitoring
 import pytest
 import rti.connextdds as dds
-from conftest import offset_domain, test_participant_qos, wait_for_reader_match
+from conftest import make_participant_qos, offset_domain, wait_for_reader_match
 from surgical_procedure.vitals_sim._alarm import AlarmEvaluator
 from surgical_procedure.vitals_sim._profiles import PROFILES, baroreceptor_reflex
 from surgical_procedure.vitals_sim._signal import SignalModel
@@ -435,7 +435,7 @@ class TestBedsideMonitorServiceIntegration:
     @pytest.fixture
     def vitals_reader(self, monitor):
         """Create a DataReader for PatientVitals in the same partition."""
-        p = test_participant_qos()
+        p = make_participant_qos()
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
         dp = dds.DomainParticipant(offset_domain(10), p)
@@ -454,7 +454,7 @@ class TestBedsideMonitorServiceIntegration:
     @pytest.fixture
     def waveform_reader(self, monitor):
         """Create a DataReader for WaveformData in the same partition."""
-        p = test_participant_qos()
+        p = make_participant_qos()
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
         dp = dds.DomainParticipant(offset_domain(10), p)
@@ -471,7 +471,7 @@ class TestBedsideMonitorServiceIntegration:
     @pytest.fixture
     def alarm_reader(self, monitor):
         """Create a DataReader for AlarmMessages in the same partition."""
-        p = test_participant_qos()
+        p = make_participant_qos()
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
         dp = dds.DomainParticipant(offset_domain(10), p)
@@ -541,7 +541,7 @@ class TestBedsideMonitorServiceIntegration:
         time.sleep(1.0)
 
         # Create late-joining reader
-        p = test_participant_qos()
+        p = make_participant_qos()
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "clinical"
         dp = dds.DomainParticipant(offset_domain(10), p)

@@ -229,17 +229,39 @@ def robot_service_host():
     env = os.environ.copy()
     env["HOST_ID"] = HOST_ID
     env["ROOM_ID"] = ROOM_ID
-    env["PROCEDURE_ID"] = PROCEDURE_ID
     proc = subprocess.Popen(
         [bin_path],
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    time.sleep(2)
+    # Wait for ServiceCatalog publication instead of fixed sleep
+    qos = dds.DomainParticipantQos()
+    qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
+    qos.partition.name = [f"room/{ROOM_ID}"]
+    probe_dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
+    probe_dp.enable()
+    topic = dds.Topic(probe_dp, "ServiceCatalog", Orchestration.ServiceCatalog)
+    rqos = dds.DataReaderQos()
+    rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
+    rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL
+    probe_reader = dds.DataReader(dds.Subscriber(probe_dp), topic, rqos)
+    cond = dds.StatusCondition(probe_reader)
+    cond.enabled_statuses = dds.StatusMask.SUBSCRIPTION_MATCHED
+    ws = dds.WaitSet()
+    ws += cond
+    ready = False
+    try:
+        ws.wait(dds.Duration(30))
+        probe_reader.wait_for_historical_data(dds.Duration(15))
+        ready = True
+    except dds.TimeoutError:
+        pass
+    probe_dp.close()
     assert (
         proc.poll() is None
     ), f"robot-service-host exited immediately with code {proc.returncode}"
+    assert ready, "robot-service-host did not publish ServiceCatalog within 30 s"
     yield proc
     proc.send_signal(signal.SIGTERM)
     try:
@@ -253,7 +275,7 @@ def robot_service_host():
 def orch_participant():
     qos = dds.DomainParticipantQos()
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
-    qos.partition.name = ["procedure"]
+    qos.partition.name = [f"room/{ROOM_ID}"]
     p = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     p.enable()
     yield p
@@ -261,13 +283,16 @@ def orch_participant():
 
 
 @pytest.fixture(scope="module")
-def rpc_requester(orch_participant):
+def rpc_requester(orch_participant, robot_service_host):
     req = Requester(
         request_type=Orchestration.ServiceHostControl.call_type,
         reply_type=Orchestration.ServiceHostControl.return_type,
         participant=orch_participant,
         service_name=f"ServiceHostControl/{HOST_ID}",
     )
+    assert req.wait_for_service(
+        dds.Duration(seconds=15)
+    ), f"RPC service ServiceHostControl/{HOST_ID} not discovered within 15 s"
     yield req
     req.close()
 
@@ -305,7 +330,10 @@ class TestControllerArmSubscription:
     ):
         """Controller receives RobotArmAssignment samples from arm services."""
         wait_for_replier(rpc_requester, timeout_sec=15)
-        call = make_start_call("RobotControllerService")
+        call = make_start_call(
+            "RobotControllerService",
+            properties=[("room_id", ROOM_ID), ("procedure_id", PROCEDURE_ID)],
+        )
         reply = send_rpc(rpc_requester, call)
         assert reply is not None
         result = reply.start_service.result.return_
@@ -321,6 +349,9 @@ class TestControllerArmSubscription:
     def test_transient_local_late_joiner(self, robot_service_host, control_dp):
         """TRANSIENT_LOCAL: late-joining reader receives current arm states."""
         topic = dds.Topic.find(control_dp, "RobotArmAssignment")
+        assert (
+            topic is not None
+        ), "RobotArmAssignment topic not registered on control_dp"
         rqos = dds.DataReaderQos()
         rqos.reliability.kind = dds.ReliabilityKind.RELIABLE
         rqos.durability.kind = dds.DurabilityKind.TRANSIENT_LOCAL

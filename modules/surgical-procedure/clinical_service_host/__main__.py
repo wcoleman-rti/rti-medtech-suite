@@ -2,7 +2,7 @@
 
 Usage::
 
-    HOST_ID=clinical-host-or1 ROOM_ID=OR-1 PROCEDURE_ID=OR1-001 \
+    HOST_ID=clinical-host-or1 ROOM_ID=OR-1 \
         python -m surgical_procedure.clinical_service_host
 """
 
@@ -20,9 +20,8 @@ from .clinical_service_host import make_clinical_service_host
 async def _run() -> None:
     host_id = os.environ.get("HOST_ID", "clinical-host-001")
     room_id = os.environ.get("ROOM_ID", "OR-1")
-    procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
 
-    host = make_clinical_service_host(host_id, room_id, procedure_id)
+    host = make_clinical_service_host(host_id, room_id)
 
     loop = asyncio.get_running_loop()
     _shutdown_count = 0

@@ -11,16 +11,12 @@ from click.testing import CliRunner
 from medtech.cli._main import main
 
 
-def _mock_hospitals_one_unnamed():
-    """Return mock for one unnamed hospital."""
+def _mock_hospitals_one_default():
+    """Return mock for one default hospital."""
     return [
         {
-            "name": None,
-            "nets": {
-                "surgical": "medtech_surgical-net",
-                "hospital": "medtech_hospital-net",
-                "orchestration": "medtech_orchestration-net",
-            },
+            "name": "hospitalA",
+            "net": "medtech_hospitalA-net",
         }
     ]
 
@@ -30,19 +26,11 @@ def _mock_hospitals_two_named():
     return [
         {
             "name": "hospital-a",
-            "nets": {
-                "surgical": "medtech_hospital-a_surgical-net",
-                "hospital": "medtech_hospital-a_hospital-net",
-                "orchestration": "medtech_hospital-a_orchestration-net",
-            },
+            "net": "medtech_hospital-a-net",
         },
         {
             "name": "hospital-b",
-            "nets": {
-                "surgical": "medtech_hospital-b_surgical-net",
-                "hospital": "medtech_hospital-b_hospital-net",
-                "orchestration": "medtech_hospital-b_orchestration-net",
-            },
+            "net": "medtech_hospital-b-net",
         },
     ]
 
@@ -52,14 +40,24 @@ class TestRunOR:
 
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._running_networks", return_value=[])
     @patch(
-        "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_unnamed()
+        "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_default()
     )
+    @patch("medtech.cli._or._ensure_network")
     @patch("medtech.cli._or.run_cmd")
     @patch("medtech.cli._or._config_volumes", return_value=[])
     @patch("medtech.cli._or._env_flags", return_value=[])
     def test_starts_gateway_and_5_containers(
-        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port, mock_ctrl_port
+        self,
+        mock_env,
+        mock_vols,
+        mock_run,
+        mock_ensure_net,
+        mock_hosp,
+        mock_or_nets,
+        mock_port,
+        mock_ctrl_port,
     ) -> None:
         """medtech run or --name OR-5 starts room-gateway + 5 app containers."""
         runner = CliRunner()
@@ -86,12 +84,16 @@ class TestRunOR:
         assert any("robot" in n for n in names)
         assert any("twin" in n for n in names)
         assert any("controller" in n for n in names)
+        # Room network should be created
+        mock_ensure_net.assert_called()
 
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._running_networks", return_value=[])
     @patch(
-        "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_unnamed()
+        "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_default()
     )
+    @patch("medtech.cli._or._ensure_network")
     @patch("medtech.cli._or.next_or_name", return_value="OR-1")
     @patch("medtech.cli._or.run_cmd")
     @patch("medtech.cli._or._config_volumes", return_value=[])
@@ -102,7 +104,9 @@ class TestRunOR:
         mock_vols,
         mock_run,
         mock_next_or,
+        mock_ensure_net,
         mock_hosp,
+        mock_or_nets,
         mock_port,
         mock_ctrl_port,
     ) -> None:
@@ -115,14 +119,24 @@ class TestRunOR:
 
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._running_networks", return_value=[])
     @patch(
         "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_two_named()
     )
+    @patch("medtech.cli._or._ensure_network")
     @patch("medtech.cli._or.run_cmd")
     @patch("medtech.cli._or._config_volumes", return_value=[])
     @patch("medtech.cli._or._env_flags", return_value=[])
     def test_targets_named_hospital(
-        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port, mock_ctrl_port
+        self,
+        mock_env,
+        mock_vols,
+        mock_run,
+        mock_ensure_net,
+        mock_hosp,
+        mock_or_nets,
+        mock_port,
+        mock_ctrl_port,
     ) -> None:
         """medtech run or --hospital hospital-a targets named hospital networks."""
         runner = CliRunner()
@@ -154,14 +168,24 @@ class TestRunOR:
 
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._running_networks", return_value=[])
     @patch(
-        "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_unnamed()
+        "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_default()
     )
+    @patch("medtech.cli._or._ensure_network")
     @patch("medtech.cli._or.run_cmd")
     @patch("medtech.cli._or._config_volumes", return_value=[])
     @patch("medtech.cli._or._env_flags", return_value=[])
     def test_infers_single_hospital(
-        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port, mock_ctrl_port
+        self,
+        mock_env,
+        mock_vols,
+        mock_run,
+        mock_ensure_net,
+        mock_hosp,
+        mock_or_nets,
+        mock_port,
+        mock_ctrl_port,
     ) -> None:
         """Infers hospital when only one is running."""
         runner = CliRunner()
@@ -170,14 +194,24 @@ class TestRunOR:
 
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._running_networks", return_value=[])
     @patch(
-        "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_unnamed()
+        "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_default()
     )
+    @patch("medtech.cli._or._ensure_network")
     @patch("medtech.cli._or.run_cmd")
     @patch("medtech.cli._or._config_volumes", return_value=[])
     @patch("medtech.cli._or._env_flags", return_value=[])
     def test_containers_have_dynamic_label(
-        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port, mock_ctrl_port
+        self,
+        mock_env,
+        mock_vols,
+        mock_run,
+        mock_ensure_net,
+        mock_hosp,
+        mock_or_nets,
+        mock_port,
+        mock_ctrl_port,
     ) -> None:
         """Containers have the medtech.dynamic=true label."""
         runner = CliRunner()
@@ -195,23 +229,32 @@ class TestRunOR:
 
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
     @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._running_networks", return_value=[])
     @patch(
-        "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_unnamed()
+        "medtech.cli._or._detect_hospitals", return_value=_mock_hospitals_one_default()
     )
+    @patch("medtech.cli._or._ensure_network")
     @patch("medtech.cli._or.run_cmd")
     @patch("medtech.cli._or._config_volumes", return_value=[])
     @patch("medtech.cli._or._env_flags", return_value=[])
     def test_prints_docker_commands(
-        self, mock_env, mock_vols, mock_run, mock_hosp, mock_port, mock_ctrl_port
+        self,
+        mock_env,
+        mock_vols,
+        mock_run,
+        mock_ensure_net,
+        mock_hosp,
+        mock_or_nets,
+        mock_port,
+        mock_ctrl_port,
     ) -> None:
         """Each docker run command is printed to stdout (via run_cmd)."""
         runner = CliRunner()
         result = runner.invoke(main, ["run", "or", "--name", "OR-1"])
         assert result.exit_code == 0
         # run_cmd prints "  $ <cmd>" for each docker run
-        assert (
-            mock_run.call_count >= 9
-        )  # gateway + rs + collector + 4 hosts + twin + controller
+        # gateway CDS + network connect + RS + collector + 4 hosts + twin + controller
+        assert mock_run.call_count >= 10
 
     @patch("medtech.cli._or._detect_hospitals", return_value=[])
     def test_errors_no_hospital(self, mock_hosp) -> None:

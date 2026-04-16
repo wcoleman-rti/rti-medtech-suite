@@ -73,7 +73,6 @@ def _start_robot_host(host_id: str, robot_id: str):
     env["HOST_ID"] = host_id
     env["ROBOT_ID"] = robot_id
     env["ROOM_ID"] = ROOM_ID
-    env["PROCEDURE_ID"] = PROCEDURE_ID
     return subprocess.Popen(
         [bin_path],
         env=env,
@@ -103,7 +102,7 @@ def orch_dp():
     """Orchestration databus participant."""
     qos = dds.DomainParticipantQos()
     qos.property["dds.transport.UDPv4.builtin.parent.message_size_max"] = "1400"
-    qos.partition.name = ["procedure"]
+    qos.partition.name = [f"room/{ROOM_ID}"]
     dp = dds.DomainParticipant(ORCHESTRATION_DOMAIN_ID, qos)
     dp.enable()
     yield dp
@@ -209,7 +208,14 @@ class TestStartServiceWithTablePosition:
         """Start arm with table_position=RIGHT, verify it reaches OPERATIONAL."""
         wait_for_replier(requester_1, timeout_sec=10)
 
-        call = make_start_call(SERVICE_ID, properties=[("table_position", "RIGHT")])
+        call = make_start_call(
+            SERVICE_ID,
+            properties=[
+                ("room_id", ROOM_ID),
+                ("procedure_id", PROCEDURE_ID),
+                ("table_position", "RIGHT"),
+            ],
+        )
         reply = send_rpc(requester_1, call)
         assert reply is not None, "No reply for start_service"
         result = reply.start_service.result.return_
@@ -292,14 +298,28 @@ class TestMultiArmCoexistence:
         wait_for_replier(requester_2, timeout_sec=10)
 
         # Start arm 1 at LEFT
-        call1 = make_start_call(SERVICE_ID, properties=[("table_position", "LEFT")])
+        call1 = make_start_call(
+            SERVICE_ID,
+            properties=[
+                ("room_id", ROOM_ID),
+                ("procedure_id", PROCEDURE_ID),
+                ("table_position", "LEFT"),
+            ],
+        )
         reply1 = send_rpc(requester_1, call1)
         assert reply1 is not None
         r1 = reply1.start_service.result.return_
         assert r1.code == Orchestration.OperationResultCode.OK
 
         # Start arm 2 at RIGHT
-        call2 = make_start_call(SERVICE_ID, properties=[("table_position", "RIGHT")])
+        call2 = make_start_call(
+            SERVICE_ID,
+            properties=[
+                ("room_id", ROOM_ID),
+                ("procedure_id", PROCEDURE_ID),
+                ("table_position", "RIGHT"),
+            ],
+        )
         reply2 = send_rpc(requester_2, call2)
         assert reply2 is not None
         r2 = reply2.start_service.result.return_

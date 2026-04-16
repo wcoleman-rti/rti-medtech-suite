@@ -109,7 +109,7 @@ def provider():
     return dds.QosProvider.default
 
 
-def test_participant_qos(base=None):
+def make_participant_qos(base=None):
     """Return a DomainParticipantQos with AvoidIPFragmentation transport.
 
     Sets message_size_max=1400 on UDPv4 to match the project-wide
@@ -140,9 +140,9 @@ def _make_participant(domain_id, domain_tag=None, partition=None, qos=None):
     configuration is complete.
     """
     if qos is None:
-        qos = test_participant_qos()
+        qos = make_participant_qos()
     elif "message_size_max" not in str(qos.property.get_all()):
-        qos = test_participant_qos(qos)
+        qos = make_participant_qos(qos)
 
     if domain_tag is not None:
         qos.property["dds.domain_participant.domain_tag"] = domain_tag

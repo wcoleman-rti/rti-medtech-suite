@@ -40,11 +40,10 @@ int main()
     try {
         const std::string host_id = env_or("HOST_ID", "robot-host-or1");
         const std::string room_id = env_or("ROOM_ID", "OR-1");
-        const std::string procedure_id = env_or("PROCEDURE_ID", "proc-001");
         const std::string robot_id = env_or("ROBOT_ID", host_id.c_str());
 
         auto svc = medtech::surgical::make_robot_service_host(
-            host_id, room_id, procedure_id, robot_id, log);
+            host_id, room_id, robot_id, log);
         g_svc_ptr = svc.get();
         svc->run();
         g_svc_ptr = nullptr;

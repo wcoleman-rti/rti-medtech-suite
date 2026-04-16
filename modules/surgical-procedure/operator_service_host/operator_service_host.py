@@ -13,6 +13,7 @@ from medtech.service_host import (
     ServiceRegistration,
     ServiceRegistryMap,
     make_service_host,
+    req_property,
 )
 from surgical_procedure.operator_sim import OperatorConsoleService
 
@@ -20,7 +21,6 @@ from surgical_procedure.operator_sim import OperatorConsoleService
 def make_operator_service_host(
     host_id: str,
     room_id: str,
-    procedure_id: str,
     robot_id: str = "robot-001",
 ) -> ServiceHost:
     """Create an Operator Service Host (capacity=1).
@@ -30,9 +30,9 @@ def make_operator_service_host(
     """
     registry: ServiceRegistryMap = {
         "OperatorConsoleService": ServiceRegistration(
-            factory=lambda svc_id: OperatorConsoleService(
-                room_id=room_id,
-                procedure_id=procedure_id,
+            factory=lambda req: OperatorConsoleService(
+                room_id=req_property(req, "room_id", room_id),
+                procedure_id=req_property(req, "procedure_id"),
                 robot_id=robot_id,
             ),
             display_name="Operator Console",

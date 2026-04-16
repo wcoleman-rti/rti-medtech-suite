@@ -13,6 +13,7 @@ from medtech.service_host import (
     ServiceRegistration,
     ServiceRegistryMap,
     make_service_host,
+    req_property,
 )
 from surgical_procedure.device_telemetry_sim import DeviceTelemetryService
 from surgical_procedure.vitals_sim import BedsideMonitorService
@@ -21,7 +22,6 @@ from surgical_procedure.vitals_sim import BedsideMonitorService
 def make_clinical_service_host(
     host_id: str,
     room_id: str,
-    procedure_id: str,
 ) -> ServiceHost:
     """Create a Clinical Service Host (capacity=2).
 
@@ -32,16 +32,16 @@ def make_clinical_service_host(
     registry: ServiceRegistryMap = {
         "BedsideMonitorService": ServiceRegistration(
             factory=lambda req: BedsideMonitorService(
-                room_id=room_id,
-                procedure_id=procedure_id,
+                room_id=req_property(req, "room_id", room_id),
+                procedure_id=req_property(req, "procedure_id"),
             ),
             display_name="Bedside Monitor",
             properties=[],
         ),
         "DeviceTelemetryService": ServiceRegistration(
             factory=lambda req: DeviceTelemetryService(
-                room_id=room_id,
-                procedure_id=procedure_id,
+                room_id=req_property(req, "room_id", room_id),
+                procedure_id=req_property(req, "procedure_id"),
             ),
             display_name="Device Telemetry",
             properties=[],

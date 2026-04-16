@@ -13,6 +13,7 @@ from medtech.service_host import (
     ServiceRegistration,
     ServiceRegistryMap,
     make_service_host,
+    req_property,
 )
 from surgical_procedure.camera_sim import CameraService
 from surgical_procedure.procedure_context_service import ProcedureContextService
@@ -21,7 +22,6 @@ from surgical_procedure.procedure_context_service import ProcedureContextService
 def make_operational_service_host(
     host_id: str,
     room_id: str,
-    procedure_id: str,
 ) -> ServiceHost:
     """Create an Operational Service Host (capacity=2).
 
@@ -37,16 +37,16 @@ def make_operational_service_host(
     registry: ServiceRegistryMap = {
         "CameraService": ServiceRegistration(
             factory=lambda req: CameraService(
-                room_id=room_id,
-                procedure_id=procedure_id,
+                room_id=req_property(req, "room_id", room_id),
+                procedure_id=req_property(req, "procedure_id"),
             ),
             display_name="Camera",
             properties=[],
         ),
         "ProcedureContextService": ServiceRegistration(
             factory=lambda req: ProcedureContextService(
-                room_id=room_id,
-                procedure_id=procedure_id,
+                room_id=req_property(req, "room_id", room_id),
+                procedure_id=req_property(req, "procedure_id"),
             ),
             display_name="Procedure Context",
             properties=[],

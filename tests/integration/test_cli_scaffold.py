@@ -100,19 +100,19 @@ class TestAutoNaming:
     def test_next_or_name_no_ors(self) -> None:
         """next_or_name() returns OR-1 when no ORs are running."""
         with patch("medtech.cli._naming._running_containers", return_value=[]):
-            assert next_or_name() == "OR-1"
+            assert next_or_name("hospitalA") == "OR-1"
 
     def test_next_or_name_skips_existing(self) -> None:
         """next_or_name() skips existing OR numbers."""
         fake_containers = [
-            {"Names": "clinical-service-host-or1"},
-            {"Names": "clinical-service-host-or2"},
+            {"Names": "hospitalA-clinical-service-host-or1"},
+            {"Names": "hospitalA-clinical-service-host-or2"},
         ]
         with patch(
             "medtech.cli._naming._running_containers",
             return_value=fake_containers,
         ):
-            assert next_or_name() == "OR-3"
+            assert next_or_name("hospitalA") == "OR-3"
 
     def test_next_or_name_hospital_filter(self) -> None:
         """next_or_name(hospital) only counts ORs for that hospital."""

@@ -14,7 +14,7 @@ import time
 import imaging
 import pytest
 import rti.connextdds as dds
-from conftest import offset_domain, test_participant_qos, wait_for_reader_match
+from conftest import make_participant_qos, offset_domain, wait_for_reader_match
 from surgical_procedure.camera_sim.camera_service import CameraService
 
 CameraFrame = imaging.Imaging.CameraFrame
@@ -130,7 +130,7 @@ class TestCameraServiceIntegration:
     @pytest.fixture
     def frame_reader(self, camera):
         """Create a DataReader for CameraFrame in the same partition."""
-        p = test_participant_qos()
+        p = make_participant_qos()
         p.partition.name = ["room/OR-1/procedure/proc-001"]
         p.property["dds.domain_participant.domain_tag"] = "operational"
         dp = dds.DomainParticipant(offset_domain(10), p)

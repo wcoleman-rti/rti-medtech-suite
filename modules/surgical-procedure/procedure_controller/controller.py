@@ -67,7 +67,6 @@ class _ViewState:
     service_filter: str = "ALL"
     selected_host_id: str | None = None
     selected_service_key: tuple[str, str] | None = None
-    room_filter: str | None = None  # None = "All rooms"
     procedure_filter: str | None = None  # None = "All procedures"
 
 
@@ -168,10 +167,6 @@ class ControllerBackend(GuiBackend):
             status = self._service_states.get(key)
             if not self._service_matches_filter(status):
                 continue
-            if self._view.room_filter is not None:
-                room_id = _catalog_property(catalog, "room_id")
-                if room_id != self._view.room_filter:
-                    continue
             if self._view.procedure_filter is not None:
                 proc_id = _catalog_property(catalog, "procedure_id")
                 if proc_id != self._view.procedure_filter:
@@ -185,15 +180,6 @@ class ControllerBackend(GuiBackend):
             for status in self._service_states.values()
             if _state_name(status.state).upper() in ("RUNNING", "STARTED", "ACTIVE")
         )
-
-    def known_room_ids(self) -> list[str]:
-        """Sorted list of distinct room_id values seen in ServiceCatalog."""
-        rooms: set[str] = set()
-        for catalog in self._catalogs.values():
-            rid = _catalog_property(catalog, "room_id")
-            if rid:
-                rooms.add(rid)
-        return sorted(rooms)
 
     def known_procedure_ids(self) -> list[str]:
         """Sorted list of distinct procedure_id values seen in ServiceCatalog.
@@ -261,7 +247,10 @@ class ControllerBackend(GuiBackend):
     ) -> None:
         """Start a new procedure: send start_service RPCs with procedure_id."""
         for host_id, service_id in service_keys:
-            props: list[tuple[str, str]] = [("procedure_id", procedure_id)]
+            props: list[tuple[str, str]] = [
+                ("procedure_id", procedure_id),
+                ("room_id", self._room_id),
+            ]
             await self._do_rpc(
                 host_id, _make_start_call(service_id, props), "start_service"
             )
@@ -284,10 +273,6 @@ class ControllerBackend(GuiBackend):
         """Stop all services in the active procedure."""
         for (host_id, service_id), _catalog in self.procedure_services():
             await self.stop_service(host_id, service_id)
-
-    def set_room_filter(self, room_id: str | None) -> None:
-        """Set the room filter (None = all rooms)."""
-        self._view.room_filter = room_id
 
     def set_procedure_filter(self, procedure_id: str | None) -> None:
         """Set the procedure filter (None = all procedures)."""
@@ -399,9 +384,9 @@ class ControllerBackend(GuiBackend):
                 "Failed to create Procedure Controller orchestration participant"
             )
 
-        # Set tier partition BEFORE enable() — static deployment-time property
+        # Set room-scoped partition BEFORE enable() — static deployment-time property
         orch_qos = self._orch_participant.qos
-        orch_qos.partition.name = ["procedure"]
+        orch_qos.partition.name = [f"room/{self._room_id}"]
         self._orch_participant.qos = orch_qos
 
         self._orch_participant.enable()
@@ -855,9 +840,8 @@ _room_nav_instance: Any = None
 @ui.page("/controller", title="Procedure Controller — Medtech Suite")
 def controller_page() -> None:
     """Render the controller page (standalone with self-contained shell)."""
-    init_theme(title="Procedure Controller")
-    if _room_nav_instance is not None:
-        _room_nav_instance.render_nav_pill(active_label="Procedure Controller")
+    init_theme(header=False)
+    _room_nav_instance.render_nav_pill(active_label="Procedure Controller")
     controller_content()
 
 
@@ -965,7 +949,6 @@ def _render_controller_ui(current_backend: ControllerBackend) -> None:
                 "running": current_backend.running_service_count(),
                 "view_mode": current_backend.view_mode,
                 "filter": current_backend._view.service_filter,
-                "room_filter": current_backend._view.room_filter,
                 "proc_filter": current_backend._view.procedure_filter,
                 "selected_host": current_backend._view.selected_host_id,
                 "selected_svc": current_backend._view.selected_service_key,
@@ -1099,29 +1082,80 @@ def _open_service_selection_dialog(
     with (
         ui.dialog() as dlg,
         ui.card()
-        .classes("min-w-[28rem] rounded-lg p-6 glass-panel")
+        .classes("min-w-[36rem] max-w-[52rem] rounded-lg p-6 glass-panel")
         .style("box-shadow: 0 4px 24px rgba(0,0,0,0.25);"),
     ):
         ui.label(label).classes("type-h2 brand-heading")
         ui.label("Select services to deploy").classes("type-body-sm text-gray-500")
         ui.separator()
         if idle:
-            for (host_id, service_id), catalog in idle:
-                display = getattr(catalog, "display_name", "") or service_id
+            # Tile grid — each service as a selectable card (like mini service view)
+            tile_refs: dict[tuple[str, str], ui.card] = {}
+            with (
+                ui.element("div")
+                .classes("w-full")
+                .style(
+                    "display: grid;"
+                    " grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));"
+                    " gap: 0.75rem; max-height: 50vh; overflow-y: auto;"
+                    " padding: 0.25rem;"
+                )
+            ):
+                for (host_id, service_id), catalog in idle:
+                    display = getattr(catalog, "display_name", "") or service_id
+                    key = (host_id, service_id)
 
-                def _toggle(
-                    checked: bool, hid: str = host_id, sid: str = service_id
-                ) -> None:
-                    if checked:
-                        selected_for_procedure.add((hid, sid))
-                    else:
-                        selected_for_procedure.discard((hid, sid))
+                    def _make_toggle(
+                        k: tuple[str, str] = key,
+                    ) -> None:
+                        if k in selected_for_procedure:
+                            selected_for_procedure.discard(k)
+                        else:
+                            selected_for_procedure.add(k)
+                        _refresh_tile_styles()
 
-                with ui.row().classes("items-center gap-2"):
-                    ui.checkbox(
-                        f"{display} ({host_id})",
-                        on_change=lambda e, t=_toggle: t(e.value),
+                    tile = (
+                        ui.card()
+                        .classes(
+                            "cursor-pointer rounded-lg p-4 transition"
+                            " hover:shadow-lg hover-elevate"
+                        )
+                        .style(
+                            f"border-left: 4px solid {BRAND_COLORS['gray']};"
+                            f" background: {_hex_to_rgba(BRAND_COLORS['gray'], OPACITY['tile_fill'])};"
+                            " box-shadow: 0 2px 8px rgba(0,0,0,0.15);"
+                        )
+                        .on("click", _make_toggle)
                     )
+                    tile_refs[key] = tile
+                    with tile:
+                        with ui.column().classes("gap-1 items-center"):
+                            ui.icon(
+                                ICONS["service"], color=BRAND_COLORS["gray"]
+                            ).classes("text-3xl")
+                            ui.label(display).classes(
+                                "type-body brand-heading text-center"
+                            )
+                            ui.label(host_id).classes(
+                                "type-body-sm text-gray-500 text-center"
+                            )
+
+            def _refresh_tile_styles() -> None:
+                for k, card in tile_refs.items():
+                    if k in selected_for_procedure:
+                        card.style(
+                            f"border-left: 4px solid {BRAND_COLORS['green']};"
+                            f" background: {_hex_to_rgba(BRAND_COLORS['green'], OPACITY['card_fill_active'])};"
+                            f" box-shadow: 0 0 0 2px {_hex_to_rgba(BRAND_COLORS['light_blue'], OPACITY['selection_glow'])},"
+                            " 0 4px 12px rgba(0,0,0,0.22);"
+                        )
+                    else:
+                        card.style(
+                            f"border-left: 4px solid {BRAND_COLORS['gray']};"
+                            f" background: {_hex_to_rgba(BRAND_COLORS['gray'], OPACITY['tile_fill'])};"
+                            " box-shadow: 0 2px 8px rgba(0,0,0,0.15);"
+                        )
+
         else:
             ui.label("No idle services available.").classes(
                 "type-body-sm text-gray-500 italic"
@@ -1194,49 +1228,7 @@ def _render_service_grid(current_backend: ControllerBackend, refresh_ui: Any) ->
     )
     with ui.column().classes("w-full gap-4"):
         with ui.row().classes("w-full items-center justify-between gap-3"):
-            with ui.row().classes("gap-2"):
-
-                async def _start_all() -> None:
-                    await _service_bulk_action(
-                        current_backend.start_all_services(), refresh_ui
-                    )
-
-                async def _stop_all() -> None:
-                    await _service_bulk_action(
-                        current_backend.stop_all_services(), refresh_ui
-                    )
-
-                ui.button(
-                    icon=ICONS["start_all"],
-                    on_click=_start_all,
-                ).props(
-                    "round unelevated color=primary"
-                ).classes("text-xl").style(_TOOLBAR_BTN_STYLE).tooltip("Start All")
-                ui.button(
-                    icon=ICONS["stop_all"],
-                    on_click=_stop_all,
-                ).props(
-                    "round unelevated color=negative"
-                ).classes("text-xl").style(_TOOLBAR_BTN_STYLE).tooltip("Stop All")
             with ui.row().classes("gap-2 items-center flex-wrap"):
-                # Room filter chips
-                known_rooms = current_backend.known_room_ids()
-                if known_rooms:
-                    ui.label("Room:").classes("type-label text-gray-400")
-                    for rid in [None] + known_rooms:  # type: ignore[list-item]
-                        label = "All" if rid is None else rid
-                        active_room = current_backend._view.room_filter == rid
-                        ui.button(
-                            label,
-                            on_click=lambda r=rid: (
-                                current_backend.set_room_filter(r),
-                                refresh_ui(),
-                            ),
-                        ).props(
-                            f"{'unelevated color=primary' if active_room else 'flat'} dense"
-                        ).classes(
-                            "text-xs"
-                        )
                 # Procedure filter chips
                 known_procs = current_backend.known_procedure_ids()
                 if known_procs:
@@ -1694,15 +1686,27 @@ def main() -> None:
 
     _current_backend()
 
-    room_id = os.environ.get("ROOM_ID", "")
-    if room_id:
-        from surgical_procedure.room_nav import RoomNav
+    room_id = os.environ.get("ROOM_ID", "") or "OR-1"
+    from surgical_procedure.room_nav import RoomNav
 
-        _room_nav_instance = RoomNav(room_id)
-        from nicegui import app as nicegui_app
+    _room_nav_instance = RoomNav(room_id)
 
-        nicegui_app.on_startup(_room_nav_instance.start)
-        nicegui_app.on_shutdown(_room_nav_instance.close)
+    # Pre-populate sibling GUI links from env cross-references
+    twin_url = os.environ.get("MEDTECH_TWIN_URL", "")
+    if twin_url:
+        _room_nav_instance.add_static_sibling("Digital Twin", twin_url)
+
+    # Register self so the pill always shows the current page as selected.
+    ctrl_self_url = os.environ.get("MEDTECH_GUI_EXTERNAL_URL", "")
+    if ctrl_self_url:
+        _room_nav_instance.add_static_sibling(
+            "Procedure Controller", f"{ctrl_self_url.rstrip('/')}/controller"
+        )
+
+    from nicegui import app as nicegui_app
+
+    nicegui_app.on_startup(_room_nav_instance.start)
+    nicegui_app.on_shutdown(_room_nav_instance.close)
 
     try:
         ui.run(

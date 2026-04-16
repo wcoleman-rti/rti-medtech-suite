@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 
 import click
-from medtech.cli._main import main, run_cmd
+from medtech.cli._main import main
 from medtech.cli._scenarios import SCENARIOS
 
 
@@ -40,6 +40,8 @@ def launch(scenario: str, list_scenarios: bool, dockgraph: bool) -> None:
         _launch_single_hospital(spec)
 
     if dockgraph:
+        from medtech.cli._main import _start_dockgraph
+
         _start_dockgraph()
 
     click.echo()
@@ -57,7 +59,7 @@ def _print_scenario_list() -> None:
 
 
 def _launch_single_hospital(spec: dict) -> None:
-    """Launch a single unnamed hospital with ORs."""
+    """Launch a single default hospital with ORs."""
     from medtech.cli._hospital import hospital as hospital_cmd
     from medtech.cli._or import or_cmd
 
@@ -81,26 +83,3 @@ def _launch_multi_site(spec: dict) -> None:
         for room in h.get("rooms", []):
             ctx = click.Context(or_cmd)
             ctx.invoke(or_cmd, or_name=room, hospital_name=h["name"], twin_port=None)
-
-
-def _start_dockgraph() -> None:
-    """Launch the DockGraph topology sidecar."""
-    run_cmd(
-        [
-            "docker",
-            "run",
-            "-d",
-            "--name",
-            "medtech-dockgraph",
-            "-p",
-            "7800:7800",
-            "-v",
-            "/var/run/docker.sock:/var/run/docker.sock:ro",
-            "--label",
-            "dockgraph.self=true",
-            "--label",
-            "medtech.dynamic=true",
-            "dockgraph/dockgraph",
-        ]
-    )
-    click.secho("DockGraph: http://localhost:7800", fg="green")

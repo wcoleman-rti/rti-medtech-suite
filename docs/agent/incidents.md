@@ -3028,3 +3028,42 @@ after closure. They form the project's decision log.
   process-level parallelism inherently unsafe for integration tests
   that create real DDS participants.
 - **Date closed:** 2026-04-15
+
+---
+
+## INC-097: Hospital dashboard shows no ORs — RS config never loaded
+
+- **Status:** Re-opened
+- **Category:** Runtime / Configuration + Docker Networking
+- **Date opened:** 2026-04-16
+- **Phase/Step:** Post-V1.5 launch scenario
+- **Documents involved:** `modules/shared/medtech/cli/_hospital.py`,
+  `modules/shared/medtech/cli/_or.py`,
+  `services/routing/RoutingService.xml`
+- **Description:** When running `medtech launch`, the hospital dashboard page
+  shows "Waiting for room data…" with no operating room cards. The
+  dashboard reads `ServiceCatalog` from the Hospital Integration databus
+  (domain 20). These samples are bridged from the Orchestration databus
+  (domain 11) via the Routing Service running in the per-OR room-gateway
+  container. Initial analysis suspected a timing/durability issue, but
+  the actual root cause was that the RS containers were launched without
+  `-cfgFile` / `-cfgName` arguments. The `RoutingService.xml` file was
+  correctly mounted at `/opt/medtech/config/RoutingService.xml`, but the
+  `rtiroutingservice` binary was never told to load the `MedtechBridge`
+  configuration — so no bridging occurred at all. Compare with the CDS
+  container launches in the same files, which correctly pass
+  `-cfgFile` / `-cfgName`.
+- **Partial fix (2026-04-16):** Added `-cfgFile` / `-cfgName` to RS
+  container launches in both `_hospital.py` and `_or.py`.
+- **Re-opened (2026-04-16):** After applying the RS config fix, the
+  dashboard still shows no active rooms/procedures with OR-1 and OR-3
+  live and a procedure deployed in OR-1. Additionally, the OR-1 digital
+  twin renders a robot arm (RobotArmAssignment received) but shows no
+  movement (RobotState joint updates not appearing), despite all six
+  services reporting RUNNING. Suspected additional root cause: the Docker
+  network topology is incorrect — all ORs share a single
+  `medtech_surgical-net` instead of each room getting its own isolated
+  LAN. Room gateways should bridge per-room LANs to a hospital LAN, and
+  hospital gateways should bridge to a cloud LAN. The flat shared network
+  may cause CDS/RS routing anomalies or DDS discovery issues.
+  Investigation of Docker network topology restructuring is pending.

@@ -45,9 +45,11 @@ x-build-args: &build-args
   CONNEXTDDS_ARCH: "x64Linux4gcc8.5.0"
 
 networks:
-  surgical-net:
+  hospitalA_or1-net:
     driver: bridge
-  hospital-net:
+  hospitalA_or3-net:
+    driver: bridge
+  hospitalA-net:
     driver: bridge
 
 services:
@@ -64,8 +66,9 @@ services:
     ports:
       - "7400:7400/udp"
     networks:
-      surgical-net:
-      hospital-net:
+      hospitalA_or1-net:
+      hospitalA_or3-net:
+      hospitalA-net:
     healthcheck:
       test: ["CMD-SHELL", "test -f /proc/1/status"]
       interval: 5s
@@ -148,8 +151,9 @@ services:
     volumes:
       - ${RTI_LICENSE_FILE:-./rti_license.dat}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro
     networks:
-      hospital-net:
-      surgical-net:
+      hospitalA-net:
+      hospitalA_or1-net:
+      hospitalA_or3-net:
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -163,7 +167,7 @@ services:
     ports:
       - "9090:9090"
     networks:
-      hospital-net:
+      hospitalA-net:
 
   loki:
     image: grafana/loki:2.9.0
@@ -172,7 +176,7 @@ services:
     ports:
       - "3100:3100"
     networks:
-      hospital-net:
+      hospitalA-net:
 
   grafana:
     image: grafana/grafana:10.4.0
@@ -188,7 +192,7 @@ services:
       - ./services/observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ${NDDSHOME:-/opt/rti.com/rti_connext_dds-7.6.0}/resource/app/app_support/observability/templates/grafana/dashboards/General:/var/lib/grafana/dashboards:ro
     networks:
-      hospital-net:
+      - hospitalA-net
     depends_on:
       - prometheus
       - loki
@@ -208,7 +212,7 @@ services:
       MEDTECH_APP_NAME: "procedure-context-or1"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or1-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -222,11 +226,10 @@ services:
       HOST_ID: "robot-host-or1"
       ROBOT_ID: "arm-or1-a"
       ROOM_ID: "OR-1"
-      PROCEDURE_ID: "OR1-001"
       MEDTECH_APP_NAME: "robot-service-host-or1"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or1-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -240,11 +243,10 @@ services:
       HOST_ID: "robot-host-or1-b"
       ROBOT_ID: "arm-or1-b"
       ROOM_ID: "OR-1"
-      PROCEDURE_ID: "OR1-001"
       MEDTECH_APP_NAME: "robot-service-host-or1-b"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or1-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -257,11 +259,10 @@ services:
       <<: *medtech-env
       HOST_ID: "clinical-host-or1"
       ROOM_ID: "OR-1"
-      PROCEDURE_ID: "OR1-001"
       MEDTECH_APP_NAME: "clinical-service-host-or1"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or1-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -274,11 +275,10 @@ services:
       <<: *medtech-env
       HOST_ID: "operational-host-or1"
       ROOM_ID: "OR-1"
-      PROCEDURE_ID: "OR1-001"
       MEDTECH_APP_NAME: "operational-service-host-or1"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or1-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -291,11 +291,10 @@ services:
       <<: *medtech-env
       HOST_ID: "operator-host-or1"
       ROOM_ID: "OR-1"
-      PROCEDURE_ID: "OR1-001"
       MEDTECH_APP_NAME: "operator-service-host-or1"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or1-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -311,7 +310,7 @@ services:
       MEDTECH_APP_NAME: "robot-controller-or1"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or1-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -327,7 +326,7 @@ services:
       MEDTECH_APP_NAME: "operator-sim-or1"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or1-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -343,7 +342,7 @@ services:
       MEDTECH_APP_NAME: "vitals-sim-or1"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or1-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -359,7 +358,7 @@ services:
       MEDTECH_APP_NAME: "camera-sim-or1"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or1-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -375,7 +374,7 @@ services:
       MEDTECH_APP_NAME: "device-telemetry-or1"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or1-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -392,8 +391,7 @@ services:
       - "8080:8080"
     volumes: *config-volumes
     networks:
-      - surgical-net
-      - hospital-net
+      - hospitalA-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -417,7 +415,7 @@ services:
       MEDTECH_APP_NAME: "procedure-context-or3"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or3-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -430,11 +428,10 @@ services:
       <<: *medtech-env
       HOST_ID: "robot-host-or3"
       ROOM_ID: "OR-3"
-      PROCEDURE_ID: "OR3-001"
       MEDTECH_APP_NAME: "robot-service-host-or3"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or3-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -447,11 +444,10 @@ services:
       <<: *medtech-env
       HOST_ID: "clinical-host-or3"
       ROOM_ID: "OR-3"
-      PROCEDURE_ID: "OR3-001"
       MEDTECH_APP_NAME: "clinical-service-host-or3"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or3-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -464,11 +460,10 @@ services:
       <<: *medtech-env
       HOST_ID: "operational-host-or3"
       ROOM_ID: "OR-3"
-      PROCEDURE_ID: "OR3-001"
       MEDTECH_APP_NAME: "operational-service-host-or3"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or3-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -481,11 +476,10 @@ services:
       <<: *medtech-env
       HOST_ID: "operator-host-or3"
       ROOM_ID: "OR-3"
-      PROCEDURE_ID: "OR3-001"
       MEDTECH_APP_NAME: "operator-service-host-or3"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or3-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -501,7 +495,7 @@ services:
       MEDTECH_APP_NAME: "robot-controller-or3"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or3-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -517,7 +511,7 @@ services:
       MEDTECH_APP_NAME: "operator-sim-or3"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or3-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -533,7 +527,7 @@ services:
       MEDTECH_APP_NAME: "vitals-sim-or3"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or3-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -549,7 +543,7 @@ services:
       MEDTECH_APP_NAME: "camera-sim-or3"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or3-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -565,7 +559,7 @@ services:
       MEDTECH_APP_NAME: "device-telemetry-or3"
     volumes: *config-volumes
     networks:
-      - surgical-net
+      - hospitalA_or3-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -592,8 +586,9 @@ services:
       - ./interfaces/qos:/opt/medtech/share/qos:ro
       - ${RTI_LICENSE_FILE:-./rti_license.dat}:/opt/rti.com/rti_connext_dds-7.6.0/rti_license.dat:ro
     networks:
-      surgical-net:
-      hospital-net:
+      hospitalA_or1-net:
+      hospitalA_or3-net:
+      hospitalA-net:
     depends_on:
       cloud-discovery-service:
         condition: service_healthy
@@ -614,7 +609,7 @@ services:
       <<: *medtech-env
     volumes: *qos-volumes
     networks:
-      - hospital-net
+      - hospitalA-net
     depends_on:
       cloud-discovery-service:
         condition: service_healthy

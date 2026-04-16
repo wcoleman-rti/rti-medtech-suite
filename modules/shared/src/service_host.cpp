@@ -385,16 +385,19 @@ public:
             .create_participant_from_config(
                 std::string(orch_names::ORCHESTRATION));
 
-        // Set tier partition BEFORE enable() — static deployment-time property
-        {
-            auto dp_qos = orch_participant_.qos();
-            dp_qos << dds::core::policy::Partition(std::string("procedure"));
-            orch_participant_.qos(dp_qos);
-        }
-
-        // Read room context from environment
+        // Read room context from environment (needed for partition)
         const char* room_env = std::getenv("ROOM_ID");
         room_id_ = (room_env != nullptr) ? room_env : "";
+
+        // Set room-scoped partition BEFORE enable() — static deployment-time property
+        {
+            std::string partition = room_id_.empty()
+                ? std::string("room/unassigned")
+                : std::string("room/") + room_id_;
+            auto dp_qos = orch_participant_.qos();
+            dp_qos << dds::core::policy::Partition(partition);
+            orch_participant_.qos(dp_qos);
+        }
 
         log_.notice("Orchestration participant created");
 

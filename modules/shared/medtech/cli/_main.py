@@ -76,8 +76,12 @@ def build(docker: bool, build_all: bool) -> None:
 @click.option(
     "--topology", is_flag=True, help="Show ASCII topology tree with network details."
 )
-def status(topology: bool) -> None:
+@click.option("--dockgraph", is_flag=True, help="Start DockGraph topology visualizer.")
+def status(topology: bool, dockgraph: bool) -> None:
     """Show running medtech containers and GUI URLs."""
+    if dockgraph:
+        _start_dockgraph()
+        return
     if topology:
         _show_topology()
         return
@@ -317,3 +321,39 @@ def _render_network(net_name: str, data: dict, is_last: bool) -> None:
         c_last = j == len(sorted_containers) - 1
         c_prefix = "\u2514\u2500\u2500 " if c_last else "\u251c\u2500\u2500 "
         click.echo(f"{child_prefix}{c_prefix}{c_name:<35} {c_ip}")
+
+
+# ---------------------------------------------------------------------------
+# DockGraph sidecar (medtech status --dockgraph / medtech launch --dockgraph)
+# ---------------------------------------------------------------------------
+
+_DOCKGRAPH_NAME = "medtech-dockgraph"
+
+
+def _start_dockgraph() -> None:
+    """Launch the DockGraph topology sidecar, replacing any stale container."""
+    # Remove any existing container with the same name (running or stopped).
+    subprocess.run(
+        ["docker", "rm", "-f", _DOCKGRAPH_NAME],
+        capture_output=True,
+    )
+    run_cmd(
+        [
+            "docker",
+            "run",
+            "-d",
+            "--rm",
+            "--name",
+            _DOCKGRAPH_NAME,
+            "-p",
+            "7800:7800",
+            "-v",
+            "/var/run/docker.sock:/var/run/docker.sock:ro",
+            "--label",
+            "dockgraph.self=true",
+            "--label",
+            "medtech.dynamic=true",
+            "dockgraph/dockgraph",
+        ]
+    )
+    click.secho("DockGraph: http://localhost:7800", fg="green")

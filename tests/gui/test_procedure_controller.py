@@ -387,6 +387,11 @@ class TestControllerPage:
         monkeypatch.setattr(controller_module, "init_theme", lambda **kwargs: None)
         monkeypatch.setattr(
             controller_module,
+            "_room_nav_instance",
+            SimpleNamespace(render_nav_pill=lambda **kwargs: None),
+        )
+        monkeypatch.setattr(
+            controller_module,
             "backend",
             SimpleNamespace(
                 hosts={"host-1"},
@@ -406,7 +411,6 @@ class TestControllerPage:
                     mode="hosts",
                     selected_host_id=None,
                     selected_service_key=None,
-                    room_filter=None,
                     procedure_filter=None,
                     service_filter="ALL",
                 ),
@@ -451,6 +455,11 @@ class TestControllerPage:
         monkeypatch.setattr(controller_module, "init_theme", lambda **kwargs: None)
         monkeypatch.setattr(
             controller_module,
+            "_room_nav_instance",
+            SimpleNamespace(render_nav_pill=lambda **kwargs: None),
+        )
+        monkeypatch.setattr(
+            controller_module,
             "backend",
             SimpleNamespace(
                 hosts={"host-1"},
@@ -470,7 +479,6 @@ class TestControllerPage:
                     mode="hosts",
                     selected_host_id="host-1",
                     selected_service_key=("host-1", "svc-1"),
-                    room_filter=None,
                     procedure_filter=None,
                     service_filter="ALL",
                 ),
@@ -747,7 +755,6 @@ class TestProcedureLifecycle:
                 mode="hosts",
                 selected_host_id=None,
                 selected_service_key=None,
-                room_filter=None,
                 procedure_filter=None,
                 service_filter="ALL",
             ),

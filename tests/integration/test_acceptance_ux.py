@@ -214,9 +214,8 @@ class TestAcceptanceUXWorkflow:
         assert len(backend.idle_services()) == 1
         assert len(backend.procedure_services()) == 1
 
-        # Room IDs tracked
-        rooms = backend.known_room_ids()
-        assert "OR-1" in rooms
+        # Room is set at construction time
+        assert backend._room_id == "OR-1"
 
         asyncio.run(backend.close())
 
