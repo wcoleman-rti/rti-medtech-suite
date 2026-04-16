@@ -143,14 +143,14 @@ environment. The workload is defined here — not invented by the agent at runti
 
 ### Workload Sequence
 
-1. `docker compose --profile observability up -d` — start full environment
+1. `medtech launch --observability` — start full environment with observability
 2. Wait for all health checks to pass (Cloud Discovery Service, Routing Service,
    surgical instances, dashboard, ClinicalAlerts engine, Collector Service, Prometheus)
 3. Begin 15 s warm-up timer (system stabilizes, discovery completes)
 4. Begin 60 s measurement window
 5. At measurement end, query Prometheus for all metrics (PromQL over the 60 s window)
 6. 5 s cool-down
-7. `docker compose down`
+7. `medtech stop`
 8. Produce benchmark result JSON
 
 ### Result File Format
@@ -394,7 +394,7 @@ or V2.0 — after the baseline framework is proven in V1.0.
 
 | Category | Workload | What It Validates |
 |----------|----------|-------------------|
-| **Scale-up** | 8–16 concurrent surgical instances (`docker compose up --scale surgical=N`) | Discovery time scaling, participant count limits, Routing Service throughput under fan-in, memory growth per instance |
+| **Scale-up** | 8–16 concurrent surgical instances (`medtech run or` × N) | Discovery time scaling, participant count limits, Routing Service throughput under fan-in, memory growth per instance |
 | **Publication burst** | 10× normal rate on select topics (OperatorInput at 5000 Hz, WaveformData at 500 Hz) | Transport saturation behavior, sample loss under overload, QoS differentiation (do State/Command topics survive while Stream topics degrade gracefully?) |
 | **Network degradation** | Introduce packet loss (1%, 5%, 10%) and latency (50 ms, 100 ms) on Docker networks via `tc netem` | RELIABLE QoS recovery under loss, BEST_EFFORT graceful degradation, TRANSIENT_LOCAL durability under impairment, deadline miss behavior |
 | **Component failure cascade** | Sequentially kill surgical instance → Routing Service → Cloud Discovery Service, then restart in reverse | Dashboard resilience (no crash, cached data served), ClinicalAlerts engine recovery, discovery re-convergence timing, TRANSIENT_LOCAL re-delivery |

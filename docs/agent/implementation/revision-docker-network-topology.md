@@ -1,5 +1,9 @@
 # Revision: Docker Network Topology — Per-Instance Isolation
 
+**Status:** R.1–R.12 complete. All 12 CI gates pass (655 Python + 5 C++
+tests). Committed in two increments: `810a704` (R.1–R.7) and the
+extension commit (R.8–R.12).
+
 **Goal:** Replace the shared-network Docker simulation topology with a
 per-instance network model where each deployable instance (room, hospital,
 cloud) gets its own isolated LAN. This aligns the Docker simulation with

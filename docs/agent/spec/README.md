@@ -35,9 +35,9 @@ Scenarios are tagged to enable selective test execution. Tags also communicate w
 | Tag | Meaning | Milestone |
 |-----|---------|----------|
 | `@unit` | Can be tested with a single component in isolation | All |
-| `@smoke` | Startup viability — verifies that each process can start and serve. Two tiers: **Tier 1 (host-side):** entry point imports without error, expected routes/commands are registered, health probe handler exists — no DDS, no Docker, no network, runs in pytest on the host. **Tier 2 (container-side):** container starts without crash, health probe responds within timeout, expected URL is reachable via port mapping — requires Docker (`docker run` or brief `docker compose up` + probe) but NOT a fully composed system with inter-service dependencies. Both tiers validate "can this thing start?", not "does the workflow work?" (that is `@acceptance`). Every implementation step that modifies an entry point, adds a route, or changes container topology must pass its `@smoke` tests before the step's test gate is considered green. | All |
+| `@smoke` | Startup viability — verifies that each process can start and serve. Two tiers: **Tier 1 (host-side):** entry point imports without error, expected routes/commands are registered, health probe handler exists — no DDS, no Docker, no network, runs in pytest on the host. **Tier 2 (container-side):** container starts without crash, health probe responds within timeout, expected URL is reachable via port mapping — requires Docker (`docker run` or brief `medtech run` + probe) but NOT a fully composed system with inter-service dependencies. Both tiers validate "can this thing start?", not "does the workflow work?" (that is `@acceptance`). Every implementation step that modifies an entry point, adds a route, or changes container topology must pass its `@smoke` tests before the step's test gate is considered green. | All |
 | `@integration` | Requires two or more DDS participants | All |
-| `@e2e` | Requires the full Docker Compose environment | All |
+| `@e2e` | Requires the full Docker simulation environment (`medtech launch`) | All |
 | `@gui` | Involves NiceGUI web application verification | V1.0+ |
 | `@streaming` | Involves high-rate data paths | V1.0+ |
 | `@command` | Involves command/response patterns | V1.0+ |

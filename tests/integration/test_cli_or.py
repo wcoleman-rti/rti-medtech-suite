@@ -75,15 +75,22 @@ class TestRunOR:
             if "--name" in cmd:
                 idx = cmd.index("--name")
                 names.append(cmd[idx + 1])
-        # Gateway (CDS) + RS + Collector + 4 service hosts + 1 twin + 1 controller = 9
-        assert len(docker_runs) == 9
+        # Gateway (CDS) + RS + Collector + 4 service hosts
+        # + 6 room services + 1 twin + 1 controller = 15
+        assert len(docker_runs) == 15
         assert any("gateway" in n for n in names)
         assert any("clinical" in n for n in names)
         assert any("operational" in n for n in names)
-        assert any("operator" in n for n in names)
-        assert any("robot" in n for n in names)
+        assert any("operator-service-host" in n for n in names)
+        assert any("robot-service-host" in n for n in names)
+        assert any("procedure-context" in n for n in names)
+        assert any("robot-controller" in n for n in names)
+        assert any("operator-sim" in n for n in names)
+        assert any("vitals-sim" in n for n in names)
+        assert any("camera-sim" in n for n in names)
+        assert any("device-telemetry" in n for n in names)
         assert any("twin" in n for n in names)
-        assert any("controller" in n for n in names)
+        assert any("controller" in n and "robot" not in n for n in names)
         # Room network should be created
         mock_ensure_net.assert_called()
 
@@ -253,8 +260,9 @@ class TestRunOR:
         result = runner.invoke(main, ["run", "or", "--name", "OR-1"])
         assert result.exit_code == 0
         # run_cmd prints "  $ <cmd>" for each docker run
-        # gateway CDS + network connect + RS + collector + 4 hosts + twin + controller
-        assert mock_run.call_count >= 10
+        # gateway CDS + network connect + RS + collector + 4 hosts
+        # + 6 room services + twin + controller
+        assert mock_run.call_count >= 16
 
     @patch("medtech.cli._or._detect_hospitals", return_value=[])
     def test_errors_no_hospital(self, mock_hosp) -> None:

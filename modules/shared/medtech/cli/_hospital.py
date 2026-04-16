@@ -395,7 +395,7 @@ def _start_gui(
 
 
 def _start_observability(network: str, hospital_name: str | None = None) -> None:
-    """Launch Prometheus and Grafana containers for local telemetry."""
+    """Launch Prometheus, Loki, and Grafana containers for local telemetry."""
     root = _project_root()
     suffix = f"-{hospital_name}" if hospital_name else ""
 
@@ -418,6 +418,24 @@ def _start_observability(network: str, hospital_name: str | None = None) -> None
         "prom/prometheus:v2.51.0",
     ]
     run_cmd(prom_cmd)
+
+    # Loki
+    loki_cmd = [
+        "docker",
+        "run",
+        "--rm",
+        "-d",
+        "--name",
+        f"loki{suffix}",
+        "--label",
+        "medtech.dynamic=true",
+        "--network",
+        network,
+        "-p",
+        "3100:3100",
+        "grafana/loki:2.9.0",
+    ]
+    run_cmd(loki_cmd)
 
     # Grafana
     nddshome = os.environ.get("NDDSHOME", "/opt/rti.com/rti_connext_dds-7.6.0")

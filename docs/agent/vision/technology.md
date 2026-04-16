@@ -898,7 +898,7 @@ The forwarding level for user logs is configured in QoS XML via `<user_forwardin
 ### Rules
 
 1. **Every DomainParticipant must have Monitoring Library 2.0 enabled.** This is configured via XML properties in the participant QoS profile — no per-module opt-in code.
-2. **Observability stack is profile-gated.** `docker compose --profile observability up` starts the telemetry backends; the core simulation runs independently.
+2. **Observability stack is CLI-gated.** `medtech run hospital --observability` starts the telemetry backends (Prometheus, Loki, Grafana); the core simulation runs independently.
 3. **Collector Service REST API is the runtime control plane.** Log verbosity and metric collection rates are adjusted via REST, not by restarting applications.
 4. **Dashboard configurations are version-controlled.** Grafana dashboard JSON and Prometheus scrape configs are stored under `services/observability/`.
 5. **No application code depends on observability.** Removing the observability profile must not affect functional behavior.

@@ -1,20 +1,21 @@
 """Tests for Phase 2 Step 2.9 — Observability Verification.
 
 Verifies the observability infrastructure configuration is correct and
-that functional tests pass without the observability profile.
+that the CLI observability launcher spawns the expected containers.
 
 Spec coverage: common-behaviors.md — Observability
 Tags: @integration @observability
 
 Tests validate:
-1. Configuration correctness — Docker Compose, Prometheus, Grafana configs
+1. Configuration correctness — Prometheus, Grafana configs
 2. Monitoring Library 2.0 QoS configuration
-3. Observability independence — surgical services have no observability deps
+3. CLI observability launcher spawns Prometheus, Loki, and Grafana
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -79,50 +80,14 @@ class TestObservabilityConfiguration:
             "/var/lib/grafana/dashboards" in all_content
         ), "Dashboard path must point to Grafana dashboards directory"
 
-    def test_collector_service_in_compose(self):
-        """Docker Compose defines collector-service with observability profile."""
+    def test_compose_is_build_only(self):
+        """docker-compose.yml contains only build-profile services."""
         content = _read_text("docker-compose.yml")
-        assert (
-            "collector-service:" in content
-        ), "collector-service must be defined in docker-compose.yml"
-
-    def test_collector_service_observability_domain(self):
-        """Collector Service monitors Room Observability databus 19."""
-        content = _read_text("docker-compose.yml")
-        # Find the collector-service section and check for the Room Observability databus
-        cs_idx = content.index("collector-service:")
-        cs_section = content[cs_idx : cs_idx + 1000]
-        assert (
-            'OBSERVABILITY_DOMAIN: "19"' in cs_section
-        ), "Collector Service must monitor Room Observability databus 19"
-
-    def test_prometheus_in_compose(self):
-        """Docker Compose defines prometheus with observability profile."""
-        content = _read_text("docker-compose.yml")
-        assert "prometheus:" in content
-
-    def test_grafana_in_compose(self):
-        """Docker Compose defines grafana with observability profile."""
-        content = _read_text("docker-compose.yml")
-        assert "grafana:" in content
-
-    def test_loki_in_compose(self):
-        """Docker Compose defines loki with observability profile."""
-        content = _read_text("docker-compose.yml")
-        assert "loki:" in content
-
-    def test_observability_services_use_profile(self):
-        """All observability services are gated behind the observability profile."""
-        content = _read_text("docker-compose.yml")
-        # Each observability service must have profiles: ["observability"]
-        obs_services = ["collector-service:", "prometheus:", "loki:", "grafana:"]
-        for svc in obs_services:
-            idx = content.index(svc)
-            # Look ahead ~500 chars for the profile declaration
-            section = content[idx : idx + 500]
-            assert (
-                "observability" in section
-            ), f"{svc.rstrip(':')} must be in observability profile"
+        assert "profiles:" in content, "Build services must have profiles"
+        # No runtime services remain
+        assert "collector-service:" not in content
+        assert "hospital-placeholder:" not in content
+        assert "routing-service:" not in content
 
 
 class TestMonitoringLibraryConfiguration:
@@ -142,75 +107,101 @@ class TestMonitoringLibraryConfiguration:
             "19" in content
         ), "Room Observability databus (19) must appear in Participants.xml"
 
-    def test_collector_service_discovery_peers(self):
-        """Collector Service has discovery peers pointing to CDS."""
-        content = _read_text("docker-compose.yml")
-        cs_idx = content.index("collector-service:")
-        cs_section = content[cs_idx : cs_idx + 1000]
-        assert (
-            "cloud-discovery-service" in cs_section
-        ), "Collector Service must discover via Cloud Discovery Service"
 
-    def test_collector_service_on_hospital_and_room_networks(self):
-        """Collector Service joins hospitalA-net and room networks."""
-        content = _read_text("docker-compose.yml")
-        cs_idx = content.index("collector-service:")
-        cs_section = content[cs_idx : cs_idx + 1000]
-        assert (
-            "hospitalA-net" in cs_section
-        ), "Collector Service must be on hospitalA-net"
-        assert (
-            "hospitalA_or1-net" in cs_section
-        ), "Collector Service must be on a room network"
+class TestCLIObservabilityLauncher:
+    """CLI _start_observability spawns Prometheus, Loki, and Grafana."""
+
+    @patch("medtech.cli._hospital._project_root")
+    @patch("medtech.cli._hospital.run_cmd")
+    def test_observability_starts_full_stack(self, mock_run, mock_root):
+        """_start_observability launches Prometheus, Loki, and Grafana."""
+        mock_root.return_value = Path("/fake/root")
+        from medtech.cli._hospital import _start_observability
+
+        _start_observability("medtech_hospitalA-net", "hospitalA")
+
+        docker_runs = [
+            c.args[0]
+            for c in mock_run.call_args_list
+            if isinstance(c.args[0], list)
+            and len(c.args[0]) > 2
+            and c.args[0][:3] == ["docker", "run", "--rm"]
+        ]
+        names = []
+        for cmd in docker_runs:
+            if "--name" in cmd:
+                idx = cmd.index("--name")
+                names.append(cmd[idx + 1])
+
+        assert len(docker_runs) == 3
+        assert "prometheus-hospitalA" in names
+        assert "loki-hospitalA" in names
+        assert "grafana-hospitalA" in names
+
+    @patch("medtech.cli._hospital._project_root")
+    @patch("medtech.cli._hospital.run_cmd")
+    def test_observability_containers_on_hospital_network(self, mock_run, mock_root):
+        """All observability containers join the hospital network."""
+        mock_root.return_value = Path("/fake/root")
+        from medtech.cli._hospital import _start_observability
+
+        _start_observability("medtech_hospitalA-net", "hospitalA")
+
+        docker_runs = [
+            c.args[0]
+            for c in mock_run.call_args_list
+            if isinstance(c.args[0], list)
+            and len(c.args[0]) > 2
+            and c.args[0][:3] == ["docker", "run", "--rm"]
+        ]
+        for cmd in docker_runs:
+            assert "medtech_hospitalA-net" in cmd
+
+    @patch("medtech.cli._hospital._project_root")
+    @patch("medtech.cli._hospital.run_cmd")
+    def test_observability_containers_have_dynamic_label(self, mock_run, mock_root):
+        """All observability containers have the medtech.dynamic=true label."""
+        mock_root.return_value = Path("/fake/root")
+        from medtech.cli._hospital import _start_observability
+
+        _start_observability("medtech_hospitalA-net", "hospitalA")
+
+        docker_runs = [
+            c.args[0]
+            for c in mock_run.call_args_list
+            if isinstance(c.args[0], list)
+            and len(c.args[0]) > 2
+            and c.args[0][:3] == ["docker", "run", "--rm"]
+        ]
+        for cmd in docker_runs:
+            assert "medtech.dynamic=true" in cmd
+
+    @patch("medtech.cli._hospital._project_root")
+    @patch("medtech.cli._hospital.run_cmd")
+    def test_loki_exposes_port_3100(self, mock_run, mock_root):
+        """Loki container maps port 3100."""
+        mock_root.return_value = Path("/fake/root")
+        from medtech.cli._hospital import _start_observability
+
+        _start_observability("medtech_hospitalA-net", "hospitalA")
+
+        docker_runs = [
+            c.args[0]
+            for c in mock_run.call_args_list
+            if isinstance(c.args[0], list)
+            and len(c.args[0]) > 2
+            and c.args[0][:3] == ["docker", "run", "--rm"]
+        ]
+        loki_cmd = [c for c in docker_runs if "loki-hospitalA" in c][0]
+        assert "3100:3100" in loki_cmd
 
 
 class TestObservabilityIndependence:
-    """Removing observability profile does not affect functional behavior.
+    """Removing observability does not affect functional behavior.
 
     Spec: common-behaviors.md — Observability stack removal does not
     affect functional behavior.
     """
-
-    def test_surgical_services_have_no_observability_dependency(self):
-        """No surgical service depends_on collector-service or prometheus."""
-        content = _read_text("docker-compose.yml")
-        surgical_prefixes = [
-            "procedure-context-",
-            "robot-controller-",
-            "vitals-sim-",
-            "camera-sim-",
-            "device-telemetry-",
-            "digital-twin-",
-        ]
-
-        for prefix in surgical_prefixes:
-            # Find all services with this prefix
-            idx = 0
-            while True:
-                try:
-                    idx = content.index(prefix, idx)
-                except ValueError:
-                    break
-                # Get up to the next service definition (next unindented line)
-                next_svc = content.find("\n  ", idx + 200)
-                if next_svc == -1:
-                    section = content[idx:]
-                else:
-                    section = content[idx : next_svc + 500]
-
-                # Check depends_on doesn't include observability services
-                deps_idx = section.find("depends_on:")
-                if deps_idx != -1:
-                    deps_section = section[deps_idx : deps_idx + 200]
-                    assert "collector-service" not in deps_section, (
-                        f"Service starting with {prefix} must not depend "
-                        "on collector-service"
-                    )
-                    assert "prometheus" not in deps_section, (
-                        f"Service starting with {prefix} must not depend "
-                        "on prometheus"
-                    )
-                idx += len(prefix)
 
     def test_functional_tests_pass_locally(self):
         """Functional tests pass without Docker observability stack.

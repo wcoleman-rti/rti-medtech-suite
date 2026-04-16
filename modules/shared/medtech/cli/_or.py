@@ -137,6 +137,40 @@ _SERVICE_HOSTS = [
     },
 ]
 
+# Additional per-room containers: core services and simulators
+_ROOM_SERVICES = [
+    {
+        "role": "procedure-context",
+        "image": "medtech/app-python",
+        "command": ["python", "-m", "surgical_procedure.procedure_context_service"],
+    },
+    {
+        "role": "robot-controller",
+        "image": "medtech/app-cpp",
+        "command": ["/opt/medtech/bin/robot-controller"],
+    },
+    {
+        "role": "operator-sim",
+        "image": "medtech/app-python",
+        "command": ["python", "-m", "surgical_procedure.operator_sim"],
+    },
+    {
+        "role": "vitals-sim",
+        "image": "medtech/app-python",
+        "command": ["python", "-m", "surgical_procedure.vitals_sim"],
+    },
+    {
+        "role": "camera-sim",
+        "image": "medtech/app-python",
+        "command": ["python", "-m", "surgical_procedure.camera_sim"],
+    },
+    {
+        "role": "device-telemetry",
+        "image": "medtech/app-python",
+        "command": ["python", "-m", "surgical_procedure.device_telemetry_sim"],
+    },
+]
+
 
 # ---------------------------------------------------------------------------
 # Command
@@ -241,6 +275,27 @@ def or_cmd(
             "NDDS_DISCOVERY_PEERS": room_cds_peers,
         }
         # Robot needs ROBOT_ID
+        if "robot" in svc["role"]:
+            extra_env["ROBOT_ID"] = f"arm-{or_key}-a"
+
+        _start_service_container(
+            name=container_name,
+            image=svc["image"],
+            command=svc["command"],
+            networks=[room_net],
+            extra_env=extra_env,
+        )
+
+    # Core services and simulators — all on room-net only
+    for svc in _ROOM_SERVICES:
+        container_name = f"{target['name']}-{svc['role']}-{or_key}"
+        extra_env = {
+            "ROOM_ID": or_name,
+            "PROCEDURE_ID": procedure_id,
+            "MEDTECH_APP_NAME": container_name,
+            "NDDS_DISCOVERY_PEERS": room_cds_peers,
+        }
+        # Robot controller needs ROBOT_ID
         if "robot" in svc["role"]:
             extra_env["ROBOT_ID"] = f"arm-{or_key}-a"
 
