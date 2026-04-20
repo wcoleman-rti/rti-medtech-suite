@@ -1,6 +1,6 @@
 [project]
 name = "rti-medtech-suite"
-version = "1.4.0-dev"
+version = "1.5.0"
 requires-python = ">=3.10"
 dependencies = ["click>=8.0"]
 
