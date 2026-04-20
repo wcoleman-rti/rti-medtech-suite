@@ -18,6 +18,7 @@ import app_names
 import rti.asyncio  # noqa: F401 - enables async DDS methods
 import rti.connextdds as dds
 import rti.rpc
+from fastapi import HTTPException
 from medtech.dds import initialize_connext
 from medtech.gui import (
     BRAND_COLORS,
@@ -30,8 +31,9 @@ from medtech.gui import (
     init_theme,
 )
 from medtech.gui._colors import OPACITY
+from medtech.gui._theme import NICEGUI_THEME_MODE_KEY, _theme_mode_value
 from medtech.log import ModuleName, init_logging
-from nicegui import background_tasks, run, ui
+from nicegui import app, background_tasks, run, ui
 from orchestration import Orchestration
 from surgery import Surgery
 
@@ -88,6 +90,12 @@ class ControllerBackend(GuiBackend):
         self._proc_op_participant: dds.DomainParticipant | None = None
         self._proc_control_participant: dds.DomainParticipant | None = None
         self._arm_assignment_reader: dds.DataReader | None = None
+        self._procedure_status_writer: dds.DataWriter | None = None
+        self._service_catalog_writer: dds.DataWriter | None = None
+        self._last_procedure_phase: Surgery.ProcedurePhase | None = None
+        self._gui_url: str = ""
+        self._twin_url: str = ""
+        self._default_procedure_id: str = ""
         self._catalog_reader = catalog_reader
         self._status_reader = status_reader
 
@@ -164,6 +172,9 @@ class ControllerBackend(GuiBackend):
     ) -> list[tuple[tuple[str, str], Orchestration.ServiceCatalog]]:
         items: list[tuple[tuple[str, str], Orchestration.ServiceCatalog]] = []
         for key, catalog in self._catalogs.items():
+            # Hide the controller's own nav entry — it is this page
+            if catalog.display_name == "Procedure Controller":
+                continue
             status = self._service_states.get(key)
             if not self._service_matches_filter(status):
                 continue
@@ -195,6 +206,27 @@ class ControllerBackend(GuiBackend):
         return sorted(procs)
 
     # --- Procedure lifecycle ---------------------------------------------------
+
+    def _publish_procedure_status(
+        self, procedure_id: str, phase: Surgery.ProcedurePhase, message: str = ""
+    ) -> None:
+        """Publish ProcedureStatus on the Procedure operational databus (write-on-change)."""
+        if self._procedure_status_writer is None:
+            return
+        if self._last_procedure_phase == phase:
+            return  # write-on-change: skip if state unchanged
+        status = Surgery.ProcedureStatus(
+            procedure_id=procedure_id,
+            phase=phase,
+            status_message=message,
+        )
+        self._procedure_status_writer.write(status)
+        self._last_procedure_phase = phase
+        log.notice(
+            f"ProcedureStatus published: procedure={procedure_id}, "
+            f"phase={phase.name}, message={message}"
+        )
+        self._log_diag(f"ProcedureStatus → {phase.name}: {message}")
 
     @property
     def active_procedure_id(self) -> str:
@@ -231,13 +263,17 @@ class ControllerBackend(GuiBackend):
             return []
         items: list[tuple[tuple[str, str], Orchestration.ServiceCatalog]] = []
         for key, catalog in self._catalogs.items():
+            if catalog.display_name == "Procedure Controller":
+                continue
             pid = _catalog_property(catalog, "procedure_id")
             if pid == active:
                 items.append((key, catalog))
         return sorted(items)
 
     def generate_procedure_id(self) -> str:
-        """Generate a unique procedure_id: ``<room_id>-<epoch_ms>``."""
+        """Return the deployment-time procedure_id if set, else generate one."""
+        if self._default_procedure_id:
+            return self._default_procedure_id
         return f"{self._room_id}-{int(time.time() * 1000)}"
 
     async def start_procedure(
@@ -245,7 +281,16 @@ class ControllerBackend(GuiBackend):
         service_keys: list[tuple[str, str]],
         procedure_id: str,
     ) -> None:
-        """Start a new procedure: send start_service RPCs with procedure_id."""
+        """Start a new procedure: send start_service RPCs with procedure_id.
+
+        Also automatically deploys DigitalTwinService to any OperatorServiceHost,
+        as the digital twin is a procedure-scoped service that displays procedure state.
+        """
+        self._publish_procedure_status(
+            procedure_id, Surgery.ProcedurePhase.PRE_OP, "Deploying services"
+        )
+
+        # Collect user-selected services
         for host_id, service_id in service_keys:
             props: list[tuple[str, str]] = [
                 ("procedure_id", procedure_id),
@@ -254,6 +299,31 @@ class ControllerBackend(GuiBackend):
             await self._do_rpc(
                 host_id, _make_start_call(service_id, props), "start_service"
             )
+
+        # Auto-deploy DigitalTwinService to any available operator service host
+        # Find an operator service host (usually operator-host-{room_id})
+        for (host_id, service_id), catalog in self.catalogs.items():
+            # Look for operator service host by its display type/id pattern
+            if "operator" in host_id.lower() or "operator" in service_id.lower():
+                # Check if this host has OperatorConsoleService (identifier of operator host)
+                if service_id == "OperatorConsoleService":
+                    # Deploy digital twin to this host
+                    props: list[tuple[str, str]] = [
+                        ("procedure_id", procedure_id),
+                        ("room_id", self._room_id),
+                    ]
+                    try:
+                        await self._do_rpc(
+                            host_id,
+                            _make_start_call("DigitalTwinService", props),
+                            "start_service",
+                        )
+                        self._log_diag(
+                            f"DigitalTwinService deployed to {host_id} for procedure {procedure_id}"
+                        )
+                    except Exception as ex:
+                        self._log_diag(f"Failed to deploy DigitalTwinService: {ex}")
+                    break  # Only deploy to the first operator host found
 
     async def add_to_procedure(
         self,
@@ -271,8 +341,18 @@ class ControllerBackend(GuiBackend):
 
     async def stop_procedure(self) -> None:
         """Stop all services in the active procedure."""
+        active = self.active_procedure_id
+        if active:
+            self._publish_procedure_status(
+                active, Surgery.ProcedurePhase.COMPLETING, "Stopping services"
+            )
         for (host_id, service_id), _catalog in self.procedure_services():
             await self.stop_service(host_id, service_id)
+        if active:
+            self._publish_procedure_status(
+                active, Surgery.ProcedurePhase.COMPLETED, "Procedure ended"
+            )
+            self._last_procedure_phase = None  # reset for next procedure
 
     def set_procedure_filter(self, procedure_id: str | None) -> None:
         """Set the procedure filter (None = all procedures)."""
@@ -400,6 +480,13 @@ class ControllerBackend(GuiBackend):
         self._catalog_reader = _find_orch_reader(dash_names.CTRL_SERVICE_CATALOG_READER)
         self._status_reader = _find_orch_reader(dash_names.CTRL_SERVICE_STATUS_READER)
 
+        # ServiceCatalog writer — advertise room GUI endpoints
+        catalog_writer_any = self._orch_participant.find_datawriter(
+            dash_names.CTRL_SERVICE_CATALOG_WRITER
+        )
+        if catalog_writer_any is not None:
+            self._service_catalog_writer = dds.DataWriter(catalog_writer_any)
+
         self._proc_op_participant = provider.create_participant_from_config(
             surg_names.PROCEDURE_CONTROLLER_PROCEDURE_OPERATIONAL
         )
@@ -411,6 +498,13 @@ class ControllerBackend(GuiBackend):
         proc_op_qos.partition.name = [f"room/{self._room_id}/procedure/*"]
         self._proc_op_participant.qos = proc_op_qos
         self._proc_op_participant.enable()
+
+        # ProcedureStatus writer — controller is the lifecycle authority
+        status_writer_any = self._proc_op_participant.find_datawriter(
+            surg_names.CTRL_PROCEDURE_STATUS_WRITER
+        )
+        if status_writer_any is not None:
+            self._procedure_status_writer = dds.DataWriter(status_writer_any)
 
         self._proc_control_participant = provider.create_participant_from_config(
             surg_names.PROCEDURE_CONTROLLER_PROCEDURE_CONTROL
@@ -441,6 +535,8 @@ class ControllerBackend(GuiBackend):
         ]
         if self._arm_assignment_reader is not None:
             self._tasks.append(background_tasks.create(self._receive_arm_assignments()))
+        if self._service_catalog_writer is not None:
+            self._tasks.append(background_tasks.create(self._publish_gui_catalog()))
         self._mark_ready()
 
     async def close(self) -> None:
@@ -525,6 +621,19 @@ class ControllerBackend(GuiBackend):
         if prev is None or prev.state != status.state:
             self._log_diag(f"{status.service_id}@{status.host_id} → {new_state}")
 
+        # Transition to IN_PROGRESS when first procedure service reaches RUNNING
+        if (
+            status.state == Orchestration.ServiceState.RUNNING
+            and self._last_procedure_phase == Surgery.ProcedurePhase.PRE_OP
+        ):
+            active = self.active_procedure_id
+            if active:
+                self._publish_procedure_status(
+                    active,
+                    Surgery.ProcedurePhase.IN_PROGRESS,
+                    "Procedure started",
+                )
+
     def _remove_host(self, host_id: str) -> None:
         for key in [key for key in self._catalogs if key[0] == host_id]:
             del self._catalogs[key]
@@ -588,6 +697,56 @@ class ControllerBackend(GuiBackend):
             )
         elif prev.status != data.status:
             self._log_diag(f"Arm {data.robot_id} → {status_name}")
+
+    def _make_gui_catalog(
+        self, display_name: str, gui_url: str
+    ) -> Orchestration.ServiceCatalog:
+        """Build a ServiceCatalog entry advertising a room GUI endpoint."""
+        props = [
+            Orchestration.PropertyDescriptor(
+                name="room_id",
+                current_value=self._room_id,
+                description="Room this GUI belongs to",
+                required=False,
+            ),
+            Orchestration.PropertyDescriptor(
+                name="gui_url",
+                current_value=gui_url,
+                description="GUI endpoint URL",
+                required=False,
+            ),
+        ]
+        return Orchestration.ServiceCatalog(
+            host_id=f"controller-{self._room_id}",
+            service_id=display_name,
+            display_name=display_name,
+            properties=props,
+            health_summary="OK",
+        )
+
+    async def _publish_gui_catalog(self) -> None:
+        """Periodically publish ServiceCatalog entries for room GUI endpoints.
+
+        For the digital twin, append the active procedure_id as a query parameter
+        so the twin initializes its backend with the correct procedure context.
+        """
+        while self._running:
+            entries: list[Orchestration.ServiceCatalog] = []
+            if self._gui_url:
+                entries.append(
+                    self._make_gui_catalog("Procedure Controller", self._gui_url)
+                )
+            if self._twin_url:
+                active = self.active_procedure_id
+                twin_url = self._twin_url
+                # Append procedure_id query parameter if a procedure is active
+                if active:
+                    sep = "&" if "?" in twin_url else "?"
+                    twin_url = f"{twin_url}{sep}procedure_id={active}"
+                entries.append(self._make_gui_catalog("Digital Twin", twin_url))
+            for entry in entries:
+                self._service_catalog_writer.write(entry)
+            await asyncio.sleep(5.0)  # re-publish periodically for late joiners
 
     async def _monitor_liveliness(self) -> None:
         status_condition = dds.StatusCondition(self._catalog_reader)
@@ -774,6 +933,15 @@ class ControllerBackend(GuiBackend):
         return dict(self._catalogs)
 
     @property
+    def service_count(self) -> int:
+        """Number of real services (excludes the controller's own entry)."""
+        return sum(
+            1
+            for c in self._catalogs.values()
+            if c.display_name != "Procedure Controller"
+        )
+
+    @property
     def hosts(self) -> set[str]:
         return self._known_host_ids()
 
@@ -837,12 +1005,27 @@ def _current_backend() -> ControllerBackend:
 _room_nav_instance: Any = None
 
 
+def _configured_room_id() -> str:
+    """Return the room identity configured for this controller instance."""
+    return os.environ.get("ROOM_ID", "") or "OR-1"
+
+
 @ui.page("/controller", title="Procedure Controller — Medtech Suite")
 def controller_page() -> None:
     """Render the controller page (standalone with self-contained shell)."""
     init_theme(header=False)
+    stored_mode = app.storage.user.get(NICEGUI_THEME_MODE_KEY, "system")
+    ui.dark_mode(_theme_mode_value(stored_mode))
     _room_nav_instance.render_nav_pill(active_label="Procedure Controller")
     controller_content()
+
+
+@ui.page("/controller/{room_id}", title="Procedure Controller — Medtech Suite")
+def controller_page_for_room(room_id: str) -> None:
+    """Render controller only when URL room_id matches this container's room."""
+    if room_id != _configured_room_id():
+        raise HTTPException(status_code=404, detail="Controller room not found")
+    controller_page()
 
 
 def controller_content_for_room(room_id: str) -> None:
@@ -895,7 +1078,7 @@ def _render_controller_ui(current_backend: ControllerBackend) -> None:
             )
             _render_summary_card(
                 title="Services",
-                value=str(len(current_backend.catalogs)),
+                value=str(current_backend.service_count),
                 icon=ICONS["service"],
                 color=BRAND_COLORS["green"],
                 active=current_backend.view_mode == "services",
@@ -1684,17 +1867,22 @@ def main() -> None:
 
     favicon_path = _resource_dir() / "images" / "favicon.ico"
 
-    _current_backend()
-
     room_id = os.environ.get("ROOM_ID", "") or "OR-1"
+
+    # Set GUI URLs on the backend for ServiceCatalog advertisement
+    global backend
+    backend = ControllerBackend(room_id=room_id)
+    current_backend = backend
+    ctrl_self_url = os.environ.get("MEDTECH_GUI_EXTERNAL_URL", "")
+    if ctrl_self_url:
+        current_backend._gui_url = f"{ctrl_self_url.rstrip('/')}/controller/{room_id}"
+    procedure_id = os.environ.get("PROCEDURE_ID", "")
+    if procedure_id:
+        current_backend._default_procedure_id = procedure_id
+
     from surgical_procedure.room_nav import RoomNav
 
     _room_nav_instance = RoomNav(room_id)
-
-    # Pre-populate sibling GUI links from env cross-references
-    twin_url = os.environ.get("MEDTECH_TWIN_URL", "")
-    if twin_url:
-        _room_nav_instance.add_static_sibling("Digital Twin", twin_url)
 
     # Register self so the pill always shows the current page as selected.
     ctrl_self_url = os.environ.get("MEDTECH_GUI_EXTERNAL_URL", "")
@@ -1703,10 +1891,8 @@ def main() -> None:
             "Procedure Controller", f"{ctrl_self_url.rstrip('/')}/controller"
         )
 
-    from nicegui import app as nicegui_app
-
-    nicegui_app.on_startup(_room_nav_instance.start)
-    nicegui_app.on_shutdown(_room_nav_instance.close)
+    app.on_startup(_room_nav_instance.start)
+    app.on_shutdown(_room_nav_instance.close)
 
     try:
         ui.run(

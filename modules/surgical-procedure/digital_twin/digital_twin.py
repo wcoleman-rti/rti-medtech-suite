@@ -33,6 +33,7 @@ import app_names
 import rti.asyncio  # noqa: F401 - enables async DDS methods
 import rti.connextdds as dds
 import surgery
+from fastapi import HTTPException
 from medtech.dds import initialize_connext
 from medtech.gui import (
     BRAND_COLORS,
@@ -43,9 +44,8 @@ from medtech.gui import (
     init_theme,
 )
 from medtech.gui._colors import THEME_PALETTE
-from medtech.gui._theme import NICEGUI_THEME_MODE_KEY, _theme_mode_value
 from medtech.log import ModuleName, init_logging
-from nicegui import app, background_tasks, ui
+from nicegui import background_tasks, ui
 
 names = app_names.MedtechEntityNames.SurgicalParticipants
 
@@ -511,7 +511,10 @@ class DigitalTwinBackend(GuiBackend):
         if participant is None:
             raise RuntimeError("Failed to create ControlDigitalTwin participant")
 
-        partition = f"room/{room_id}/procedure/{procedure_id}"
+        # Wildcard partition: receive data from ANY procedure in this room.
+        # Services are started with dynamic procedure IDs by the controller,
+        # so the twin must match all of them.
+        partition = f"room/{room_id}/procedure/*"
         qos = participant.qos
         qos.partition.name = [partition]
         participant.qos = qos
@@ -718,13 +721,57 @@ _room_nav_instance: Any = None
 
 
 def _get_backend(room_id: str, procedure_id: str = "proc-001") -> DigitalTwinBackend:
-    """Return (or create on first access) the DigitalTwinBackend for *room_id*."""
+    """Return (or create on first access) the DigitalTwinBackend for *room_id*.
+
+    Note: Backends are cached per room_id only. If procedure_id changes, the
+    existing backend for that room is reused. This is intentional — the backend
+    uses a wildcard partition (room/OR-1/procedure/*) so it will receive data
+    from any procedure in the room. The procedure_id param is logged for clarity.
+    """
     global _twin_backends
     if room_id not in _twin_backends:
         _twin_backends[room_id] = DigitalTwinBackend(
             room_id=room_id, procedure_id=procedure_id
         )
+        if procedure_id and procedure_id != "proc-001":
+            log.informational(
+                f"DigitalTwinBackend created with explicit procedure_id={procedure_id}"
+            )
     return _twin_backends[room_id]
+
+
+def _ensure_room_nav(room_id: str, external_url: str = "") -> None:
+    """Initialize room navigation helper once per process.
+
+    Creates the :class:`RoomNav` on first call and hooks its DDS lifecycle
+    into the NiceGUI app.  If NiceGUI has already started (e.g. the digital
+    twin is running as a :class:`DigitalTwinService` inside the operator
+    service host), the subscription is launched immediately via
+    ``background_tasks``.
+    """
+    global _room_nav_instance
+    if _room_nav_instance is None:
+        from surgical_procedure.room_nav import RoomNav
+
+        _room_nav_instance = RoomNav(room_id)
+
+        from nicegui import app as nicegui_app
+
+        try:
+            nicegui_app.on_startup(_room_nav_instance.start)
+        except RuntimeError:
+            # App already running — start immediately.
+            background_tasks.create(_room_nav_instance.start())
+        try:
+            nicegui_app.on_shutdown(_room_nav_instance.close)
+        except RuntimeError:
+            pass  # shutdown hook unavailable after start
+
+    twin_self_url = ""
+    if external_url:
+        twin_self_url = f"{external_url.rstrip('/')}/twin/{room_id}"
+    if twin_self_url:
+        _room_nav_instance.add_static_sibling("Digital Twin", twin_self_url)
 
 
 # --------------------------------------------------------------------------- #
@@ -735,18 +782,32 @@ def _get_backend(room_id: str, procedure_id: str = "proc-001") -> DigitalTwinBac
 @ui.page("/twin/{room_id}", title="Digital Twin — Medtech Suite")
 def twin_page(room_id: str) -> None:
     """Render the digital twin 3D visualization page for *room_id*."""
+    configured_room_id = os.environ.get("ROOM_ID", "OR-1")
+    if room_id != configured_room_id:
+        raise HTTPException(status_code=404, detail="Twin room not found")
+
+    procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
+    _ensure_room_nav(
+        configured_room_id,
+        os.environ.get("MEDTECH_GUI_EXTERNAL_URL", ""),
+    )
+
     init_theme(header=False)
-    _room_nav_instance.render_nav_pill(active_label="Digital Twin")
-    twin_content(room_id)
+    if _room_nav_instance is not None:
+        _room_nav_instance.render_nav_pill(active_label="Digital Twin")
+    twin_content(room_id, procedure_id)
 
 
-def twin_content(room_id: str) -> None:
-    """Render digital twin content.  Call this from the SPA shell's sub_pages."""
-    current_backend = _get_backend(room_id)
+def twin_content(room_id: str, procedure_id: str = "") -> None:
+    """Render digital twin content.  Call this from the SPA shell's sub_pages.
 
-    # Restore the user's stored theme preference
-    stored_mode = app.storage.user.get(NICEGUI_THEME_MODE_KEY, "system")
-    dark_mode = ui.dark_mode(_theme_mode_value(stored_mode))  # noqa: F841
+    Args:
+        room_id: The operating room identifier (e.g., 'OR-1')
+        procedure_id: The procedure ID to use. If empty, uses env var default.
+    """
+    if not procedure_id:
+        procedure_id = os.environ.get("PROCEDURE_ID", "proc-001")
+    current_backend = _get_backend(room_id, procedure_id)
 
     # ---- Mode badge at top of content area --------------------------------
     with ui.row().classes("w-full items-center gap-3 px-4 pt-2"):
@@ -1224,26 +1285,7 @@ def main() -> None:
     favicon_path = _resource_dir() / "images" / "favicon.ico"
 
     # Room navigation pill — discovers sibling GUIs in this room
-    from surgical_procedure.room_nav import RoomNav
-
-    _room_nav_instance = RoomNav(room_id)
-
-    # Pre-populate sibling GUI links from env cross-references
-    ctrl_url = os.environ.get("MEDTECH_CONTROLLER_URL", "")
-    if ctrl_url:
-        _room_nav_instance.add_static_sibling("Procedure Controller", ctrl_url)
-
-    # Register self so the pill always shows the current page as selected.
-    twin_self_url = ""
-    if external_url:
-        twin_self_url = f"{external_url.rstrip('/')}/twin/{room_id}"
-    if twin_self_url:
-        _room_nav_instance.add_static_sibling("Digital Twin", twin_self_url)
-
-    from nicegui import app as nicegui_app
-
-    nicegui_app.on_startup(_room_nav_instance.start)
-    nicegui_app.on_shutdown(_room_nav_instance.close)
+    _ensure_room_nav(room_id, external_url)
 
     # Root redirect: navigating to / sends the browser to the room-specific page.
     @ui.page("/")

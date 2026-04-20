@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+from typing import Any
 
 import click
 from medtech.cli._hospital import (
@@ -32,16 +33,6 @@ def _detect_hospitals() -> list[dict]:
     return [{"name": n, "net": f"medtech_{n}-net"} for n in names]
 
 
-def _twin_port_base(hospital_name: str) -> int:
-    """Base port for twin containers.  hospitalA=8081, 2nd hospital=9081, …"""
-    names = _detect_hospital_names()
-    if hospital_name in names:
-        ordinal = names.index(hospital_name) + 1
-    else:
-        ordinal = 1
-    return 8081 + (ordinal - 1) * 1000
-
-
 def _controller_port_base(hospital_name: str) -> int:
     """Base port for controller containers.  hospitalA=8091, 2nd hospital=9091, …"""
     names = _detect_hospital_names()
@@ -55,7 +46,7 @@ def _controller_port_base(hospital_name: str) -> int:
 def _next_controller_port(hospital_name: str) -> int:
     """Auto-assign the next available controller port for the hospital."""
     base = _controller_port_base(hospital_name)
-    containers = _running_containers()
+    containers = _running_containers(hospital_name)
     used_ports: set[int] = set()
     for c in containers:
         ports = c.get("Ports", "")
@@ -78,10 +69,20 @@ def _next_controller_port(hospital_name: str) -> int:
     return port
 
 
-def _next_twin_port(hospital_name: str) -> int:
-    """Auto-assign the next available twin port for the hospital."""
-    base = _twin_port_base(hospital_name)
-    containers = _running_containers()
+def _operator_gui_port_base(hospital_name: str) -> int:
+    """Base host port for operator-host NiceGUI endpoint."""
+    names = _detect_hospital_names()
+    if hospital_name in names:
+        ordinal = names.index(hospital_name) + 1
+    else:
+        ordinal = 1
+    return 8081 + (ordinal - 1) * 1000
+
+
+def _next_operator_gui_port(hospital_name: str) -> int:
+    """Auto-assign the next available operator-host GUI port."""
+    base = _operator_gui_port_base(hospital_name)
+    containers = _running_containers(hospital_name)
     used_ports: set[int] = set()
     for c in containers:
         ports = c.get("Ports", "")
@@ -113,8 +114,11 @@ def _or_lower(or_name: str) -> str:
 # Container definitions
 # ---------------------------------------------------------------------------
 
-# Service host containers to start per OR
-_SERVICE_HOSTS = [
+# Arm letter suffix for robot-id indexing: a, b, c, ...
+_ARM_LETTERS = "abcdefghijklmnopqrstuvwxyz"
+
+# Non-arm service hosts started once per OR
+_ROOM_SERVICE_HOSTS = [
     {
         "role": "clinical-service-host",
         "image": "medtech/app-python",
@@ -125,6 +129,12 @@ _SERVICE_HOSTS = [
         "image": "medtech/app-python",
         "command": ["python", "-m", "surgical_procedure.operational_service_host"],
     },
+]
+
+# Arm-pair service hosts — one of each per arm in the OR.
+# Both receive the same ROBOT_ID so the operator console targets the
+# correct robot controller's content-filtered readers.
+_ARM_SERVICE_HOSTS = [
     {
         "role": "operator-service-host",
         "image": "medtech/app-python",
@@ -137,39 +147,15 @@ _SERVICE_HOSTS = [
     },
 ]
 
-# Additional per-room containers: core services and simulators
-_ROOM_SERVICES = [
-    {
-        "role": "procedure-context",
-        "image": "medtech/app-python",
-        "command": ["python", "-m", "surgical_procedure.procedure_context_service"],
-    },
-    {
-        "role": "robot-controller",
-        "image": "medtech/app-cpp",
-        "command": ["/opt/medtech/bin/robot-controller"],
-    },
-    {
-        "role": "operator-sim",
-        "image": "medtech/app-python",
-        "command": ["python", "-m", "surgical_procedure.operator_sim"],
-    },
-    {
-        "role": "vitals-sim",
-        "image": "medtech/app-python",
-        "command": ["python", "-m", "surgical_procedure.vitals_sim"],
-    },
-    {
-        "role": "camera-sim",
-        "image": "medtech/app-python",
-        "command": ["python", "-m", "surgical_procedure.camera_sim"],
-    },
-    {
-        "role": "device-telemetry",
-        "image": "medtech/app-python",
-        "command": ["python", "-m", "surgical_procedure.device_telemetry_sim"],
-    },
-]
+# Legacy alias used by existing tests — union of both lists.
+_SERVICE_HOSTS = _ROOM_SERVICE_HOSTS + _ARM_SERVICE_HOSTS
+
+# Additional per-room containers: standalone services not managed by a
+# service host.  All core services (procedure-context, robot-controller,
+# operator, vitals, camera, device-telemetry) are orchestrated through
+# their respective service hosts above; listing them here as well would
+# create duplicate DDS writers on the same topics with mismatched IDs.
+_ROOM_SERVICES: list[dict[str, Any]] = []
 
 
 # ---------------------------------------------------------------------------
@@ -191,12 +177,19 @@ _ROOM_SERVICES = [
     help="Target hospital (required when multiple are running).",
 )
 @click.option(
-    "--twin-port", type=int, default=None, help="Host port for the digital twin GUI."
+    "--arms",
+    "num_arms",
+    default=1,
+    type=click.IntRange(1, len(_ARM_LETTERS)),
+    show_default=True,
+    help="Number of robot arms to deploy in the OR.",
 )
-def or_cmd(
-    or_name: str | None, hospital_name: str | None, twin_port: int | None
-) -> None:
-    """Spawn per-OR containers (room-gateway, service hosts, digital twin)."""
+def or_cmd(or_name: str | None, hospital_name: str | None, num_arms: int = 1) -> None:
+    """Spawn per-OR containers (room-gateway, service hosts, procedure controller).
+
+    Note: Digital Twin is now a procedure-scoped service deployed by the Procedure
+    Controller when a procedure starts. It is no longer a standalone room service.
+    """
     hospitals = _detect_hospitals()
 
     if not hospitals:
@@ -247,10 +240,6 @@ def or_cmd(
     # Create per-room network
     _ensure_network(room_net)
 
-    # Auto-assign twin port
-    if twin_port is None:
-        twin_port = _next_twin_port(target["name"])
-
     # Auto-assign controller port
     controller_port = _next_controller_port(target["name"])
 
@@ -266,7 +255,9 @@ def or_cmd(
 
     # Service host containers — all on room-net only
     procedure_id = f"{or_name}-001"
-    for svc in _SERVICE_HOSTS:
+
+    # --- Non-arm service hosts (one per OR) ---
+    for svc in _ROOM_SERVICE_HOSTS:
         container_name = f"{target['name']}-{svc['role']}-{or_key}"
         host_id = f"{svc['role'].replace('-service-host', '-host')}-{or_key}"
         extra_env = {
@@ -276,10 +267,6 @@ def or_cmd(
             "MEDTECH_APP_NAME": container_name,
             "NDDS_DISCOVERY_PEERS": room_cds_peers,
         }
-        # Robot needs ROBOT_ID
-        if "robot" in svc["role"]:
-            extra_env["ROBOT_ID"] = f"arm-{or_key}-a"
-
         _start_service_container(
             name=container_name,
             image=svc["image"],
@@ -287,6 +274,43 @@ def or_cmd(
             networks=[room_net],
             extra_env=extra_env,
         )
+
+    # --- Arm-pair service hosts (one operator + one robot per arm) ---
+    for arm_idx in range(num_arms):
+        arm_letter = _ARM_LETTERS[arm_idx]
+        robot_id = f"arm-{or_key}-{arm_letter}"
+        arm_suffix = f"-{arm_letter}" if num_arms > 1 else ""
+
+        for svc in _ARM_SERVICE_HOSTS:
+            container_name = f"{target['name']}-{svc['role']}{arm_suffix}-{or_key}"
+            host_id = (
+                f"{svc['role'].replace('-service-host', '-host')}"
+                f"{arm_suffix}-{or_key}"
+            )
+            extra_env = {
+                "ROOM_ID": or_name,
+                "PROCEDURE_ID": procedure_id,
+                "HOST_ID": host_id,
+                "MEDTECH_APP_NAME": container_name,
+                "NDDS_DISCOVERY_PEERS": room_cds_peers,
+                "ROBOT_ID": robot_id,
+            }
+            port_mapping = None
+
+            if svc["role"] == "operator-service-host":
+                gui_port = _next_operator_gui_port(target["name"])
+                extra_env["MEDTECH_GUI_PORT"] = "8080"
+                extra_env["MEDTECH_GUI_EXTERNAL_URL"] = f"http://localhost:{gui_port}"
+                port_mapping = f"{gui_port}:8080"
+
+            _start_service_container(
+                name=container_name,
+                image=svc["image"],
+                command=svc["command"],
+                networks=[room_net],
+                extra_env=extra_env,
+                port_mapping=port_mapping,
+            )
 
     # Core services and simulators — all on room-net only
     for svc in _ROOM_SERVICES:
@@ -297,9 +321,6 @@ def or_cmd(
             "MEDTECH_APP_NAME": container_name,
             "NDDS_DISCOVERY_PEERS": room_cds_peers,
         }
-        # Robot controller needs ROBOT_ID
-        if "robot" in svc["role"]:
-            extra_env["ROBOT_ID"] = f"arm-{or_key}-a"
 
         _start_service_container(
             name=container_name,
@@ -309,32 +330,11 @@ def or_cmd(
             extra_env=extra_env,
         )
 
-    # Digital twin container — room-net only
-    twin_name = f"{target['name']}-medtech-twin-{or_key}"
-    twin_url = f"http://localhost:{twin_port}"
-
     # Procedure Controller container — room-net only
     ctrl_name = f"{target['name']}-medtech-controller-{or_key}"
     ctrl_url = f"http://localhost:{controller_port}"
 
-    # Start twin with cross-reference to controller
-    _start_service_container(
-        name=twin_name,
-        image="medtech/app-python",
-        command=["python", "-m", "surgical_procedure.digital_twin"],
-        networks=[room_net],
-        extra_env={
-            "ROOM_ID": or_name,
-            "PROCEDURE_ID": procedure_id,
-            "MEDTECH_APP_NAME": twin_name,
-            "MEDTECH_GUI_EXTERNAL_URL": twin_url,
-            "MEDTECH_CONTROLLER_URL": f"{ctrl_url}/controller/{or_name}",
-            "NDDS_DISCOVERY_PEERS": room_cds_peers,
-        },
-        port_mapping=f"{twin_port}:8080",
-    )
-
-    # Start controller with cross-reference to twin
+    # Start controller (digital twin will be deployed when procedure starts)
     _start_service_container(
         name=ctrl_name,
         image="medtech/app-python",
@@ -346,7 +346,6 @@ def or_cmd(
             "HOST_ID": f"controller-{or_key}",
             "MEDTECH_APP_NAME": ctrl_name,
             "MEDTECH_GUI_EXTERNAL_URL": ctrl_url,
-            "MEDTECH_TWIN_URL": f"{twin_url}/twin/{or_name}",
             "NDDS_DISCOVERY_PEERS": room_cds_peers,
         },
         port_mapping=f"{controller_port}:8080",
@@ -357,7 +356,7 @@ def or_cmd(
     click.secho(f"OR: {or_name}", bold=True)
     click.echo(f"Hospital: {target['name']}")
     click.secho(f"Controller: {ctrl_url}/controller/{or_name}", fg="green")
-    click.secho(f"Twin: {twin_url}/twin/{or_name}", fg="green")
+    click.echo("(Digital Twin will be deployed when a procedure starts)")
 
 
 # ---------------------------------------------------------------------------
@@ -460,9 +459,13 @@ def _start_room_gateway(
         "--label",
         "medtech.dynamic=true",
         "-e",
-        "CFG_NAME=NonSecureLAN",
+        "CFG_NAME=NonSecureForwarderLANtoLAN",
         "-e",
-        "OBSERVABILITY_DOMAIN=20",
+        "OBSERVABILITY_DOMAIN=19",
+        "-e",
+        "OBSERVABILITY_OUTPUT_DOMAIN=29",
+        "-e",
+        f"OBSERVABILITY_OUTPUT_COLLECTOR_PEER={hospital_cds_peers}",
         "-e",
         "OBSERVABILITY_PROMETHEUS_EXPORTER_PORT=19090",
         "-e",

@@ -13,6 +13,7 @@ from typing import Any
 import app_names
 import pytest
 import rti.connextdds as dds
+from fastapi import HTTPException
 from medtech.gui import BRAND_COLORS, ICONS
 from orchestration import Orchestration
 from surgical_procedure.procedure_controller import controller as controller_module
@@ -386,6 +387,11 @@ class TestControllerPage:
         _patch_ui(monkeypatch, recorder)
         monkeypatch.setattr(controller_module, "init_theme", lambda **kwargs: None)
         monkeypatch.setattr(
+            controller_module.app,
+            "storage",
+            SimpleNamespace(user={}),
+        )
+        monkeypatch.setattr(
             controller_module,
             "_room_nav_instance",
             SimpleNamespace(render_nav_pill=lambda **kwargs: None),
@@ -432,6 +438,7 @@ class TestControllerPage:
                 start_selected=lambda: None,
                 stop_selected=lambda: None,
                 active_procedure_id="",
+                service_count=1,
             ),
         )
 
@@ -453,6 +460,11 @@ class TestControllerPage:
         recorder = Recorder()
         _patch_ui(monkeypatch, recorder)
         monkeypatch.setattr(controller_module, "init_theme", lambda **kwargs: None)
+        monkeypatch.setattr(
+            controller_module.app,
+            "storage",
+            SimpleNamespace(user={}),
+        )
         monkeypatch.setattr(
             controller_module,
             "_room_nav_instance",
@@ -500,6 +512,7 @@ class TestControllerPage:
                 start_selected=lambda: None,
                 stop_selected=lambda: None,
                 active_procedure_id="",
+                service_count=1,
             ),
         )
 
@@ -508,6 +521,26 @@ class TestControllerPage:
     def test_constants_remain_available(self):
         assert ICONS["dashboard"] == "space_dashboard"
         assert BRAND_COLORS["blue"] == "#004A8A"
+
+    def test_room_route_returns_404_on_mismatch(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ROOM_ID", "OR-1")
+        with pytest.raises(HTTPException) as exc:
+            controller_module.controller_page_for_room("OR-3")
+        assert exc.value.status_code == 404
+
+    def test_room_route_renders_on_match(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ROOM_ID", "OR-1")
+        called = False
+
+        def _fake_controller_page() -> None:
+            nonlocal called
+            called = True
+
+        monkeypatch.setattr(controller_module, "controller_page", _fake_controller_page)
+        controller_module.controller_page_for_room("OR-1")
+        assert called is True
 
 
 # ---------------------------------------------------------------------------
@@ -772,6 +805,7 @@ class TestProcedureLifecycle:
             toggle_service_selection=lambda host_id, service_id: None,
             running_service_count=lambda: 0,
             active_procedure_id="",
+            service_count=1,
         )
         monkeypatch.setattr(controller_module, "backend", mock_backend)
         monkeypatch.setattr(controller_module, "_current_backend", lambda: mock_backend)

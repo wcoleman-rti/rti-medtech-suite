@@ -31,6 +31,7 @@ from medtech.gui import (
     create_status_chip,
     init_theme,
 )
+from medtech.gui._colors import OPACITY
 from medtech.gui._theme import NICEGUI_THEME_MODE_KEY, _resource_dir, _theme_mode_value
 from medtech.gui._widgets import ConnectionDot
 from medtech.log import ModuleName, init_logging
@@ -39,6 +40,15 @@ from nicegui import app, background_tasks, ui
 dash_names = app_names.MedtechEntityNames.HospitalDashboard
 
 log = init_logging(ModuleName.HOSPITAL_DASHBOARD)
+
+
+def _hex_to_rgba(hex_color: str, alpha: float) -> str:
+    value = hex_color.lstrip("#")
+    r = int(value[0:2], 16)
+    g = int(value[2:4], 16)
+    b = int(value[4:6], 16)
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
 
 _LIVELINESS_POLL_INTERVAL = 0.5  # seconds — same cadence as digital twin
 
@@ -195,6 +205,7 @@ class DashboardBackend(GuiBackend):
         self._tasks: list[asyncio.Task[Any]] = []
         self._participant: dds.DomainParticipant | None = None
         self._running = False
+        self._revision: int = 0  # incremented on every data change
 
         self._procedure_status_reader = procedure_status_reader
         self._procedure_context_reader = procedure_context_reader
@@ -331,6 +342,7 @@ class DashboardBackend(GuiBackend):
         entry.phase = _phase_text(phase_value)
         entry.phase_color = _phase_color(phase_value)
         entry.status_message = _text(getattr(sample, "status_message", ""))
+        self._revision += 1
 
     def update_procedure_context(self, sample: Any) -> None:
         procedure_id = _text(getattr(sample, "procedure_id", ""))
@@ -342,6 +354,7 @@ class DashboardBackend(GuiBackend):
         patient_id = _nested_text(sample, "patient", "id")
         if patient_id:
             self._patient_to_procedure[patient_id] = procedure_id
+        self._revision += 1
 
     def update_patient_vitals(self, sample: Any) -> None:
         patient_id = _text(getattr(sample, "patient_id", ""))
@@ -353,11 +366,13 @@ class DashboardBackend(GuiBackend):
             "systolic_bp": getattr(sample, "systolic_bp", None),
             "diastolic_bp": getattr(sample, "diastolic_bp", None),
         }
+        self._revision += 1
 
     def update_alarm_message(self, sample: Any) -> None:
         procedure_id = _text(getattr(sample, "procedure_id", ""))
         entry = self._get_or_create_procedure(procedure_id)
         entry.status_message = _text(getattr(sample, "message", ""))
+        self._revision += 1
 
     def update_robot_state(self, sample: Any) -> None:
         # Support both real DDS RobotState samples (robot_id key, operational_mode field)
@@ -384,6 +399,7 @@ class DashboardBackend(GuiBackend):
         else:
             entry.robot_state = _robot_mode_label(raw_mode)
             entry.robot_color = _robot_mode_color(raw_mode)
+        self._revision += 1
 
     def mark_robot_disconnected(self, robot_id: str) -> None:
         """Mark the robot associated with *robot_id* as disconnected (liveliness lost)."""
@@ -400,6 +416,7 @@ class DashboardBackend(GuiBackend):
             entry.robot_disconnected = True
             entry.robot_state = "Disconnected"
             entry.robot_color = BRAND_COLORS["light_gray"]
+        self._revision += 1
 
     def update_clinical_alert(self, sample: Any) -> None:
         severity = _text(getattr(sample, "severity", "UNKNOWN")) or "UNKNOWN"
@@ -415,6 +432,7 @@ class DashboardBackend(GuiBackend):
         if severity.upper() == "CRITICAL":
             alert.highlighted = True
             ui.notification(alert.message or "CRITICAL alert", type="negative")
+        self._revision += 1
 
     def update_resource_availability(self, sample: Any) -> None:
         resource = ResourceEntry(
@@ -426,6 +444,7 @@ class DashboardBackend(GuiBackend):
             location=_text(getattr(sample, "location", "")),
         )
         self.resources[resource.name or resource.kind] = resource
+        self._revision += 1
 
     def update_service_catalog(self, sample: Any) -> None:
         host_id = _text(getattr(sample, "host_id", ""))
@@ -434,6 +453,7 @@ class DashboardBackend(GuiBackend):
             return
         self._service_catalogs[(host_id, service_id)] = sample
         self._rebuild_rooms()
+        self._revision += 1
 
     def _rebuild_rooms(self) -> None:
         """Re-aggregate room data from the current service catalog cache."""
@@ -582,12 +602,6 @@ def dashboard_page() -> None:
     """Render the hospital dashboard page (standalone with self-contained shell)."""
     init_theme()
     create_header(title="Hospital Dashboard")
-    controller_url = os.environ.get("MEDTECH_CONTROLLER_URL", "")
-    if controller_url:
-        with ui.row().classes("w-full px-4 pt-2 items-center"):
-            ui.link("← Return to Controller", controller_url).classes(
-                "text-sm text-blue-400 hover:text-blue-300"
-            )
     dashboard_content()
 
 
@@ -606,11 +620,35 @@ def dashboard_content() -> None:
             if not rooms:
                 create_empty_state("Waiting for room data…")
                 return
-            with ui.row().classes("w-full gap-4 flex-wrap"):
+            with (
+                ui.element("div")
+                .classes("w-full")
+                .style(
+                    "display: grid;"
+                    " grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));"
+                    " gap: 1rem;"
+                )
+            ):
                 for room in rooms:
-                    with ui.card().classes("w-72 gap-2 p-4 hover-elevate"):
-                        with ui.row().classes("w-full items-center gap-2"):
-                            ui.label(room.room_id).classes("type-h3")
+                    border_color = (
+                        BRAND_COLORS["green"]
+                        if room.procedure_id
+                        else BRAND_COLORS["gray"]
+                    )
+                    with (
+                        ui.card()
+                        .classes(
+                            "w-full rounded-lg p-5 transition"
+                            " hover:shadow-lg hover-elevate"
+                        )
+                        .style(
+                            f"border-left: 4px solid {border_color};"
+                            f" background: {_hex_to_rgba(border_color, OPACITY['tile_fill'])};"
+                            f" box-shadow: 0 2px 8px rgba(0,0,0,{OPACITY['shadow']});"
+                        )
+                    ):
+                        with ui.row().classes("w-full items-center gap-3"):
+                            ui.label(room.room_id).classes("type-h3 brand-heading")
                             ui.space()
                             if room.procedure_id:
                                 ui.badge("Active", color="green").props("rounded")
@@ -646,12 +684,30 @@ def dashboard_content() -> None:
                 create_empty_state("No active procedures")
                 return
             for entry in active:
-                with ui.card().classes("w-full gap-1 p-4 hover-elevate"):
-                    with ui.row().classes("w-full items-center gap-2"):
+                border_color = entry.phase_color
+                with (
+                    ui.card()
+                    .classes(
+                        "w-full rounded-lg p-5 transition"
+                        " hover:shadow-lg hover-elevate"
+                    )
+                    .style(
+                        f"border-left: 4px solid {border_color};"
+                        f" background: {_hex_to_rgba(border_color, OPACITY['tile_fill'])};"
+                        f" box-shadow: 0 2px 8px rgba(0,0,0,{OPACITY['shadow']});"
+                    )
+                ):
+                    with ui.row().classes("w-full items-center gap-3"):
                         create_status_chip(entry.phase)
-                        ui.label(entry.room or entry.procedure_id).classes("type-h3")
+                        ui.label(entry.room or entry.procedure_id).classes(
+                            "type-h3 brand-heading"
+                        )
                         ui.space()
                         ui.label(entry.phase).classes("type-body")
+                    if entry.procedure_id:
+                        ui.label(f"Procedure: {entry.procedure_id}").classes(
+                            "type-body-sm text-gray-500"
+                        )
                     ui.label(f"Patient: {entry.patient_name or '—'}").classes(
                         "type-body-sm text-gray-500"
                     )
@@ -687,13 +743,22 @@ def dashboard_content() -> None:
                                 entry.robot_state in ("E-STOP", "EMERGENCY_STOP")
                                 and not entry.robot_disconnected
                             )
-                            card_classes = "w-full p-3"
+                            robot_border = entry.robot_color
+                            card_cls = (
+                                "w-full rounded-lg p-5 transition"
+                                " hover:shadow-lg hover-elevate"
+                            )
+                            card_style = (
+                                f"border-left: 4px solid {robot_border};"
+                                f" background: {_hex_to_rgba(robot_border, OPACITY['tile_fill'])};"
+                                f" box-shadow: 0 2px 8px rgba(0,0,0,{OPACITY['shadow']});"
+                            )
                             if is_estop:
-                                card_classes += " animate-pulse border-2 border-red-600"
-                            with ui.card().classes(card_classes):
-                                with ui.row().classes("w-full items-center gap-2"):
+                                card_cls += " animate-pulse"
+                            with ui.card().classes(card_cls).style(card_style):
+                                with ui.row().classes("w-full items-center gap-3"):
                                     ui.label(entry.room or entry.procedure_id).classes(
-                                        "type-h3"
+                                        "type-h3 brand-heading"
                                     )
                                     create_status_chip(entry.robot_state)
 
@@ -756,12 +821,26 @@ def dashboard_content() -> None:
                 return
             with ui.scroll_area().classes("w-full h-72"):
                 for alert in alerts:
-                    card_classes = "w-full gap-1 p-3 animate-slide-in"
-                    if alert.severity.upper() == "CRITICAL":
-                        card_classes += " pulse-critical"
-                    with ui.card().classes(card_classes):
+                    sev = alert.severity.upper()
+                    alert_color = {
+                        "CRITICAL": BRAND_COLORS["red"],
+                        "WARNING": BRAND_COLORS["amber"],
+                        "INFO": BRAND_COLORS["blue"],
+                    }.get(sev, BRAND_COLORS["gray"])
+                    card_cls = "w-full rounded-lg p-5 transition animate-slide-in"
+                    if sev == "CRITICAL":
+                        card_cls += " pulse-critical"
+                    with (
+                        ui.card()
+                        .classes(card_cls)
+                        .style(
+                            f"border-left: 4px solid {alert_color};"
+                            f" background: {_hex_to_rgba(alert_color, OPACITY['tile_fill'])};"
+                            f" box-shadow: 0 2px 8px rgba(0,0,0,{OPACITY['shadow']});"
+                        )
+                    ):
                         ui.label(f"{alert.severity} · {alert.room or '—'}").classes(
-                            "type-h3"
+                            "type-h3 brand-heading"
                         )
                         ui.label(alert.patient_name or "—").classes("type-body")
                         ui.label(alert.category or "").classes(
@@ -771,16 +850,22 @@ def dashboard_content() -> None:
 
         render_alert_feed()
 
-        ui.timer(
-            0.5,
-            lambda: (
-                render_room_cards.refresh(),
-                render_procedure_list.refresh(),
-                render_alert_feed.refresh(),
-                render_robot_status.refresh(),
-                render_resource_panel.refresh(),
-            ),
-        )
+        # Change-driven refresh: only re-render panels when backend data
+        # has actually changed, eliminating flicker from idle re-renders.
+        _last_rev = {"value": current_backend._revision}
+
+        def _maybe_refresh() -> None:
+            rev = current_backend._revision
+            if rev == _last_rev["value"]:
+                return
+            _last_rev["value"] = rev
+            render_room_cards.refresh()
+            render_procedure_list.refresh()
+            render_alert_feed.refresh()
+            render_robot_status.refresh()
+            render_resource_panel.refresh()
+
+        ui.timer(0.5, _maybe_refresh)
 
 
 # ---------------------------------------------------------------------------
@@ -844,6 +929,10 @@ def shell_page() -> None:
     stored_mode = app.storage.user.get(NICEGUI_THEME_MODE_KEY, "system")
     dark_mode = ui.dark_mode(_theme_mode_value(stored_mode))  # noqa: F841
 
+    # Derive hospital display name from MEDTECH_APP_NAME (e.g. "hospitalA-gui" → "hospitalA")
+    app_name = os.environ.get("MEDTECH_APP_NAME", "")
+    hospital_label = app_name.removesuffix("-gui") if app_name else "Hospital"
+
     # ---- Floating navigation pill (top-center overlay) --------------------
     _NAV_PILL_CSS = (
         "position: fixed; top: 18px; left: 50%; transform: translateX(-50%);"
@@ -859,11 +948,13 @@ def shell_page() -> None:
         ui.html(
             '<img src="/images/rti-logo-white.png" '
             'class="rti-logo-dark" '
-            'style="height: 1.8rem; width: auto; opacity: 0.85;" alt="RTI">'
+            'style="height: 1.8rem; width: auto; flex-shrink: 0; opacity: 0.85;" alt="RTI">'
             '<img src="/images/rti-logo-color.png" '
             'class="rti-logo-light" '
-            'style="height: 1.8rem; width: auto; opacity: 0.85;" alt="RTI">'
-        )
+            'style="height: 1.8rem; width: auto; flex-shrink: 0; opacity: 0.85;" alt="RTI">'
+        ).style("flex-shrink: 0")
+
+        ui.label(hospital_label).classes("type-h3 mr-2")
 
         # --- Static page tabs ---
         nav_buttons: dict[str, ui.button] = {}

@@ -19,8 +19,10 @@ import rti.asyncio  # noqa: F401 — enables async DDS methods
 import rti.connextdds as dds
 from medtech.dds import initialize_connext
 from medtech.gui._icons import ICONS
+from medtech.gui._theme import NICEGUI_THEME_MODE_KEY, _theme_mode_value
+from medtech.gui._widgets import ConnectionDot
 from medtech.log import ModuleName, init_logging
-from nicegui import background_tasks, ui
+from nicegui import app, background_tasks, ui
 
 _nav_names = app_names.MedtechEntityNames.RoomNav
 
@@ -164,6 +166,16 @@ class RoomNav:
             )
             .style(_NAV_PILL_CSS)
         ):
+            # Theme-aware RTI logo — matches hospital dashboard nav pill
+            ui.html(
+                '<img src="/images/rti-logo-white.png" '
+                'class="rti-logo-dark" '
+                'style="height: 1.8rem; width: auto; flex-shrink: 0; opacity: 0.85;" alt="RTI">'
+                '<img src="/images/rti-logo-color.png" '
+                'class="rti-logo-light" '
+                'style="height: 1.8rem; width: auto; flex-shrink: 0; opacity: 0.85;" alt="RTI">'
+            ).style("flex-shrink: 0")
+
             ui.label(self._room_id).classes("type-h3 mr-2")
 
             @ui.refreshable
@@ -176,11 +188,6 @@ class RoomNav:
                     btn = (
                         ui.button(
                             name,
-                            icon=(
-                                None
-                                if is_active
-                                else ICONS.get("open_in_new", "open_in_new")
-                            ),
                             on_click=(
                                 None if is_active else (lambda u=url: ui.navigate.to(u))
                             ),
@@ -192,6 +199,44 @@ class RoomNav:
                         btn.props("disable")
 
             _render_buttons()
+
+            # Separator before theme toggle
+            ui.separator().props("vertical").classes("mx-1")
+
+            # Theme toggle — matches create_header() cycling logic
+            stored_mode = app.storage.user.get(NICEGUI_THEME_MODE_KEY, "system")
+            dark_mode = ui.dark_mode(_theme_mode_value(stored_mode))
+
+            def _cycle_to(new_value: bool | None) -> None:
+                dark_mode.set_value(new_value)
+                if new_value is True:
+                    mode = "dark"
+                elif new_value is False:
+                    mode = "light"
+                else:
+                    mode = "system"
+                app.storage.user[NICEGUI_THEME_MODE_KEY] = mode
+
+            with (
+                ui.button(on_click=lambda: _cycle_to(None))
+                .props("flat round size=sm")
+                .bind_visibility_from(dark_mode, "value", value=True)
+            ):
+                ui.icon(ICONS["dark_mode"]).classes("text-lg")
+            with (
+                ui.button(on_click=lambda: _cycle_to(True))
+                .props("flat round size=sm")
+                .bind_visibility_from(dark_mode, "value", value=False)
+            ):
+                ui.icon(ICONS["light_mode"]).classes("text-lg")
+            with (
+                ui.button(on_click=lambda: _cycle_to(False))
+                .props("flat round size=sm")
+                .bind_visibility_from(dark_mode, "value", backward=lambda v: v is None)
+            ):
+                ui.icon(ICONS["auto_mode"]).classes("text-lg")
+
+            ConnectionDot(connected=True)
 
             ui.timer(1.0, _render_buttons.refresh)
 
