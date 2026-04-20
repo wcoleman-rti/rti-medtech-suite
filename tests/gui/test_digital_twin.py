@@ -28,6 +28,7 @@ import pytest
 import rti.connextdds as dds
 import surgery
 from conftest import wait_for_data, wait_for_discovery
+from fastapi import HTTPException
 from surgical_procedure.digital_twin import digital_twin as twin_module
 
 pytestmark = [
@@ -562,6 +563,36 @@ class TestArmStateColors:
             twin_module.ARM_STATE_COLORS[ArmAssignmentState.POSITIONING]
             == twin_module.BRAND_COLORS["amber"]
         )
+
+
+class TestTwinPageRouting:
+    def test_twin_page_returns_404_on_room_mismatch(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ROOM_ID", "OR-1")
+        with pytest.raises(HTTPException) as exc:
+            twin_module.twin_page("OR-3")
+        assert exc.value.status_code == 404
+
+    def test_twin_page_renders_on_matching_room(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ROOM_ID", "OR-1")
+        called = False
+        monkeypatch.setattr(twin_module, "init_theme", lambda **kwargs: None)
+        monkeypatch.setattr(
+            twin_module,
+            "_room_nav_instance",
+            SimpleNamespace(render_nav_pill=lambda **kwargs: None),
+        )
+
+        def _fake_twin_content(room_id: str, procedure_id: str = "") -> None:
+            nonlocal called
+            called = room_id == "OR-1"
+
+        monkeypatch.setattr(twin_module, "twin_content", _fake_twin_content)
+        twin_module.twin_page("OR-1")
+        assert called is True
 
     def test_failed_red(self) -> None:
         assert (

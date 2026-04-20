@@ -62,13 +62,39 @@ class TestRunHospitalDefault:
                 idx = cmd.index("--name")
                 names.append(cmd[idx + 1])
         assert "hospitalA-gateway" in names
-        assert "hospitalA-gateway-rs" in names
+        # Hospital gateway RS is suppressed until V3.0 (Hospital → Cloud bridge).
+        # The Procedure → Hospital RS runs in the per-OR gateway instead.
+        assert "hospitalA-gateway-rs" not in names
         assert "hospitalA-gateway-collector" in names
         assert "hospitalA-gui" in names
 
     @patch("medtech.cli._hospital._running_networks", return_value=[])
     @patch("medtech.cli._hospital.run_cmd")
-    def test_no_nat_router(self, mock_run, mock_nets) -> None:
+    def test_gateway_publishes_collector_control_port(
+        self, mock_run, mock_nets
+    ) -> None:
+        """Gateway container publishes the Collector Service control port."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", "hospital"])
+        assert result.exit_code == 0
+        docker_runs = [
+            c.args[0]
+            for c in mock_run.call_args_list
+            if isinstance(c.args[0], list)
+            and c.args[0][:3] == ["docker", "run", "--rm"]
+        ]
+        # Find the gateway (CDS) container command
+        gw_cmd = [
+            cmd
+            for cmd in docker_runs
+            if "hospitalA-gateway" in cmd
+            and "hospitalA-gateway-rs" not in cmd
+            and "hospitalA-gateway-collector" not in cmd
+        ][0]
+        # Control port 19098 must be published on the host
+        assert "-p" in gw_cmd
+        p_idx = gw_cmd.index("-p")
+        assert gw_cmd[p_idx + 1] == "19098:19098"
         """No NAT router is created for unnamed hospital."""
         runner = CliRunner()
         result = runner.invoke(main, ["run", "hospital"])
@@ -219,6 +245,38 @@ class TestRunHospitalNamed:
         ]
         net_names = [cmd[-1] for cmd in network_creates]
         assert net_names.count("medtech_wan-net") == 0
+
+    @patch(
+        "medtech.cli._hospital._running_networks",
+        return_value=[
+            "medtech_hospital-a-net",
+            "medtech_wan-net",
+        ],
+    )
+    @patch("medtech.cli._hospital.run_cmd")
+    def test_second_hospital_collector_control_port_offset(
+        self, mock_run, mock_nets
+    ) -> None:
+        """Second hospital gateway publishes collector control port 20098."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", "hospital", "--name", "hospital-b"])
+        assert result.exit_code == 0
+        docker_runs = [
+            c.args[0]
+            for c in mock_run.call_args_list
+            if isinstance(c.args[0], list)
+            and c.args[0][:3] == ["docker", "run", "--rm"]
+        ]
+        gw_cmd = [
+            cmd
+            for cmd in docker_runs
+            if "hospital-b-gateway" in cmd
+            and "hospital-b-gateway-rs" not in cmd
+            and "hospital-b-gateway-collector" not in cmd
+        ][0]
+        assert "-p" in gw_cmd
+        p_idx = gw_cmd.index("-p")
+        assert gw_cmd[p_idx + 1] == "20098:19098"
 
 
 class TestRunHospitalObservability:

@@ -110,6 +110,7 @@ other well-known services.
 | Dashboard (GUI)     | 8080       | 9080       | 8080 + (N−1)×1000     |
 | Digital Twin (base) | 8081+      | 9081+      | 8081 + (N−1)×1000+    |
 | Controller (base)   | 8091+      | 9091+      | 8091 + (N−1)×1000+    |
+| Collector Control   | 19098      | 20098      | 19098 + (N−1)×1000    |
 | Prometheus          | 9090       | 10090      | 9090 + (N−1)×1000     |
 | Loki                | 3100       | 4100       | 3100 + (N−1)×1000     |
 | Grafana             | 3000       | 4000       | 3000 + (N−1)×1000     |

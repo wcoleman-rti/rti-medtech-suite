@@ -43,9 +43,9 @@ TEST(AppNames, ProcedureContextWriter)
     EXPECT_EQ(names::PROCEDURE_CONTEXT_WRITER, "OperationalPublisher::ProcedureContextWriter");
 }
 
-TEST(AppNames, ProcedureStatusWriter)
+TEST(AppNames, CtrlProcedureStatusWriter)
 {
-    EXPECT_EQ(names::PROCEDURE_STATUS_WRITER, "OperationalPublisher::ProcedureStatusWriter");
+    EXPECT_EQ(names::CTRL_PROCEDURE_STATUS_WRITER, "ControllerProcOpPublisher::ProcedureStatusWriter");
 }
 
 TEST(AppNames, CameraFrameWriter)

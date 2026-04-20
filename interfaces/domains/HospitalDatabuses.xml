@@ -47,13 +47,16 @@
         </domain>
 
         <!--
-            Hospital Observability databus (Domain 29)
+            Hospital Observability databus — Domain ID 29 (reserved)
             Aggregated telemetry: room-forwarded (from Room Observability
             databus) + hospital-native. Collector Service forwards to
             Cloud Observability databus (V3.0).
             No registered types or topics.
+
+            Commented out: empty domain elements cause Routing Service
+            XML validation errors.
         -->
-        <domain name="Observability" domain_id="29"/>
+        <!-- <domain name="Observability" domain_id="29"/> -->
 
     </domain_library>
 

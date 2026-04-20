@@ -156,6 +156,11 @@ def _gui_port(ordinal: int) -> int:
     return 8080 + (ordinal - 1) * 1000
 
 
+def _collector_control_port(ordinal: int) -> int:
+    """Collector Service control host port for a hospital ordinal (1→19098, 2→20098, …)."""
+    return 19098 + (ordinal - 1) * 1000
+
+
 # ---------------------------------------------------------------------------
 # Command
 # ---------------------------------------------------------------------------
@@ -198,7 +203,7 @@ def hospital(hospital_name: str | None, observability: bool) -> None:
         _ensure_network(net_name)
 
     gateway_name = f"{name}-gateway"
-    _start_gateway(gateway_name, net_name)
+    _start_gateway(gateway_name, net_name, ordinal)
 
     port = _gui_port(ordinal)
     gui_name = f"{name}-gui"
@@ -219,6 +224,7 @@ def hospital(hospital_name: str | None, observability: bool) -> None:
 def _start_gateway(
     gateway_name: str,
     network: str,
+    ordinal: int = 1,
 ) -> None:
     """Launch the gateway base container (CDS) plus co-located RS and Collector."""
     root = _project_root()
@@ -236,6 +242,9 @@ def _start_gateway(
         "medtech.dynamic=true",
         "--network",
         network,
+        # Collector shares this network namespace; map its control port here.
+        "-p",
+        f"{_collector_control_port(ordinal)}:19098",
         "-v",
         f"{root}/services/cloud-discovery-service/CloudDiscoveryService.xml:"
         "/opt/medtech/config/CloudDiscoveryService.xml:ro",
@@ -252,39 +261,10 @@ def _start_gateway(
     ]
     run_cmd(cmd)
 
-    # 2. Routing Service (shares gateway network namespace)
-    rs_cmd = [
-        "docker",
-        "run",
-        "--rm",
-        "-d",
-        "--name",
-        f"{gateway_name}-rs",
-        "--network",
-        f"container:{gateway_name}",
-        "--label",
-        "medtech.dynamic=true",
-    ]
-    rs_cmd.extend(_config_volumes())
-    rs_cmd.extend(
-        [
-            "-v",
-            f"{root}/services/routing/RoutingService.xml:"
-            "/opt/medtech/config/RoutingService.xml:ro",
-            "-e",
-            f"NDDS_DISCOVERY_PEERS={cds_peers}",
-            "-e",
-            f"NDDS_QOS_PROFILES={_MEDTECH_ENV['NDDS_QOS_PROFILES']}",
-            "-e",
-            "MEDTECH_TRANSPORT_PROFILE=Docker",
-            "medtech/routing-service",
-            "-cfgFile",
-            "/opt/medtech/config/RoutingService.xml",
-            "-cfgName",
-            "MedtechBridge",
-        ]
-    )
-    run_cmd(rs_cmd)
+    # 2. Routing Service — Hospital → Cloud bridge (V3.0)
+    # The Procedure → Hospital bridge runs in the per-OR gateway (see _or.py).
+    # The hospital-level RS will bridge Domain 20 → 30 once the Cloud
+    # Routing Service config is implemented.  Suppressed until then.
 
     # 3. Collector Service (shares gateway network namespace)
     # Loki runs in the observability node (Prometheus's namespace),
@@ -303,9 +283,14 @@ def _start_gateway(
         "--label",
         "medtech.dynamic=true",
         "-e",
-        "CFG_NAME=NonSecureLAN",
+        # "CFG_NAME=NonSecureForwarderLANtoLAN",
+        "CFG_NAME=NonSecureRemoteDebuggingLAN",
         "-e",
-        "OBSERVABILITY_DOMAIN=20",
+        "OBSERVABILITY_DOMAIN=29",
+        "-e",
+        "OBSERVABILITY_OUTPUT_DOMAIN=39",
+        "-e",
+        "OBSERVABILITY_OUTPUT_COLLECTOR_PEER=rtps@udpv4://cloud-gateway:7400",
         "-e",
         "OBSERVABILITY_PROMETHEUS_EXPORTER_PORT=19090",
         "-e",

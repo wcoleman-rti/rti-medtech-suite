@@ -22,7 +22,7 @@ class TestAcceptanceSimulationWorkflow:
 
     @patch("medtech.cli._main.subprocess.run")
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
-    @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._next_operator_gui_port", return_value=8081)
     @patch("medtech.cli._or._running_networks", return_value=[])
     @patch("medtech.cli._or._detect_hospitals")
     @patch("medtech.cli._hospital._running_networks", return_value=[])
@@ -39,7 +39,7 @@ class TestAcceptanceSimulationWorkflow:
         mock_nets,
         mock_hosp,
         mock_or_nets,
-        mock_port,
+        mock_operator_gui_port,
         mock_ctrl_port,
         mock_subprocess,
     ) -> None:
@@ -65,7 +65,7 @@ class TestAcceptanceSimulationWorkflow:
         # --- Phase 2: medtech run or --name OR-5 ---------------------------
         mock_or_run.reset_mock()
         mock_h_run.reset_mock()
-        mock_port.return_value = 8083
+        mock_operator_gui_port.return_value = 8083
         mock_ctrl_port.return_value = 8093
 
         result = runner.invoke(main, ["run", "or", "--name", "OR-5"])
@@ -153,7 +153,7 @@ class TestAcceptanceSimulationWorkflow:
 
     @patch("medtech.cli._main.subprocess.run")
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
-    @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._next_operator_gui_port", return_value=8081)
     @patch("medtech.cli._or._running_networks", return_value=[])
     @patch("medtech.cli._or._detect_hospitals")
     @patch("medtech.cli._hospital._running_networks")
@@ -170,7 +170,7 @@ class TestAcceptanceSimulationWorkflow:
         mock_nets,
         mock_hosp,
         mock_or_nets,
-        mock_port,
+        mock_operator_gui_port,
         mock_ctrl_port,
         mock_subprocess,
     ) -> None:

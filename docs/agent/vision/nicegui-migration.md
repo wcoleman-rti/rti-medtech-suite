@@ -171,8 +171,10 @@ hook automatically.
 >   on the Hospital Integration databus (Hospital integration). Receives all data via per-room RS bridge.
 > - **Procedure Controller** (`medtech-controller` on `<room>-net`) — one
 >   participant on the Orchestration databus (Orchestration, room-scoped). Room-level deployment.
-> - **Digital Twin** (`medtech-twin` on `<room>-net`) — one participant on
->   the Procedure DDS domain (`control` tag). Room-level deployment.
+> - **Digital Twin** (one per active procedure) — deployed by Procedure Controller via
+>   OperatorServiceHost RPC call. Joins the Procedure DDS domain (`control` tag) with
+>   procedure-specific partition. Procedure-scoped lifecycle: starts when procedure starts,
+>   terminates when procedure stops. Publishes its GUI URL via ServiceCatalog.
 >
 > No GUI backend spans deployment levels. The dashboard does NOT join
 > orchestration or procedure domains — it discovers rooms and services via

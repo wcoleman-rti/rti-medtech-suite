@@ -391,7 +391,9 @@ class TestLivelinessDetection:
         reader = dds.DataReader(dds.Subscriber(dp), topic, rqos)
 
         # Start a dedicated host for this destructive test
-        proc = _start_python_host("surgical_procedure.operator_service_host", host_id)
+        # Use clinical host (not operator) to avoid NiceGUI port conflicts
+        # with the module-scoped all_service_hosts fixture.
+        proc = _start_python_host("surgical_procedure.clinical_service_host", host_id)
         try:
             # Wait until we receive ServiceCatalog data from THIS host
             # (not just any host on the domain).

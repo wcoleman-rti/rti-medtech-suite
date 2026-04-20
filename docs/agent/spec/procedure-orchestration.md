@@ -38,7 +38,7 @@ as partition strings.
 | Well-known property key — procedure context | `procedure_id` |
 | Well-known property key — GUI endpoint URL | `gui_url` |
 | Service Host liveliness lease | 2 s (host failure detection via liveliness) |
-| Procedure Controller domains | Orchestration + Procedure (`operational` read-only, `control` read-only) |
+| Procedure Controller domains | Orchestration + Procedure (`operational` publishes ProcedureStatus / reads ProcedureContext, `control` read-only) |
 | Orchestration → Procedure DDS domain isolation | Complete — orchestration failure must not disrupt surgical data |
 | Service context injection | All context via constructor/setter — never environment variables |
 | RPC operations | `start_service`, `stop_service`, `update_service`, `get_capabilities`, `get_health` |
@@ -249,16 +249,17 @@ is added or changed.*
 **Given** the Procedure Controller process starts
 **When** the controller creates its DomainParticipants
 **Then** one participant is on the Orchestration databus (for RPC and status)
-**And** one participant is on the Procedure DDS domain (`operational` tag, read-only — for `ProcedureStatus` and `ProcedureContext`)
+**And** one participant is on the Procedure DDS domain (`operational` tag — publishes `ProcedureStatus`, reads `ProcedureContext`)
 **And** one participant is on the Procedure DDS domain (`control` tag, read-only — for `RobotArmAssignment`)
 **And** the controller does not join the Hospital Integration databus
 
-### Scenario: Procedure Controller does not publish on any domain `@integration` `@orchestration`
+### Scenario: Procedure Controller publishes only ProcedureStatus on the Procedure domain `@integration` `@orchestration`
 
 **Given** the Procedure Controller has participants on the Orchestration and Procedure DDS domain
 **When** the controller operates normally
-**Then** the controller only subscribes (reads) on the Procedure DDS domain — it never publishes
-**And** the controller only publishes via DDS RPC on the Orchestration databus (request/reply)
+**Then** the controller publishes `ProcedureStatus` on the Procedure operational databus (Class A/I non-critical metadata)
+**And** the controller only reads (never publishes) on the Procedure `control` and `clinical` databuses
+**And** the controller publishes via DDS RPC on the Orchestration databus (request/reply)
 
 ---
 

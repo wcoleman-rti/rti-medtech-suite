@@ -40,7 +40,7 @@
              (e.g. hospital-gateway:7400, or-1-gateway:7400).  No initial_peers
              are set here so the env var is not overridden by XML. -->
         <qos_profile name="Docker">
-            <domain_participant_qos>
+            <!-- <domain_participant_qos>
                 <discovery>
                     <multicast_receive_addresses/>
                 </discovery>
@@ -52,7 +52,7 @@
                         </element>
                     </value>
                 </property>
-            </domain_participant_qos>
+            </domain_participant_qos> -->
         </qos_profile>
 
     </qos_library>

@@ -45,10 +45,10 @@ class TestWriterNames:
             == "OperationalPublisher::ProcedureContextWriter"
         )
 
-    def test_procedure_status_writer(self):
+    def test_ctrl_procedure_status_writer(self):
         assert (
-            names.PROCEDURE_STATUS_WRITER
-            == "OperationalPublisher::ProcedureStatusWriter"
+            names.CTRL_PROCEDURE_STATUS_WRITER
+            == "ControllerProcOpPublisher::ProcedureStatusWriter"
         )
 
     def test_camera_frame_writer(self):
@@ -128,3 +128,16 @@ class TestReaderNames:
 
     def test_twin_robot_command_reader(self):
         assert names.TWIN_ROBOT_COMMAND_READER == "TwinSubscriber::RobotCommandReader"
+
+
+orch_names = app_names.MedtechEntityNames.OrchestrationParticipants
+
+
+class TestOrchestrationWriterNames:
+    """Verify Orchestration writer entity name constants."""
+
+    def test_ctrl_service_catalog_writer(self):
+        assert (
+            orch_names.CTRL_SERVICE_CATALOG_WRITER
+            == "ControllerOrchPublisher::ServiceCatalogWriter"
+        )

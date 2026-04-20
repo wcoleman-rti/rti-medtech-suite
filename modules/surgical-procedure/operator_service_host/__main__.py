@@ -10,39 +10,37 @@ from __future__ import annotations
 
 import asyncio
 import os
-import signal
 
 import rti.asyncio  # noqa: F401 — RTI asyncio integration
+from medtech.gui_runtime import NiceGuiRuntime
+from nicegui import app, background_tasks, ui
 
 from .operator_service_host import make_operator_service_host
 
 
-async def _run() -> None:
+def main() -> None:
     host_id = os.environ.get("HOST_ID", "operator-host-001")
     room_id = os.environ.get("ROOM_ID", "OR-1")
     robot_id = os.environ.get("ROBOT_ID", "robot-001")
+    gui_runtime = NiceGuiRuntime.from_env()
 
-    host = make_operator_service_host(host_id, room_id, robot_id)
+    host = make_operator_service_host(host_id, room_id, robot_id, gui_runtime)
+    host_task: asyncio.Task | None = None
 
-    loop = asyncio.get_running_loop()
-    _shutdown_count = 0
+    @app.on_startup
+    async def _start_host() -> None:
+        nonlocal host_task
+        host_task = background_tasks.create(host.run())
 
-    def _on_signal() -> None:
-        nonlocal _shutdown_count
-        _shutdown_count += 1
-        if _shutdown_count == 1:
-            host.stop()
-        else:
-            os._exit(1)
+    @app.on_shutdown
+    async def _stop_host() -> None:
+        host.stop()
+        if host_task is not None:
+            await asyncio.gather(host_task, return_exceptions=True)
 
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, _on_signal)
+    ui.page("/")(lambda: ui.navigate.to(f"/twin/{room_id}"))
 
-    await host.run()
-
-
-def main() -> None:
-    rti.asyncio.run(_run())
+    gui_runtime.run(title="Operator Service Host — Medtech Suite")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
-"""Procedure Context and Status publisher.
+"""Procedure Context publisher.
 
-Publishes ProcedureContext and ProcedureStatus on the Procedure DDS domain
+Publishes ProcedureContext on the Procedure DDS domain
 (operational tag) with State pattern QoS and TRANSIENT_LOCAL durability.
 
 The participant and all writers are created from XML configuration
@@ -9,6 +9,9 @@ name using find_datawriter().
 
 Configuration is read from constructor parameters (atomic IDs).
 Implements medtech.Service for orchestration lifecycle management.
+
+Note: ProcedureStatus is published by the Procedure Controller, not here.
+The controller is the semantic authority for procedure lifecycle transitions.
 """
 
 from __future__ import annotations
@@ -27,8 +30,6 @@ from medtech.service import Service, ServiceState
 names = app_names.MedtechEntityNames.SurgicalParticipants
 
 ProcedureContext = surgery.Surgery.ProcedureContext
-ProcedureStatus = surgery.Surgery.ProcedureStatus
-ProcedurePhase = surgery.Surgery.ProcedurePhase
 EntityIdentity = common.Common.EntityIdentity
 Time_t = common.Common.Time_t
 
@@ -37,9 +38,9 @@ log = init_logging(ModuleName.SURGICAL_PROCEDURE)
 
 
 class ProcedureContextService(Service):
-    """Publishes ProcedureContext and ProcedureStatus using write-on-change model.
+    """Publishes ProcedureContext using write-on-change model.
 
-    Both topics use State pattern QoS (TRANSIENT_LOCAL, RELIABLE, KEEP_LAST 1)
+    Uses State pattern QoS (TRANSIENT_LOCAL, RELIABLE, KEEP_LAST 1)
     so late-joining subscribers receive the current state immediately.
 
     Owns its DomainParticipant (created from XML configuration
@@ -74,19 +75,14 @@ class ProcedureContextService(Service):
 
         # Look up XML-created writers by entity name
         ctx_any = self._participant.find_datawriter(names.PROCEDURE_CONTEXT_WRITER)
-        status_any = self._participant.find_datawriter(names.PROCEDURE_STATUS_WRITER)
 
         if ctx_any is None:
             raise RuntimeError(f"Writer not found: {names.PROCEDURE_CONTEXT_WRITER}")
-        if status_any is None:
-            raise RuntimeError(f"Writer not found: {names.PROCEDURE_STATUS_WRITER}")
 
         self._context_writer = dds.DataWriter(ctx_any)
-        self._status_writer = dds.DataWriter(status_any)
 
         self._procedure_id = procedure_id
         self._last_context: ProcedureContext | None = None
-        self._last_phase: ProcedurePhase | None = None
 
     def _start(self) -> None:
         """Enable the participant to initiate DDS discovery.
@@ -130,20 +126,6 @@ class ProcedureContextService(Service):
             f"room={room}"
         )
 
-    def publish_status(self, phase: ProcedurePhase, message: str = "") -> None:
-        """Publish a ProcedureStatus sample (write-on-change)."""
-        status = ProcedureStatus(
-            procedure_id=self._procedure_id,
-            phase=phase,
-            status_message=message,
-        )
-        self._status_writer.write(status)
-        self._last_phase = phase
-        log.notice(
-            f"ProcedureStatus published: procedure={self._procedure_id}, "
-            f"phase={phase}"
-        )
-
     @property
     def procedure_id(self) -> str:
         """Return the procedure ID."""
@@ -156,7 +138,6 @@ class ProcedureContextService(Service):
         self._stop_event = asyncio.Event()
         self._start()
         self.publish_context(room=self._room_id)
-        self.publish_status(ProcedurePhase.PRE_OP, message="Initializing")
         self._state_val = ServiceState.RUNNING
 
         await self._stop_event.wait()

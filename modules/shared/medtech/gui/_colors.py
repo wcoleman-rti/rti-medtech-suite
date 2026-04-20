@@ -80,6 +80,12 @@ STATUS_COLORS = {
     "STOPPING": ("#FFF3E0", _semantic["warning"]),
     "DISCONNECTED": ("#ECEFF1", _neutral["500"]),
     "UNKNOWN": ("#ECEFF1", _neutral["500"]),
+    # Procedure phase labels
+    "PRE-OP": ("#E3F2FD", _semantic["info"]),
+    "IN PROGRESS": ("#E8F5E9", _semantic["success"]),
+    "COMPLETING": ("#FFF3E0", _semantic["warning"]),
+    "COMPLETED": ("#F5F5F5", "#63666A"),
+    "ALERT": ("#FFEBEE", _semantic["critical"]),
 }
 
 STATUS_COLORS_DARK = {
@@ -100,4 +106,10 @@ STATUS_COLORS_DARK = {
     "STOPPING": ("#3B2510", "#FFA726"),
     "DISCONNECTED": ("#2D3139", BRAND_COLORS["light_gray"]),
     "UNKNOWN": ("#2D3139", _neutral["500"]),
+    # Procedure phase labels
+    "PRE-OP": ("#0D2744", "#42A5F5"),
+    "IN PROGRESS": ("#1B3A26", "#66BB6A"),
+    "COMPLETING": ("#3B2510", "#FFA726"),
+    "COMPLETED": ("#2D3139", "#BBBCBC"),
+    "ALERT": ("#3B1515", "#EF5350"),
 }

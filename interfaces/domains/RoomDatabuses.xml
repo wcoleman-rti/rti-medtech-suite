@@ -78,13 +78,16 @@
         </domain>
 
         <!--
-            Room Observability databus (Domain 19)
+            Room Observability databus — Domain ID 19 (reserved)
             Monitoring Library 2.0 per-room telemetry. Collector Service
             subscribes here and forwards to the Hospital Observability databus.
             No registered types or topics (Monitoring Library manages its
             own entities on this domain).
+
+            Commented out: empty domain elements cause Routing Service
+            XML validation errors.
         -->
-        <domain name="Observability" domain_id="19"/>
+        <!-- <domain name="Observability" domain_id="19"/> -->
 
     </domain_library>
 

@@ -29,7 +29,8 @@
 
         <!--
             OperationalPub — operational tag publisher
-            Publishes: ProcedureContext, ProcedureStatus, CameraFrame, CameraConfig
+            Publishes: ProcedureContext, CameraFrame, CameraConfig
+            Subscribes: ProcedureContext, ProcedureStatus
             Used by: procedure context publisher, camera simulator
         -->
         <domain_participant name="OperationalPub"
@@ -50,11 +51,6 @@
                 <data_writer name="ProcedureContextWriter"
                              topic_ref="ProcedureContext">
                     <datawriter_qos base_name="TopicProfiles::ProcedureContext"/>
-                </data_writer>
-
-                <data_writer name="ProcedureStatusWriter"
-                             topic_ref="ProcedureStatus">
-                    <datawriter_qos base_name="TopicProfiles::ProcedureStatus"/>
                 </data_writer>
 
                 <data_writer name="CameraFrameWriter"
@@ -349,10 +345,11 @@
         </domain_participant>
 
         <!--
-            ProcedureController_Procedure_Operational — Controller's read-only
-            view of procedure metadata (Procedure operational databus).
-            Used by: Procedure Controller (hospital-dashboard)
-            Reads: ProcedureStatus, ProcedureContext
+            ProcedureController_Procedure_Operational — Controller's
+            operational-tag participant on the Procedure databus.
+            Publishes: ProcedureStatus (lifecycle authority)
+            Reads: ProcedureContext
+            Used by: Procedure Controller
         -->
         <domain_participant name="ProcedureController_Procedure_Operational"
                             domain_ref="Room::Procedure_operational">
@@ -367,12 +364,14 @@
                 </property>
             </domain_participant_qos>
 
-            <subscriber name="ControllerProcOpSubscriber">
-                <data_reader name="ProcedureStatusReader"
+            <publisher name="ControllerProcOpPublisher">
+                <data_writer name="ProcedureStatusWriter"
                              topic_ref="ProcedureStatus">
-                    <datareader_qos base_name="TopicProfiles::ProcedureStatus"/>
-                </data_reader>
+                    <datawriter_qos base_name="TopicProfiles::ProcedureStatus"/>
+                </data_writer>
+            </publisher>
 
+            <subscriber name="ControllerProcOpSubscriber">
                 <data_reader name="ProcedureContextReader"
                              topic_ref="ProcedureContext">
                     <datareader_qos base_name="TopicProfiles::ProcedureContext"/>

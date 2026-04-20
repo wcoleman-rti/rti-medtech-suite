@@ -165,7 +165,7 @@ class TestDockgraphLabel:
     """Verify DockGraph container has medtech.dynamic=true label."""
 
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
-    @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._next_operator_gui_port", return_value=8081)
     @patch("medtech.cli._or._running_networks", return_value=[])
     @patch("medtech.cli._or._detect_hospitals")
     @patch("medtech.cli._or._ensure_network")
@@ -188,7 +188,7 @@ class TestDockgraphLabel:
         mock_ensure_net,
         mock_hosp,
         mock_or_nets,
-        mock_port,
+        mock_operator_gui_port,
         mock_ctrl_port,
     ) -> None:
         """medtech launch --dockgraph starts DockGraph with dynamic label."""

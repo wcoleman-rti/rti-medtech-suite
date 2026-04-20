@@ -146,7 +146,7 @@ Update all other vision documents that reference Docker network names:
 - `vision/capabilities.md` — V1.4 split-GUI section
 - `vision/versioning.md` — V1.4 milestone table
 - `vision/nicegui-migration.md` — Docker deployment references
-- `vision/tooling.md` — DockGraph topology example
+- `vision/tooling.md` — topology visualization guidance
 
 ### Test gate
 

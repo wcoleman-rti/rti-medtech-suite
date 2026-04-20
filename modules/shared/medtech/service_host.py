@@ -43,6 +43,9 @@ Time_t = common.Common.Time_t
 ServiceFactory = Callable[[Orchestration.ServiceRequest], Service]
 """Callable(req: Orchestration.ServiceRequest) -> Service"""
 
+StartServiceValidator = Callable[[str, Service, dict[str, "_ServiceSlot"]], None]
+"""Callable(service_id, service, running_slots) -> None"""
+
 
 def req_property(
     req: Orchestration.ServiceRequest, name: str, default: str = ""
@@ -82,6 +85,7 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
         host_id: str,
         capacity: int,
         registry: ServiceRegistryMap,
+        start_service_validator: StartServiceValidator | None = None,
     ) -> None:
         self._host_id = host_id
         self._capacity = capacity
@@ -92,6 +96,7 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
         self._procedure_ids: dict[str, str] = {}  # svc_id → procedure_id
         # pending catalog re-publish flag — set by start/stop, consumed by host
         self._catalog_dirty: set[str] = set()  # svc_ids needing re-publish
+        self._start_service_validator = start_service_validator
 
     def start_service(
         self, req: Orchestration.ServiceRequest
@@ -118,6 +123,8 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
 
         try:
             service = self._registry[svc_id].factory(req)
+            if self._start_service_validator is not None:
+                self._start_service_validator(svc_id, service, self._slots)
             task = asyncio.ensure_future(service.run())
             self._slots[svc_id] = _ServiceSlot(service=service, task=task)
 
@@ -135,10 +142,10 @@ class _ServiceHostControlImpl(Orchestration.ServiceHostControl):
             result.code = Orchestration.OperationResultCode.OK
             result.message = "Service started"
             self._log.info("start_service: OK (service_id=%s)", svc_id)
-        except Exception:
+        except Exception as ex:
             self._log.exception("start_service: INTERNAL_ERROR")
             result.code = Orchestration.OperationResultCode.INTERNAL_ERROR
-            result.message = "Failed to start service"
+            result.message = f"Failed to start service: {ex}"
         return result
 
     def stop_service(self, service_id: str) -> Orchestration.OperationResult:
@@ -258,6 +265,7 @@ class ServiceHost(Service):
         host_name: str,
         capacity: int,
         registry: ServiceRegistryMap,
+        start_service_validator: StartServiceValidator | None = None,
     ) -> None:
         if len(registry) > capacity:
             raise ValueError(
@@ -306,7 +314,12 @@ class ServiceHost(Service):
         self._log.info("Orchestration DataWriters found")
 
         # -- Create the RPC implementation --
-        self._rpc_impl = _ServiceHostControlImpl(host_id, capacity, registry)
+        self._rpc_impl = _ServiceHostControlImpl(
+            host_id,
+            capacity,
+            registry,
+            start_service_validator=start_service_validator,
+        )
 
     async def run(self) -> None:
         self._state_val = ServiceState.STARTING

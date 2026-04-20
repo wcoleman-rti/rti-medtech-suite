@@ -27,7 +27,6 @@ module MedtechEntityNames {
 
         // Writer names — find_datawriter_by_name() / find_datawriter()
         const string PROCEDURE_CONTEXT_WRITER  = "OperationalPublisher::ProcedureContextWriter";
-        const string PROCEDURE_STATUS_WRITER   = "OperationalPublisher::ProcedureStatusWriter";
         const string CAMERA_FRAME_WRITER       = "OperationalPublisher::CameraFrameWriter";
         const string CAMERA_CONFIG_WRITER      = "OperationalPublisher::CameraConfigWriter";
         const string ROBOT_STATE_WRITER        = "RobotPublisher::RobotStateWriter";
@@ -55,11 +54,11 @@ module MedtechEntityNames {
         const string TWIN_ROBOT_ARM_ASSIGNMENT_READER = "TwinSubscriber::RobotArmAssignmentReader";
         const string CTRL_ROBOT_ARM_ASSIGNMENT_READER = "ProcedureControlSubscriber::RobotArmAssignmentReader";
 
-        // ProcedureController_Procedure_Operational — Domain 10 operational reads
+        // ProcedureController_Procedure_Operational — Domain 10 operational
         const string PROCEDURE_CONTROLLER_PROCEDURE_OPERATIONAL =
             "SurgicalParticipants::ProcedureController_Procedure_Operational";
-        const string CTRL_PROCEDURE_STATUS_READER =
-            "ControllerProcOpSubscriber::ProcedureStatusReader";
+        const string CTRL_PROCEDURE_STATUS_WRITER =
+            "ControllerProcOpPublisher::ProcedureStatusWriter";
         const string CTRL_PROCEDURE_CONTEXT_READER =
             "ControllerProcOpSubscriber::ProcedureContextReader";
     };
@@ -82,6 +81,9 @@ module MedtechEntityNames {
         // Controller reader names
         const string CTRL_SERVICE_CATALOG_READER = "ControllerOrchSubscriber::ServiceCatalogReader";
         const string CTRL_SERVICE_STATUS_READER  = "ControllerOrchSubscriber::ServiceStatusReader";
+
+        // Controller writer names
+        const string CTRL_SERVICE_CATALOG_WRITER = "ControllerOrchPublisher::ServiceCatalogWriter";
     };
 
     // --- RoomNav participant (in OrchestrationParticipants library) ---

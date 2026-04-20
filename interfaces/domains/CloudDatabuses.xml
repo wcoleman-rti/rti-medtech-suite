@@ -9,11 +9,14 @@
     <domain_library name="Cloud">
 
         <!--
-            Cloud Enterprise databus (Domain 30) — V3.0
+            Cloud Enterprise databus — Domain ID 30 (reserved, V3.0)
             Multi-facility aggregation: extracted hospital data + cloud-native
             topics. Placeholder — no registered types or topics until V3.0.
+
+            Commented out: empty domain elements cause Routing Service
+            XML validation errors.
         -->
-        <domain name="Enterprise" domain_id="30"/>
+        <!-- <domain name="Enterprise" domain_id="30"/> -->
 
     </domain_library>
 

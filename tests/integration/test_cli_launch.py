@@ -39,7 +39,7 @@ class TestLaunchDistributed:
     """Verify ``medtech launch`` (default distributed scenario)."""
 
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
-    @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._next_operator_gui_port", return_value=8081)
     @patch("medtech.cli._or._running_networks", return_value=[])
     @patch("medtech.cli._or._detect_hospitals")
     @patch("medtech.cli._or._ensure_network")
@@ -58,7 +58,7 @@ class TestLaunchDistributed:
         mock_ensure_net,
         mock_hosp,
         mock_or_nets,
-        mock_port,
+        mock_operator_gui_port,
         mock_ctrl_port,
     ) -> None:
         """medtech launch starts the distributed scenario."""
@@ -79,7 +79,7 @@ class TestLaunchMultiSite:
     """Verify ``medtech launch multi-site``."""
 
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
-    @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._next_operator_gui_port", return_value=8081)
     @patch("medtech.cli._or._running_networks", return_value=[])
     @patch("medtech.cli._or._detect_hospitals")
     @patch("medtech.cli._or._ensure_network")
@@ -98,7 +98,7 @@ class TestLaunchMultiSite:
         mock_ensure_net,
         mock_hosp,
         mock_or_nets,
-        mock_port,
+        mock_operator_gui_port,
         mock_ctrl_port,
     ) -> None:
         """medtech launch multi-site starts two hospitals with 4 ORs total."""
@@ -128,7 +128,7 @@ class TestLaunchMinimal:
     """Verify ``medtech launch minimal``."""
 
     @patch("medtech.cli._or._next_controller_port", return_value=8091)
-    @patch("medtech.cli._or._next_twin_port", return_value=8081)
+    @patch("medtech.cli._or._next_operator_gui_port", return_value=8081)
     @patch("medtech.cli._or._running_networks", return_value=[])
     @patch("medtech.cli._or._detect_hospitals")
     @patch("medtech.cli._or._ensure_network")
@@ -147,7 +147,7 @@ class TestLaunchMinimal:
         mock_ensure_net,
         mock_hosp,
         mock_or_nets,
-        mock_port,
+        mock_operator_gui_port,
         mock_ctrl_port,
     ) -> None:
         """medtech launch minimal starts a single-OR scenario."""

@@ -23,6 +23,12 @@ _STATUS_ICONS: dict[str, str] = {
     "IDLE": "remove_circle_outline",
     "DISCONNECTED": "wifi_off",
     "UNKNOWN": "help_outline",
+    # Procedure phase labels (from _phase_text in dashboard)
+    "PRE-OP": "schedule",
+    "IN PROGRESS": "play_circle",
+    "COMPLETING": "hourglass_bottom",
+    "COMPLETED": "task_alt",
+    "ALERT": "warning",
 }
 
 

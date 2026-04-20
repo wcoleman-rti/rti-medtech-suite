@@ -57,11 +57,19 @@
         <!--
             ProcedureController_Orchestration — Controller's Orchestration databus
             participant. Subscribes to ServiceCatalog and ServiceStatus.
+            Publishes: ServiceCatalog (gui_url advertisements for room GUIs).
             RPC: ServiceHostControl client endpoint.
         -->
         <domain_participant name="ProcedureController_Orchestration"
                             domain_ref="Room::Orchestration">
             <domain_participant_qos base_name="Participants::Transport"/>
+
+            <publisher name="ControllerOrchPublisher">
+                <data_writer name="ServiceCatalogWriter"
+                             topic_ref="ServiceCatalog">
+                    <datawriter_qos base_name="TopicProfiles::ServiceCatalog"/>
+                </data_writer>
+            </publisher>
 
             <subscriber name="ControllerOrchSubscriber">
 

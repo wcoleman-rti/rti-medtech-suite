@@ -112,13 +112,12 @@ client-side routing internally. But the current code uses `@ui.page("/")`
 
 4. **Standalone page self-sufficiency**:
    - Each GUI module's `*_page()` function (guarded behind `__main__`)
-     must render a self-contained page: header bar, theme toggle, and
-     a "← Return to Controller" link.
-   - The return link targets the controller's URL. In the initial
-     implementation, this can be configured via an environment variable
-     (`MEDTECH_CONTROLLER_URL`). A future enhancement can discover it
-     from `ServiceCatalog` via a dedicated `controller_url` well-known
-     property, or via the controller's own `gui_url`.
+     must render a self-contained page: header bar and theme toggle.
+   - Navigation to sibling GUIs (e.g., "Return to Controller", "View Twin")
+     is handled dynamically via the `RoomNav` discovery mechanism, which
+     discovers other GUIs running in the same room via `ServiceCatalog`.
+     This replaces the previous approach of hard-coding URLs via environment
+     variables like `MEDTECH_CONTROLLER_URL` or `MEDTECH_TWIN_URL`.
 
 5. **Add active-nav highlighting** to the sidebar drawer:
    - Use `ui.context.client.sub_pages_router.on_path_changed()` to track

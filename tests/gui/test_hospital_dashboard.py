@@ -395,6 +395,7 @@ class TestDashboardPage:
                 rooms={},
                 severity_filter="ALL",
                 room_filter="ALL",
+                _revision=0,
                 filtered_alerts=lambda: [
                     dashboard_module.AlertEntry(
                         alert_id="alert-001",
@@ -678,6 +679,7 @@ class TestResourcePanel:
                 rooms={},
                 severity_filter="ALL",
                 room_filter="ALL",
+                _revision=0,
                 filtered_alerts=lambda: [],
             ),
         )

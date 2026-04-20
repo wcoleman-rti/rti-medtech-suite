@@ -59,6 +59,7 @@ def offset_domain(base_id: int) -> int:
 _SERVICE_HOST_PATTERNS = [
     "surgical_procedure.clinical_service_host",
     "surgical_procedure.operational_service_host",
+    "surgical_procedure.operator_service_host",
     "robot-service-host",
 ]
 
